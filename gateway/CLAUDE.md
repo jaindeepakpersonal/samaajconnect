@@ -62,6 +62,7 @@ works whether you curl a service directly or go through here.
 
 ```
 UseAuthentication            → the override check needs to know if the caller is a Super Admin
+UseRateLimiter               → before tenant resolution: a rejected request should not cost a Samaaj lookup
 TenantResolutionMiddleware   → strips forged headers, resolves the Samaaj, injects X-Tenant-Id
 MapReverseProxy
   └── ModuleGateMiddleware   → inside the proxy pipeline, where the route metadata exists
@@ -108,6 +109,19 @@ request rather than once per session.
 matching. That is not hypothetical: the override check passed its unit tests
 and failed against a real token, because the tests built the principal by hand.
 
+**Rate limiting is per source address and deliberately loose.** `/login`,
+`/activations/redeem` and `/register` carry policies; everything else is
+unlimited. The limits are set well above any plausible human volume because
+Indian mobile carriers put very large numbers of subscribers behind one address
+- they exist to make scripted attacks expensive, not to police individuals, and
+the per-account lockout in identity-tenant-service is what protects a specific
+person. Put a proxy in front of this and you must configure
+`ForwardedHeaders`, or every request partitions into one bucket and the limit
+becomes a global cap.
+
+Those three routes are declared above the identity catch-all with a lower
+`Order` purely so they can carry a policy; they proxy to the same cluster.
+
 ## Configuration
 
 | Key | Purpose |
@@ -116,6 +130,10 @@ and failed against a real token, because the tests built the principal by hand.
 | `Gateway__TenantCacheSeconds` | Cache TTL; also how long deactivating a Samaaj takes to bite |
 | `Redis__ConnectionString` | Optional. Absent means no caching, not a failure |
 | `Jwt__SigningKey` | Must match the key `identity-tenant-service` signs with |
+| `RateLimiting__Enabled` | Set false only in a host that must make hundreds of credential attempts on purpose |
+| `RateLimiting__CredentialAttemptsPerWindow` | Sign-in and activation attempts per source per window |
+| `RateLimiting__RegistrationsPerWindow` | Registrations per source per window |
+| `RateLimiting__WindowSeconds` | Window length, default 60 |
 
 ## Testing
 

@@ -1,4 +1,5 @@
 using FluentValidation;
+using Sangam.MemberFamily.Domain.Common;
 using Sangam.MemberFamily.Domain.Members;
 
 namespace Sangam.MemberFamily.Application.Members.Commands.UpdateProfile;
@@ -11,7 +12,11 @@ public sealed class UpdateProfileCommandValidator : AbstractValidator<UpdateProf
     {
         RuleFor(x => x.MemberId).NotEmpty();
         RuleFor(x => x.FullName).NotEmpty().MaximumLength(200);
-        RuleFor(x => x.PhotoUrl).MaximumLength(2048);
+        RuleFor(x => x.PhotoUrl)
+            .Must(ImageUrl.IsAcceptable)
+            .WithMessage(
+                "A photo link must be a full http:// or https:// web address. "
+                + "Scripted and inline links are not accepted.");
         RuleFor(x => x.Mobile).MaximumLength(20);
         RuleFor(x => x.Email).MaximumLength(320);
         RuleFor(x => x.Address).MaximumLength(500);

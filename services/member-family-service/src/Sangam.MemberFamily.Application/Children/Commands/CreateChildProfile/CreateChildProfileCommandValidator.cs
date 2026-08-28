@@ -1,4 +1,5 @@
 using FluentValidation;
+using Sangam.MemberFamily.Domain.Common;
 using Sangam.MemberFamily.Domain.Members;
 
 namespace Sangam.MemberFamily.Application.Children.Commands.CreateChildProfile;
@@ -8,7 +9,11 @@ public sealed class CreateChildProfileCommandValidator : AbstractValidator<Creat
     public CreateChildProfileCommandValidator()
     {
         RuleFor(x => x.FullName).NotEmpty().MaximumLength(200);
-        RuleFor(x => x.PhotoUrl).MaximumLength(2048);
+        RuleFor(x => x.PhotoUrl)
+            .Must(ImageUrl.IsAcceptable)
+            .WithMessage(
+                "A photo link must be a full http:// or https:// web address. "
+                + "Scripted and inline links are not accepted.");
 
         RuleFor(x => x.DateOfBirth)
             .Must(value => value <= DateOnly.FromDateTime(DateTime.UtcNow))

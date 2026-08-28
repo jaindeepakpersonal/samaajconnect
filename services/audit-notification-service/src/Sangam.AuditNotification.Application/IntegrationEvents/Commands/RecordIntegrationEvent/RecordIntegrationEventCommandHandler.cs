@@ -47,7 +47,8 @@ public sealed class RecordIntegrationEventCommandHandler(
             clock.UtcNow,
             actorUserId: ReadGuid(payload, descriptor.ActorIdProperty),
             entityName: descriptor.EntityName,
-            entityId: ReadString(payload, descriptor.EntityIdProperty)));
+            entityId: ReadString(payload, descriptor.EntityIdProperty),
+            beforeState: ReadBefore(payload, descriptor.BeforeProperties)));
 
         var notificationRaised = await TryRaiseNotificationAsync(
             envelope, descriptor, payload, cancellationToken);
@@ -113,6 +114,32 @@ public sealed class RecordIntegrationEventCommandHandler(
 
             return null;
         }
+    }
+
+    /// <summary>
+    /// The named properties, as a small JSON object, or null when this event
+    /// describes nothing that existed before it.
+    /// </summary>
+    private static string? ReadBefore(JsonElement? payload, IReadOnlyList<string>? properties)
+    {
+        if (properties is null or { Count: 0 }
+            || payload is not { } element
+            || element.ValueKind != JsonValueKind.Object)
+        {
+            return null;
+        }
+
+        var captured = properties
+            .Where(name => element.TryGetProperty(name, out _))
+            .ToDictionary(name => name, name => element.GetProperty(name).GetRawText());
+
+        if (captured.Count == 0)
+        {
+            return null;
+        }
+
+        return "{" + string.Join(",", captured.Select(pair =>
+            $"{JsonSerializer.Serialize(pair.Key)}:{pair.Value}")) + "}";
     }
 
     private static Guid? ReadGuid(JsonElement? payload, string? property) =>

@@ -35,8 +35,8 @@ public sealed class WithdrawConsentCommandHandler(
             // The right answer is erasure, which is a different request.
             return Result.Failure<IReadOnlyList<ConsentStateResponse>>(Error.Conflict(
                 "Consent.Required",
-                "This consent is what your membership rests on. To withdraw it, ask your "
-                + "Samaaj administrator to erase your account."));
+                "This consent is what your membership rests on. To withdraw it, erase your "
+                + "account instead."));
         }
 
         var user = await users.GetByIdAsync(userId, cancellationToken);

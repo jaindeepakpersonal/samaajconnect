@@ -80,6 +80,7 @@ tenant is reported as 404 rather than as a distinct state, for the same reason.
 | `AdminInvitedDomainEvent` | `identity.admin.invited.v1` | `User.Invite` |
 | `UserRoleGrantedDomainEvent` | `identity.user.role-granted.v1` | `User.GrantRole` |
 | `UserRoleRevokedDomainEvent` | `identity.user.role-revoked.v1` | `User.RevokeRole` |
+| (no aggregate) | `identity.member-data.exported.v1` | `DataExportRecorder` |
 
 Delivery is at-least-once by design (see `Messaging/OutboxDispatcher.cs`).
 Consumers must be idempotent.
@@ -355,6 +356,28 @@ than Added and the save fails against a row that was never there. This is the
 same trap member-family-service's `CLAUDE.md` records for `Family` and
 `FamilyMember`; it stayed hidden here until `GrantRole` started adding a role to
 a `User` that was already loaded. Apply it to any domain-assigned key.
+
+**A cross-tenant write is refused at `SaveChanges`, not only by the
+handler.** `TenantWriteGuard` compares every added or modified
+`ITenantScopedEntity` against `ITenantContext.TenantId` and throws when they
+disagree. Handlers still do their own check - a 404 saying no such row exists in
+this Samaaj is a far better answer than an exception - but a handler that
+forgets one looks exactly like one that does not need it, so the rule is also
+enforced where it cannot be skipped. The guard is silent when no tenant is
+resolved, because consumers legitimately have none.
+
+**A data export is announced, and the announcement carries no data.** An export
+hands out a complete copy of a person's data, which makes it more worth
+recording than most of what already is (SECURITY-CHECKLIST.md) - and until this
+it was the one operation leaving no trace at all. The event carries ids and a
+timestamp only: putting the export's contents into an append-only audit table
+would make the record of the copy a second copy.
+
+`DataExportRecorder` writes on its own scope, like `IFailedLoginRecorder`, for
+a related reason: the export is a *query*, so no transaction is open and no unit
+of work will be committed on its behalf. It also swallows its own failures. A
+member's right to a copy of their data does not depend on our bookkeeping
+succeeding.
 
 ## Dependencies
 

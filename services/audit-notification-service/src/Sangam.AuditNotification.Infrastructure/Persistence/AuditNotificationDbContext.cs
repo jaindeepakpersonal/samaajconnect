@@ -64,6 +64,7 @@ public sealed class AuditNotificationDbContext(
 
     public override async Task<int> SaveChangesAsync(CancellationToken cancellationToken = default)
     {
+        TenantWriteGuard.Verify(ChangeTracker, tenantContext);
         DrainDomainEventsToOutbox();
 
         return await base.SaveChangesAsync(cancellationToken);
@@ -71,6 +72,7 @@ public sealed class AuditNotificationDbContext(
 
     public override int SaveChanges()
     {
+        TenantWriteGuard.Verify(ChangeTracker, tenantContext);
         DrainDomainEventsToOutbox();
 
         return base.SaveChanges();

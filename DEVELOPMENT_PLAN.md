@@ -7,17 +7,19 @@ version of the plan; the reasoning behind the ordering lives in
 
 ## Current Status
 
-- **Stage:** Stage 0 complete; Phase 1 - Platform Foundation in progress
-- **Last updated:** 2026-08-28 - the admin portal: an Angular SPA with the
-  Samaaj list and module toggles, administrators and role assignment, the role
-  matrix, the conversion queue and the audit log, all against real endpoints.
-  511 tests green (452 backend, 59 frontend) plus 79 smoke checks against a
-  stack built from empty volumes.
-- **Blocking item:** none. Next: a `docs/product/SECURITY-CHECKLIST.md` pass
-  over the Stage-0 and Phase-1 services, which is the last item standing
-  between Phase 1 and Phase 2. The five questions in
-  `docs/product/DPDP-COMPLIANCE.md` need counsel before Phase 1 ships to real
-  users; none blocks work today.
+- **Stage:** Stage 0 complete; Phase 1 - Platform Foundation nearly done
+- **Last updated:** 2026-08-29 - a full `SECURITY-CHECKLIST.md` pass over the
+  three services and the gateway. 535 tests green (476 backend, 59 frontend)
+  plus 81 smoke checks against a stack built from empty volumes.
+- **Blocking item:** none. Five Phase 1 items remain, all of them known and
+  none blocking: session revocation, step-up auth on deactivating a Samaaj, a
+  member-portal surface for the DPDP rights, an editable role matrix, and the
+  two DPDP obligations that need a notification channel first. The checklist
+  now records what is asserted and what is missing rather than reading as
+  though it were all done. The five questions in
+  `docs/product/DPDP-COMPLIANCE.md` need counsel before this ships to real
+  users. Next: either session revocation, which is the largest open security
+  item, or Phase 2.
 
 *(Update these three lines at the start/end of every work session —
 they're what a coding agent or a teammate should read first to know
@@ -117,8 +119,22 @@ unit tested.
       editable needs per-tenant role definitions, an audit trail of matrix
       changes, and a floor of permissions no edit may remove. See
       "The admin surface" in `services/identity-tenant-service/CLAUDE.md`
-- [ ] `docs/product/SECURITY-CHECKLIST.md` pass on both Stage-0 +
-      Phase-1 services
+- [x] `docs/product/SECURITY-CHECKLIST.md` pass on both Stage-0 +
+      Phase-1 services. Every box walked against the code; the file now records
+      what is asserted, what is missing and where each gap is tracked. Added on
+      the way: a `TenantWriteGuard` that refuses a cross-tenant write at
+      `SaveChanges` whatever the handler did, per-source rate limits at the
+      gateway, before-state on corrections and status changes, audit events for
+      data exports, and validation of the photo links that were previously only
+      length-checked
+- [ ] Session revocation: refresh tokens, rotation, and a server-side
+      revocation list, plus the `POST /v1/identity/logout` that
+      `API-CONTRACTS.md` already promises. Today a token is valid until it
+      expires and signing out only discards it locally, which is the largest
+      open item in `SECURITY-CHECKLIST.md`
+- [ ] Step-up authentication on deactivating a Samaaj. Erasing an account
+      already re-asks for the password; deactivating a whole Samaaj is at least
+      as consequential and does not
 
 ## Phase 2 — Social & Community Engagement
 
@@ -144,6 +160,17 @@ unit tested.
 
 - [ ] `boli-service`
 - [ ] Full `SECURITY-CHECKLIST.md` pass across every service
+- [ ] HTTPS-only in production: TLS termination, HSTS, secure-cookie policy,
+      and `ForwardedHeaders` so the gateway rate limiter partitions on the real
+      caller rather than on the proxy
+- [ ] Platform-hosted images, replacing the client-supplied `PhotoUrl` and
+      `LogoUrl`. Those are now validated as absolute http(s) URLs, which stops
+      `javascript:` links, but a photo hosted anywhere still sends every
+      viewer's IP to that host - and on a `ChildProfile` that is the
+      third-party tracking of children DPDP s.9(3) prohibits. Storage also makes
+      the file-handling half of `SECURITY-CHECKLIST.md` live: size and type
+      limits, virus scanning, and per-request authorization rather than an
+      unguessable URL
 - [ ] Tenant-isolation penetration testing (attempt cross-tenant IDOR
       on every write endpoint)
 - [ ] Accessibility pass (WCAG 2.1 AA) on both Angular apps

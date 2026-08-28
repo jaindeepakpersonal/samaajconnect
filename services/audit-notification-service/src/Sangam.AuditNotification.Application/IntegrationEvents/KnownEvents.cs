@@ -3,12 +3,27 @@ using System.Text.Json;
 namespace Sangam.AuditNotification.Application.IntegrationEvents;
 
 /// <summary>How one topic should be recorded, and whether it deserves a notification.</summary>
+/// <param name="BeforeProperties">
+/// Payload properties describing the state *before* this event, recorded into
+/// AuditLog.BeforeState. SECURITY-CHECKLIST.md asks for before/after on
+/// corrections and status changes rather than only on creations: "it changed"
+/// is not an audit trail if nobody can tell what it changed from.
+///
+/// Named properties rather than the whole payload, because the payload is
+/// stored verbatim in an append-only table. A status or a set of module keys
+/// is safe to keep forever; a member's previous mobile number is not, and
+/// copying one here would put personal data somewhere deliberately hard to
+/// redact. Where the before-state is personal, the event carries the names of
+/// the fields that changed instead of their values - see
+/// members.profile.updated.v1.
+/// </param>
 public sealed record EventDescriptor(
     string Action,
     string EntityName,
     string? EntityIdProperty,
     string? ActorIdProperty = null,
-    Func<JsonElement, NotificationSpec?>? Notification = null);
+    Func<JsonElement, NotificationSpec?>? Notification = null,
+    IReadOnlyList<string>? BeforeProperties = null);
 
 public sealed record NotificationSpec(Guid? RecipientUserId, string Title, string Body);
 
@@ -33,7 +48,8 @@ public static class KnownEvents
         ["identity.tenant.status-changed.v1"] = new(
             Action: "TenantStatusChanged",
             EntityName: "Tenant",
-            EntityIdProperty: "tenantId"),
+            EntityIdProperty: "tenantId",
+            BeforeProperties: ["previousStatus"]),
 
         ["identity.user.registered.v1"] = new(
             Action: "UserRegistered",
@@ -90,10 +106,30 @@ public static class KnownEvents
             EntityIdProperty: "userId",
             ActorIdProperty: "revokedBy"),
 
+        // A correction to a member's own details. The before-state is the list
+        // of field names that changed, never their values: those are personal
+        // data, and this table is append-only.
+        ["members.profile.updated.v1"] = new(
+            Action: "MemberProfileUpdated",
+            EntityName: "MemberProfile",
+            EntityIdProperty: "memberId",
+            ActorIdProperty: "updatedBy",
+            BeforeProperties: ["changedFields"]),
+
         ["identity.tenant.modules-changed.v1"] = new(
             Action: "TenantModulesChanged",
             EntityName: "Tenant",
-            EntityIdProperty: "tenantId"),
+            EntityIdProperty: "tenantId",
+            BeforeProperties: ["previousModules"]),
+
+        // A complete copy of somebody's data left the platform. The event
+        // carries ids and a timestamp only - recording what was in the export
+        // would make the record of the copy a second copy.
+        ["identity.member-data.exported.v1"] = new(
+            Action: "MemberDataExported",
+            EntityName: "User",
+            EntityIdProperty: "userId",
+            ActorIdProperty: "userId"),
 
         // Erasure is handled by ErasePersonalDataCommandHandler rather than
         // recorded through this path, and it writes its own row with no actor

@@ -120,10 +120,38 @@ public sealed class MemberProfile : AggregateRoot, ITenantScopedEntity
         string? locality,
         string? profession,
         FieldPrivacy privacy,
-        DateTimeOffset updatedAt)
+        DateTimeOffset updatedAt,
+        Guid updatedBy)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(fullName);
         ArgumentNullException.ThrowIfNull(privacy);
+
+        // Which fields changed, recorded before anything is overwritten.
+        // SECURITY-CHECKLIST.md asks for a before-state on corrections, and a
+        // Samaaj admin correcting a member's details is exactly that: an audit
+        // row saying only "profile updated" cannot answer what was changed.
+        //
+        // Names, never values. The audit service stores payloads verbatim in an
+        // append-only table, and a member's previous mobile number or address
+        // is personal data that would then be deliberately hard to redact.
+        // Knowing which field an administrator touched is what the audit
+        // question actually needs.
+        var changed = new List<string>();
+
+        Note(changed, nameof(FullName), FullName, fullName.Trim());
+        Note(changed, nameof(PhotoUrl), PhotoUrl, Normalize(photoUrl));
+        Note(changed, nameof(DateOfBirth), DateOfBirth?.ToString("O"), dateOfBirth?.ToString("O"));
+        Note(changed, nameof(Gender), Gender.ToString(), gender.ToString());
+        Note(changed, nameof(Mobile), Mobile, Normalize(mobile));
+        Note(changed, nameof(Email), Email, Normalize(email)?.ToLowerInvariant());
+        Note(changed, nameof(Address), Address, Normalize(address));
+        Note(changed, nameof(Locality), Locality, Normalize(locality));
+        Note(changed, nameof(Profession), Profession, Normalize(profession));
+
+        if (!Privacy.Equals(privacy))
+        {
+            changed.Add(nameof(Privacy));
+        }
 
         FullName = fullName.Trim();
         PhotoUrl = Normalize(photoUrl);
@@ -137,7 +165,16 @@ public sealed class MemberProfile : AggregateRoot, ITenantScopedEntity
         Privacy = privacy;
         UpdatedAt = updatedAt;
 
-        Raise(new MemberProfileUpdatedDomainEvent(Id, TenantId, FullName, updatedAt));
+        Raise(new MemberProfileUpdatedDomainEvent(
+            Id, TenantId, FullName, changed, updatedBy, updatedAt));
+    }
+
+    private static void Note(List<string> changed, string field, string? before, string? after)
+    {
+        if (!string.Equals(before, after, StringComparison.Ordinal))
+        {
+            changed.Add(field);
+        }
     }
 
     /// <summary>

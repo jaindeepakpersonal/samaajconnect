@@ -37,7 +37,7 @@ enforced by `TenantAuthorizationBehavior`, not just UI hiding.
 | GET | `/admins` | `SuperAdmin`, `SamaajAdmin` + `AdminUsers.Manage` | This Samaaj's administrators and their roles |
 | POST | `/admins` | `SuperAdmin`, `SamaajAdmin` + `AdminUsers.Manage` | Invite an administrator; returns a one-time activation code |
 | PUT | `/admins/{userId}/roles/{role}` | `SuperAdmin`, `SamaajAdmin` + `AdminUsers.Manage` | Grant or revoke one role, body `{"granted":bool}` |
-| POST | `/logout` | Authenticated | Revoke current session/refresh token |
+| POST | `/logout` | Authenticated | Revoke current session/refresh token — **not built**; there are no refresh tokens and no server-side revocation yet, so signing out only discards the token in the browser. See `SECURITY-CHECKLIST.md` |
 | GET | `/me` | Authenticated | Current user + roles + tenant |
 
 > The original draft named these `/admin-users` and `PATCH /admin-users/{id}/roles`. They

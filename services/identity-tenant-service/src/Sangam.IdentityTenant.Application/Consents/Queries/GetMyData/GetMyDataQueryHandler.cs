@@ -9,6 +9,7 @@ public sealed class GetMyDataQueryHandler(
     IUserRepository users,
     ITenantRepository tenants,
     IConsentRepository consents,
+    IDataExportRecorder exportRecorder,
     ICurrentUser currentUser,
     IDateTimeProvider clock)
     : IRequestHandler<GetMyDataQuery, Result<MyDataResponse>>
@@ -30,6 +31,13 @@ public sealed class GetMyDataQueryHandler(
             return Result.Failure<MyDataResponse>(
                 Error.NotFound("User.NotFound", "This account no longer exists."));
         }
+
+        // An export produces a complete copy of a person's data, which makes it
+        // more worth recording than most of what already is
+        // (SECURITY-CHECKLIST.md). Deliberately before the response is built:
+        // an export that happened must leave a record even if assembling it
+        // then fails.
+        await exportRecorder.RecordAsync(user.Id, user.TenantId, cancellationToken);
 
         var tenant = await tenants.GetByIdAsync(user.TenantId, cancellationToken);
         var authorization = await users.GetAuthorizationAsync(user.Id, user.TenantId, cancellationToken);

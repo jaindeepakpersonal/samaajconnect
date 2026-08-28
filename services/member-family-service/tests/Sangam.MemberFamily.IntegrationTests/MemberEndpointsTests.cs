@@ -67,7 +67,7 @@ public sealed class MemberEndpointsTests(MemberFamilyApiFactory factory)
                 PrivacyLevel.Private,
                 PrivacyLevel.SamaajOnly,
                 PrivacyLevel.Private),
-            DateTimeOffset.UtcNow);
+            DateTimeOffset.UtcNow, Guid.NewGuid());
 
         db.MemberProfiles.Add(profile);
         await db.SaveChangesAsync();

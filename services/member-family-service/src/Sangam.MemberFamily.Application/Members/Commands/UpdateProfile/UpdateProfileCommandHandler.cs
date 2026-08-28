@@ -55,7 +55,10 @@ public sealed class UpdateProfileCommandHandler(
             command.Locality,
             command.Profession,
             ToFieldPrivacy(command.Privacy),
-            clock.UtcNow);
+            clock.UtcNow,
+            // Recorded on the event so the audit row can tell a member fixing
+            // their own details apart from an admin correcting them.
+            currentUser.UserId ?? profile.Id);
 
         await unitOfWork.SaveChangesAsync(cancellationToken);
 

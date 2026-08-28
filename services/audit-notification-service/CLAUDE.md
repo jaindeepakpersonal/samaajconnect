@@ -139,6 +139,18 @@ reach properties whose setters are private on an aggregate that exposes no
 mutating method at all. There is an integration test against a real Postgres,
 because none of that is provable against a substituted repository.
 
+**A before-state is recorded for corrections and status changes.**
+SECURITY-CHECKLIST.md asks for it, and "something changed" is not an audit
+trail if nobody can tell what it changed from. `EventDescriptor.BeforeProperties`
+names which payload properties describe the prior state; they land in
+`AuditLog.BeforeState`.
+
+Named properties rather than the whole payload, because the payload is kept
+verbatim forever. A previous status or set of module keys is safe to keep; a
+member's previous mobile number is not. Where the before-state would be personal
+data the event carries the *names* of the fields that changed instead of their
+values - see `members.profile.updated.v1`.
+
 ## Dependencies
 
 - **Postgres** `samaajconnect_audit_notification` — `ConnectionStrings__Default`

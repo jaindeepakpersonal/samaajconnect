@@ -42,7 +42,7 @@ public sealed class ErasureConsumerTests(MemberFamilyApiFactory factory)
         profile.Update(
             "Ravi Shah", null, new DateOnly(1985, 4, 2), Gender.Male,
             "9876543210", "ravi@example.com", "12 Temple Road", "Ghatkopar",
-            "Chartered Accountant", FieldPrivacy.Default, DateTimeOffset.UtcNow);
+            "Chartered Accountant", FieldPrivacy.Default, DateTimeOffset.UtcNow, Guid.NewGuid());
 
         db.MemberProfiles.Add(profile);
 

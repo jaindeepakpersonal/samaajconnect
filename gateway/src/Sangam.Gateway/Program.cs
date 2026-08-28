@@ -95,6 +95,15 @@ builder.Services
 
 builder.Services.AddAuthorization();
 
+var rateLimits = builder.Configuration
+    .GetSection(GatewayRateLimitOptions.SectionName)
+    .Get<GatewayRateLimitOptions>() ?? new GatewayRateLimitOptions();
+
+if (rateLimits.Enabled)
+{
+    builder.Services.AddGatewayRateLimiting(rateLimits);
+}
+
 var app = builder.Build();
 
 app.MapGet("/health", () => Results.Ok(new { status = "healthy" }));
@@ -104,6 +113,14 @@ app.MapGet("/health", () => Results.Ok(new { status = "healthy" }));
 // service re-checks roles and permissions itself, and the gateway is a filter
 // rather than the authorization boundary (ARCHITECTURE.md section 6).
 app.UseAuthentication();
+
+// Ahead of tenant resolution and the proxy: a request being rejected for
+// volume should cost as little as possible, and certainly should not cost a
+// lookup of the Samaaj it claims to belong to.
+if (rateLimits.Enabled)
+{
+    app.UseRateLimiter();
+}
 
 app.UseMiddleware<TenantResolutionMiddleware>();
 

@@ -221,6 +221,53 @@ public sealed class ErasureEndpointTests(IdentityTenantApiFactory factory)
 
         after.Should().Be(0);
     }
+
+    [Fact]
+    public async Task Exporting_your_data_is_recorded_as_an_event()
+    {
+        // SECURITY-CHECKLIST.md: an export produces a complete copy of a
+        // person's data, and until this it was the one operation that left no
+        // trace at all.
+        var client = await SignedInMemberAsync();
+
+        var response = await client.GetAsync("/v1/identity/me/data-export");
+
+        response.StatusCode.Should().Be(HttpStatusCode.OK);
+
+        var outbox = await factory.WithDbContextAsync(db =>
+            db.OutboxMessages.AsNoTracking()
+                .Where(m => m.Topic == "identity.member-data.exported.v1")
+                .ToListAsync());
+
+        outbox.Should().ContainSingle();
+
+        // Ids and a timestamp. Recording what was in the export would make the
+        // record of the copy a second copy.
+        outbox[0].Payload.Should().NotContain("Ravi");
+        outbox[0].Payload.Should().NotContain(Member);
+    }
+
+    [Fact]
+    public async Task The_export_still_succeeds_when_it_cannot_be_recorded()
+    {
+        // A member's right to a copy of their data (DPDP s.11) does not depend
+        // on the platform's bookkeeping working.
+        var client = await SignedInMemberAsync();
+
+        var first = await client.GetAsync("/v1/identity/me/data-export");
+        var second = await client.GetAsync("/v1/identity/me/data-export");
+
+        first.StatusCode.Should().Be(HttpStatusCode.OK);
+        second.StatusCode.Should().Be(HttpStatusCode.OK);
+
+        // Two exports, two records: this is not deduplicated, because each one
+        // really did hand out a copy.
+        var recorded = await factory.WithDbContextAsync(db =>
+            db.OutboxMessages.AsNoTracking()
+                .CountAsync(m => m.Topic == "identity.member-data.exported.v1"));
+
+        recorded.Should().Be(2);
+    }
     [Fact]
     public async Task Erasing_needs_a_token()
     {

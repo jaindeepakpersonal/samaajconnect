@@ -39,6 +39,7 @@ public static class DependencyInjection
         services.AddSingleton<IPasswordHasher, PasswordHasher>();
         services.AddScoped<ITokenIssuer, JwtTokenIssuer>();
         services.AddScoped<IFailedLoginRecorder, FailedLoginRecorder>();
+        services.AddScoped<IDataExportRecorder, DataExportRecorder>();
         services.AddScoped<IFailedActivationRecorder, FailedActivationRecorder>();
 
         // Bound and validated here rather than in Api: this service issues

@@ -80,14 +80,34 @@ check "the Samaaj directory is public" 200 "$(status "$GATEWAY/v1/identity/tenan
 
 echo
 echo "Super Admin signs in"
-ADMIN_TOKEN=$(curl -s -X POST "$GATEWAY/v1/identity/login" \
-  -H 'Content-Type: application/json' \
-  -d "{\"mobileOrEmail\":\"$SUPERADMIN\",\"password\":\"$SUPERADMIN_PASSWORD\"}" | json_field accessToken)
+sign_in_super_admin() {
+  curl -s -X POST "$GATEWAY/v1/identity/login" \
+    -H 'Content-Type: application/json' \
+    -d "{\"mobileOrEmail\":\"$SUPERADMIN\",\"password\":\"$SUPERADMIN_PASSWORD\"}" \
+    | json_field accessToken
+}
+
+ADMIN_TOKEN=$(sign_in_super_admin)
+
+# The rate-limit section at the end of this script deliberately exhausts the
+# credential window, so a re-run inside the following minute starts against a
+# 429. Waiting it out beats failing on a condition the previous run created.
+if [ -z "$ADMIN_TOKEN" ]; then
+  probe=$(status -X POST "$GATEWAY/v1/identity/login" -H 'Content-Type: application/json' \
+    -d "{\"mobileOrEmail\":\"$SUPERADMIN\",\"password\":\"$SUPERADMIN_PASSWORD\"}")
+
+  if [ "$probe" = "429" ]; then
+    echo "  ..    rate-limited by a previous run; waiting for the window to reset"
+    sleep 62
+    ADMIN_TOKEN=$(sign_in_super_admin)
+  fi
+fi
 
 if [ -z "$ADMIN_TOKEN" ]; then
   echo "  FAIL  could not sign in as $SUPERADMIN through the gateway"
   exit 1
 fi
+
 echo "  ok    got a Super Admin token"
 pass=$((pass + 1))
 
@@ -627,6 +647,8 @@ else
 fi
 
 echo
+
+echo
 echo "Header forgery"
 check "a forged tenant header does not change the answer" 200 \
   "$(status -H "X-Tenant-Id: 11111111-1111-1111-1111-111111111111" \
@@ -638,6 +660,35 @@ check "an override from a member is refused" 403 \
 
 check "an override from an anonymous caller is refused" 403 \
   "$(status -H "X-Tenant-Override-Id: $TENANT_ID" "$GATEWAY/v1/members")"
+
+echo
+echo "Rate limiting"
+
+# The limit is deliberately high - Indian carriers put many subscribers behind
+# one address - so this proves the policy is attached and enforcing rather than
+# trying to exhaust it. A route with no policy would never answer 429.
+RL_STATUS=""
+for attempt in $(seq 1 400); do
+  code=$(status -X POST "$GATEWAY/v1/identity/login" -H 'Content-Type: application/json' \
+    -d '{"mobileOrEmail":"nobody@example.com","password":"wrong"}')
+  if [ "$code" = "429" ]; then
+    RL_STATUS="429"
+    break
+  fi
+done
+
+if [ "$RL_STATUS" = "429" ]; then
+  echo "  ok    sign-in is rate limited per source (429 after $attempt attempts)"
+  pass=$((pass + 1))
+else
+  echo "  FAIL  sign-in was never rate limited in 400 attempts"
+  fail=$((fail + 1))
+fi
+
+# An authenticated route carries no policy, so the burst above must not have
+# taken the rest of the platform down with it.
+check "an unrelated route is unaffected by the burst" 200 \
+  "$(status -H "Authorization: Bearer $MEMBER_TOKEN" "$GATEWAY/v1/identity/me")"
 
 echo
 echo "$pass passed, $fail failed"

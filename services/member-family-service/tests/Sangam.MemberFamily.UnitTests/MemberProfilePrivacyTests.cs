@@ -32,7 +32,7 @@ public sealed class MemberProfilePrivacyTests
             locality: "Udaipur",
             profession: "Architect",
             privacy,
-            Now);
+            Now, Guid.NewGuid());
 
         return profile;
     }

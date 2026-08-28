@@ -228,6 +228,15 @@ not in a consumer.
 `Public` keeps appearing in the directory as a visible row, which is not what
 erasure means to the person who asked for it.
 
+**A cross-tenant write is refused at `SaveChanges`, not only by the
+handler.** `TenantWriteGuard` compares every added or modified
+`ITenantScopedEntity` against `ITenantContext.TenantId` and throws when they
+disagree. Handlers still do their own check - a 404 saying no such row exists in
+this Samaaj is a far better answer than an exception - but a handler that
+forgets one looks exactly like one that does not need it, so the rule is also
+enforced where it cannot be skipped. The guard is silent when no tenant is
+resolved, because consumers legitimately have none.
+
 ## Dependencies
 
 - **Postgres** `samaajconnect_member_family` — `ConnectionStrings__Default`

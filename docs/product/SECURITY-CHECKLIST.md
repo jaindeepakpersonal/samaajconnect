@@ -4,29 +4,56 @@ Derived from the cross-cutting requirements in both requirement docs.
 Treat this as a PR review checklist for anything touching a new
 endpoint, not just a one-time setup task.
 
+> **Status as of 2026-08-29.** Every box below has been walked against the code
+> in the three services and the gateway. A ticked box is something a test or a
+> smoke check actually asserts, not something believed to be true; an unticked
+> one says plainly what is missing and where it is tracked. Items that cannot
+> apply yet — file uploads, for instance — say so rather than being ticked by
+> default.
+
 ## Tenant isolation
 
-- [ ] Every tenant-owned entity has `TenantId` and an EF Core
-      `HasQueryFilter` applying it on every read.
-- [ ] Every write handler re-validates that the target entity's
+- [x] Every tenant-owned entity has `TenantId` and an EF Core
+      `HasQueryFilter` applying it on every read. Applied by reflection over
+      `ITenantScopedEntity` in each `DbContext`, so an entity is filtered by
+      implementing the interface rather than by someone remembering.
+- [x] Every write handler re-validates that the target entity's
       `TenantId` matches `ITenantContext.TenantId` — do not rely on the
-      query filter alone for writes (IDOR protection).
-- [ ] `TenantId` is never read from a client-supplied field in a
-      request body. It comes only from the resolved gateway context.
-- [ ] Super Admin tenant-override requests are logged with both the
+      query filter alone for writes (IDOR protection). Handlers do this and
+      say so. It is *also* enforced once, at `SaveChanges`, by
+      `TenantWriteGuard`: a handler that forgets the check looks exactly like
+      one that does not need it, so the rule is enforced where it cannot be
+      skipped. The guard is deliberately silent when no tenant is resolved,
+      because consumers legitimately have none.
+- [x] `TenantId` is never read from a client-supplied field in a
+      request body. It comes only from the resolved gateway context. The one
+      apparent exception is registration, which takes a **slug** and resolves
+      it server-side against the tenant table, refusing a request whose
+      resolved tenant disagrees.
+- [x] Super Admin tenant-override requests are logged with both the
       actor's identity and the overridden `TenantId`, on every request,
-      not just at session start.
+      not just at session start. `TenantResolutionMiddleware` logs actor,
+      tenant, method and path per request, and refusals are logged too.
 
 ## Authorization
 
-- [ ] Every endpoint has an explicit `[Authorize(Policy = "...")]` or
+- [x] Every endpoint has an explicit `[Authorize(Policy = "...")]` or
       equivalent — no endpoint relies on "nobody will call it directly."
-- [ ] UI hiding of a nav item or button is never the only control —
-      confirm the backend rejects the action too.
-- [ ] `TenantAuthorizationBehavior` runs before `ValidationBehavior` in
+      Every request type carries `[RequiresRoles]`, `[RequiresPermission]`,
+      `[AllowAnonymousRequest]` or `[InternalRequest]`, and
+      `TenantAuthorizationBehavior` **denies a request carrying none of them**.
+      Forgetting to annotate surfaces as a 403 in the first test rather than as
+      an unguarded endpoint in production.
+- [x] UI hiding of a nav item or button is never the only control —
+      confirm the backend rejects the action too. Both portals treat guards and
+      role-aware rendering as convenience; the refusals are asserted
+      server-side, and `scripts/smoke-through-gateway.sh` checks the negative
+      cases through the gateway.
+- [x] `TenantAuthorizationBehavior` runs before `ValidationBehavior` in
       the pipeline (see `ARCHITECTURE.md` §3) so an unauthorized caller
       never learns anything about validation rules for data they can't
-      access.
+      access. Registered in that order in all three services, numbered in the
+      source, and covered by `PipelineBehaviorTests`.
 
 ## Permission key naming convention
 
@@ -52,44 +79,99 @@ existing platform (`Pathshala.Attendance.Write`, `Issue.Approve`):
 | `Boli.PublishResults` | Publish (irreversible without correction flow) |
 | `Audit.Read` | View audit log |
 
+`AuthorizationCatalog` in identity-tenant-service is the executable copy of
+this table, with stable hand-assigned ids so a grant means the same thing in
+every environment. `GET /v1/identity/roles` serves it, so the admin panel shows
+what is actually enforced rather than a second copy that can drift.
+
 ## Audit logging
 
-- [ ] Every state-changing command that matches an item in the "Audit
+- [x] Every state-changing command that matches an item in the "Audit
       Logs" section of the admin requirements doc publishes a domain
-      event that `audit-notification-service` consumes.
-- [ ] Audit rows are immutable (no update/delete endpoint exists for
-      `AuditLog`, ever).
-- [ ] Before/after JSON snapshots are captured for corrections and
-      status changes, not just creation events.
+      event that `audit-notification-service` consumes. That service also
+      subscribes by regex to *every* versioned topic, so an event nobody has
+      described yet still produces a row rather than a hole.
+- [x] Audit rows are immutable (no update/delete endpoint exists for
+      `AuditLog`, ever). One narrowly-scoped exception exists for erasure, and
+      it cannot touch the action, entity, topic or timestamps — see "Erasure vs.
+      the audit log" in `docs/product/DPDP-COMPLIANCE.md`.
+- [x] Before/after JSON snapshots are captured for corrections and
+      status changes, not just creation events. Status and module changes carry
+      their previous value into `AuditLog.BeforeState`. A profile correction
+      records **which fields changed, never their values**: the payload is
+      stored verbatim in an append-only table, and a member's previous mobile
+      number would then be somewhere the platform deliberately makes hard to
+      redact. That is a knowing deviation from the literal "JSON snapshot", and
+      it answers the audit question — what did an administrator change, and
+      when — without turning the audit log into a second copy of the data.
 
 ## Session & auth
 
 - [ ] Sessions/JWTs are tenant-scoped and expire; refresh tokens are
       revocable server-side (e.g. on suspicious activity or admin
-      forced logout).
-- [ ] Rate limiting and brute-force lockout on `/login` and any OTP
-      endpoint.
-- [ ] All production traffic is HTTPS-only; no mixed content.
+      forced logout). **Half built.** Tokens carry `tenant_id` and expire, and
+      a token is refused the moment its Samaaj is deactivated. There are **no
+      refresh tokens and no server-side revocation**: a stolen token is valid
+      until it expires, and `POST /v1/identity/logout` in `API-CONTRACTS.md`
+      does not exist — the portals only discard the token locally. Erasure
+      clears the account's role grants, so a stale token loses its authority
+      even though it still authenticates. Closing this properly needs a refresh
+      token store, rotation, and a revocation list the services consult; it is
+      its own piece of work and is tracked in `DEVELOPMENT_PLAN.md`.
+- [x] Rate limiting and brute-force lockout on `/login` and any OTP
+      endpoint. Both halves. Per-account lockout after five wrong passwords,
+      and five wrong activation guesses kill the code; per-source rate limits
+      at the gateway on `/login`, `/activations/redeem` and `/register`. The
+      limits are deliberately loose because Indian mobile carriers put many
+      subscribers behind one address — see `gateway/.../RateLimiting.cs`. There
+      is no OTP endpoint yet; when one lands it belongs on the credential
+      policy.
+- [ ] All production traffic is HTTPS-only; no mixed content. **A deployment
+      concern, not a code one, and nothing here enforces it.** Compose serves
+      plain HTTP for local work. Needs TLS termination, HSTS, and secure-cookie
+      policy decided with the hosting; tracked in `DEVELOPMENT_PLAN.md` Phase 5.
 - [ ] Sensitive admin actions (publish Boli result, publish voting
       results, deactivate a tenant) are candidates for step-up
-      authentication (re-enter password / OTP) — see the "Suggested
-      Enhancements" callouts in the requirements docs.
+      authentication (re-enter password / OTP). **One exists**: erasing an
+      account requires the password again, which is the most irreversible
+      action on the platform today. The others named here belong to services
+      that do not exist yet. Deactivating a Samaaj does not ask, and should.
 
 ## File handling
 
 - [ ] Uploaded files (post media, social issue evidence, profile
       photos) are size/type restricted and virus-scanned before being
-      served back to any user.
+      served back to any user. **Nothing is uploaded to this platform yet** —
+      there is no file storage and no upload endpoint. What exists is a *link*:
+      `PhotoUrl` on a member or child, and `LogoUrl` on a Samaaj, supplied by
+      the client. Those are now validated as absolute `http(s)` URLs, which
+      closes the `javascript:`/`data:` stored-scripting hole.
+      **It does not close the tracking one**: a photo hosted anywhere sends
+      every viewer's IP address to that host, and on a `ChildProfile` that is
+      exactly the third-party tracking of children DPDP s.9(3) prohibits. The
+      real fix is the platform hosting its own images, at which point this item
+      becomes live in full. Tracked in `DEVELOPMENT_PLAN.md`.
 - [ ] File storage access is authorization-checked per request, not
-      just obscured by a random URL.
+      just obscured by a random URL. Not applicable until there is storage;
+      when there is, it must not be a public bucket with unguessable keys.
 
 ## Data privacy
 
 - [x] Member directory respects `PrivacyLevel` per profile field, not
       just an all-or-nothing visibility toggle. Built in
       `member-family-service`; a hidden field is null, never masked.
-- [ ] Exports of member data are logged as audit events and restricted
-      to roles with an explicit export permission.
+- [x] Exports of member data are logged as audit events and restricted
+      to roles with an explicit export permission. Logged: each export
+      publishes `identity.member-data.exported.v1`, carrying ids and a
+      timestamp and never the contents — recording what was in the export
+      would make the record of the copy a second copy.
+      **The permission half is deliberately not implemented as written.** The
+      exports that exist are a member reading their *own* data, which is a
+      right under DPDP s.11; gating that behind a permission an administrator
+      grants would defeat it. The checklist item is about an administrator
+      exporting *other people's* data in bulk, and no such endpoint exists. If
+      one is ever added it needs its own permission key, and this item should
+      be re-read then.
 
 > **DPDP Act, 2023.** The obligations this platform carries under India's data
 > protection law, what is built for them, and what still needs counsel, are in
