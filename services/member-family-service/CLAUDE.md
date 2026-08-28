@@ -16,8 +16,8 @@ worked example of a cross-service flow with no synchronous call.
 | `MemberProfile` | built | Tenant-scoped. Its `Id` **is** the user id from identity-tenant-service. |
 | `Family` | built | Household, joined by quoting a family code. |
 | `FamilyMember` | built | Membership or a pending request; carries the relationship. |
-| `ChildProfile` | not built | Next. |
-| `ChildConversionRequest` | not built | Blocked on an open decision — see below. |
+| `ChildProfile` | built | No login of its own; the family manages the record. |
+| `ChildConversionRequest` | built | Admin-approved. |
 
 ## Commands
 
@@ -28,8 +28,9 @@ worked example of a cross-service flow with no synchronous call.
 | `CreateFamilyCommand` | any member | built |
 | `RequestJoinFamilyCommand` | any member | built |
 | `DecideJoinRequestCommand` | head of that family | built |
-| `CreateChildProfileCommand` | `FamilyHead` | not built |
-| `RequestChildConversionCommand` / `ApproveChildConversionCommand` | — | not built |
+| `CreateChildProfileCommand` | head of that family + `Family.Write` | built |
+| `RequestChildConversionCommand` | head of that family + `Family.Write` | built |
+| `DecideChildConversionCommand` | `SamaajAdmin` + `Family.ApproveConversion` | built |
 
 ## Queries
 
@@ -38,7 +39,8 @@ worked example of a cross-service flow with no synchronous call.
 | `SearchMembersQuery` | `Members.Read` | built |
 | `GetMyProfileQuery` | any authenticated role | built |
 | `GetMyFamilyQuery` | any member | built |
-| `ListEligibleConversionsQuery` | — | not built |
+| `ListFamilyChildrenQuery` | any member | built |
+| `ListConversionRequestsQuery` | `SamaajAdmin` + `Family.ApproveConversion` | built |
 
 ## Events published
 
@@ -46,6 +48,7 @@ worked example of a cross-service flow with no synchronous call.
 |---|---|---|
 | `MemberProfileUpdatedDomainEvent` | `members.profile.updated.v1` | `MemberProfile.Update` |
 | `FamilyCreatedDomainEvent` | `members.family.created.v1` | `Family.Create` |
+| `ChildConversionApprovedDomainEvent` | `members.child-conversion.approved.v1` | `ChildConversionRequest.Approve` |
 
 ## Events consumed
 
@@ -67,6 +70,11 @@ it did nothing with.
 | GET | `/v1/families/mine` | any member |
 | POST | `/v1/families/join-requests` | any member |
 | POST | `/v1/families/{familyId}/join-requests/{requestId}/decide` | head of that family |
+| GET | `/v1/children` | any member |
+| POST | `/v1/children` | head of that family + `Family.Write` |
+| POST | `/v1/children/{id}/conversion` | head of that family + `Family.Write` |
+| GET | `/v1/children/conversion-requests` | `SamaajAdmin` + `Family.ApproveConversion` |
+| POST | `/v1/children/conversion-requests/{requestId}/decide` | `SamaajAdmin` + `Family.ApproveConversion` |
 | GET | `/health` | anonymous |
 
 ## Decisions worth knowing before you change this service
@@ -121,12 +129,38 @@ apply the same setting to any future domain-assigned key.
 would otherwise exhaust its retries on one bad message and stall every
 registration queued behind it. The Warning log is the signal.
 
-## Open decision blocking the children work
+## Adult-child conversion
 
-`DEVELOPMENT_PLAN.md` lists **adult-child conversion: admin-approved vs
-self-service**, with admin-approved as the recommended default. Resolve it
-before building `ChildConversionRequest`; the two shapes differ in who the
-approval flow even involves.
+Decided 2026-08-28: **admin-approved**. The family head raises the request once
+the child turns 18; a Samaaj admin holding `Family.ApproveConversion` decides.
+Self-service was the alternative and was rejected as the less safe default -
+creating a platform login is not something a household should do unilaterally,
+and the rule is easy to relax later if approval proves too slow.
+
+Three things about the flow are deliberate:
+
+**Eligibility is derived from the date of birth, not stored.** DATA-MODEL.md
+lists `EligibleForConversion` as a status, but a stored one needs a nightly job
+to move children into it and is silently wrong on any day that job does not run.
+The stored status records only the two things that are actual decisions - `Minor`
+and `Converted` - and `IsEligibleForConversion(today)` computes the rest.
+
+**The approval event carries no credential.** audit-notification-service records
+every event payload verbatim into an append-only table, so a password or even a
+hash travelling on `members.child-conversion.approved.v1` would land somewhere
+deliberately impossible to redact. The event carries the name and the chosen
+identifier; how the new member first authenticates is identity-tenant-service's
+problem.
+
+**Approval does not mark the child `Converted`.** The login does not exist until
+identity-tenant-service has consumed the event and created it. A child record
+claiming an account nobody can sign in to would be worse than one that lags by a
+second.
+
+**Still missing:** the identity side. Nothing consumes
+`members.child-conversion.approved.v1` yet, so an approved conversion currently
+announces itself and stops. That consumer, and how the new member sets their
+first password without a notification channel, is the next piece of work.
 
 ## Dependencies
 

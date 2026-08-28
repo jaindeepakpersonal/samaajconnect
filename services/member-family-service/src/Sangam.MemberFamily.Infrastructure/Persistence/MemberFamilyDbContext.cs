@@ -2,6 +2,7 @@ using System.Linq.Expressions;
 using System.Text.Json;
 using Microsoft.EntityFrameworkCore;
 using Sangam.MemberFamily.Application.Abstractions;
+using Sangam.MemberFamily.Domain.Children;
 using Sangam.MemberFamily.Domain.Common;
 using Sangam.MemberFamily.Domain.Families;
 using Sangam.MemberFamily.Domain.Members;
@@ -20,6 +21,10 @@ public sealed class MemberFamilyDbContext(
     public DbSet<Family> Families => Set<Family>();
 
     public DbSet<FamilyMember> FamilyMembers => Set<FamilyMember>();
+
+    public DbSet<ChildProfile> ChildProfiles => Set<ChildProfile>();
+
+    public DbSet<ChildConversionRequest> ChildConversionRequests => Set<ChildConversionRequest>();
 
     public DbSet<OutboxMessage> OutboxMessages => Set<OutboxMessage>();
 

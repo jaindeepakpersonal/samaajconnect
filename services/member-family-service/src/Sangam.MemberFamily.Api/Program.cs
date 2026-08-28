@@ -49,6 +49,7 @@ app.MapGet("/health", () => Results.Ok(new { status = "healthy" }))
 
 app.MapMemberEndpoints();
 app.MapFamilyEndpoints();
+app.MapChildEndpoints();
 
 await app.RunAsync();
 

@@ -17,7 +17,9 @@ enforced by `TenantAuthorizationBehavior`, not just UI hiding.
 | POST | `/tenants` | SuperAdmin | Create a Samaaj tenant |
 | PATCH | `/tenants/{id}/status` | SuperAdmin | Activate/deactivate/archive |
 | GET | `/tenants` | SuperAdmin | List all tenants |
-| GET | `/tenants/{slug}` | Anonymous | Resolve slug → tenant (used by gateway) |
+| GET | `/tenants/{slug}` | Anonymous | Resolve slug → tenant (registration picker) |
+| GET | `/tenants/by-id/{id}` | Anonymous | Resolve id → tenant (used by the gateway on every request) |
+| GET | `/tenants/directory` | Anonymous | Active Samaaj a visitor can register into |
 | POST | `/register` | Anonymous | Member registration into one Samaaj |
 | POST | `/login` | Anonymous | Common login → returns tenant-scoped JWT |
 | POST | `/logout` | Authenticated | Revoke current session/refresh token |
@@ -35,10 +37,11 @@ enforced by `TenantAuthorizationBehavior`, not just UI hiding.
 | POST | `/families` | Member | Create family, become head |
 | POST | `/families/join-requests` | Member | Request to join via family code |
 | POST | `/families/join-requests/{id}/decide` | FamilyHead | Accept/reject |
-| POST | `/families/{id}/children` | FamilyHead | Add child profile |
-| GET | `/children/conversion-eligible` | FamilyHead, SamaajAdmin | List children >18 |
-| POST | `/children/{id}/conversion` | Child/FamilyHead | Start adult-child conversion |
-| POST | `/children/{id}/conversion/approve` | SamaajAdmin | Approve conversion |
+| GET | `/children` | Member | Children in your own household |
+| POST | `/children` | FamilyHead | Add child profile |
+| POST | `/children/{id}/conversion` | FamilyHead | Start adult-child conversion |
+| GET | `/children/conversion-requests` | SamaajAdmin | Requests awaiting a decision |
+| POST | `/children/conversion-requests/{id}/decide` | SamaajAdmin | Approve or reject (admin-approved, decided 2026-08-28) |
 
 ## timeline-service — `/v1/timeline`
 

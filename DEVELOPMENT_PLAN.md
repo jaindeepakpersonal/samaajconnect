@@ -8,12 +8,11 @@ version of the plan; the reasoning behind the ordering lives in
 ## Current Status
 
 - **Stage:** Stage 0 complete; starting Phase 1 - Platform Foundation
-- **Last updated:** 2026-08-28 - single-domain tenant resolution. The Samaaj
-  now comes from the token, not a subdomain, per the decision below. 292
-  tests green (250 backend, 42 frontend) plus 19 smoke checks against a stack
-  built from scratch.
-- **Blocking item:** none. Adult-child conversion is decided (admin-approved),
-  so children and conversion are next, then the DPDP capabilities.
+- **Last updated:** 2026-08-28 - child profiles and the admin-approved
+  adult-child conversion flow. 319 tests green (277 backend, 42 frontend)
+  plus 19 smoke checks against a stack built from scratch.
+- **Blocking item:** none. Next up is the identity side of conversion, then
+  the DPDP capabilities.
 
 *(Update these three lines at the start/end of every work session —
 they're what a coding agent or a teammate should read first to know
@@ -72,9 +71,16 @@ unit tested.
       two services
   - [x] Profile update flow, with per-field privacy levels
   - [x] Family create / join-request / decide
-  - [ ] Child profile create
-  - [ ] Adult-child conversion request + approval flow (see Open
-        Decisions below — default assumption is admin-approved)
+  - [x] Child profile create
+  - [x] Adult-child conversion request + approval flow, admin-approved. The
+        member-family half is done and announces
+        `members.child-conversion.approved.v1`; nothing consumes it yet, so
+        the login is not created - see below.
+- [ ] identity-tenant-service consumes `members.child-conversion.approved.v1`
+      and creates the login, including how the new member sets a first
+      password with no notification channel yet
+- [ ] DPDP Act capabilities: consent records, data export, erasure requests
+      (the review is confirmed required — see Open Decisions)
 - [ ] Admin: tenant CRUD screens
 - [ ] Admin: admin user + role assignment screens
 - [ ] `docs/product/SECURITY-CHECKLIST.md` pass on both Stage-0 +

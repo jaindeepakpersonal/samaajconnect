@@ -38,7 +38,12 @@ status() {
 json_field() {
   # Deliberately grep-based: this script must run anywhere curl runs, without
   # requiring jq to be installed.
-  grep -o "\"$1\":\"[^\"]*\"" | head -1 | cut -d'"' -f4
+  #
+  # The `|| true` matters: with `set -o pipefail`, a grep that matches nothing
+  # fails the whole pipeline and errexit kills the script. That only bites on a
+  # re-run, where creating an existing Samaaj returns a problem document with
+  # no id - so the script died silently exactly when someone ran it twice.
+  { grep -o "\"$1\":\"[^\"]*\"" || true; } | head -1 | cut -d'"' -f4
 }
 
 wait_for_stack() {
@@ -169,6 +174,12 @@ check "member directory" 200 "$(status -H "Authorization: Bearer $MEMBER_TOKEN" 
 
 check "family before joining one" 404 "$(status -H "Authorization: Bearer $MEMBER_TOKEN" \
   "$GATEWAY/v1/families/mine")"
+
+check "children of a member with no family" 200 "$(status -H "Authorization: Bearer $MEMBER_TOKEN" \
+  "$GATEWAY/v1/children")"
+
+check "conversion queue is refused to a member" 403 "$(status -H "Authorization: Bearer $MEMBER_TOKEN" \
+  "$GATEWAY/v1/children/conversion-requests")"
 
 echo
 echo "Header forgery"

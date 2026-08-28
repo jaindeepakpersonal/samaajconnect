@@ -10,4 +10,5 @@ public static class PermissionKeys
     public const string MembersRead = "Members.Read";
     public const string MembersWrite = "Members.Write";
     public const string FamilyWrite = "Family.Write";
+    public const string FamilyApproveConversion = "Family.ApproveConversion";
 }
