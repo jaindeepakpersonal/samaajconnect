@@ -19,5 +19,12 @@ public sealed class TenantRepository(IdentityTenantDbContext dbContext) : ITenan
     public Task<bool> DomainExistsAsync(string domain, CancellationToken cancellationToken = default) =>
         dbContext.Tenants.AnyAsync(t => t.Domain == domain, cancellationToken);
 
+    public async Task<IReadOnlyList<Tenant>> ListActiveAsync(CancellationToken cancellationToken = default) =>
+        await dbContext.Tenants
+            .AsNoTracking()
+            .Where(t => t.Status == TenantStatus.Active)
+            .OrderBy(t => t.Name)
+            .ToListAsync(cancellationToken);
+
     public void Add(Tenant tenant) => dbContext.Tenants.Add(tenant);
 }

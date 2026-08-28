@@ -1,0 +1,11 @@
+{
+  "//": "Local development only. The gateway resolves a Samaaj from the Host header, and a browser on localhost has no subdomain to offer - so the dev server supplies one. Change SLUG here to develop against a different Samaaj.",
+  "/v1": {
+    "target": "http://localhost:8080",
+    "secure": false,
+    "changeOrigin": false,
+    "headers": {
+      "Host": "mahavir-samaj.samaajconnect.com"
+    }
+  }
+}

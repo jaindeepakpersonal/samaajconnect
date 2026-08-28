@@ -8,12 +8,12 @@ version of the plan; the reasoning behind the ordering lives in
 ## Current Status
 
 - **Stage:** Stage 0 - Walking Skeleton, in progress
-- **Last updated:** 2026-08-28 - YARP gateway routing to both services with
-  subdomain-to-Samaaj resolution, JWT validation, module flags and header
-  stripping. 214 tests green, plus a through-the-gateway smoke script.
-- **Blocking item:** none. Next up is the `apps/member-portal` shell with the
-  tenant interceptor, then the Login / Register / Home screens from the
-  wireframes.
+- **Last updated:** 2026-08-28 - member portal shell with Login, Register and
+  Home wired to real endpoints through the gateway. Stage 0 is functionally
+  complete: register, sign in, land on your Samaaj Home. 258 tests green
+  (214 backend, 44 frontend) plus the gateway smoke script.
+- **Blocking item:** none. Next up is CI, which is the last unchecked Stage 0
+  item, then Phase 1 proper (`member-family-service`).
 
 *(Update these three lines at the start/end of every work session —
 they're what a coding agent or a teammate should read first to know
@@ -41,12 +41,17 @@ vertical slice working end-to-end, not broad partial progress.
 - [x] Gateway: subdomain → tenant resolution + JWT validation wired
       for `/v1/identity/**`, `/v1/audit/**` and `/v1/notifications/**`,
       with the module feature-flag gate and inbound tenant-header stripping
-- [ ] `apps/member-portal` shell created with the tenant interceptor
-- [ ] Login / Register / Home screens ported from
+- [x] `apps/member-portal` shell created with the shared interceptors in
+      `libs/shared` (npm workspace; Angular workspace root is the repo root)
+- [x] Login / Register / Home screens ported from
       `docs/product/wireframes/member-portal-wireframes.html`
       (`.claude/skills/wireframe-to-angular`), calling real endpoints
-- [ ] **End-to-end proof:** register → select a Samaaj → log in →
-      redirected to that Samaaj's subdomain → Home renders
+- [x] **End-to-end proof:** register → select a Samaaj → log in → Home
+      renders with that Samaaj's name, the member's name, the welcome
+      notification the Kafka consumer raised, and only the modules that
+      Samaaj has enabled. Verified in a browser against the compose stack.
+      The subdomain redirect is implemented but exercised only by unit test
+      locally, since `localhost` has no subdomains.
 - [ ] CI running build + test on every push
 
 > The through-the-gateway coverage CLAUDE.md §9 requires is

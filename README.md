@@ -47,10 +47,25 @@ an explicit `Host:` header locally, so no `/etc/hosts` entries are needed:
 bash scripts/smoke-through-gateway.sh
 ```
 
-Run a service's tests - integration tests need Docker for Testcontainers:
+Then start the member portal against it:
+
+```bash
+npm start
+```
+
+It serves on http://localhost:4200 and proxies `/v1` to the gateway. See
+`apps/member-portal/CLAUDE.md` for how the Samaaj is chosen locally.
+
+Backend tests - the integration ones need Docker for Testcontainers:
 
 ```bash
 dotnet test services/identity-tenant-service/Sangam.IdentityTenant.sln
+```
+
+Frontend tests:
+
+```bash
+npm test
 ```
 
 ## Scaffolding

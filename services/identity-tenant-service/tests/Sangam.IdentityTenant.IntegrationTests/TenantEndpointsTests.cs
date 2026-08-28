@@ -173,4 +173,42 @@ public sealed class TenantEndpointsTests(IdentityTenantApiFactory factory)
 
         response.StatusCode.Should().Be(HttpStatusCode.NotFound);
     }
+
+    [Fact]
+    public async Task The_registration_directory_is_anonymous_and_lists_only_active_Samaaj()
+    {
+        var admin = SuperAdminClient();
+
+        // One created but never activated, one activated.
+        await admin.PostAsJsonAsync(TenantsUrl, NewTenantPayload("dormant-samaj"));
+
+        var live = await admin.PostAsJsonAsync(TenantsUrl, NewTenantPayload("live-samaj"));
+        var liveId = (await live.Content.ReadFromJsonAsync<JsonElement>()).GetProperty("id").GetGuid();
+        await admin.PatchAsJsonAsync($"{TenantsUrl}/{liveId}/status", new { status = "Active" });
+
+        var directory = await factory.CreateClient()
+            .GetFromJsonAsync<JsonElement>($"{TenantsUrl}/directory");
+
+        var slugs = directory.EnumerateArray().Select(t => t.GetProperty("slug").GetString()).ToList();
+
+        slugs.Should().Contain("live-samaj");
+        slugs.Should().NotContain("dormant-samaj");
+    }
+
+    [Fact]
+    public async Task The_registration_directory_does_not_expose_contact_details()
+    {
+        var admin = SuperAdminClient();
+        var created = await admin.PostAsJsonAsync(TenantsUrl, NewTenantPayload("live-samaj"));
+        var id = (await created.Content.ReadFromJsonAsync<JsonElement>()).GetProperty("id").GetGuid();
+        await admin.PatchAsJsonAsync($"{TenantsUrl}/{id}/status", new { status = "Active" });
+
+        var directory = await factory.CreateClient()
+            .GetFromJsonAsync<JsonElement>($"{TenantsUrl}/directory");
+
+        var entry = directory.EnumerateArray().First();
+
+        entry.TryGetProperty("contactEmail", out _).Should().BeFalse();
+        entry.TryGetProperty("contactPerson", out _).Should().BeFalse();
+    }
 }

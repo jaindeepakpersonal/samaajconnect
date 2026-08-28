@@ -1,0 +1,22 @@
+{
+  "name": "samaajconnect",
+  "private": true,
+  "description": "Multi-tenant platform for Jain Samaaj organizations - Angular apps and shared libraries.",
+  "workspaces": [
+    "apps/*",
+    "libs/*"
+  ],
+  "scripts": {
+    "ng": "ng",
+    "start": "ng serve member-portal",
+    "build": "ng build member-portal",
+    "test:app": "ng test member-portal --watch=false",
+    "test:libs": "vitest run",
+    "test": "npm run test:libs && npm run test:app"
+  },
+  "devDependencies": {
+    "@angular/cli": "^20.3.35",
+    "vitest": "^3.2.4",
+    "jsdom": "^26.0.0"
+  }
+}

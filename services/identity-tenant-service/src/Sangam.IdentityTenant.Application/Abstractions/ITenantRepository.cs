@@ -12,5 +12,8 @@ public interface ITenantRepository
 
     Task<bool> DomainExistsAsync(string domain, CancellationToken cancellationToken = default);
 
+    /// <summary>Active Samaaj, by name, for the public registration picker.</summary>
+    Task<IReadOnlyList<Tenant>> ListActiveAsync(CancellationToken cancellationToken = default);
+
     void Add(Tenant tenant);
 }

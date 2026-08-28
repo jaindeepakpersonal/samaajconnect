@@ -1,0 +1,14 @@
+{
+  "name": "@samaajconnect/shared",
+  "version": "0.0.0",
+  "private": true,
+  "description": "Interceptors, auth plumbing and API models shared by member-portal and admin-portal (root CLAUDE.md section 7).",
+  "type": "module",
+  "//": "Consumed as TypeScript source through the tsconfig path mapping in each app, not as a built package. This manifest exists so npm workspaces hoists the Angular packages these files import.",
+  "peerDependencies": {
+    "@angular/common": "^20.3.0",
+    "@angular/core": "^20.3.0",
+    "@angular/router": "^20.3.0",
+    "rxjs": "^7.8.0"
+  }
+}
