@@ -11,7 +11,8 @@ public sealed record TenantResponse(
     string? ContactEmail,
     string Status,
     IReadOnlyCollection<string> EnabledModules,
-    DateTimeOffset CreatedAt);
+    DateTimeOffset CreatedAt,
+    GrievanceContactResponse? GrievanceContact);
 
 /// <summary>
 /// The public face of a tenant, returned by the anonymous slug-resolution
@@ -25,4 +26,12 @@ public sealed record TenantSummaryResponse(
     string Slug,
     string? LogoUrl,
     string Status,
-    IReadOnlyCollection<string> EnabledModules);
+    IReadOnlyCollection<string> EnabledModules,
+    GrievanceContactResponse? GrievanceContact);
+
+/// <summary>
+/// Who to complain to about data handling. Public on purpose: DPDP section 13
+/// requires the means of grievance redressal to be published, and a contact
+/// only members can see is not published.
+/// </summary>
+public sealed record GrievanceContactResponse(string? Name, string? Email, string? Phone);

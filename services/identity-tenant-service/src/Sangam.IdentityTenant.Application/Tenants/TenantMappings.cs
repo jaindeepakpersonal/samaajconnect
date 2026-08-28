@@ -14,7 +14,15 @@ internal static class TenantMappings
         tenant.ContactEmail,
         tenant.Status.ToString(),
         tenant.EnabledModules,
-        tenant.CreatedAt);
+        tenant.CreatedAt,
+        tenant.GrievanceContactName is null
+        && tenant.GrievanceContactEmail is null
+        && tenant.GrievanceContactPhone is null
+            ? null
+            : new GrievanceContactResponse(
+                tenant.GrievanceContactName,
+                tenant.GrievanceContactEmail,
+                tenant.GrievanceContactPhone));
 
     public static TenantSummaryResponse ToSummaryResponse(this Tenant tenant) => new(
         tenant.Id,
@@ -22,5 +30,13 @@ internal static class TenantMappings
         tenant.Slug,
         tenant.LogoUrl,
         tenant.Status.ToString(),
-        tenant.EnabledModules);
+        tenant.EnabledModules,
+        tenant.GrievanceContactName is null
+        && tenant.GrievanceContactEmail is null
+        && tenant.GrievanceContactPhone is null
+            ? null
+            : new GrievanceContactResponse(
+                tenant.GrievanceContactName,
+                tenant.GrievanceContactEmail,
+                tenant.GrievanceContactPhone));
 }

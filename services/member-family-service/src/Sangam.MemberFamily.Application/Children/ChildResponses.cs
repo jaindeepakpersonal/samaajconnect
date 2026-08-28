@@ -11,7 +11,18 @@ public sealed record ChildResponse(
     string Status,
     bool IsEligibleForConversion,
     bool HasPendingConversion,
-    DateTimeOffset CreatedAt);
+    DateTimeOffset CreatedAt,
+    ParentalConsentResponse? ParentalConsent);
+
+/// <summary>
+/// The consent this record rests on. Shown back so a family can see what was
+/// agreed and when, rather than having to take it on trust.
+/// </summary>
+public sealed record ParentalConsentResponse(
+    Guid GivenByMemberId,
+    string NoticeVersion,
+    string Attestation,
+    DateTimeOffset GivenAt);
 
 public sealed record ConversionRequestResponse(
     Guid Id,

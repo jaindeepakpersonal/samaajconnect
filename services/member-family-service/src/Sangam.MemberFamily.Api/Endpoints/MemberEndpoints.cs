@@ -2,6 +2,7 @@ using MediatR;
 using Sangam.MemberFamily.Api.Extensions;
 using Sangam.MemberFamily.Application.Members;
 using Sangam.MemberFamily.Application.Members.Commands.UpdateProfile;
+using Sangam.MemberFamily.Application.Members.Queries.GetMyData;
 using Sangam.MemberFamily.Application.Members.Queries.GetMyProfile;
 using Sangam.MemberFamily.Application.Members.Queries.SearchMembers;
 
@@ -41,6 +42,16 @@ public static class MemberEndpoints
             .WithSummary("The caller's own profile, complete regardless of privacy settings.")
             .Produces<MyProfileResponse>()
             .ProducesProblem(StatusCodes.Status404NotFound);
+
+        group.MapGet("/me/data-export", async (ISender sender, CancellationToken cancellationToken) =>
+            {
+                var result = await sender.Send(new GetMyDataQuery(), cancellationToken);
+
+                return result.ToApiResult();
+            })
+            .WithName("ExportMyMemberData")
+            .WithSummary("Everything this service holds about you and your household (DPDP s.11).")
+            .Produces<MyMemberDataResponse>();
 
         group.MapPatch("/{id:guid}", async (
                 Guid id,

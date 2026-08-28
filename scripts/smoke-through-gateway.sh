@@ -229,9 +229,20 @@ fi
 
 DOB=$(date -d '20 years ago' +%Y-%m-%d 2>/dev/null || date -v-20y +%Y-%m-%d)
 
+CHILD_NOTICE=$(curl -s -H "Authorization: Bearer $MEMBER_TOKEN" \
+  "$GATEWAY/v1/children/data-notice" | json_field version)
+
+check "the child data notice is available before asking" 200 \
+  "$(status -H "Authorization: Bearer $MEMBER_TOKEN" "$GATEWAY/v1/children/data-notice")"
+
+check "a child cannot be added without parental consent" 400 \
+  "$(status -X POST "$GATEWAY/v1/children" -H 'Content-Type: application/json' \
+     -H "Authorization: Bearer $MEMBER_TOKEN" \
+     -d "{\"fullName\":\"No Consent\",\"dateOfBirth\":\"$DOB\",\"gender\":\"Male\",\"parentalConsentGiven\":false,\"noticeVersion\":\"$CHILD_NOTICE\"}")"
+
 CHILD_ID=$(curl -s -X POST "$GATEWAY/v1/children" \
   -H 'Content-Type: application/json' -H "Authorization: Bearer $MEMBER_TOKEN" \
-  -d "{\"fullName\":\"Aarav Jain\",\"dateOfBirth\":\"$DOB\",\"gender\":\"Male\"}" | json_field id)
+  -d "{\"fullName\":\"Aarav Jain\",\"dateOfBirth\":\"$DOB\",\"gender\":\"Male\",\"parentalConsentGiven\":true,\"noticeVersion\":\"$CHILD_NOTICE\"}" | json_field id)
 
 if [ -n "$CHILD_ID" ]; then
   echo "  ok    added a child who has turned 18"
@@ -316,6 +327,34 @@ for attempt in $(seq 1 30); do
   sleep 2
 done
 check "the child record is marked Converted" 1 "$converted"
+echo
+echo "DPDP: the three data exports, and the grievance contact"
+check "identity export" 200 "$(status -H "Authorization: Bearer $MEMBER_TOKEN" \
+  "$GATEWAY/v1/identity/me/data-export")"
+
+check "member-family export" 200 "$(status -H "Authorization: Bearer $MEMBER_TOKEN" \
+  "$GATEWAY/v1/members/me/data-export")"
+
+check "audit export" 200 "$(status -H "Authorization: Bearer $MEMBER_TOKEN" \
+  "$GATEWAY/v1/audit/me/data-export")"
+
+check "withdrawing an optional consent" 200 \
+  "$(status -X POST "$GATEWAY/v1/identity/me/consents/Communications/withdraw" \
+     -H "Authorization: Bearer $MEMBER_TOKEN")"
+
+check "the membership consent cannot be withdrawn piecemeal" 409 \
+  "$(status -X POST "$GATEWAY/v1/identity/me/consents/Membership/withdraw" \
+     -H "Authorization: Bearer $MEMBER_TOKEN")"
+
+check "naming the grievance contact" 200 \
+  "$(status -X PUT "$GATEWAY/v1/identity/tenants/$TENANT_ID/grievance-contact" \
+     -H 'Content-Type: application/json' -H "Authorization: Bearer $ADMIN_TOKEN" \
+     -H "$ADMIN_TENANT_HEADER" \
+     -d '{"name":"Ravi Shah","email":"grievances@example.com","phone":null}')"
+
+GRIEVANCE=$(curl -s "$GATEWAY/v1/identity/tenants/$SLUG" | json_field email)
+check "it is published to anyone, as section 13 requires" "grievances@example.com" "$GRIEVANCE"
+
 echo
 echo "Header forgery"
 check "a forged tenant header does not change the answer" 200 \

@@ -37,6 +37,7 @@ genuinely externally-reachable unauthenticated surface greppable on its own.
 |---|---|---|
 | `ListAuditLogsQuery` | `SuperAdmin`/`SamaajAdmin` + `Audit.Read` | built |
 | `GetMyNotificationsQuery` | any authenticated role | built |
+| `GetMyDataQuery` | any authenticated role | built |
 
 ## Events published
 
@@ -65,6 +66,7 @@ raises a notification.
 |---|---|---|
 | GET | `/v1/audit/logs` | `SuperAdmin`, `SamaajAdmin` + `Audit.Read` |
 | GET | `/v1/notifications` | any authenticated role |
+| GET | `/v1/audit/me/data-export` | any authenticated role |
 | GET | `/health` | anonymous |
 
 ## Decisions worth knowing before you change this service
@@ -88,6 +90,13 @@ rebalance.
 moves on. Committing an unrecorded message loses it, which is bad; refusing to
 commit stalls the partition and loses everything queued behind it, which is
 worse. The Critical log is the recovery path — treat one as an incident.
+
+**The member data export covers actions they took, not actions about them.**
+An audit log is largely a record of administrators' work. Handing someone
+else's actions to a member because they asked for "their data" would turn a
+transparency right (DPDP s.11) into a surveillance tool. The payload is
+omitted for the same reason: it is the state of whatever changed, which may be
+someone else's data.
 
 **Metadata refresh is 30s, not Confluent's five-minute default.** Kafka only
 matches a regex subscription against topics it already knows about, so the

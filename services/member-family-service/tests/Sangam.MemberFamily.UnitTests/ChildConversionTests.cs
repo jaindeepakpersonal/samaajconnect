@@ -11,9 +11,11 @@ public sealed class ChildProfileTests
     private static readonly DateOnly Today = new(2026, 6, 1);
     private static readonly Guid TenantId = Guid.NewGuid();
     private static readonly Guid FamilyId = Guid.NewGuid();
+    private static readonly Guid ConsentGivenBy = Guid.NewGuid();
 
     private static ChildProfile ChildBornOn(DateOnly dateOfBirth) =>
-        ChildProfile.Create(TenantId, FamilyId, "Aarav Jain", dateOfBirth, Gender.Male, null, Now);
+        ChildProfile.Create(
+            TenantId, FamilyId, "Aarav Jain", dateOfBirth, Gender.Male, null, ConsentGivenBy, Now);
 
     [Fact]
     public void A_new_child_is_a_minor_with_no_account_of_their_own()

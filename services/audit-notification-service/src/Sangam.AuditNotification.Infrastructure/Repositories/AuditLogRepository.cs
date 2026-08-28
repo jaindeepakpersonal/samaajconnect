@@ -1,6 +1,7 @@
 using Microsoft.EntityFrameworkCore;
 using Sangam.AuditNotification.Application.Abstractions;
 using Sangam.AuditNotification.Application.AuditLogs;
+using Sangam.AuditNotification.Application.Privacy.Queries.GetMyData;
 using Sangam.AuditNotification.Domain.AuditLogs;
 using Sangam.AuditNotification.Infrastructure.Persistence;
 
@@ -59,4 +60,18 @@ public sealed class AuditLogQueries(AuditNotificationDbContext dbContext) : IAud
                 a.RecordedAt))
             .ToListAsync(cancellationToken);
     }
+
+    public async Task<IReadOnlyList<MyActionResponse>> ListForActorAsync(
+        Guid actorUserId,
+        int limit,
+        CancellationToken cancellationToken = default) =>
+        // Tenant-filtered, and the payload is deliberately not selected: it is
+        // the state of whatever changed, which may be someone else's data.
+        await dbContext.AuditLogs
+            .AsNoTracking()
+            .Where(a => a.ActorUserId == actorUserId)
+            .OrderByDescending(a => a.OccurredAt)
+            .Take(limit)
+            .Select(a => new MyActionResponse(a.Action, a.EntityName!, a.EntityId, a.OccurredAt))
+            .ToListAsync(cancellationToken);
 }

@@ -2,7 +2,7 @@ using Sangam.MemberFamily.Domain.Children;
 
 namespace Sangam.MemberFamily.Application.Children;
 
-internal static class ChildMappings
+public static class ChildMappings
 {
     public static ChildResponse ToResponse(
         this ChildProfile child, DateOnly today, bool hasPendingConversion) =>
@@ -17,7 +17,14 @@ internal static class ChildMappings
             child.Status.ToString(),
             child.IsEligibleForConversion(today),
             hasPendingConversion,
-            child.CreatedAt);
+            child.CreatedAt,
+            child.ParentalConsent is null
+                ? null
+                : new ParentalConsentResponse(
+                    child.ParentalConsent.GivenByMemberId,
+                    child.ParentalConsent.NoticeVersion,
+                    child.ParentalConsent.Attestation,
+                    child.ParentalConsent.GivenAt));
 
     public static ConversionRequestResponse ToResponse(
         this ChildConversionRequest request, string childFullName) =>

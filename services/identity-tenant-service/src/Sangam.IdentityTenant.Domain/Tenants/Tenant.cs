@@ -23,6 +23,17 @@ public sealed class Tenant : AggregateRoot
     public string? LogoUrl { get; private set; }
     public string? ContactPerson { get; private set; }
     public string? ContactEmail { get; private set; }
+
+    /// <summary>
+    /// Who a member complains to about how their data is handled
+    /// (DPDP section 13). Kept separate from the general contact above: the
+    /// Act requires a published means of grievance redressal specifically, and
+    /// conflating it with "who do I ask about the next event" would make it
+    /// impossible to tell whether a Samaaj has actually named one.
+    /// </summary>
+    public string? GrievanceContactName { get; private set; }
+    public string? GrievanceContactEmail { get; private set; }
+    public string? GrievanceContactPhone { get; private set; }
     public TenantStatus Status { get; private set; }
 
     /// <summary>
@@ -79,6 +90,21 @@ public sealed class Tenant : AggregateRoot
 
         return tenant;
     }
+
+    /// <summary>
+    /// Names the person a member complains to about their data (DPDP s.13).
+    /// Passing nothing clears it, which is a Samaaj saying it has not named
+    /// one - visible rather than hidden behind a stale value.
+    /// </summary>
+    public void SetGrievanceContact(string? name, string? email, string? phone)
+    {
+        GrievanceContactName = Normalize(name);
+        GrievanceContactEmail = Normalize(email)?.ToLowerInvariant();
+        GrievanceContactPhone = Normalize(phone);
+    }
+
+    private static string? Normalize(string? value) =>
+        string.IsNullOrWhiteSpace(value) ? null : value.Trim();
 
     /// <summary>
     /// Moves the Samaaj between Active, Inactive and Archived. Returns false

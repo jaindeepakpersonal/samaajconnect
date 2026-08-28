@@ -22,6 +22,13 @@ public sealed class ChildProfile : AggregateRoot, ITenantScopedEntity
     public string? PhotoUrl { get; private set; }
     public ChildStatus Status { get; private set; }
 
+    /// <summary>
+    /// Why this record is allowed to exist at all (DPDP section 9). Not
+    /// nullable in practice - the factory requires it - but the property is
+    /// nullable so EF can materialise the owned type.
+    /// </summary>
+    public ParentalConsent? ParentalConsent { get; private set; }
+
     /// <summary>The member profile created when conversion was approved.</summary>
     public Guid? ConvertedMemberId { get; private set; }
 
@@ -29,6 +36,12 @@ public sealed class ChildProfile : AggregateRoot, ITenantScopedEntity
 
     private ChildProfile() { }
 
+    /// <summary>
+    /// Creates a child record. <paramref name="consentGivenByMemberId"/> is
+    /// required rather than optional: DPDP section 9 makes parental consent
+    /// the basis on which this data may be held, so a record without it should
+    /// not be constructible.
+    /// </summary>
     public static ChildProfile Create(
         Guid tenantId,
         Guid familyId,
@@ -36,12 +49,21 @@ public sealed class ChildProfile : AggregateRoot, ITenantScopedEntity
         DateOnly dateOfBirth,
         Gender gender,
         string? photoUrl,
+        Guid consentGivenByMemberId,
         DateTimeOffset createdAt)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(fullName);
 
+        if (consentGivenByMemberId == Guid.Empty)
+        {
+            throw new ArgumentException(
+                "A child record cannot be created without recorded parental consent.",
+                nameof(consentGivenByMemberId));
+        }
+
         return new ChildProfile
         {
+            ParentalConsent = new ParentalConsent(consentGivenByMemberId, createdAt),
             Id = Guid.NewGuid(),
             TenantId = tenantId,
             FamilyId = familyId,

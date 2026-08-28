@@ -8,14 +8,14 @@ version of the plan; the reasoning behind the ordering lives in
 ## Current Status
 
 - **Stage:** Stage 0 complete; starting Phase 1 - Platform Foundation
-- **Last updated:** 2026-08-28 - DPDP consent: a versioned notice, per-purpose
-  append-only consent records, withdrawal, and data export. 435 tests green
-  (387 backend, 48 frontend) plus 34 smoke checks against a stack built from
-  scratch.
-- **Blocking item:** none for building. Five questions in
-  `docs/product/DPDP-COMPLIANCE.md` need someone qualified in Indian data
-  protection law before Phase 1 ships to real users - the erasure-vs-audit-log
-  reading in particular shapes what gets built next.
+- **Last updated:** 2026-08-28 - DPDP: parental consent on child records,
+  exports from all three services, and a published grievance contact. 461
+  tests green (413 backend, 48 frontend) plus 43 smoke checks against a stack
+  built from scratch.
+- **Blocking item:** erasure is genuinely blocked on question 1 in
+  `docs/product/DPDP-COMPLIANCE.md` - whether de-identifying audit rows counts
+  as erasure. The other four questions there need counsel before Phase 1 ships
+  to real users but block nothing today. Next unblocked work: the admin portal.
 
 *(Update these three lines at the start/end of every work session —
 they're what a coding agent or a teammate should read first to know
@@ -87,9 +87,15 @@ unit tested.
 - [x] DPDP Act: the compliance mapping (`docs/product/DPDP-COMPLIANCE.md`),
       versioned consent notice, per-purpose append-only consent records
       captured at registration, withdrawal, and per-service data export
-- [ ] DPDP Act, remaining: erasure requests (and de-identifying audit rows
-      rather than deleting them), parental consent recorded on `ChildProfile`,
-      member-family and audit data exports, grievance contact per Samaaj
+- [x] DPDP Act: parental consent required to create a `ChildProfile` (s.9),
+      data exports from all three services (s.11), and a published grievance
+      contact per Samaaj (s.13)
+- [ ] DPDP Act, remaining: erasure requests, including de-identifying audit
+      rows rather than deleting them. **Waiting on counsel** - question 1 in
+      `docs/product/DPDP-COMPLIANCE.md` decides the design, and building it
+      twice is the waste worth avoiding
+- [ ] DPDP Act, remaining: breach notification (s.8(6)) and the right to
+      nominate (s.14), both of which need a notification channel first
 - [ ] Admin: tenant CRUD screens
 - [ ] Admin: admin user + role assignment screens
 - [ ] `docs/product/SECURITY-CHECKLIST.md` pass on both Stage-0 +

@@ -3,6 +3,7 @@ using Sangam.IdentityTenant.Api.Extensions;
 using Sangam.IdentityTenant.Application.Tenants;
 using Sangam.IdentityTenant.Application.Tenants.Commands.ChangeTenantStatus;
 using Sangam.IdentityTenant.Application.Tenants.Commands.CreateTenant;
+using Sangam.IdentityTenant.Application.Tenants.Commands.SetGrievanceContact;
 using Sangam.IdentityTenant.Application.Tenants.Queries.GetTenantById;
 using Sangam.IdentityTenant.Application.Tenants.Queries.GetTenantBySlug;
 using Sangam.IdentityTenant.Application.Tenants.Queries.ListRegisterableTenants;
@@ -66,6 +67,26 @@ public static class TenantEndpoints
             .ProducesProblem(StatusCodes.Status404NotFound)
             .ProducesProblem(StatusCodes.Status409Conflict);
 
+        group.MapPut("/{id:guid}/grievance-contact", async (
+                Guid id,
+                GrievanceContactRequest request,
+                ISender sender,
+                CancellationToken cancellationToken) =>
+            {
+                var result = await sender.Send(
+                    new SetGrievanceContactCommand(id, request.Name, request.Email, request.Phone),
+                    cancellationToken);
+
+                return result.ToApiResult();
+            })
+            .RequireAuthorization()
+            .WithName("SetGrievanceContact")
+            .WithSummary("Name who members complain to about their data (DPDP s.13).")
+            .Produces<TenantResponse>()
+            .ProducesValidationProblem()
+            .ProducesProblem(StatusCodes.Status403Forbidden)
+            .ProducesProblem(StatusCodes.Status404NotFound);
+
         group.MapGet("/by-id/{id:guid}", async (
                 Guid id,
                 ISender sender,
@@ -115,6 +136,8 @@ public static class TenantEndpoints
     /// contract can evolve independently of the internal one.
     /// </summary>
     public sealed record ChangeStatusRequest(string Status);
+
+    public sealed record GrievanceContactRequest(string? Name, string? Email, string? Phone);
 
     public sealed record CreateTenantRequest(
         string Name,

@@ -4,6 +4,7 @@ using Sangam.MemberFamily.Application.Children;
 using Sangam.MemberFamily.Application.Children.Commands.CreateChildProfile;
 using Sangam.MemberFamily.Application.Children.Commands.DecideChildConversion;
 using Sangam.MemberFamily.Application.Children.Commands.RequestChildConversion;
+using Sangam.MemberFamily.Application.Children.Queries.GetChildDataNotice;
 using Sangam.MemberFamily.Application.Children.Queries.ListConversionRequests;
 using Sangam.MemberFamily.Application.Children.Queries.ListFamilyChildren;
 
@@ -25,13 +26,28 @@ public static class ChildEndpoints
             .WithSummary("Children in your household, with whether each is old enough to convert.")
             .Produces<IReadOnlyList<ChildResponse>>();
 
+        group.MapGet("/data-notice", async (ISender sender, CancellationToken cancellationToken) =>
+            {
+                var result = await sender.Send(new GetChildDataNoticeQuery(), cancellationToken);
+
+                return result.ToApiResult();
+            })
+            .WithName("GetChildDataNotice")
+            .WithSummary("What a parent is shown before a child record is created (DPDP s.5 and s.9).")
+            .Produces<ChildDataNoticeResponse>();
+
         group.MapPost("/", async (
                 CreateChildRequest request,
                 ISender sender,
                 CancellationToken cancellationToken) =>
             {
                 var command = new CreateChildProfileCommand(
-                    request.FullName, request.DateOfBirth, request.Gender, request.PhotoUrl);
+                    request.FullName,
+                    request.DateOfBirth,
+                    request.Gender,
+                    request.PhotoUrl,
+                    request.ParentalConsentGiven,
+                    request.NoticeVersion ?? string.Empty);
 
                 var result = await sender.Send(command, cancellationToken);
 
@@ -94,11 +110,19 @@ public static class ChildEndpoints
         return app;
     }
 
+    /// <summary>
+    /// <paramref name="ParentalConsentGiven"/> and <paramref name="NoticeVersion"/>
+    /// are required: DPDP section 9 makes parental consent the basis on which a
+    /// child`s data may be held, and section 6(7) means a consent that cannot
+    /// say what was shown is worth little.
+    /// </summary>
     public sealed record CreateChildRequest(
         string FullName,
         DateOnly DateOfBirth,
         string? Gender,
-        string? PhotoUrl);
+        string? PhotoUrl,
+        bool ParentalConsentGiven,
+        string? NoticeVersion);
 
     public sealed record ConversionRequest(string MobileOrEmail);
 

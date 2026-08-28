@@ -28,7 +28,9 @@ public sealed class TenantEndpointsTests(IdentityTenantApiFactory factory)
     };
 
     private HttpClient SuperAdminClient() =>
-        factory.CreateClientWith(PermissionKeys.TenantManage);
+        // Naming the grievance contact needs AdminUsers.Manage, because a
+        // Samaaj Admin must be able to do it and they do not hold Tenant.Manage.
+        factory.CreateClientWith(PermissionKeys.TenantManage, PermissionKeys.AdminUsersManage);
 
     [Fact]
     public async Task Creating_a_tenant_without_a_token_is_rejected()
@@ -264,5 +266,106 @@ public sealed class TenantEndpointsTests(IdentityTenantApiFactory factory)
         var response = await factory.CreateClient().GetAsync($"{TenantsUrl}/by-id/{Guid.NewGuid()}");
 
         response.StatusCode.Should().Be(HttpStatusCode.NotFound);
+    }
+
+    [Fact]
+    public async Task A_Samaaj_starts_with_no_grievance_contact_and_says_so()
+    {
+        var created = await SuperAdminClient().PostAsJsonAsync(TenantsUrl, NewTenantPayload());
+        var body = await created.Content.ReadFromJsonAsync<JsonElement>();
+
+        // Null rather than an empty object: "nobody has been named" is a real
+        // state a Samaaj needs to be able to see about itself (DPDP s.13).
+        body.GetProperty("grievanceContact").ValueKind.Should().Be(JsonValueKind.Null);
+    }
+
+    [Fact]
+    public async Task A_Super_Admin_names_the_grievance_contact_and_it_is_public()
+    {
+        var admin = SuperAdminClient();
+        var created = await admin.PostAsJsonAsync(TenantsUrl, NewTenantPayload());
+        var id = (await created.Content.ReadFromJsonAsync<JsonElement>()).GetProperty("id").GetGuid();
+
+        var set = await admin.PutAsJsonAsync($"{TenantsUrl}/{id}/grievance-contact", new
+        {
+            name = "Ravi Shah",
+            email = "GRIEVANCES@example.com",
+            phone = "+919812345678",
+        });
+
+        set.StatusCode.Should().Be(HttpStatusCode.OK);
+
+        // Published, per s.13: reachable without a token, like the rest of the
+        // public Samaaj summary.
+        var summary = await factory.CreateClient()
+            .GetFromJsonAsync<JsonElement>($"{TenantsUrl}/by-id/{id}");
+
+        var contact = summary.GetProperty("grievanceContact");
+
+        contact.GetProperty("name").GetString().Should().Be("Ravi Shah");
+        contact.GetProperty("email").GetString().Should().Be("grievances@example.com");
+    }
+
+    [Fact]
+    public async Task A_name_with_no_way_to_reach_them_is_refused()
+    {
+        var admin = SuperAdminClient();
+        var created = await admin.PostAsJsonAsync(TenantsUrl, NewTenantPayload());
+        var id = (await created.Content.ReadFromJsonAsync<JsonElement>()).GetProperty("id").GetGuid();
+
+        // A name alone is not a means of redressal.
+        var response = await admin.PutAsJsonAsync($"{TenantsUrl}/{id}/grievance-contact", new
+        {
+            name = "Ravi Shah",
+            email = (string?)null,
+            phone = (string?)null,
+        });
+
+        response.StatusCode.Should().Be(HttpStatusCode.BadRequest);
+    }
+
+    [Fact]
+    public async Task Clearing_the_grievance_contact_is_allowed_because_having_none_is_visible()
+    {
+        var admin = SuperAdminClient();
+        var created = await admin.PostAsJsonAsync(TenantsUrl, NewTenantPayload());
+        var id = (await created.Content.ReadFromJsonAsync<JsonElement>()).GetProperty("id").GetGuid();
+
+        await admin.PutAsJsonAsync($"{TenantsUrl}/{id}/grievance-contact", new
+        {
+            name = "Ravi Shah",
+            email = "grievances@example.com",
+            phone = (string?)null,
+        });
+
+        var cleared = await admin.PutAsJsonAsync($"{TenantsUrl}/{id}/grievance-contact", new
+        {
+            name = (string?)null,
+            email = (string?)null,
+            phone = (string?)null,
+        });
+
+        cleared.StatusCode.Should().Be(HttpStatusCode.OK);
+
+        (await cleared.Content.ReadFromJsonAsync<JsonElement>())
+            .GetProperty("grievanceContact").ValueKind.Should().Be(JsonValueKind.Null);
+    }
+
+    [Fact]
+    public async Task A_member_cannot_name_the_grievance_contact()
+    {
+        var created = await SuperAdminClient().PostAsJsonAsync(TenantsUrl, NewTenantPayload());
+        var id = (await created.Content.ReadFromJsonAsync<JsonElement>()).GetProperty("id").GetGuid();
+
+        var member = factory.CreateClientAs(Guid.NewGuid(), id, [Roles.Member], []);
+
+        var response = await member.PutAsJsonAsync($"{TenantsUrl}/{id}/grievance-contact", new
+        {
+            name = "Not Me",
+            email = "me@example.com",
+            phone = (string?)null,
+        });
+
+        response.StatusCode.Should().Be(HttpStatusCode.Forbidden);
     }
 }

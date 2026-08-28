@@ -48,6 +48,9 @@ public sealed class CreateChildProfileCommandHandler(
             command.DateOfBirth,
             ParseGender(command.Gender),
             command.PhotoUrl,
+            // The head is the person attesting; the validator has already
+            // refused the request if they did not.
+            memberId,
             clock.UtcNow);
 
         children.Add(child);

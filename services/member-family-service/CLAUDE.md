@@ -18,6 +18,7 @@ worked example of a cross-service flow with no synchronous call.
 | `FamilyMember` | built | Membership or a pending request; carries the relationship. |
 | `ChildProfile` | built | No login of its own; the family manages the record. |
 | `ChildConversionRequest` | built | Admin-approved. |
+| `ParentalConsent` | built | Owned by `ChildProfile`; required to create one (DPDP s.9). |
 
 ## Commands
 
@@ -41,6 +42,8 @@ worked example of a cross-service flow with no synchronous call.
 | `GetMyFamilyQuery` | any member | built |
 | `ListFamilyChildrenQuery` | any member | built |
 | `ListConversionRequestsQuery` | `SamaajAdmin` + `Family.ApproveConversion` | built |
+| `GetChildDataNoticeQuery` | any member | built |
+| `GetMyDataQuery` | any authenticated role | built |
 
 ## Events published
 
@@ -80,6 +83,8 @@ here, which looks exactly like a broker problem and is not one.
 | POST | `/v1/children/{id}/conversion` | head of that family + `Family.Write` |
 | GET | `/v1/children/conversion-requests` | `SamaajAdmin` + `Family.ApproveConversion` |
 | POST | `/v1/children/conversion-requests/{requestId}/decide` | `SamaajAdmin` + `Family.ApproveConversion` |
+| GET | `/v1/children/data-notice` | any member |
+| GET | `/v1/members/me/data-export` | any authenticated role |
 | GET | `/health` | anonymous |
 
 ## Decisions worth knowing before you change this service
@@ -172,6 +177,30 @@ The loop closes in identity-tenant-service, which consumes the approval,
 creates a `PendingActivation` account, and announces
 `identity.child-conversion.completed.v1` once the new member has redeemed an
 activation code. Only then does the child record here become `Converted`.
+
+## DPDP and children's data
+
+Full mapping in `docs/product/DPDP-COMPLIANCE.md`. This service holds the
+platform's largest compliance surface, because `ChildProfile` exists by design
+and section 9 treats anyone under 18 as a child.
+
+**A child record cannot be created without recorded parental consent.** The
+factory requires the attesting member and throws without one; the validator
+refuses the request before it gets there. Section 9 makes the consent the basis
+on which the data may be held, so this is a precondition rather than a field.
+
+**The attestation is stored verbatim, not just its version.** Keeping only a
+version number would mean reconstructing the wording from source control to
+answer "what did they actually agree to?".
+
+**Section 9(3) is satisfied by absence.** The platform does no tracking, no
+behavioural monitoring and no advertising to children, and the notice says so.
+Keep it that way - this is the obligation most easily broken by adding an
+innocuous-looking analytics call.
+
+**Withdrawing parental consent is erasure, not a toggle.** Unlike a member's own
+consent, this is not a switch: the record exists because of it. That is why
+`ParentalConsent` sits on the child rather than in a log of decisions.
 
 ## Dependencies
 

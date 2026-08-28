@@ -12,4 +12,11 @@ public interface IAuditLogQueries
 {
     Task<IReadOnlyList<AuditLogResponse>> ListAsync(
         string? action, string? entityName, int limit, CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Rows where this member is the actor, for their own data export. Not the
+    /// rows that merely mention them: see the remarks on GetMyDataQuery.
+    /// </summary>
+    Task<IReadOnlyList<Privacy.Queries.GetMyData.MyActionResponse>> ListForActorAsync(
+        Guid actorUserId, int limit, CancellationToken cancellationToken = default);
 }

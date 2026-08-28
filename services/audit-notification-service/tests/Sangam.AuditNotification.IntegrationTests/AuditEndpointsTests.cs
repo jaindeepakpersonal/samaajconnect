@@ -147,4 +147,62 @@ public sealed class AuditEndpointsTests(AuditNotificationApiFactory factory)
 
         notifications.EnumerateArray().Should().BeEmpty();
     }
+
+    [Fact]
+    public async Task The_data_export_needs_a_token()
+    {
+        (await factory.CreateClient().GetAsync("/v1/audit/me/data-export"))
+            .StatusCode.Should().Be(HttpStatusCode.Unauthorized);
+    }
+
+    [Fact]
+    public async Task A_member_exports_their_notifications_and_what_they_are_used_for()
+    {
+        var member = factory.CreateClientAs(MemberA, TenantA, ["Member"], []);
+
+        var export = await member.GetFromJsonAsync<JsonElement>("/v1/audit/me/data-export");
+
+        export.GetProperty("notifications").EnumerateArray()
+            .Select(n => n.GetProperty("title").GetString())
+            .Should().Contain("Welcome to your Samaaj");
+
+        export.GetProperty("processingPurposes").EnumerateArray().Should().NotBeEmpty();
+    }
+
+    [Fact]
+    public async Task The_export_covers_actions_the_member_took_not_ones_about_them()
+    {
+        var member = factory.CreateClientAs(MemberA, TenantA, ["Member"], []);
+
+        var export = await member.GetFromJsonAsync<JsonElement>("/v1/audit/me/data-export");
+
+        // The seeded registration event names this member as the actor.
+        export.GetProperty("actionsYouTook").EnumerateArray()
+            .Select(a => a.GetProperty("action").GetString())
+            .Should().Contain("UserRegistered");
+    }
+
+    [Fact]
+    public async Task The_export_does_not_include_the_payload_of_what_changed()
+    {
+        var member = factory.CreateClientAs(MemberA, TenantA, ["Member"], []);
+
+        var body = await member.GetStringAsync("/v1/audit/me/data-export");
+
+        // The payload is the state of whatever was changed, which may be
+        // someone else's data.
+        body.Should().NotContain("afterState");
+        body.Should().NotContain("beforeState");
+    }
+
+    [Fact]
+    public async Task A_member_of_another_Samaaj_sees_none_of_this()
+    {
+        var stranger = factory.CreateClientAs(Guid.NewGuid(), TenantB, ["Member"], []);
+
+        var export = await stranger.GetFromJsonAsync<JsonElement>("/v1/audit/me/data-export");
+
+        export.GetProperty("notifications").EnumerateArray().Should().BeEmpty();
+        export.GetProperty("actionsYouTook").EnumerateArray().Should().BeEmpty();
+    }
 }

@@ -26,6 +26,18 @@ public sealed class ChildProfileConfiguration : IEntityTypeConfiguration<ChildPr
         builder.Property(c => c.Gender).HasConversion<string>().HasMaxLength(20).IsRequired();
         builder.Property(c => c.Status).HasConversion<string>().HasMaxLength(20).IsRequired();
 
+        // Owned rather than a table of its own: this consent has no life apart
+        // from the record it justifies, and is deleted with it.
+        builder.OwnsOne(c => c.ParentalConsent, consent =>
+        {
+            consent.Property(x => x.GivenByMemberId).HasColumnName("parental_consent_given_by");
+            consent.Property(x => x.NoticeVersion)
+                .HasColumnName("parental_consent_notice_version").HasMaxLength(40);
+            consent.Property(x => x.Attestation)
+                .HasColumnName("parental_consent_attestation").HasMaxLength(1000);
+            consent.Property(x => x.GivenAt).HasColumnName("parental_consent_given_at");
+        });
+
         builder.HasIndex(c => c.FamilyId);
 
         // The admin's eligibility list scans a Samaaj by date of birth.

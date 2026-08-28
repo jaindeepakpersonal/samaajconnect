@@ -20,6 +20,7 @@ enforced by `TenantAuthorizationBehavior`, not just UI hiding.
 | GET | `/tenants/{slug}` | Anonymous | Resolve slug → tenant (registration picker) |
 | GET | `/tenants/by-id/{id}` | Anonymous | Resolve id → tenant (used by the gateway on every request) |
 | GET | `/tenants/directory` | Anonymous | Active Samaaj a visitor can register into |
+| PUT | `/tenants/{id}/grievance-contact` | SuperAdmin, SamaajAdmin | Name who members complain to (DPDP s.13) |
 | POST | `/register` | Anonymous | Member registration into one Samaaj |
 | POST | `/login` | Anonymous | Common login → returns tenant-scoped JWT |
 | GET | `/activations/pending` | SamaajAdmin | Accounts awaiting activation |
@@ -45,6 +46,8 @@ enforced by `TenantAuthorizationBehavior`, not just UI hiding.
 | POST | `/families/join-requests/{id}/decide` | FamilyHead | Accept/reject |
 | GET | `/children` | Member | Children in your own household |
 | POST | `/children` | FamilyHead | Add child profile |
+| GET | `/children/data-notice` | Member | What a parent is shown before adding a child (DPDP s.9) |
+| GET | `/members/me/data-export` | Authenticated | Profile, family and children (DPDP s.11) |
 | POST | `/children/{id}/conversion` | FamilyHead | Start adult-child conversion |
 | GET | `/children/conversion-requests` | SamaajAdmin | Requests awaiting a decision |
 | POST | `/children/conversion-requests/{id}/decide` | SamaajAdmin | Approve or reject (admin-approved, decided 2026-08-28) |
@@ -133,7 +136,8 @@ enforced by `TenantAuthorizationBehavior`, not just UI hiding.
 
 | Method | Path | Roles | Purpose |
 |---|---|---|---|
-| GET | `/audit` | SuperAdmin, SamaajAdmin | Query audit log (filterable) |
+| GET | `/audit/logs` | SuperAdmin, SamaajAdmin | Query audit log (filterable) |
+| GET | `/audit/me/data-export` | Authenticated | My notifications and my actions (DPDP s.11) |
 | GET | `/notifications` | Authenticated | My notifications |
 | POST | `/notifications/{id}/read` | Authenticated | Mark read |
 | POST | `/notifications/broadcast` | SamaajAdmin, SuperAdmin | Send tenant/platform announcement |

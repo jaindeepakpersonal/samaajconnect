@@ -34,11 +34,11 @@ deferrable — it attaches the moment the first child record is created.
 | 8(4) | Reasonable security safeguards | partial | See "Security" below |
 | 8(6) | Breach notification to the Board and affected principals | **not built** | Needs a process and a notification channel |
 | 8(7) | Erase when consent is withdrawn or the purpose is served | **not built** | Next cycle; see "Erasure vs. the audit log" |
-| 9 | **Verifiable parental consent for under-18s** | partial | Consent is recorded on `ChildProfile`; "verifiable" needs counsel |
+| 9 | **Verifiable parental consent for under-18s** | partial | `ParentalConsent` on `ChildProfile`, required to create one; "verifiable" needs counsel |
 | 9(3) | No tracking or behavioural monitoring of children | **built by absence** | The platform does none. Keep it that way. |
-| 11 | Right to access a summary of data and processing | **built** | `GET /v1/identity/me/data-export` |
+| 11 | Right to access a summary of data and processing | **built** | A `/me/data-export` in each of the three services |
 | 12 | Right to correction and erasure | partial | Correction exists (profile edit); erasure does not |
-| 13 | Right to grievance redressal | **not built** | Needs a named officer per Samaaj |
+| 13 | Right to grievance redressal | **built** | `GrievanceContact` per Samaaj, published on the public summary |
 | 14 | Right to nominate | **not built** | |
 
 ## What is built
@@ -60,18 +60,57 @@ Granting and withdrawing both write rows; nothing is updated in place. §6(7)
 requires a Fiduciary to be able to produce the consent it relied on, which is
 impossible if the record is mutable.
 
+### Parental consent for children
+
+A `ChildProfile` cannot be constructed without a `ParentalConsent`: the factory
+requires the attesting member, and the command validator refuses a request that
+does not carry the attestation. Section 9 makes that consent the basis on which
+the data may be held, so a record without it should not be creatable, not merely
+discouraged.
+
+The consent stores the notice version **and the attestation text verbatim**.
+Keeping only a version number would mean reconstructing the wording from source
+control to answer "what did they actually agree to?".
+
+`GET /v1/children/data-notice` is what the parent is shown first. The notice
+says plainly that the platform does not track children, monitor their behaviour
+or advertise to them — which is section 9(3), and which the platform satisfies
+by not doing any of those things. Keep it that way.
+
+**Needs counsel:** whether a family head's recorded attestation is "verifiable"
+parental consent for a community organisation whose members know each other in
+person.
+
 ### Data export
 
-`GET /v1/identity/me/data-export` returns what identity-tenant-service holds
-about the caller, in a form a person can read: the account, the roles, the
-consent history, and the processing purposes.
+Each service answers for what it holds:
 
-**It is deliberately per-service.** A member's data is spread across
-identity, member-family and audit, and the alternative — one service reaching
-into the others synchronously — would undo the service boundaries for a feature
-used a handful of times a year. Each service exposes its own export and the
-portal assembles them. This is a documented gap in convenience, not in rights:
-everything is reachable.
+| Endpoint | Covers |
+|---|---|
+| `GET /v1/identity/me/data-export` | Account, roles, consent history, processing purposes |
+| `GET /v1/members/me/data-export` | Profile and privacy settings, family, children and their consents |
+| `GET /v1/audit/me/data-export` | Notifications, and the actions this member took |
+
+**Per-service is deliberate.** One service reaching synchronously into the
+others would undo the service boundaries for a feature used a handful of times a
+year. Each response names what it does *not* cover, so no single export can be
+mistaken for the whole picture. This is a gap in convenience, not in rights.
+
+Two things are deliberately absent. The identity export omits the password hash:
+a credential is data about a person only in the sense that a lock is about a
+key. The audit export omits the payload of each row and covers only actions
+where the member is the *actor* — an audit log is largely a record of
+administrators' work, and handing someone else's actions to a member on request
+would turn a transparency right into a surveillance tool.
+
+### Grievance redressal
+
+`PUT /v1/identity/tenants/{id}/grievance-contact` names the person, and the
+contact appears on the Samaaj's public summary — published, as section 13
+requires, rather than visible only to members. It is kept separate from the
+Samaaj's general contact: conflating the two would make it impossible to tell
+whether a Samaaj has actually named one. A name with no email or phone is
+refused, because that is not a means of redressal.
 
 ## Erasure vs. the audit log — the real tension
 

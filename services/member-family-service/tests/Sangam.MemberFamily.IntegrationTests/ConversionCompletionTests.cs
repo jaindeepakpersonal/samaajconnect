@@ -41,6 +41,7 @@ public sealed class ConversionCompletionTests(MemberFamilyApiFactory factory)
             DateOnly.FromDateTime(DateTime.UtcNow).AddYears(-19),
             Gender.Male,
             null,
+            headId,
             DateTimeOffset.UtcNow);
 
         db.ChildProfiles.Add(child);

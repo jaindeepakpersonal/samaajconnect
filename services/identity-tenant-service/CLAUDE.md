@@ -36,6 +36,7 @@ since those happen *before* a tenant is established.
 | `IssueActivationCodeCommand` | `SamaajAdmin` + `AdminUsers.Manage` | built |
 | `ActivateAccountCommand` | anonymous | built |
 | `WithdrawConsentCommand` | any authenticated role | built |
+| `SetGrievanceContactCommand` | `SuperAdmin`, `SamaajAdmin` + `AdminUsers.Manage` | built |
 | `AssignRoleCommand` | `SuperAdmin`, `SamaajAdmin` + `AdminUsers.Manage` | not built |
 
 A new Samaaj is created **Inactive**. Creating the record and letting it serve
@@ -101,6 +102,7 @@ offsets for messages it did nothing with.
 | GET | `/v1/identity/consent-notice` | anonymous |
 | POST | `/v1/identity/me/consents/{purpose}/withdraw` | any authenticated role |
 | GET | `/v1/identity/me/data-export` | any authenticated role |
+| PUT | `/v1/identity/tenants/{id}/grievance-contact` | `SuperAdmin`, `SamaajAdmin` + `AdminUsers.Manage` |
 | GET | `/health` | anonymous |
 
 Paths are absolute, not gateway-relative, so the same URL works whether you
@@ -206,6 +208,13 @@ cannot be withdrawn piecemeal, and the error says to ask for erasure instead.
 **The data export never contains the password hash.** A credential is data
 about a person only in the sense that a lock is about a key; exporting it in the
 name of transparency would be a way of handing one out. There is a test.
+
+**The grievance contact is separate from the general contact, and public.**
+Section 13 requires a published means of grievance redressal. Reusing
+`ContactPerson` would make it impossible to tell whether a Samaaj has actually
+named one, and a contact only members can see is not published. A Samaaj Admin
+can set their own Samaaj's, because routing every change through the platform
+operator would make it stale by design.
 
 **The export is per-service and says so.** A member's data is spread across
 three services, and having one reach synchronously into the others would undo

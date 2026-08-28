@@ -35,6 +35,9 @@ public sealed class TenantConfiguration : IEntityTypeConfiguration<Tenant>
         builder.Property(t => t.LogoUrl).HasMaxLength(2048);
         builder.Property(t => t.ContactPerson).HasMaxLength(200);
         builder.Property(t => t.ContactEmail).HasMaxLength(320);
+        builder.Property(t => t.GrievanceContactName).HasMaxLength(200);
+        builder.Property(t => t.GrievanceContactEmail).HasMaxLength(320);
+        builder.Property(t => t.GrievanceContactPhone).HasMaxLength(20);
         builder.Property(t => t.CreatedAt).IsRequired();
 
         builder.Property(t => t.Status)

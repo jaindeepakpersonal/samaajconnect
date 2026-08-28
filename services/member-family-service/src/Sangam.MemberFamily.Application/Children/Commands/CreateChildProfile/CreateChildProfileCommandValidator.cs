@@ -20,5 +20,17 @@ public sealed class CreateChildProfileCommandValidator : AbstractValidator<Creat
             .Must(value => Enum.TryParse<Gender>(value, ignoreCase: true, out _))
             .WithMessage($"Gender must be one of: {string.Join(", ", Enum.GetNames<Gender>())}.")
             .When(x => !string.IsNullOrWhiteSpace(x.Gender));
+
+        // DPDP section 9. Refused here rather than in the handler so the
+        // message reaches the form that asked for it.
+        RuleFor(x => x.ParentalConsentGiven)
+            .Equal(true)
+            .WithMessage(
+                "A child's record can only be created with the consent of their parent "
+                + "or lawful guardian.");
+
+        RuleFor(x => x.NoticeVersion)
+            .NotEmpty()
+            .WithMessage("Child data notice version is required.");
     }
 }

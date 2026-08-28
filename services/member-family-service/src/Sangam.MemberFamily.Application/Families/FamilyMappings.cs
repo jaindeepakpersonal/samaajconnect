@@ -3,7 +3,7 @@ using Sangam.MemberFamily.Domain.Members;
 
 namespace Sangam.MemberFamily.Application.Families;
 
-internal static class FamilyMappings
+public static class FamilyMappings
 {
     /// <summary>
     /// Builds the family view for one viewer. Names come from the profiles

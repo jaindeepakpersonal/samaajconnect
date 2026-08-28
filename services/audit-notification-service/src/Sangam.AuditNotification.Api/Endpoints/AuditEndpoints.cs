@@ -4,6 +4,7 @@ using Sangam.AuditNotification.Application.AuditLogs;
 using Sangam.AuditNotification.Application.AuditLogs.Queries.ListAuditLogs;
 using Sangam.AuditNotification.Application.Notifications;
 using Sangam.AuditNotification.Application.Notifications.Queries.GetMyNotifications;
+using Sangam.AuditNotification.Application.Privacy.Queries.GetMyData;
 
 namespace Sangam.AuditNotification.Api.Endpoints;
 
@@ -31,6 +32,20 @@ public static class AuditEndpoints
             .ProducesValidationProblem()
             .ProducesProblem(StatusCodes.Status401Unauthorized)
             .ProducesProblem(StatusCodes.Status403Forbidden);
+
+        app.MapGet("/v1/audit/me/data-export", async (
+                ISender sender,
+                CancellationToken cancellationToken) =>
+            {
+                var result = await sender.Send(new GetMyDataQuery(), cancellationToken);
+
+                return result.ToApiResult();
+            })
+            .RequireAuthorization()
+            .WithTags("Privacy")
+            .WithName("ExportMyAuditData")
+            .WithSummary("Your notifications and the actions you took (DPDP s.11).")
+            .Produces<MyAuditDataResponse>();
 
         app.MapGet("/v1/notifications", async (
                 int? limit,

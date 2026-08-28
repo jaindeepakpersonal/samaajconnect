@@ -2,7 +2,7 @@ using Sangam.MemberFamily.Domain.Members;
 
 namespace Sangam.MemberFamily.Application.Members;
 
-internal static class MemberMappings
+public static class MemberMappings
 {
     /// <summary>
     /// Applies the per-field privacy rules. This is the only place a profile

@@ -65,12 +65,16 @@ public sealed class ChildEndpointsTests(MemberFamilyApiFactory factory)
         return client;
     }
 
-    private static object NewChild(DateOnly dateOfBirth) => new
+    private static object NewChild(DateOnly dateOfBirth, bool consent = true) => new
     {
         fullName = "Aarav Jain",
         dateOfBirth = dateOfBirth.ToString("yyyy-MM-dd"),
         gender = "Male",
         photoUrl = (string?)null,
+        // DPDP section 9: a child record cannot be created without recorded
+        // parental consent, so every caller has to attest.
+        parentalConsentGiven = consent,
+        noticeVersion = Domain.Children.ChildDataNotice.CurrentVersion,
     };
 
     private static DateOnly Aged(int years) =>
@@ -279,5 +283,76 @@ public sealed class ChildEndpointsTests(MemberFamilyApiFactory factory)
             $"/v1/children/{childId}/conversion", new { mobileOrEmail = "not-an-identifier" });
 
         response.StatusCode.Should().Be(HttpStatusCode.BadRequest);
+    }
+
+    [Fact]
+    public async Task A_child_record_cannot_be_created_without_parental_consent()
+    {
+        var head = await HeadWithFamilyAsync();
+
+        // DPDP s.9: the consent is the basis on which this data may be held at
+        // all, so the record should not be creatable without it.
+        var response = await head.PostAsJsonAsync("/v1/children", NewChild(Aged(10), consent: false));
+
+        response.StatusCode.Should().Be(HttpStatusCode.BadRequest);
+    }
+
+    [Fact]
+    public async Task The_consent_is_recorded_on_the_child_with_what_was_agreed()
+    {
+        var head = await HeadWithFamilyAsync();
+
+        var created = await head.PostAsJsonAsync("/v1/children", NewChild(Aged(10)));
+
+        var child = await created.Content.ReadFromJsonAsync<JsonElement>();
+        var consent = child.GetProperty("parentalConsent");
+
+        consent.GetProperty("givenByMemberId").GetGuid().Should().Be(_head);
+        consent.GetProperty("noticeVersion").GetString()
+            .Should().Be(Domain.Children.ChildDataNotice.CurrentVersion);
+
+        // Stored verbatim, so "what did they agree?" does not need answering
+        // from source control.
+        consent.GetProperty("attestation").GetString().Should().Contain("parent or lawful guardian");
+    }
+
+    [Fact]
+    public async Task The_child_data_notice_is_available_to_show_before_asking()
+    {
+        var head = MemberClient(_head);
+
+        var notice = await head.GetFromJsonAsync<JsonElement>("/v1/children/data-notice");
+
+        notice.GetProperty("version").GetString().Should().NotBeNullOrWhiteSpace();
+        notice.GetProperty("summary").GetString().Should().Contain("do not track children");
+    }
+
+    [Fact]
+    public async Task The_data_export_covers_the_household_and_says_what_it_does_not()
+    {
+        var head = await HeadWithFamilyAsync();
+        await head.PostAsJsonAsync("/v1/children", NewChild(Aged(9)));
+
+        var export = await head.GetFromJsonAsync<JsonElement>("/v1/members/me/data-export");
+
+        export.GetProperty("profile").GetProperty("fullName").GetString()
+            .Should().Be("Ravi Shah " + _run);
+
+        export.GetProperty("children").EnumerateArray().Should().ContainSingle();
+        export.GetProperty("family").GetProperty("viewerIsHead").GetBoolean().Should().BeTrue();
+
+        export.GetProperty("heldElsewhere").EnumerateArray()
+            .Select(e => e.GetString())
+            .Should().Contain(e => e!.Contains("identity-tenant-service"));
+    }
+
+    [Fact]
+    public async Task The_export_of_a_member_with_no_family_is_empty_rather_than_an_error()
+    {
+        var export = await MemberClient(_otherMember)
+            .GetFromJsonAsync<JsonElement>("/v1/members/me/data-export");
+
+        export.GetProperty("children").EnumerateArray().Should().BeEmpty();
+        export.GetProperty("family").ValueKind.Should().Be(JsonValueKind.Null);
     }
 }
