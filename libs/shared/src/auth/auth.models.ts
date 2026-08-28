@@ -29,6 +29,12 @@ export interface RegisterRequest {
   readonly fullName: string;
   readonly mobileOrEmail: string;
   readonly password: string;
+
+  /** Purposes the visitor actively agreed to. Never pre-filled. */
+  readonly consentedPurposes: readonly string[];
+
+  /** Which version of the notice they were shown (DPDP s.6(7)). */
+  readonly noticeVersion: string;
 }
 
 export interface RegisterResult {
@@ -47,4 +53,17 @@ export interface TenantSummary {
   readonly logoUrl: string | null;
   readonly status: string;
   readonly enabledModules: readonly string[];
+}
+
+/** One purpose in the consent notice (DPDP s.5). */
+export interface ConsentNoticeItem {
+  readonly purpose: string;
+  readonly title: string;
+  readonly description: string;
+  readonly required: boolean;
+}
+
+export interface ConsentNotice {
+  readonly version: string;
+  readonly items: readonly ConsentNoticeItem[];
 }

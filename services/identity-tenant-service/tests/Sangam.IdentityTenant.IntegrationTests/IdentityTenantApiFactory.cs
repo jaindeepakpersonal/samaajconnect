@@ -101,7 +101,8 @@ public sealed class IdentityTenantApiFactory : WebApplicationFactory<Program>, I
         await dbContext.Database.ExecuteSqlRawAsync(
             // roles, permissions and role_permissions are migration-seeded
             // reference data and must survive a reset.
-            "TRUNCATE TABLE user_roles, users, tenants, outbox_messages RESTART IDENTITY CASCADE;");
+            "TRUNCATE TABLE consent_records, user_roles, users, tenants, outbox_messages "
+            + "RESTART IDENTITY CASCADE;");
 
         Publisher.Clear();
     }

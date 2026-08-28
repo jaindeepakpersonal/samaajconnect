@@ -4,6 +4,7 @@ using Microsoft.EntityFrameworkCore;
 using Sangam.IdentityTenant.Application.Abstractions;
 using Sangam.IdentityTenant.Domain.Authorization;
 using Sangam.IdentityTenant.Domain.Common;
+using Sangam.IdentityTenant.Domain.Consents;
 using Sangam.IdentityTenant.Domain.Tenants;
 using Sangam.IdentityTenant.Domain.Users;
 
@@ -27,6 +28,8 @@ public sealed class IdentityTenantDbContext(
     public DbSet<RolePermission> RolePermissions => Set<RolePermission>();
 
     public DbSet<UserRole> UserRoles => Set<UserRole>();
+
+    public DbSet<ConsentRecord> ConsentRecords => Set<ConsentRecord>();
 
     public DbSet<OutboxMessage> OutboxMessages => Set<OutboxMessage>();
 

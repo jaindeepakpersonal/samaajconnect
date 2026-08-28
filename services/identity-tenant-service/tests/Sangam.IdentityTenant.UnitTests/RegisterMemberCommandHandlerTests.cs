@@ -18,6 +18,7 @@ public sealed class RegisterMemberCommandHandlerTests
     private readonly IPasswordHasher _passwordHasher = Substitute.For<IPasswordHasher>();
     private readonly IUnitOfWork _unitOfWork = Substitute.For<IUnitOfWork>();
     private readonly ITenantContext _tenantContext = Substitute.For<ITenantContext>();
+    private readonly IConsentRepository _consents = Substitute.For<IConsentRepository>();
     private readonly IDateTimeProvider _clock = Substitute.For<IDateTimeProvider>();
     private readonly RegisterMemberCommandHandler _handler;
 
@@ -34,13 +35,19 @@ public sealed class RegisterMemberCommandHandlerTests
         _tenants.GetBySlugAsync("mumbai", Arg.Any<CancellationToken>()).Returns(_tenant);
 
         _handler = new RegisterMemberCommandHandler(
-            _tenants, _users, _passwordHasher, _unitOfWork, _tenantContext, _clock);
+            _tenants, _users, _passwordHasher, _unitOfWork, _tenantContext, _consents, _clock);
     }
 
     private Task<Result<Application.Users.RegisterMemberResponse>> Register(
         string slug = "Mumbai", string identifier = "Ravi@Example.com") =>
         _handler.Handle(
-            new RegisterMemberCommand(slug, "Ravi Shah", identifier, "a-long-enough-password"),
+            new RegisterMemberCommand(
+                slug,
+                "Ravi Shah",
+                identifier,
+                "a-long-enough-password",
+                ["Membership"],
+                "2026-08-28.1"),
             CancellationToken.None);
 
     [Fact]

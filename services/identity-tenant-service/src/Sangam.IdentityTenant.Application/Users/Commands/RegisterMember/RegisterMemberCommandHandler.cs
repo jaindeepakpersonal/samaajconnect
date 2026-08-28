@@ -2,6 +2,7 @@ using MediatR;
 using Sangam.IdentityTenant.Application.Abstractions;
 using Sangam.IdentityTenant.Application.Common;
 using Sangam.IdentityTenant.Domain.Authorization;
+using Sangam.IdentityTenant.Domain.Consents;
 using Sangam.IdentityTenant.Domain.Tenants;
 using Sangam.IdentityTenant.Domain.Users;
 
@@ -13,6 +14,7 @@ public sealed class RegisterMemberCommandHandler(
     IPasswordHasher passwordHasher,
     IUnitOfWork unitOfWork,
     ITenantContext tenantContext,
+    IConsentRepository consents,
     IDateTimeProvider clock)
     : IRequestHandler<RegisterMemberCommand, Result<RegisterMemberResponse>>
 {
@@ -64,9 +66,34 @@ public sealed class RegisterMemberCommandHandler(
 
         users.Add(user);
 
+        // Written in the same transaction as the account. DPDP section 6(7)
+        // requires the consent relied on to be producible, and an account that
+        // exists without its consent record would be exactly the gap that
+        // obligation is about.
+        foreach (var purpose in ParsePurposes(command.ConsentedPurposes))
+        {
+            consents.Add(ConsentRecord.Grant(
+                tenant.Id, user.Id, purpose, "Registration", clock.UtcNow));
+        }
+
         await unitOfWork.SaveChangesAsync(cancellationToken);
 
         return Result.Success(new RegisterMemberResponse(
             user.Id, tenant.Id, tenant.Slug, user.MobileOrEmail, user.IsContactVerified));
     }
+
+    /// <summary>
+    /// Turns the submitted purpose names into values, ignoring anything
+    /// unrecognised. The validator has already rejected unknown names and
+    /// missing required ones; this is the belt to that pair of braces.
+    /// </summary>
+    private static IEnumerable<ConsentPurpose> ParsePurposes(IReadOnlyCollection<string>? submitted) =>
+        (submitted ?? [])
+            .Select(name =>
+                Enum.TryParse<ConsentPurpose>(name, ignoreCase: true, out var purpose)
+                    ? purpose
+                    : (ConsentPurpose?)null)
+            .Where(purpose => purpose is not null)
+            .Select(purpose => purpose!.Value)
+            .Distinct();
 }

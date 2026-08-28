@@ -85,7 +85,13 @@ existing platform (`Pathshala.Attendance.Write`, `Issue.Approve`):
 
 ## Data privacy
 
-- [ ] Member directory respects `PrivacyLevel` per profile field, not
-      just an all-or-nothing visibility toggle.
+- [x] Member directory respects `PrivacyLevel` per profile field, not
+      just an all-or-nothing visibility toggle. Built in
+      `member-family-service`; a hidden field is null, never masked.
 - [ ] Exports of member data are logged as audit events and restricted
       to roles with an explicit export permission.
+
+> **DPDP Act, 2023.** The obligations this platform carries under India's data
+> protection law, what is built for them, and what still needs counsel, are in
+> `docs/product/DPDP-COMPLIANCE.md`. The children's-data provisions (section 9)
+> are the largest exposure here, because `ChildProfile` exists by design.

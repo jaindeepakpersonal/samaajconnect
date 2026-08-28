@@ -18,6 +18,7 @@ a `Tenant`'s own `Id` **is** the tenant id every other service references.
 | `User` | built | Tenant-scoped; the first entity here the query filter actually applies to. |
 | `Role`, `Permission`, `RolePermission` | built | Seeded by migration from `AuthorizationCatalog`. |
 | `UserRole` | built | A null `TenantScope` is the platform-wide grant, i.e. Super Admin. |
+| `ConsentRecord` | built | Append-only. One row per decision, per purpose. |
 
 `Tenant` deliberately does not implement `ITenantScopedEntity`. Applying the
 global query filter to it would make the gateway's own lookups impossible,
@@ -34,6 +35,7 @@ since those happen *before* a tenant is established.
 | `CreateAccountForConvertedChildCommand` | `[InternalRequest]` | built |
 | `IssueActivationCodeCommand` | `SamaajAdmin` + `AdminUsers.Manage` | built |
 | `ActivateAccountCommand` | anonymous | built |
+| `WithdrawConsentCommand` | any authenticated role | built |
 | `AssignRoleCommand` | `SuperAdmin`, `SamaajAdmin` + `AdminUsers.Manage` | not built |
 
 A new Samaaj is created **Inactive**. Creating the record and letting it serve
@@ -48,6 +50,8 @@ traffic are two separately audited decisions, so activation is its own command.
 | `GetTenantByIdQuery` | anonymous | built |
 | `ListRegisterableTenantsQuery` | anonymous | built |
 | `ListPendingActivationsQuery` | `SamaajAdmin` + `AdminUsers.Manage` | built |
+| `GetConsentNoticeQuery` | anonymous | built |
+| `GetMyDataQuery` | any authenticated role | built |
 | `ListTenantsQuery` | `SuperAdmin` | not built |
 
 `GetTenantBySlugQuery` returns `TenantSummaryResponse`, not `TenantResponse`.
@@ -64,6 +68,7 @@ tenant is reported as 404 rather than as a distinct state, for the same reason.
 | `UserRegisteredDomainEvent` | `identity.user.registered.v1` | `User.Register` |
 | `UserLoggedInDomainEvent` | `identity.user.logged-in.v1` | `User.RecordSuccessfulLogin` |
 | `UserActivatedFromChildDomainEvent` | `identity.child-conversion.completed.v1` | `User.Activate` |
+| `ConsentRecordedDomainEvent` | `identity.consent.recorded.v1` | `ConsentRecord.Grant` and `.Withdraw` |
 
 Delivery is at-least-once by design (see `Messaging/OutboxDispatcher.cs`).
 Consumers must be idempotent.
@@ -93,6 +98,9 @@ offsets for messages it did nothing with.
 | GET | `/v1/identity/activations/pending` | `SamaajAdmin` + `AdminUsers.Manage` |
 | POST | `/v1/identity/activations/{userId}/code` | `SamaajAdmin` + `AdminUsers.Manage` |
 | POST | `/v1/identity/activations/redeem` | anonymous |
+| GET | `/v1/identity/consent-notice` | anonymous |
+| POST | `/v1/identity/me/consents/{purpose}/withdraw` | any authenticated role |
+| GET | `/v1/identity/me/data-export` | any authenticated role |
 | GET | `/health` | anonymous |
 
 Paths are absolute, not gateway-relative, so the same URL works whether you
@@ -170,6 +178,39 @@ new one.
 Same reason as `IFailedLoginRecorder`: the command returns a failure,
 `TransactionBehavior` rolls it back, and a counter on the tracked aggregate
 would be rolled back with it - leaving the code guessable without limit.
+
+## Consent and the DPDP Act
+
+Full mapping in `docs/product/DPDP-COMPLIANCE.md`. What matters when changing
+this service:
+
+**Consent records are append-only.** Granting and withdrawing each write a row;
+nothing is updated in place. Section 6(7) requires a Data Fiduciary to be able
+to produce the consent it relied on, which a mutable record cannot do. Current
+state is derived from the latest row per purpose, never stored.
+
+**Every record carries the notice version in force when it was made.** Bump
+`ConsentNotice.CurrentVersion` whenever the wording changes in substance, so an
+old record still says what that person was actually shown.
+
+**Purposes are separate, and the required list is short.** Section 6 wants
+consent to be specific, so bundling "run your membership" with "send you news"
+into one tick would make neither valid. Consent conditional on service is only
+valid where the service genuinely cannot be given without it - hence only
+`Membership` is required.
+
+**Withdrawal is one call, with no reason field and no admin in the way**
+(section 6(4): as easy as giving). The required purpose is the exception: it
+cannot be withdrawn piecemeal, and the error says to ask for erasure instead.
+
+**The data export never contains the password hash.** A credential is data
+about a person only in the sense that a lock is about a key; exporting it in the
+name of transparency would be a way of handing one out. There is a test.
+
+**The export is per-service and says so.** A member's data is spread across
+three services, and having one reach synchronously into the others would undo
+the service boundaries for a feature used a handful of times a year. The
+response names what it does not cover.
 
 ## Dependencies
 

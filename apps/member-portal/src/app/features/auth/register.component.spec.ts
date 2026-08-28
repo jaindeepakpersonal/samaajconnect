@@ -39,9 +39,19 @@ describe('RegisterComponent', () => {
 
   afterEach(() => http.verify());
 
-  function loadDirectory(body: object = directory): void {
+  const notice = {
+    version: '2026-08-28.1',
+    items: [
+      { purpose: 'Membership', title: 'Your membership', description: '...', required: true },
+      { purpose: 'Communications', title: 'Samaaj communications', description: '...', required: false },
+    ],
+  };
+
+  /** Answers the two calls the screen makes on load. */
+  function loadScreen(body: object = directory, noticeBody: object = notice): void {
     fixture.detectChanges();
     http.expectOne('/v1/identity/tenants/directory').flush(body);
+    http.expectOne('/v1/identity/consent-notice').flush(noticeBody);
     fixture.detectChanges();
   }
 
@@ -51,15 +61,19 @@ describe('RegisterComponent', () => {
 
   function fillValidForm(): void {
     component.form.setValue({
-      fullName: 'Ravi Shah',
-      mobileOrEmail: 'ravi@example.com',
-      tenantSlug: 'mahavir-samaj',
-      password: 'a-long-enough-password',
+      fullName: "Ravi Shah",
+      mobileOrEmail: "ravi@example.com",
+      tenantSlug: "mahavir-samaj",
+      password: "a-long-enough-password",
     });
+
+    // Nothing is ticked for the visitor, so a valid submission has to tick
+    // the required purpose explicitly.
+    component.toggleAgreement("Membership");
   }
 
   it('fills the Samaaj picker from the API rather than the wireframe sample list', () => {
-    loadDirectory();
+    loadScreen();
 
     const options = (fixture.nativeElement as HTMLElement).querySelectorAll('select option');
 
@@ -68,24 +82,25 @@ describe('RegisterComponent', () => {
     expect(options[1].textContent).toContain('Mahavir Samaaj');
   });
 
-  it('offers a retry when the Samaaj list cannot be loaded', () => {
+  it("offers a retry when the Samaaj list cannot be loaded", () => {
     fixture.detectChanges();
     http
-      .expectOne('/v1/identity/tenants/directory')
-      .flush({}, { status: 503, statusText: 'Unavailable' });
+      .expectOne("/v1/identity/tenants/directory")
+      .flush({}, { status: 503, statusText: "Unavailable" });
+    http.expectOne("/v1/identity/consent-notice").flush(notice);
     fixture.detectChanges();
 
-    expect(text()).toContain('Try again');
+    expect(text()).toContain("Try again");
   });
 
   it('explains an empty directory instead of showing a blank dropdown', () => {
-    loadDirectory([]);
+    loadScreen([]);
 
     expect(text()).toContain('No Samaaj is currently accepting registrations');
   });
 
   it('does not submit an incomplete form', () => {
-    loadDirectory();
+    loadScreen();
 
     component.submit();
 
@@ -93,7 +108,7 @@ describe('RegisterComponent', () => {
   });
 
   it('rejects a password shorter than the API will accept', () => {
-    loadDirectory();
+    loadScreen();
 
     component.form.setValue({
       fullName: 'Ravi Shah',
@@ -106,7 +121,7 @@ describe('RegisterComponent', () => {
   });
 
   it('registers and sends the member to sign in', () => {
-    loadDirectory();
+    loadScreen();
 
     const router = TestBed.inject(Router);
     const navigate = vi.spyOn(router, 'navigate').mockResolvedValue(true);
@@ -116,10 +131,12 @@ describe('RegisterComponent', () => {
 
     const request = http.expectOne('/v1/identity/register');
     expect(request.request.body).toEqual({
-      fullName: 'Ravi Shah',
-      mobileOrEmail: 'ravi@example.com',
-      tenantSlug: 'mahavir-samaj',
-      password: 'a-long-enough-password',
+      fullName: "Ravi Shah",
+      mobileOrEmail: "ravi@example.com",
+      tenantSlug: "mahavir-samaj",
+      password: "a-long-enough-password",
+      consentedPurposes: ["Membership"],
+      noticeVersion: "2026-08-28.1",
     });
 
     request.flush({
@@ -134,7 +151,7 @@ describe('RegisterComponent', () => {
   });
 
   it('surfaces the field-level messages the API returned', () => {
-    loadDirectory();
+    loadScreen();
     fillValidForm();
     component.submit();
 
@@ -151,7 +168,7 @@ describe('RegisterComponent', () => {
   });
 
   it('shows the conflict message when the identifier is already registered', () => {
-    loadDirectory();
+    loadScreen();
     fillValidForm();
     component.submit();
 
@@ -165,5 +182,77 @@ describe('RegisterComponent', () => {
     fixture.detectChanges();
 
     expect(text()).toContain('already registered');
+  });
+
+  it('leaves every consent box unticked, including the required one', () => {
+    loadScreen();
+
+    // A pre-ticked box is not consent. DPDP requires it to be affirmative.
+    const boxes = (fixture.nativeElement as HTMLElement)
+      .querySelectorAll<HTMLInputElement>('.consent input[type="checkbox"]');
+
+    expect(boxes.length).toBe(2);
+    expect(Array.from(boxes).every((box) => !box.checked)).toBe(true);
+    expect(component.agreed()).toEqual([]);
+  });
+
+  it('will not submit until the required consent is ticked', () => {
+    loadScreen();
+
+    component.form.setValue({
+      fullName: 'Ravi Shah',
+      mobileOrEmail: 'ravi@example.com',
+      tenantSlug: 'mahavir-samaj',
+      password: 'a-long-enough-password',
+    });
+
+    component.submit();
+
+    http.expectNone('/v1/identity/register');
+    expect(component.showConsentError()).toBe(true);
+  });
+
+  it('sends only the purposes actually ticked', () => {
+    loadScreen();
+    fillValidForm();
+    component.toggleAgreement('Communications');
+
+    component.submit();
+
+    const body = http.expectOne('/v1/identity/register').request.body as {
+      consentedPurposes: string[];
+    };
+
+    expect(body.consentedPurposes.sort()).toEqual(['Communications', 'Membership']);
+  });
+
+  it('unticking removes the purpose again', () => {
+    loadScreen();
+
+    component.toggleAgreement('Communications');
+    component.toggleAgreement('Communications');
+
+    expect(component.agreed()).toEqual([]);
+  });
+
+  it('marks which purposes the notice says are required', () => {
+    loadScreen();
+
+    expect(text()).toContain('Required');
+    expect(text()).toContain('Your membership');
+  });
+
+  it('cannot be submitted at all when the notice could not be loaded', () => {
+    fixture.detectChanges();
+    http.expectOne('/v1/identity/tenants/directory').flush(directory);
+    http
+      .expectOne('/v1/identity/consent-notice')
+      .flush({}, { status: 503, statusText: 'Unavailable' });
+    fixture.detectChanges();
+
+    // Registering without a notice would produce a consent record that cannot
+    // say what the person was shown.
+    expect(component.canSubmit()).toBe(false);
+    expect(text()).toContain('Try again');
   });
 });

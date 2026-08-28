@@ -230,6 +230,7 @@ session.
 | Need | Location |
 |---|---|
 | Business requirements & rationale | `docs/product/README.md` and the linked docs |
+| DPDP Act obligations, what is built, what needs counsel | `docs/product/DPDP-COMPLIANCE.md` |
 | Data model / entity fields | `docs/product/DATA-MODEL.md` |
 | Per-service ownership, commands/queries/events | `docs/product/SERVICES.md` |
 | REST endpoint list | `docs/product/API-CONTRACTS.md` |

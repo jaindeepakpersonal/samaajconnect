@@ -8,12 +8,14 @@ version of the plan; the reasoning behind the ordering lives in
 ## Current Status
 
 - **Stage:** Stage 0 complete; starting Phase 1 - Platform Foundation
-- **Last updated:** 2026-08-28 - adult-child conversion complete end to end,
-  across three services and two Kafka topics, with one-time activation codes.
-  389 tests green (347 backend, 42 frontend) plus 30 smoke checks against a
-  stack built from scratch.
-- **Blocking item:** none. Next up is the DPDP Act work - consent records,
-  data export and erasure - which the review below confirms is required.
+- **Last updated:** 2026-08-28 - DPDP consent: a versioned notice, per-purpose
+  append-only consent records, withdrawal, and data export. 435 tests green
+  (387 backend, 48 frontend) plus 34 smoke checks against a stack built from
+  scratch.
+- **Blocking item:** none for building. Five questions in
+  `docs/product/DPDP-COMPLIANCE.md` need someone qualified in Indian data
+  protection law before Phase 1 ships to real users - the erasure-vs-audit-log
+  reading in particular shapes what gets built next.
 
 *(Update these three lines at the start/end of every work session —
 they're what a coding agent or a teammate should read first to know
@@ -82,8 +84,12 @@ unit tested.
       issues a one-time activation code (shown once, stored as a hash) and
       hands it over in person; redeeming it sets the first password and closes
       the loop back to member-family-service
-- [ ] DPDP Act capabilities: consent records, data export, erasure requests
-      (the review is confirmed required — see Open Decisions)
+- [x] DPDP Act: the compliance mapping (`docs/product/DPDP-COMPLIANCE.md`),
+      versioned consent notice, per-purpose append-only consent records
+      captured at registration, withdrawal, and per-service data export
+- [ ] DPDP Act, remaining: erasure requests (and de-identifying audit rows
+      rather than deleting them), parental consent recorded on `ChildProfile`,
+      member-family and audit data exports, grievance contact per Samaaj
 - [ ] Admin: tenant CRUD screens
 - [ ] Admin: admin user + role assignment screens
 - [ ] `docs/product/SECURITY-CHECKLIST.md` pass on both Stage-0 +

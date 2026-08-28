@@ -16,6 +16,9 @@ YARP gateway.
   finish a session.
 - **Business requirements & rationale:** [`docs/product/`](./docs/product/) —
   start with `docs/product/README.md`.
+- **DPDP Act, 2023:** [`docs/product/DPDP-COMPLIANCE.md`](./docs/product/DPDP-COMPLIANCE.md)
+  — which obligations the software satisfies, and the five questions that need
+  a lawyer rather than an engineer.
 - **Clickable wireframes:** `docs/product/wireframes/*.html` — open
   directly in a browser. These are the UI spec, not just a reference —
   see `.claude/skills/wireframe-to-angular/`.

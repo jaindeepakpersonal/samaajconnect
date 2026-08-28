@@ -19,4 +19,6 @@ public sealed record RegisterMemberCommand(
     string TenantSlug,
     string FullName,
     string MobileOrEmail,
-    string Password) : ICommand<RegisterMemberResponse>;
+    string Password,
+    IReadOnlyCollection<string> ConsentedPurposes,
+    string NoticeVersion) : ICommand<RegisterMemberResponse>;

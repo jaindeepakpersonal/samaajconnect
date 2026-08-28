@@ -110,6 +110,8 @@ public sealed class PlatformBootstrapTests(IdentityTenantApiFactory factory)
             fullName = "Ravi Shah",
             mobileOrEmail = "ravi@example.com",
             password = "a-long-enough-password",
+            consentedPurposes = new[] { "Membership" },
+            noticeVersion = Domain.Consents.ConsentNotice.CurrentVersion,
         });
 
         registered.StatusCode.Should().Be(HttpStatusCode.Created);

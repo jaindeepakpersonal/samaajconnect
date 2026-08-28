@@ -2,6 +2,7 @@ import { HttpClient } from '@angular/common/http';
 import { Injectable, computed, inject, signal } from '@angular/core';
 import { Observable, tap } from 'rxjs';
 import {
+  ConsentNotice,
   CurrentUser,
   LoginResult,
   RegisterRequest,
@@ -37,9 +38,14 @@ export class AuthService {
       .pipe(tap((user) => this.currentUser.set(user)));
   }
 
-  /** Anonymous lookup - this is what the gateway itself calls to resolve a subdomain. */
+  /** Anonymous lookup of one Samaaj by slug. */
   findTenant(slug: string): Observable<TenantSummary> {
     return this.http.get<TenantSummary>(`/v1/identity/tenants/${encodeURIComponent(slug)}`);
+  }
+
+  /** The consent notice, which must be shown before registering (DPDP s.5). */
+  consentNotice(): Observable<ConsentNotice> {
+    return this.http.get<ConsentNotice>('/v1/identity/consent-notice');
   }
 
   signOut(): void {

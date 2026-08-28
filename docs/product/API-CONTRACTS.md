@@ -25,6 +25,9 @@ enforced by `TenantAuthorizationBehavior`, not just UI hiding.
 | GET | `/activations/pending` | SamaajAdmin | Accounts awaiting activation |
 | POST | `/activations/{userId}/code` | SamaajAdmin | Mint a one-time activation code (returned once) |
 | POST | `/activations/redeem` | Anonymous | Redeem a code and set a first password |
+| GET | `/consent-notice` | Anonymous | The consent notice and its version (DPDP s.5) |
+| POST | `/me/consents/{purpose}/withdraw` | Authenticated | Withdraw one consent (DPDP s.6(4)) |
+| GET | `/me/data-export` | Authenticated | What this service holds about you (DPDP s.11) |
 | POST | `/logout` | Authenticated | Revoke current session/refresh token |
 | GET | `/me` | Authenticated | Current user + roles + tenant |
 | POST | `/admin-users` | SuperAdmin, SamaajAdmin | Invite/create admin user |

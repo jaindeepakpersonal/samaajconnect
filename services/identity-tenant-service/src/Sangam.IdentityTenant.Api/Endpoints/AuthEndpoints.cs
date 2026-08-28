@@ -19,7 +19,12 @@ public static class AuthEndpoints
                 CancellationToken cancellationToken) =>
             {
                 var command = new RegisterMemberCommand(
-                    request.TenantSlug, request.FullName, request.MobileOrEmail, request.Password);
+                    request.TenantSlug,
+                    request.FullName,
+                    request.MobileOrEmail,
+                    request.Password,
+                    request.ConsentedPurposes ?? [],
+                    request.NoticeVersion ?? string.Empty);
 
                 var result = await sender.Send(command, cancellationToken);
 
@@ -67,11 +72,18 @@ public static class AuthEndpoints
         return app;
     }
 
+    /// <summary>
+    /// <paramref name="NoticeVersion"/> is which version of the consent notice
+    /// the visitor was shown. Required, because DPDP section 6(7) makes a
+    /// consent record that cannot say what was shown worth very little.
+    /// </summary>
     public sealed record RegisterRequest(
         string TenantSlug,
         string FullName,
         string MobileOrEmail,
-        string Password);
+        string Password,
+        IReadOnlyCollection<string>? ConsentedPurposes,
+        string? NoticeVersion);
 
     public sealed record LoginRequest(string MobileOrEmail, string Password);
 }

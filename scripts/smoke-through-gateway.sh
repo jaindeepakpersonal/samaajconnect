@@ -112,10 +112,26 @@ check "activate" 200 "$(status -X PATCH "$GATEWAY/v1/identity/tenants/$TENANT_ID
   -d '{"status":"Active"}')"
 
 echo
+echo "Consent notice, shown before anyone registers"
+NOTICE_VERSION=$(curl -s "$GATEWAY/v1/identity/consent-notice" | json_field version)
+
+if [ -n "$NOTICE_VERSION" ]; then
+  echo "  ok    consent notice is public (version $NOTICE_VERSION)"
+  pass=$((pass + 1))
+else
+  echo "  FAIL  could not read the consent notice"
+  fail=$((fail + 1))
+fi
+
+check "registering without consent is refused" 400 \
+  "$(status -X POST "$GATEWAY/v1/identity/register" -H 'Content-Type: application/json' \
+     -d "{\"tenantSlug\":\"$SLUG\",\"fullName\":\"No Consent\",\"mobileOrEmail\":\"no-consent@example.com\",\"password\":\"$MEMBER_PASSWORD\",\"consentedPurposes\":[],\"noticeVersion\":\"$NOTICE_VERSION\"}")"
+
+echo
 echo "Member registers, choosing their Samaaj from the directory"
 REGISTER_STATUS=$(status -X POST "$GATEWAY/v1/identity/register" \
   -H 'Content-Type: application/json' \
-  -d "{\"tenantSlug\":\"$SLUG\",\"fullName\":\"Smoke Member\",\"mobileOrEmail\":\"$MEMBER\",\"password\":\"$MEMBER_PASSWORD\"}")
+  -d "{\"tenantSlug\":\"$SLUG\",\"fullName\":\"Smoke Member\",\"mobileOrEmail\":\"$MEMBER\",\"password\":\"$MEMBER_PASSWORD\",\"consentedPurposes\":[\"Membership\"],\"noticeVersion\":\"$NOTICE_VERSION\"}")
 
 if [ "$REGISTER_STATUS" = "409" ]; then
   echo "  note  member already registered from an earlier run"

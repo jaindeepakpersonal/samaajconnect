@@ -137,6 +137,8 @@ public sealed class ActivationEndpointsTests(IdentityTenantApiFactory factory)
             fullName = "Ravi Shah",
             mobileOrEmail = "ravi@example.com",
             password = Password,
+            consentedPurposes = new[] { "Membership" },
+            noticeVersion = Domain.Consents.ConsentNotice.CurrentVersion,
         });
 
         var userId = (await registered.Content.ReadFromJsonAsync<JsonElement>())

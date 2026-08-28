@@ -26,6 +26,10 @@ public sealed class AuthEndpointsTests(IdentityTenantApiFactory factory)
         fullName = "Ravi Shah",
         mobileOrEmail = identifier,
         password = Password,
+        // Registration records consent, so every caller has to say what it
+        // agreed to and which notice it was shown (DPDP s.6).
+        consentedPurposes = new[] { "Membership" },
+        noticeVersion = Domain.Consents.ConsentNotice.CurrentVersion,
     };
 
     private Task<HttpResponseMessage> RegisterAsync(string slug, string identifier = "ravi@example.com") =>
@@ -112,6 +116,8 @@ public sealed class AuthEndpointsTests(IdentityTenantApiFactory factory)
             fullName = "Ravi Shah",
             mobileOrEmail = "ravi@example.com",
             password = "short",
+            consentedPurposes = new[] { "Membership" },
+            noticeVersion = Domain.Consents.ConsentNotice.CurrentVersion,
         });
 
         response.StatusCode.Should().Be(HttpStatusCode.BadRequest);
