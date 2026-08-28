@@ -6,7 +6,10 @@ using Sangam.IdentityTenant.Application.Tenants.Commands.CreateTenant;
 using Sangam.IdentityTenant.Application.Tenants.Commands.SetGrievanceContact;
 using Sangam.IdentityTenant.Application.Tenants.Queries.GetTenantById;
 using Sangam.IdentityTenant.Application.Tenants.Queries.GetTenantBySlug;
+using Sangam.IdentityTenant.Application.Tenants.Commands.SetTenantModules;
 using Sangam.IdentityTenant.Application.Tenants.Queries.ListRegisterableTenants;
+using Sangam.IdentityTenant.Application.Tenants.Queries.ListTenants;
+using Sangam.IdentityTenant.Domain.Tenants;
 
 namespace Sangam.IdentityTenant.Api.Endpoints;
 
@@ -102,6 +105,59 @@ public static class TenantEndpoints
             .Produces<TenantSummaryResponse>()
             .ProducesProblem(StatusCodes.Status404NotFound);
 
+        // Before "/{slug}", or a request for /v1/identity/tenants/modules would
+        // be read as a Samaaj whose slug is "modules".
+        group.MapGet("/modules", (CancellationToken _) =>
+                Results.Ok(ModuleCatalog.All.Select(m => new
+                {
+                    key = m.Key,
+                    label = m.Label,
+                    defaultOn = m.DefaultOn,
+                })))
+            .AllowAnonymous()
+            .WithName("ListModules")
+            .WithSummary("The modules a Samaaj can run. Fills the create/edit toggles.");
+
+        group.MapGet("/", async (
+                string? status,
+                string? search,
+                ISender sender,
+                CancellationToken cancellationToken) =>
+            {
+                var result = await sender.Send(
+                    new ListTenantsQuery(status, search), cancellationToken);
+
+                return result.ToApiResult();
+            })
+            .RequireAuthorization()
+            .WithName("ListTenants")
+            .WithSummary("Every Samaaj, in every status (Super Admin only).")
+            .Produces<IReadOnlyList<TenantResponse>>()
+            .ProducesValidationProblem()
+            .ProducesProblem(StatusCodes.Status401Unauthorized)
+            .ProducesProblem(StatusCodes.Status403Forbidden);
+
+        group.MapPut("/{id:guid}/modules", async (
+                Guid id,
+                SetModulesRequest request,
+                ISender sender,
+                CancellationToken cancellationToken) =>
+            {
+                var result = await sender.Send(
+                    new SetTenantModulesCommand(id, request.EnabledModules), cancellationToken);
+
+                return result.ToApiResult();
+            })
+            .RequireAuthorization()
+            .WithName("SetTenantModules")
+            .WithSummary("Replace the set of modules a Samaaj runs (Super Admin only).")
+            .Produces<TenantResponse>()
+            .ProducesValidationProblem()
+            .ProducesProblem(StatusCodes.Status401Unauthorized)
+            .ProducesProblem(StatusCodes.Status403Forbidden)
+            .ProducesProblem(StatusCodes.Status404NotFound)
+            .ProducesProblem(StatusCodes.Status409Conflict);
+
         group.MapGet("/directory", async (ISender sender, CancellationToken cancellationToken) =>
             {
                 var result = await sender.Send(new ListRegisterableTenantsQuery(), cancellationToken);
@@ -138,6 +194,8 @@ public static class TenantEndpoints
     public sealed record ChangeStatusRequest(string Status);
 
     public sealed record GrievanceContactRequest(string? Name, string? Email, string? Phone);
+
+    public sealed record SetModulesRequest(IReadOnlyList<string> EnabledModules);
 
     public sealed record CreateTenantRequest(
         string Name,

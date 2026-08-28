@@ -176,6 +176,62 @@ public sealed class User : AggregateRoot, ITenantScopedEntity
     }
 
     /// <summary>
+    /// Creates an account for someone a Samaaj Admin is inviting into a role.
+    /// </summary>
+    /// <remarks>
+    /// Like <see cref="CreateFromChildConversion"/>, the account starts in
+    /// <see cref="UserStatus.PendingActivation"/> with no password: inviting
+    /// someone establishes that they are entitled to an account, and nobody has
+    /// yet proved they are the person asking for it. Redeeming an activation
+    /// code is that proof and sets the first password.
+    ///
+    /// The invited roles are granted up front rather than after activation.
+    /// They cannot be used until the account can be signed into, and granting
+    /// them here means the invitation is one decision with one audit trail
+    /// rather than a grant that someone has to remember to make later.
+    ///
+    /// Member is granted alongside them. Everyone with a login is a member of
+    /// their Samaaj first; the administrative role is what they do in addition.
+    /// </remarks>
+    public static User Invite(
+        Guid tenantId,
+        string mobileOrEmail,
+        string fullName,
+        Guid memberRoleId,
+        IEnumerable<Guid> roleIds,
+        Guid invitedBy,
+        DateTimeOffset createdAt)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(mobileOrEmail);
+        ArgumentException.ThrowIfNullOrWhiteSpace(fullName);
+
+        var user = new User
+        {
+            Id = Guid.NewGuid(),
+            TenantId = tenantId,
+            MobileOrEmail = NormalizeIdentifier(mobileOrEmail),
+            FullName = fullName.Trim(),
+            PasswordHash = string.Empty,
+            AuthMethod = AuthMethod.Password,
+            Status = UserStatus.PendingActivation,
+            IsContactVerified = false,
+            CreatedAt = createdAt,
+        };
+
+        user._roles.Add(new UserRole(user.Id, memberRoleId, tenantId, createdAt));
+
+        foreach (var roleId in roleIds.Distinct().Where(id => id != memberRoleId))
+        {
+            user._roles.Add(new UserRole(user.Id, roleId, tenantId, createdAt));
+        }
+
+        user.Raise(new AdminInvitedDomainEvent(
+            user.Id, tenantId, [.. user._roles.Select(r => r.RoleId)], invitedBy, createdAt));
+
+        return user;
+    }
+
+    /// <summary>
     /// Attaches a freshly issued activation code, replacing any earlier one.
     /// Re-issuing is normal: codes expire, and paper gets lost.
     /// </summary>
@@ -297,6 +353,47 @@ public sealed class User : AggregateRoot, ITenantScopedEntity
         _roles.Add(new UserRole(Id, roleId, tenantScope, now));
     }
 
+
+    /// <summary>
+    /// Grants a role, and announces it. Returns false when the user already
+    /// holds it at that scope, so a repeated click is a no-op rather than a
+    /// second identical grant and a second audit row.
+    /// </summary>
+    public bool GrantRole(Guid roleId, Guid? tenantScope, Guid grantedBy, DateTimeOffset now)
+    {
+        if (_roles.Any(r => r.RoleId == roleId && r.TenantScope == tenantScope))
+        {
+            return false;
+        }
+
+        _roles.Add(new UserRole(Id, roleId, tenantScope, now));
+
+        Raise(new UserRoleGrantedDomainEvent(Id, TenantId, roleId, tenantScope, grantedBy, now));
+
+        return true;
+    }
+
+    /// <summary>
+    /// Removes a role. Returns false when the user did not hold it, which is
+    /// the normal outcome of two admins revoking the same grant at once.
+    /// </summary>
+    public bool RevokeRole(Guid roleId, Guid? tenantScope, Guid revokedBy, DateTimeOffset now)
+    {
+        var held = _roles.FirstOrDefault(r => r.RoleId == roleId && r.TenantScope == tenantScope);
+
+        if (held is null)
+        {
+            return false;
+        }
+
+        _roles.Remove(held);
+
+        Raise(new UserRoleRevokedDomainEvent(Id, TenantId, roleId, tenantScope, revokedBy, now));
+
+        return true;
+    }
+
+    public bool HasRole(Guid roleId) => _roles.Any(r => r.RoleId == roleId);
     /// <summary>
     /// Lowercases and trims so "Ravi@Example.com " and "ravi@example.com" can
     /// never become two accounts, and so login lookups are exact-match.

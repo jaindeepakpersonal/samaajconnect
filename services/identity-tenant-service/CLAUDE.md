@@ -38,7 +38,9 @@ since those happen *before* a tenant is established.
 | `WithdrawConsentCommand` | any authenticated role | built |
 | `SetGrievanceContactCommand` | `SuperAdmin`, `SamaajAdmin` + `AdminUsers.Manage` | built |
 | `EraseMyAccountCommand` | any authenticated role, self only | built |
-| `AssignRoleCommand` | `SuperAdmin`, `SamaajAdmin` + `AdminUsers.Manage` | not built |
+| `AssignRoleCommand` | `SuperAdmin`, `SamaajAdmin` + `AdminUsers.Manage` | built |
+| `InviteAdminCommand` | `SuperAdmin`, `SamaajAdmin` + `AdminUsers.Manage` | built |
+| `SetTenantModulesCommand` | `SuperAdmin` + `Tenant.Manage` | built |
 
 A new Samaaj is created **Inactive**. Creating the record and letting it serve
 traffic are two separately audited decisions, so activation is its own command.
@@ -54,7 +56,9 @@ traffic are two separately audited decisions, so activation is its own command.
 | `ListPendingActivationsQuery` | `SamaajAdmin` + `AdminUsers.Manage` | built |
 | `GetConsentNoticeQuery` | anonymous | built |
 | `GetMyDataQuery` | any authenticated role | built |
-| `ListTenantsQuery` | `SuperAdmin` | not built |
+| `ListTenantsQuery` | `SuperAdmin` + `Tenant.Manage` | built |
+| `ListAdminUsersQuery` | `SuperAdmin`, `SamaajAdmin` + `AdminUsers.Manage` | built |
+| `ListRolesQuery` | any authenticated role | built |
 
 `GetTenantBySlugQuery` returns `TenantSummaryResponse`, not `TenantResponse`.
 The endpoint is reachable without a JWT, so it must not hand an anonymous
@@ -72,6 +76,10 @@ tenant is reported as 404 rather than as a distinct state, for the same reason.
 | `UserActivatedFromChildDomainEvent` | `identity.child-conversion.completed.v1` | `User.Activate` |
 | `ConsentRecordedDomainEvent` | `identity.consent.recorded.v1` | `ConsentRecord.Grant` and `.Withdraw` |
 | `UserErasedDomainEvent` | `identity.user.erased.v1` | `User.Erase` |
+| `TenantModulesChangedDomainEvent` | `identity.tenant.modules-changed.v1` | `Tenant.SetEnabledModules` |
+| `AdminInvitedDomainEvent` | `identity.admin.invited.v1` | `User.Invite` |
+| `UserRoleGrantedDomainEvent` | `identity.user.role-granted.v1` | `User.GrantRole` |
+| `UserRoleRevokedDomainEvent` | `identity.user.role-revoked.v1` | `User.RevokeRole` |
 
 Delivery is at-least-once by design (see `Messaging/OutboxDispatcher.cs`).
 Consumers must be idempotent.
@@ -95,6 +103,9 @@ offsets for messages it did nothing with.
 | GET | `/v1/identity/tenants/{slug}` | anonymous |
 | GET | `/v1/identity/tenants/by-id/{id}` | anonymous (the gateway calls it) |
 | GET | `/v1/identity/tenants/directory` | anonymous |
+| GET | `/v1/identity/tenants` | `SuperAdmin` + `Tenant.Manage` |
+| GET | `/v1/identity/tenants/modules` | anonymous |
+| PUT | `/v1/identity/tenants/{id}/modules` | `SuperAdmin` + `Tenant.Manage` |
 | POST | `/v1/identity/register` | anonymous |
 | POST | `/v1/identity/login` | anonymous |
 | GET | `/v1/identity/me` | any authenticated role |
@@ -103,6 +114,10 @@ offsets for messages it did nothing with.
 | POST | `/v1/identity/activations/redeem` | anonymous |
 | GET | `/v1/identity/consent-notice` | anonymous |
 | POST | `/v1/identity/me/consents/{purpose}/withdraw` | any authenticated role |
+| GET | `/v1/identity/roles` | any authenticated role |
+| GET | `/v1/identity/admins` | `SuperAdmin`, `SamaajAdmin` + `AdminUsers.Manage` |
+| POST | `/v1/identity/admins` | `SuperAdmin`, `SamaajAdmin` + `AdminUsers.Manage` |
+| PUT | `/v1/identity/admins/{userId}/roles/{role}` | `SuperAdmin`, `SamaajAdmin` + `AdminUsers.Manage` |
 | GET | `/v1/identity/me/data-export` | any authenticated role |
 | POST | `/v1/identity/me/erase` | any authenticated role |
 | PUT | `/v1/identity/tenants/{id}/grievance-contact` | `SuperAdmin`, `SamaajAdmin` + `AdminUsers.Manage` |
@@ -247,6 +262,99 @@ audit-notification-service, which records every payload verbatim into an
 append-only table, so a name on it would land somewhere deliberately impossible
 to redact. `User.Erase` and the outbox row commit together, so an erasure that
 succeeds here is always announced to the other two services.
+
+
+## The admin surface
+
+What the admin portal's Samaaj/Tenants, Admin Users & Roles, and Role Matrix
+screens call. `docs/product/wireframes/admin-panel-wireframes.html` is the spec.
+
+**Module keys are a closed list, not free text.** `ModuleCatalog` in the domain
+is the only set of values `Tenant.EnabledModules` may hold, and both the create
+and the set-modules validators refuse anything else. The reason is what an
+unrecognised value does: the gateway gates a route by looking for its module key
+in that collection and answers 404 when it is absent, so a Samaaj created with
+"pathshaala" would have its Pathshala routes disappear with nothing logged
+anywhere - and a typo and a deliberate switch-off would look identical. The
+catalogue also carries the label the admin portal shows, so the two cannot drift
+into disagreeing about what a key means.
+
+Keys are canonicalised rather than rejected on casing. The gateway compares them
+case-insensitively, so refusing "Pathshala" would refuse a request that would
+have worked, while storing it verbatim would leave two spellings of one module
+for the next comparison to disagree about.
+
+**Nothing consumes `identity.tenant.modules-changed.v1`.** The gateway re-reads
+a Samaaj when its own 60-second cache expires, so a module change takes effect
+within a minute with no consumer to keep in step. The event exists because
+switching a module off makes a whole area of the platform answer 404 for
+everyone in that Samaaj, which is a decision worth having in the audit log.
+
+**The role matrix is read-only, and that is a decision rather than an
+omission.** The wireframe's Role & Permission Matrix screen says "this screen
+edits it, not just displays it". Every command and query on this platform
+declares the roles and permissions it requires as a compiled-in attribute, so a
+runtime-editable matrix would split the answer to "who may approve a
+conversion?" between source control and a table someone changed on a Tuesday,
+with neither half reviewable against the other. It is also platform-wide: a
+Samaaj Admin editing it would be editing what a Samaaj Admin means everywhere.
+
+Making it editable is a real requirement and its own piece of work - it needs
+per-tenant role definitions, an audit trail of matrix changes, and a floor of
+permissions no edit may remove or the platform locks itself out. Until then
+`GET /v1/identity/roles` reports what the pipeline actually enforces, reading
+straight from `AuthorizationCatalog` rather than the database so it cannot
+report a matrix that has drifted, and says `editable: false` so a screen does
+not have to assume.
+
+**Which modules a Samaaj runs is a Super Admin decision; who administers it is
+the Samaaj Admin's.** Modules are what the gateway routes on, and switching one
+off makes a whole area of the platform answer 404 for everybody in that Samaaj.
+A Samaaj Admin manages people and content inside the modules they have.
+
+**Not every role can be handed out.** `AuthorizationCatalog.AdminAssignableRoleIds`
+is the list, and both the matrix and the assign-role command read it, so a role
+can never be assignable in one and not the other. `SuperAdmin` is missing
+because its only route is the bootstrap on an empty database, so granting it can
+never be one compromised admin account away. `Member`, `FamilyHead` and
+`PathshalaStudent` are missing because they are earned - by registering, by
+creating a household, by enrolling - and granting one from a screen would write
+a grant with no account behind it.
+
+**An admin cannot remove their own Samaaj Admin role.** In a Samaaj with one
+administrator that locks everybody out of the screen they are standing on.
+Another admin can still do it, which makes it take two people rather than one
+mis-click.
+
+**Inviting creates the account and issues the code in one command.** An
+invitation that created the account and then failed to issue a code would leave
+an account nobody can reach and no obvious way to tell that is what happened.
+The invited roles are granted up front: they cannot be used until the account
+can be signed into, and granting them at invitation time means the decision has
+one audit trail rather than a grant someone must remember to make later. The
+account is `PendingActivation` with no password, exactly like a converted
+child's, because inviting someone establishes they are entitled to an account
+and nobody has yet proved they are the person asking for it.
+
+**An identifier already on the platform is refused without saying where.**
+`MobileOrEmail` is unique platform-wide, so the existing account may be in
+another Samaaj; naming it would confirm an identifier is on the platform to
+anyone holding an admin account anywhere. Adding a role to an existing account
+is what `AssignRoleCommand` is for.
+
+**`GetByIdAsync` includes the role grants, and that Include is load-bearing.**
+Every write path reaching a `User` through it reasons about roles - granting one
+checks for a duplicate, revoking one looks for the grant, erasure clears them
+all. With the collection unloaded each of those operates on an empty list and
+reports success having done nothing; erasure was leaving live role rows behind
+until this was fixed. There is a regression test.
+
+**`UserRole.Id` is `ValueGeneratedNever`.** The aggregate assigns it. Left as
+EF's default, a grant added to a *tracked* `User` comes back Modified rather
+than Added and the save fails against a row that was never there. This is the
+same trap member-family-service's `CLAUDE.md` records for `Family` and
+`FamilyMember`; it stayed hidden here until `GrantRole` started adding a role to
+a `User` that was already loaded. Apply it to any domain-assigned key.
 
 ## Dependencies
 

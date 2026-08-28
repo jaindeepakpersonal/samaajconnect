@@ -15,8 +15,20 @@ public sealed class UserRepository(IdentityTenantDbContext dbContext) : IUserRep
             .IgnoreQueryFilters()
             .FirstOrDefaultAsync(u => u.MobileOrEmail == mobileOrEmail, cancellationToken);
 
+    /// <summary>
+    /// Tenant-filtered, with the role grants loaded.
+    /// </summary>
+    /// <remarks>
+    /// The Include is load-bearing, not an optimisation. Every write path that
+    /// reaches a User through this method reasons about its roles - granting
+    /// one checks for a duplicate, revoking one looks for the grant, and
+    /// erasure clears them all. With the collection unloaded each of those
+    /// operates on an empty list and reports success having done nothing.
+    /// </remarks>
     public Task<User?> GetByIdAsync(Guid id, CancellationToken cancellationToken = default) =>
-        dbContext.Users.FirstOrDefaultAsync(u => u.Id == id, cancellationToken);
+        dbContext.Users
+            .Include(u => u.Roles)
+            .FirstOrDefaultAsync(u => u.Id == id, cancellationToken);
 
     public Task<bool> IdentifierExistsAsync(string mobileOrEmail, CancellationToken cancellationToken = default) =>
         dbContext.Users
@@ -61,6 +73,18 @@ public sealed class UserRepository(IdentityTenantDbContext dbContext) : IUserRep
             // The consumer that calls this has no request and so no tenant.
             .IgnoreQueryFilters()
             .FirstOrDefaultAsync(u => u.ConvertedFromChildProfileId == childProfileId, cancellationToken);
+
+    public async Task<IReadOnlyList<User>> ListWithRolesAsync(
+        IReadOnlyCollection<Guid> roleIds, CancellationToken cancellationToken = default) =>
+        // Tenant-filtered: reachable over HTTP, so a Samaaj Admin sees their own
+        // administrators and nobody else's.
+        await dbContext.Users
+            .AsNoTracking()
+            .Include(u => u.Roles)
+            .Where(u => u.Status != UserStatus.Erased)
+            .Where(u => u.Roles.Any(r => roleIds.Contains(r.RoleId)))
+            .OrderBy(u => u.FullName)
+            .ToListAsync(cancellationToken);
 
     public async Task<IReadOnlyList<User>> ListPendingActivationAsync(
         CancellationToken cancellationToken = default) =>

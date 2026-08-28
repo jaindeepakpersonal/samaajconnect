@@ -140,4 +140,38 @@ public static class AuthorizationCatalog
         new(RoleIds.BoliManager, PermissionIds.BoliManage),
         new(RoleIds.BoliManager, PermissionIds.BoliPublishResults),
     ];
+
+    /// <summary>
+    /// The roles a Samaaj administrator may hand out.
+    /// </summary>
+    /// <remarks>
+    /// Not every role. Three kinds are missing, for three different reasons.
+    ///
+    /// <b>SuperAdmin</b> is platform administration, not Samaaj
+    /// administration. Its only route is the bootstrap on an empty database, so
+    /// that granting it can never be one compromised Samaaj Admin account away.
+    ///
+    /// <b>Member</b> and <b>FamilyHead</b> are earned, not granted - by
+    /// registering, and by creating a household. Handing someone Member from
+    /// this screen would write a grant with no account behind it.
+    ///
+    /// <b>PathshalaStudent</b> is created by enrolment for the same reason.
+    ///
+    /// This list is what both the role matrix and the assign-role command read,
+    /// so a role can never be assignable in one and not the other.
+    /// </remarks>
+    public static IReadOnlyList<Guid> AdminAssignableRoleIds { get; } =
+    [
+        RoleIds.SamaajAdmin,
+        RoleIds.ContentModerator,
+        RoleIds.VolunteerGroupPresident,
+        RoleIds.PathshalaTeacher,
+        RoleIds.BoliManager,
+    ];
+
+    public static bool IsAdminAssignable(Guid roleId) => AdminAssignableRoleIds.Contains(roleId);
+
+    /// <summary>The role with this name, or null when nothing is called that.</summary>
+    public static Role? FindRoleByName(string? name) =>
+        name is null ? null : Roles.FirstOrDefault(r => string.Equals(r.Name, name, StringComparison.OrdinalIgnoreCase));
 }

@@ -28,6 +28,13 @@ public interface IUserRepository
     Task<User?> GetByConvertedChildAsync(
         Guid childProfileId, CancellationToken cancellationToken = default);
 
+    /// <summary>
+    /// Accounts in this Samaaj holding any of these roles, with their roles
+    /// loaded. Tenant-filtered, like every read path reachable over HTTP.
+    /// </summary>
+    Task<IReadOnlyList<User>> ListWithRolesAsync(
+        IReadOnlyCollection<Guid> roleIds, CancellationToken cancellationToken = default);
+
     /// <summary>Accounts in this Samaaj waiting to be activated.</summary>
     Task<IReadOnlyList<User>> ListPendingActivationAsync(CancellationToken cancellationToken = default);
 

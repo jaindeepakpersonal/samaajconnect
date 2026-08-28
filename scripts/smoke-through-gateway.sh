@@ -358,6 +358,153 @@ check "it is published to anyone, as section 13 requires" "grievances@example.co
 echo
 
 echo
+
+echo
+echo "Admin surface: tenants, modules, the role matrix, and administrators"
+
+check "the tenant list is refused to a member" 403 \
+  "$(status -H "Authorization: Bearer $MEMBER_TOKEN" "$GATEWAY/v1/identity/tenants")"
+
+check "the tenant list is served to a Super Admin" 200 \
+  "$(status -H "Authorization: Bearer $ADMIN_TOKEN" "$GATEWAY/v1/identity/tenants")"
+
+check "a nonsense status is refused, not answered with an empty list" 400 \
+  "$(status -H "Authorization: Bearer $ADMIN_TOKEN" "$GATEWAY/v1/identity/tenants?status=Dormant")"
+
+check "the module catalogue is public because it fills a form" 200 \
+  "$(status "$GATEWAY/v1/identity/tenants/modules")"
+
+check "a mistyped module key is refused" 400 \
+  "$(status -X PUT "$GATEWAY/v1/identity/tenants/$TENANT_ID/modules" \
+     -H 'Content-Type: application/json' -H "Authorization: Bearer $ADMIN_TOKEN" \
+     -d '{"enabledModules":["pathshaala"]}')"
+
+check "modules are replaced as a whole set" 200 \
+  "$(status -X PUT "$GATEWAY/v1/identity/tenants/$TENANT_ID/modules" \
+     -H 'Content-Type: application/json' -H "Authorization: Bearer $ADMIN_TOKEN" \
+     -d '{"enabledModules":["pathshala","boli"]}')"
+
+check "the role matrix is readable by any signed-in member" 200 \
+  "$(status -H "Authorization: Bearer $MEMBER_TOKEN" "$GATEWAY/v1/identity/roles")"
+
+MATRIX=$(curl -s -H "Authorization: Bearer $MEMBER_TOKEN" "$GATEWAY/v1/identity/roles")
+
+if printf '%s' "$MATRIX" | grep -q '"editable":false'; then
+  echo "  ok    the matrix says it is not editable rather than letting a screen assume"
+  pass=$((pass + 1))
+else
+  echo "  FAIL  the matrix says it is not editable"
+  fail=$((fail + 1))
+fi
+
+INVITE_EMAIL="admin-$(date +%s)@example.com"
+
+check "a member cannot invite an administrator" 403 \
+  "$(status -X POST "$GATEWAY/v1/identity/admins" -H 'Content-Type: application/json' \
+     -H "Authorization: Bearer $MEMBER_TOKEN" \
+     -d "{\"fullName\":\"Rajesh Jain\",\"mobileOrEmail\":\"$INVITE_EMAIL\",\"roles\":[\"SamaajAdmin\"]}")"
+
+check "SuperAdmin cannot be invited into" 400 \
+  "$(status -X POST "$GATEWAY/v1/identity/admins" -H 'Content-Type: application/json' \
+     -H "Authorization: Bearer $ADMIN_TOKEN" -H "$ADMIN_TENANT_HEADER" \
+     -d "{\"fullName\":\"Rajesh Jain\",\"mobileOrEmail\":\"$INVITE_EMAIL\",\"roles\":[\"SuperAdmin\"]}")"
+
+INVITE=$(curl -s -X POST "$GATEWAY/v1/identity/admins" -H 'Content-Type: application/json' \
+  -H "Authorization: Bearer $ADMIN_TOKEN" -H "$ADMIN_TENANT_HEADER" \
+  -d "{\"fullName\":\"Rajesh Jain\",\"mobileOrEmail\":\"$INVITE_EMAIL\",\"roles\":[\"SamaajAdmin\"]}")
+
+INVITED_ID=$(printf '%s' "$INVITE" | json_field userId)
+INVITE_CODE=$(printf '%s' "$INVITE" | json_field activationCode)
+
+if [ -n "$INVITED_ID" ] && [ -n "$INVITE_CODE" ]; then
+  echo "  ok    an admin is invited and handed a one-time code"
+  pass=$((pass + 1))
+else
+  echo "  FAIL  an admin is invited and handed a one-time code ($INVITE)"
+  fail=$((fail + 1))
+fi
+
+check "the invited account cannot be signed into until the code is redeemed" 401 \
+  "$(status -X POST "$GATEWAY/v1/identity/login" -H 'Content-Type: application/json' \
+     -d "{\"mobileOrEmail\":\"$INVITE_EMAIL\",\"password\":\"$MEMBER_PASSWORD\"}")"
+
+check "the same identifier cannot be invited twice" 409 \
+  "$(status -X POST "$GATEWAY/v1/identity/admins" -H 'Content-Type: application/json' \
+     -H "Authorization: Bearer $ADMIN_TOKEN" -H "$ADMIN_TENANT_HEADER" \
+     -d "{\"fullName\":\"Rajesh Jain\",\"mobileOrEmail\":\"$INVITE_EMAIL\",\"roles\":[\"SamaajAdmin\"]}")"
+
+check "the invited admin redeems the code and sets a password" 200 \
+  "$(status -X POST "$GATEWAY/v1/identity/activations/redeem" -H 'Content-Type: application/json' \
+     -d "{\"mobileOrEmail\":\"$INVITE_EMAIL\",\"code\":\"$INVITE_CODE\",\"password\":\"$MEMBER_PASSWORD\"}")"
+
+SAMAAJ_ADMIN_TOKEN=$(curl -s -X POST "$GATEWAY/v1/identity/login" \
+  -H 'Content-Type: application/json' \
+  -d "{\"mobileOrEmail\":\"$INVITE_EMAIL\",\"password\":\"$MEMBER_PASSWORD\"}" | json_field accessToken)
+
+if [ -n "$SAMAAJ_ADMIN_TOKEN" ]; then
+  echo "  ok    the invited admin signs in with the role they were invited into"
+  pass=$((pass + 1))
+else
+  echo "  FAIL  the invited admin signs in"
+  fail=$((fail + 1))
+fi
+
+# The role travelled with the invitation, so this admin can do admin work
+# without anyone granting them anything after activation.
+check "and can immediately see their Samaaj's administrators" 200 \
+  "$(status -H "Authorization: Bearer $SAMAAJ_ADMIN_TOKEN" "$GATEWAY/v1/identity/admins")"
+
+check "but cannot decide which modules their Samaaj runs" 403 \
+  "$(status -X PUT "$GATEWAY/v1/identity/tenants/$TENANT_ID/modules" \
+     -H 'Content-Type: application/json' -H "Authorization: Bearer $SAMAAJ_ADMIN_TOKEN" \
+     -d '{"enabledModules":["boli"]}')"
+
+check "nor list every Samaaj on the platform" 403 \
+  "$(status -H "Authorization: Bearer $SAMAAJ_ADMIN_TOKEN" "$GATEWAY/v1/identity/tenants")"
+
+check "granting a role" 200 \
+  "$(status -X PUT "$GATEWAY/v1/identity/admins/$INVITED_ID/roles/BoliManager" \
+     -H 'Content-Type: application/json' -H "Authorization: Bearer $ADMIN_TOKEN" \
+     -H "$ADMIN_TENANT_HEADER" -d '{"granted":true}')"
+
+check "SuperAdmin cannot be granted through this endpoint" 400 \
+  "$(status -X PUT "$GATEWAY/v1/identity/admins/$INVITED_ID/roles/SuperAdmin" \
+     -H 'Content-Type: application/json' -H "Authorization: Bearer $ADMIN_TOKEN" \
+     -H "$ADMIN_TENANT_HEADER" -d '{"granted":true}')"
+
+check "an admin cannot remove their own Samaaj Admin role" 409 \
+  "$(status -X PUT "$GATEWAY/v1/identity/admins/$INVITED_ID/roles/SamaajAdmin" \
+     -H 'Content-Type: application/json' -H "Authorization: Bearer $SAMAAJ_ADMIN_TOKEN" \
+     -d '{"granted":false}')"
+
+ADMINS=$(curl -s -H "Authorization: Bearer $ADMIN_TOKEN" -H "$ADMIN_TENANT_HEADER" \
+  "$GATEWAY/v1/identity/admins")
+
+if printf '%s' "$ADMINS" | grep -q "BoliManager"; then
+  echo "  ok    the admin list shows the granted role"
+  pass=$((pass + 1))
+else
+  echo "  FAIL  the admin list shows the granted role"
+  fail=$((fail + 1))
+fi
+
+if printf '%s' "$ADMINS" | grep -q "Smoke Member"; then
+  echo "  FAIL  the admin list leaks ordinary members"
+  fail=$((fail + 1))
+else
+  echo "  ok    the admin list omits ordinary members"
+  pass=$((pass + 1))
+fi
+
+check "revoking a role" 200 \
+  "$(status -X PUT "$GATEWAY/v1/identity/admins/$INVITED_ID/roles/BoliManager" \
+     -H 'Content-Type: application/json' -H "Authorization: Bearer $ADMIN_TOKEN" \
+     -H "$ADMIN_TENANT_HEADER" -d '{"granted":false}')"
+
+check "the admin list is refused to a member" 403 \
+  "$(status -H "Authorization: Bearer $MEMBER_TOKEN" "$GATEWAY/v1/identity/admins")"
+
+echo
 echo "DPDP section 12: erasure, across all three services"
 
 # A throwaway account, because everything below this point still needs the

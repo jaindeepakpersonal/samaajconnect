@@ -1,5 +1,6 @@
 using System.Text.RegularExpressions;
 using FluentValidation;
+using Sangam.IdentityTenant.Domain.Tenants;
 
 namespace Sangam.IdentityTenant.Application.Tenants.Commands.CreateTenant;
 
@@ -47,9 +48,17 @@ public sealed partial class CreateTenantCommandValidator : AbstractValidator<Cre
             .WithMessage("Contact email must be a valid email address.")
             .When(x => !string.IsNullOrWhiteSpace(x.ContactEmail));
 
-        RuleForEach(x => x.EnabledModules)
-            .NotEmpty()
-            .MaximumLength(100)
+        // Same closed list as SetTenantModulesCommand. A Samaaj created with a
+        // mistyped module key would have every route of that module answer 404
+        // from the day it opened, with nothing logged anywhere to say why.
+        RuleFor(x => x.EnabledModules)
+            .Must(modules => ModuleCatalog.Unknown(modules).Count == 0)
+            .WithMessage(command =>
+                "Unknown module(s): "
+                + string.Join(", ", ModuleCatalog.Unknown(command.EnabledModules))
+                + ". Known modules are: "
+                + string.Join(", ", ModuleCatalog.All.Select(m => m.Key))
+                + ".")
             .When(x => x.EnabledModules is not null);
     }
 

@@ -192,6 +192,35 @@ public sealed class ErasureEndpointTests(IdentityTenantApiFactory factory)
         body.GetProperty("whatIsKeptAndWhy").EnumerateArray().Should().NotBeEmpty();
     }
 
+
+    [Fact]
+    public async Task Erasing_removes_the_role_grants_from_the_database_not_just_the_object()
+    {
+        // A regression: the repository fetched the User without its roles, so
+        // Erase cleared an empty collection and the grant rows survived - a
+        // token minted before erasure would still have carried real authority.
+        var client = await SignedInMemberAsync();
+
+        var userId = await factory.WithDbContextAsync(db =>
+            db.Users.IgnoreQueryFilters().AsNoTracking()
+                .Where(u => u.MobileOrEmail == Member)
+                .Select(u => u.Id)
+                .SingleAsync());
+
+        var before = await factory.WithDbContextAsync(db =>
+            db.Set<Domain.Authorization.UserRole>().AsNoTracking()
+                .CountAsync(r => r.UserId == userId));
+
+        before.Should().BeGreaterThan(0);
+
+        await client.PostAsJsonAsync("/v1/identity/me/erase", new { password = Password });
+
+        var after = await factory.WithDbContextAsync(db =>
+            db.Set<Domain.Authorization.UserRole>().AsNoTracking()
+                .CountAsync(r => r.UserId == userId));
+
+        after.Should().Be(0);
+    }
     [Fact]
     public async Task Erasing_needs_a_token()
     {

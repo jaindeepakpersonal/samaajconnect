@@ -75,7 +75,7 @@ public sealed class TenantEndpointsTests(IdentityTenantApiFactory factory)
             db.Tenants.AsNoTracking().SingleAsync(t => t.Id == tenantId));
 
         persisted.Slug.Should().Be("mumbai-samaaj");
-        persisted.EnabledModules.Should().ContainSingle().Which.Should().Be("Pathshala");
+        persisted.EnabledModules.Should().ContainSingle().Which.Should().Be("pathshala");
 
         var outbox = await factory.WithDbContextAsync(db =>
             db.OutboxMessages.AsNoTracking().ToListAsync());

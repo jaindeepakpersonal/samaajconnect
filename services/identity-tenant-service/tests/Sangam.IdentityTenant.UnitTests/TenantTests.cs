@@ -39,12 +39,26 @@ public sealed class TenantTests
     }
 
     [Fact]
-    public void Create_deduplicates_enabled_modules_case_insensitively()
+    public void Create_stores_module_keys_in_the_catalogue_s_own_spelling()
     {
+        // Whatever spelling arrives, one spelling is stored. Two spellings of
+        // one module in the column is a comparison waiting to disagree.
         var tenant = Tenant.Create(
-            "Mumbai Samaaj", "mumbai", null, null, null, ["Pathshala", "pathshala", " Boli "], Now);
+            "Mumbai Samaaj", "mumbai", null, null, null, ["Pathshala", "pathshala", " BOLI "], Now);
 
-        tenant.EnabledModules.Should().BeEquivalentTo(["Pathshala", "Boli"]);
+        tenant.EnabledModules.Should().BeEquivalentTo([ModuleCatalog.Pathshala, ModuleCatalog.Boli]);
+    }
+
+    [Fact]
+    public void Create_drops_a_module_the_catalogue_does_not_know()
+    {
+        // The validator refuses these before they reach the aggregate; this is
+        // the second line, so a caller bypassing it cannot write a key that
+        // would silently 404 every route of a module.
+        var tenant = Tenant.Create(
+            "Mumbai Samaaj", "mumbai", null, null, null, ["pathshaala"], Now);
+
+        tenant.EnabledModules.Should().BeEmpty();
     }
 
     [Fact]

@@ -8,15 +8,15 @@ version of the plan; the reasoning behind the ordering lives in
 ## Current Status
 
 - **Stage:** Stage 0 complete; Phase 1 - Platform Foundation in progress
-- **Last updated:** 2026-08-28 - DPDP: the right to erasure, end to end across
-  all three services. 432 tests green (384 backend, 48 frontend) plus 54 smoke
-  checks against a stack built from empty volumes.
-- **Blocking item:** none. Erasure is built on the reading set out in
-  `docs/product/DPDP-COMPLIANCE.md` - audit rows de-identified rather than
-  deleted - and confined to two files per service so counsel's answer to
-  question 1 changes little if it goes the other way. All five questions there
-  need counsel before Phase 1 ships to real users; none blocks work today.
-  Next: the admin portal.
+- **Last updated:** 2026-08-28 - the admin portal's backend surface: the Super
+  Admin tenant list, a closed module catalogue with runtime toggles, the role
+  matrix, and inviting and re-roling administrators. 500 tests green (452
+  backend, 48 frontend) plus 79 smoke checks against a stack built from empty
+  volumes.
+- **Blocking item:** none. Next: the admin-portal Angular app itself, which now
+  has real endpoints behind every screen it needs. The five questions in
+  `docs/product/DPDP-COMPLIANCE.md` need counsel before Phase 1 ships to real
+  users; none blocks work today.
 
 *(Update these three lines at the start/end of every work session —
 they're what a coding agent or a teammate should read first to know
@@ -102,8 +102,17 @@ unit tested.
       erasure. The endpoints exist and are exercised end to end, but a right
       only reachable with curl is not one a member has. No wireframe covers an
       account/privacy screen, so this needs one first
+- [x] Admin backend: Super Admin tenant list (`GET /v1/identity/tenants`), a
+      closed `ModuleCatalog` with runtime toggles, the read-only role and
+      permission matrix, listing administrators, inviting one with a one-time
+      activation code, and granting/revoking a role
 - [ ] Admin: tenant CRUD screens
 - [ ] Admin: admin user + role assignment screens
+- [ ] Admin: an editable role and permission matrix. `GET /v1/identity/roles`
+      reports what the backend enforces and says `editable: false`; making it
+      editable needs per-tenant role definitions, an audit trail of matrix
+      changes, and a floor of permissions no edit may remove. See
+      "The admin surface" in `services/identity-tenant-service/CLAUDE.md`
 - [ ] `docs/product/SECURITY-CHECKLIST.md` pass on both Stage-0 +
       Phase-1 services
 

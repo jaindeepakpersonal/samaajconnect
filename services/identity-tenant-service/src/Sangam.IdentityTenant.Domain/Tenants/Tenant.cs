@@ -72,14 +72,9 @@ public sealed class Tenant : AggregateRoot
             CreatedAt = createdAt,
         };
 
-        if (enabledModules is not null)
-        {
-            tenant._enabledModules.AddRange(
-                enabledModules
-                    .Where(m => !string.IsNullOrWhiteSpace(m))
-                    .Select(m => m.Trim())
-                    .Distinct(StringComparer.OrdinalIgnoreCase));
-        }
+        // Canonical spelling only. The validator has already refused anything
+        // the catalogue does not know, so this is normalisation, not a filter.
+        tenant._enabledModules.AddRange(ModuleCatalog.Normalize(enabledModules));
 
         tenant.Raise(new TenantCreatedDomainEvent(
             tenant.Id,
@@ -127,6 +122,43 @@ public sealed class Tenant : AggregateRoot
         return true;
     }
 
+
+    /// <summary>
+    /// Replaces the set of modules this Samaaj runs. Returns false when the set
+    /// is unchanged, so a caller can report "nothing to do" without an event
+    /// being published for a non-change.
+    /// </summary>
+    /// <remarks>
+    /// A whole-set replacement rather than add/remove calls: the admin screen
+    /// is a row of toggles submitted together, and two clients each flipping
+    /// one switch against a stale view would otherwise merge into a state
+    /// neither of them asked for.
+    ///
+    /// Keys are not validated here. The aggregate has no way to know what the
+    /// gateway routes; <see cref="ModuleCatalog"/> is that list, and the
+    /// validator is where an unknown key becomes a 400 rather than a silent
+    /// 404 on every route of that module.
+    /// </remarks>
+    public bool SetEnabledModules(IEnumerable<string> modules, DateTimeOffset occurredAt)
+    {
+        var next = ModuleCatalog.Normalize(modules)
+            .OrderBy(m => m, StringComparer.Ordinal)
+            .ToList();
+
+        var current = _enabledModules.OrderBy(m => m, StringComparer.Ordinal).ToList();
+
+        if (next.SequenceEqual(current, StringComparer.OrdinalIgnoreCase))
+        {
+            return false;
+        }
+
+        _enabledModules.Clear();
+        _enabledModules.AddRange(next);
+
+        Raise(new TenantModulesChangedDomainEvent(Id, current, next, occurredAt));
+
+        return true;
+    }
     /// <summary>
     /// Lowercases and trims a slug so "  Mumbai-Samaaj " and "mumbai-samaaj"
     /// can never become two different tenants.

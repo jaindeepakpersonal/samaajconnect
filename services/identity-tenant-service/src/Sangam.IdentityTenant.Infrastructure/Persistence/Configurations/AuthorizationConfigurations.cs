@@ -54,6 +54,14 @@ public sealed class UserRoleConfiguration : IEntityTypeConfiguration<UserRole>
         builder.ToTable("user_roles");
         builder.HasKey(ur => ur.Id);
 
+        // The aggregate assigns the id. Left as EF's default ValueGeneratedOnAdd,
+        // a grant added to a *tracked* User comes back Modified rather than
+        // Added and the save fails against a row that was never there. This is
+        // the same trap member-family-service's CLAUDE.md records for Family and
+        // FamilyMember; it stayed hidden here until GrantRole started adding a
+        // role to a User that was already loaded.
+        builder.Property(ur => ur.Id).ValueGeneratedNever();
+
         builder.Property(ur => ur.AssignedAt).IsRequired();
 
         builder.HasOne<Role>().WithMany().HasForeignKey(ur => ur.RoleId).OnDelete(DeleteBehavior.Restrict);

@@ -33,7 +33,7 @@ Two blocks in `src/Sangam.Gateway/appsettings.json`, and nothing else:
     "Match": { "Path": "/v1/pathshala/{**catch-all}" },
     // Only for routes a Samaaj can switch off. Omit for platform
     // infrastructure — nobody can disable their own ability to log in.
-    "Metadata": { "module": "Pathshala" }
+    "Metadata": { "module": "pathshala" }
   }
 },
 "Clusters": {
@@ -46,6 +46,13 @@ Two blocks in `src/Sangam.Gateway/appsettings.json`, and nothing else:
 The module key lives in route metadata rather than in a table in this project,
 so `ModuleGateMiddleware` needs no change when a service is added. Keep the path
 prefix identical to the one in `docs/product/SERVICES.md`.
+
+**The key must be one of the keys in `ModuleCatalog`** in
+identity-tenant-service's domain. That is the closed list a Samaaj's enabled
+modules are validated against, so a route whose metadata names a key no Samaaj
+can ever have enabled answers 404 to everybody, forever, with nothing logged.
+Comparison is case-insensitive, but write the key in the catalogue's own
+lowercase spelling. Adding a module means adding it in both places.
 
 Services host their endpoints at the absolute path (`/v1/identity/...`), not at
 a gateway-relative one, so no path rewriting is configured and the same URL

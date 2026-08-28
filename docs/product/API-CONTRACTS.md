@@ -30,10 +30,21 @@ enforced by `TenantAuthorizationBehavior`, not just UI hiding.
 | POST | `/me/consents/{purpose}/withdraw` | Authenticated | Withdraw one consent (DPDP s.6(4)) |
 | GET | `/me/data-export` | Authenticated | What this service holds about you (DPDP s.11) |
 | POST | `/me/erase` | Authenticated | Erase this account and, by event, everything the platform holds (DPDP s.12) |
+| GET | `/tenants` | `SuperAdmin` + `Tenant.Manage` | Every Samaaj, any status; `?status=` and `?search=` narrow it |
+| GET | `/tenants/modules` | Anonymous | The closed list of module keys, with labels, for the toggles |
+| PUT | `/tenants/{id}/modules` | `SuperAdmin` + `Tenant.Manage` | Replace the whole set of modules a Samaaj runs |
+| GET | `/roles` | Authenticated | The role and permission matrix the backend enforces. Read-only |
+| GET | `/admins` | `SuperAdmin`, `SamaajAdmin` + `AdminUsers.Manage` | This Samaaj's administrators and their roles |
+| POST | `/admins` | `SuperAdmin`, `SamaajAdmin` + `AdminUsers.Manage` | Invite an administrator; returns a one-time activation code |
+| PUT | `/admins/{userId}/roles/{role}` | `SuperAdmin`, `SamaajAdmin` + `AdminUsers.Manage` | Grant or revoke one role, body `{"granted":bool}` |
 | POST | `/logout` | Authenticated | Revoke current session/refresh token |
 | GET | `/me` | Authenticated | Current user + roles + tenant |
-| POST | `/admin-users` | SuperAdmin, SamaajAdmin | Invite/create admin user |
-| PATCH | `/admin-users/{id}/roles` | SuperAdmin, SamaajAdmin | Assign roles/scope |
+
+> The original draft named these `/admin-users` and `PATCH /admin-users/{id}/roles`. They
+> shipped as `POST /admins` and `PUT /admins/{userId}/roles/{role}` above:
+> one role per call, because the screen is a set of checkboxes and a PATCH
+> taking a whole role list makes two admins editing at once silently overwrite
+> each other.
 
 ## member-family-service — `/v1/members`, `/v1/families`
 
