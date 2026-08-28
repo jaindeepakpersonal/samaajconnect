@@ -7,13 +7,12 @@ version of the plan; the reasoning behind the ordering lives in
 
 ## Current Status
 
-- **Stage:** Stage 0 - Walking Skeleton, in progress
-- **Last updated:** 2026-08-28 - member portal shell with Login, Register and
-  Home wired to real endpoints through the gateway. Stage 0 is functionally
-  complete: register, sign in, land on your Samaaj Home. 258 tests green
-  (214 backend, 44 frontend) plus the gateway smoke script.
-- **Blocking item:** none. Next up is CI, which is the last unchecked Stage 0
-  item, then Phase 1 proper (`member-family-service`).
+- **Stage:** Stage 0 complete; starting Phase 1 - Platform Foundation
+- **Last updated:** 2026-08-28 - CI wired up. Register, sign in, land on your
+  Samaaj Home, all through the gateway. 258 tests green (214 backend, 44
+  frontend) plus 14 smoke checks against a stack built from scratch.
+- **Blocking item:** none. Stage 0 is complete. Next up is Phase 1:
+  `member-family-service` (profile, family, children).
 
 *(Update these three lines at the start/end of every work session —
 they're what a coding agent or a teammate should read first to know
@@ -52,10 +51,13 @@ vertical slice working end-to-end, not broad partial progress.
       Samaaj has enabled. Verified in a browser against the compose stack.
       The subdomain redirect is implemented but exercised only by unit test
       locally, since `localhost` has no subdomains.
-- [ ] CI running build + test on every push
+- [x] CI running build + test on every push (`.github/workflows/ci.yml`):
+      per-service .NET build and test, the two frontend suites, a check that
+      no EF model has drifted from its migrations, and the gateway smoke test
+      against a stack built from scratch
 
 > The through-the-gateway coverage CLAUDE.md §9 requires is
-> `scripts/smoke-through-gateway.sh`, run against the compose stack.
+> `scripts/smoke-through-gateway.sh`, run against the compose stack and in CI.
 
 **Exit criteria:** the Platform Foundation acceptance criteria in
 `docs/product/requirements/samaajconnect-product-requirements.docx`

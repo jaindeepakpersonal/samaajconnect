@@ -1,5 +1,7 @@
 # samaajconnect
 
+[![CI](https://github.com/jaindeepakpersonal/samaajconnect/actions/workflows/ci.yml/badge.svg)](https://github.com/jaindeepakpersonal/samaajconnect/actions/workflows/ci.yml)
+
 Multi-tenant platform for Jain Samaaj (community) organizations —
 member portal, unified admin panel, and ten backend services behind a
 YARP gateway.

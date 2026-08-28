@@ -43,7 +43,23 @@ json_field() {
   grep -o "\"$1\":\"[^\"]*\"" | head -1 | cut -d'"' -f4
 }
 
+wait_for_gateway() {
+  # The services have no healthcheck of their own (the aspnet image ships no
+  # curl), so readiness is established here rather than by compose --wait.
+  local attempt=0
+  until [ "$(status "$GATEWAY/health")" = "200" ]; do
+    attempt=$((attempt + 1))
+    if [ "$attempt" -ge 60 ]; then
+      echo "  FAIL  gateway did not become healthy"
+      exit 1
+    fi
+    sleep 2
+  done
+}
+
 echo "Gateway smoke test against $GATEWAY"
+
+wait_for_gateway
 
 echo
 echo "Gateway itself"
