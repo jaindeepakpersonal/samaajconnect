@@ -8,12 +8,12 @@ version of the plan; the reasoning behind the ordering lives in
 ## Current Status
 
 - **Stage:** Stage 0 - Walking Skeleton, in progress
-- **Last updated:** 2026-08-28 - `audit-notification-service` consuming every
-  platform event into an immutable audit log, verified against real Kafka.
-  172 tests green across two services.
-- **Blocking item:** none. Next up is the gateway (subdomain to tenant, JWT
-  validation, module flags), which also unblocks the through-the-gateway test
-  CLAUDE.md section 9 requires.
+- **Last updated:** 2026-08-28 - YARP gateway routing to both services with
+  subdomain-to-Samaaj resolution, JWT validation, module flags and header
+  stripping. 214 tests green, plus a through-the-gateway smoke script.
+- **Blocking item:** none. Next up is the `apps/member-portal` shell with the
+  tenant interceptor, then the Login / Register / Home screens from the
+  wireframes.
 
 *(Update these three lines at the start/end of every work session —
 they're what a coding agent or a teammate should read first to know
@@ -38,8 +38,9 @@ vertical slice working end-to-end, not broad partial progress.
 - [x] `audit-notification-service` scaffolded - regex-subscribed consumer
       recording every platform event into an append-only audit log, plus
       member notifications. Verified with Testcontainers Kafka, not a fake.
-- [ ] Gateway: subdomain → tenant resolution + JWT validation wired
-      for `/v1/identity/**` and `/v1/audit/**` only
+- [x] Gateway: subdomain → tenant resolution + JWT validation wired
+      for `/v1/identity/**`, `/v1/audit/**` and `/v1/notifications/**`,
+      with the module feature-flag gate and inbound tenant-header stripping
 - [ ] `apps/member-portal` shell created with the tenant interceptor
 - [ ] Login / Register / Home screens ported from
       `docs/product/wireframes/member-portal-wireframes.html`
@@ -47,6 +48,9 @@ vertical slice working end-to-end, not broad partial progress.
 - [ ] **End-to-end proof:** register → select a Samaaj → log in →
       redirected to that Samaaj's subdomain → Home renders
 - [ ] CI running build + test on every push
+
+> The through-the-gateway coverage CLAUDE.md §9 requires is
+> `scripts/smoke-through-gateway.sh`, run against the compose stack.
 
 **Exit criteria:** the Platform Foundation acceptance criteria in
 `docs/product/requirements/samaajconnect-product-requirements.docx`

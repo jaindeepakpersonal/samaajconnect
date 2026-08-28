@@ -1,0 +1,36 @@
+﻿
+Microsoft Visual Studio Solution File, Format Version 12.00
+# Visual Studio Version 17
+VisualStudioVersion = 17.0.31903.59
+MinimumVisualStudioVersion = 10.0.40219.1
+Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "src", "src", "{A13CAE39-5464-4657-BAFA-D4E9BCF89B71}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Sangam.Gateway", "src\Sangam.Gateway\Sangam.Gateway.csproj", "{547364E8-CA73-4064-9C52-D9444A31C99A}"
+EndProject
+Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "tests", "tests", "{838FAF83-C5A6-406B-9417-B9291A0DE11D}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Sangam.Gateway.Tests", "tests\Sangam.Gateway.Tests\Sangam.Gateway.Tests.csproj", "{DC0EC3C2-1D60-4CEB-BED6-F3838015A437}"
+EndProject
+Global
+	GlobalSection(SolutionConfigurationPlatforms) = preSolution
+		Debug|Any CPU = Debug|Any CPU
+		Release|Any CPU = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(SolutionProperties) = preSolution
+		HideSolutionNode = FALSE
+	EndGlobalSection
+	GlobalSection(ProjectConfigurationPlatforms) = postSolution
+		{547364E8-CA73-4064-9C52-D9444A31C99A}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{547364E8-CA73-4064-9C52-D9444A31C99A}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{547364E8-CA73-4064-9C52-D9444A31C99A}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{547364E8-CA73-4064-9C52-D9444A31C99A}.Release|Any CPU.Build.0 = Release|Any CPU
+		{DC0EC3C2-1D60-4CEB-BED6-F3838015A437}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{DC0EC3C2-1D60-4CEB-BED6-F3838015A437}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{DC0EC3C2-1D60-4CEB-BED6-F3838015A437}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{DC0EC3C2-1D60-4CEB-BED6-F3838015A437}.Release|Any CPU.Build.0 = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(NestedProjects) = preSolution
+		{547364E8-CA73-4064-9C52-D9444A31C99A} = {A13CAE39-5464-4657-BAFA-D4E9BCF89B71}
+		{DC0EC3C2-1D60-4CEB-BED6-F3838015A437} = {838FAF83-C5A6-406B-9417-B9291A0DE11D}
+	EndGlobalSection
+EndGlobal

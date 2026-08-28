@@ -36,8 +36,16 @@ KRaft Kafka broker, and every service built so far.
 
 | Service | Local URL |
 |---|---|
+| **gateway** | http://localhost:8080 - the entry point everything should go through |
 | identity-tenant-service | http://localhost:5101 (Swagger at `/swagger`) |
 | audit-notification-service | http://localhost:5102 (Swagger at `/swagger`) |
+
+The service ports are exposed for debugging only. Subdomains are supplied with
+an explicit `Host:` header locally, so no `/etc/hosts` entries are needed:
+
+```bash
+bash scripts/smoke-through-gateway.sh
+```
 
 Run a service's tests - integration tests need Docker for Testcontainers:
 

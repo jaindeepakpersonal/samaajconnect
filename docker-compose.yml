@@ -121,6 +121,33 @@ services:
     ports:
       - "5102:8080"
 
+  gateway:
+    build:
+      context: .
+      dockerfile: gateway/Dockerfile
+    container_name: samaajconnect-gateway
+    restart: unless-stopped
+    depends_on:
+      redis:
+        condition: service_healthy
+      identity-tenant-service:
+        condition: service_started
+      audit-notification-service:
+        condition: service_started
+    environment:
+      ASPNETCORE_ENVIRONMENT: Development
+      Redis__ConnectionString: redis:6379
+      Jwt__SigningKey: "${JWT_SIGNING_KEY:-local-development-signing-key-do-not-use-in-production}"
+      Gateway__IdentityServiceUrl: "http://identity-tenant-service:8080"
+      # Host headers used locally. Anything else is treated as a Samaaj
+      # subdomain and resolved against identity-tenant-service.
+      Gateway__ApexHosts__0: "samaajconnect.com"
+      Gateway__ApexHosts__1: "www.samaajconnect.com"
+      Gateway__ApexHosts__2: "localhost"
+      Gateway__AdminHost: "admin.samaajconnect.com"
+    ports:
+      - "8080:8080"
+
 volumes:
   postgres-data:
   redis-data:
