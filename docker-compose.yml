@@ -121,6 +121,21 @@ services:
     ports:
       - "5102:8080"
 
+  member-family-service:
+    <<: *service-defaults
+    build:
+      context: .
+      dockerfile: services/member-family-service/Dockerfile
+    container_name: samaajconnect-members
+    environment:
+      <<: *service-environment
+      ConnectionStrings__Default: "Host=postgres;Port=5432;Database=samaajconnect_member_family;Username=samaajconnect;Password=samaajconnect"
+      Jwt__SigningKey: "${JWT_SIGNING_KEY:-local-development-signing-key-do-not-use-in-production}"
+      Outbox__PollIntervalSeconds: "5"
+      Consumer__GroupId: "member-family-service"
+    ports:
+      - "5103:8080"
+
   gateway:
     build:
       context: .
@@ -133,6 +148,8 @@ services:
       identity-tenant-service:
         condition: service_started
       audit-notification-service:
+        condition: service_started
+      member-family-service:
         condition: service_started
     environment:
       ASPNETCORE_ENVIRONMENT: Development

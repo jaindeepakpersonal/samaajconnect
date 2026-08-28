@@ -8,11 +8,13 @@ version of the plan; the reasoning behind the ordering lives in
 ## Current Status
 
 - **Stage:** Stage 0 complete; starting Phase 1 - Platform Foundation
-- **Last updated:** 2026-08-28 - CI wired up. Register, sign in, land on your
-  Samaaj Home, all through the gateway. 258 tests green (214 backend, 44
-  frontend) plus 14 smoke checks against a stack built from scratch.
-- **Blocking item:** none. Stage 0 is complete. Next up is Phase 1:
-  `member-family-service` (profile, family, children).
+- **Last updated:** 2026-08-28 - `member-family-service` built: profiles created
+  from the registration event over Kafka, the privacy-filtered directory, and
+  the family join flow. 305 tests green (261 backend, 44 frontend) plus 17
+  smoke checks against a stack built from scratch.
+- **Blocking item:** the **adult-child conversion** open decision below now
+  blocks the next piece of work (children). Recommended default is
+  admin-approved. Everything else in Phase 1 is unblocked.
 
 *(Update these three lines at the start/end of every work session —
 they're what a coding agent or a teammate should read first to know
@@ -66,9 +68,11 @@ unit tested.
 
 ## Phase 1 — Platform Foundation (remainder)
 
-- [ ] `member-family-service` scaffolded
-  - [ ] Profile update flow
-  - [ ] Family create / join-request
+- [x] `member-family-service` scaffolded - profile created from the
+      `identity.user.registered.v1` event, no synchronous call between the
+      two services
+  - [x] Profile update flow, with per-field privacy levels
+  - [x] Family create / join-request / decide
   - [ ] Child profile create
   - [ ] Adult-child conversion request + approval flow (see Open
         Decisions below — default assumption is admin-approved)

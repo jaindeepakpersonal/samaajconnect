@@ -143,6 +143,25 @@ check "notifications" 200 "$(status -H "Host: $SLUG.$APEX_HOST" \
   -H "Authorization: Bearer $MEMBER_TOKEN" "$GATEWAY/v1/notifications")"
 
 echo
+echo "Member profile, created by the registration event rather than by a call"
+profile_ready=0
+for attempt in $(seq 1 30); do
+  if [ "$(status -H "Host: $SLUG.$APEX_HOST" -H "Authorization: Bearer $MEMBER_TOKEN" \
+        "$GATEWAY/v1/members/me")" = "200" ]; then
+    profile_ready=1
+    break
+  fi
+  sleep 2
+done
+check "profile arrives over Kafka" 1 "$profile_ready"
+
+check "member directory" 200 "$(status -H "Host: $SLUG.$APEX_HOST" \
+  -H "Authorization: Bearer $MEMBER_TOKEN" "$GATEWAY/v1/members")"
+
+check "family before joining one" 404 "$(status -H "Host: $SLUG.$APEX_HOST" \
+  -H "Authorization: Bearer $MEMBER_TOKEN" "$GATEWAY/v1/families/mine")"
+
+echo
 echo "Header forgery"
 check "a forged tenant header does not change the answer" 200 \
   "$(status -H "Host: $SLUG.$APEX_HOST" -H "X-Tenant-Id: 11111111-1111-1111-1111-111111111111" \

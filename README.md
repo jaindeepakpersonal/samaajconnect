@@ -41,6 +41,7 @@ KRaft Kafka broker, and every service built so far.
 | **gateway** | http://localhost:8080 - the entry point everything should go through |
 | identity-tenant-service | http://localhost:5101 (Swagger at `/swagger`) |
 | audit-notification-service | http://localhost:5102 (Swagger at `/swagger`) |
+| member-family-service | http://localhost:5103 (Swagger at `/swagger`) |
 
 The service ports are exposed for debugging only. Subdomains are supplied with
 an explicit `Host:` header locally, so no `/etc/hosts` entries are needed:
