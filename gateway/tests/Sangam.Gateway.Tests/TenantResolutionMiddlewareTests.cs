@@ -19,8 +19,10 @@ namespace Sangam.Gateway.Tests;
 /// </summary>
 public sealed class TenantResolutionMiddlewareTests : IAsyncLifetime
 {
+    private static readonly Guid MahavirId = Guid.NewGuid();
+
     private static readonly ResolvedTenant Mahavir = new(
-        Guid.NewGuid(), "mahavir-samaj", "Active", ["Pathshala"]);
+        MahavirId, "mahavir-samaj", "Active", ["Pathshala"]);
 
     private readonly ITenantResolver _resolver = Substitute.For<ITenantResolver>();
     private IHost _host = null!;
@@ -29,19 +31,13 @@ public sealed class TenantResolutionMiddlewareTests : IAsyncLifetime
 
     public async Task InitializeAsync()
     {
-        _resolver.ResolveAsync("mahavir-samaj", Arg.Any<CancellationToken>()).Returns(Mahavir);
+        _resolver.ResolveAsync(MahavirId, Arg.Any<CancellationToken>()).Returns(Mahavir);
 
         _host = await new HostBuilder()
             .ConfigureWebHost(web => web
                 .UseTestServer()
                 .ConfigureServices(services =>
                 {
-                    services.Configure<GatewayOptions>(o =>
-                    {
-                        o.ApexHosts = ["samaajconnect.com", "localhost"];
-                        o.AdminHost = "admin.samaajconnect.com";
-                    });
-                    services.AddSingleton<HostSlugExtractor>();
                     services.AddSingleton(_resolver);
                     services.AddLogging();
                 })
@@ -68,52 +64,76 @@ public sealed class TenantResolutionMiddlewareTests : IAsyncLifetime
 
     public async Task DisposeAsync() => await _host.StopAsync();
 
-    private HttpClient Client(string host)
-    {
-        var client = _host.GetTestClient();
-        client.BaseAddress = new Uri("http://" + host);
+    private HttpClient Client() => _host.GetTestClient();
 
-        return client;
+    /// <summary>Signs the caller in with a tenant claim, as a real token would carry.</summary>
+    private void SignInTo(Guid? tenantId, params string[] roles)
+    {
+        var claims = new List<Claim> { new(ClaimTypes.NameIdentifier, Guid.NewGuid().ToString()) };
+
+        if (tenantId is { } id)
+        {
+            claims.Add(new Claim(TenantResolutionMiddleware.TenantClaimType, id.ToString()));
+        }
+
+        claims.AddRange(roles.Select(role => new Claim("role", role)));
+
+        _user = new ClaimsPrincipal(new ClaimsIdentity(
+            claims, authenticationType: "Test", nameType: ClaimTypes.NameIdentifier, roleType: "role"));
     }
 
-    private void SignInAs(params string[] roles) =>
-        _user = new ClaimsPrincipal(new ClaimsIdentity(
-            [
-                new Claim(ClaimTypes.NameIdentifier, Guid.NewGuid().ToString()),
-                .. roles.Select(role => new Claim("role", role)),
-            ],
-            authenticationType: "Test",
-            nameType: ClaimTypes.NameIdentifier,
-            roleType: "role"));
+    [Fact]
+    public async Task A_token_naming_a_Samaaj_becomes_a_tenant_header_for_the_service_behind_it()
+    {
+        SignInTo(MahavirId, "Member");
+
+        var body = await Client().GetStringAsync("/v1/members");
+
+        body.Should().Contain(MahavirId.ToString());
+        body.Should().Contain("mahavir-samaj");
+    }
 
     [Fact]
-    public async Task A_Samaaj_subdomain_becomes_a_tenant_header_for_the_service_behind_it()
+    public async Task An_anonymous_request_reaches_the_service_with_no_tenant()
     {
-        var body = await Client("mahavir-samaj.samaajconnect.com").GetStringAsync("/v1/identity/me");
+        // Login, registration and the Samaaj directory all live here.
+        var body = await Client().GetStringAsync("/v1/identity/login");
 
-        body.Should().Contain(Mahavir.Id.ToString());
-        body.Should().Contain("mahavir-samaj");
+        body.Should().Contain("\"tenantId\":\"\"");
+    }
+
+    [Fact]
+    public async Task A_Super_Admin_with_no_tenant_claim_is_not_forced_into_one()
+    {
+        // A platform account belongs to no Samaaj.
+        SignInTo(tenantId: null, "SuperAdmin");
+
+        var body = await Client().GetStringAsync("/v1/identity/tenants");
+
+        body.Should().Contain("\"tenantId\":\"\"");
     }
 
     [Fact]
     public async Task A_client_supplied_tenant_header_is_stripped_and_replaced()
     {
-        var client = Client("mahavir-samaj.samaajconnect.com");
+        SignInTo(MahavirId, "Member");
+
+        var client = Client();
         var forged = Guid.NewGuid();
         client.DefaultRequestHeaders.Add(TenantResolutionMiddleware.TenantHeader, forged.ToString());
 
-        var body = await client.GetStringAsync("/v1/identity/me");
+        var body = await client.GetStringAsync("/v1/members");
 
-        // Downstream services treat this header as a gateway-issued fact, so a
-        // caller must never be able to choose their own Samaaj with it.
+        // Services treat this header as a gateway-issued fact, so a caller must
+        // never be able to choose their own Samaaj with it.
         body.Should().NotContain(forged.ToString());
-        body.Should().Contain(Mahavir.Id.ToString());
+        body.Should().Contain(MahavirId.ToString());
     }
 
     [Fact]
-    public async Task A_client_supplied_tenant_header_is_stripped_even_on_an_apex_host()
+    public async Task A_client_supplied_tenant_header_is_stripped_on_an_anonymous_request_too()
     {
-        var client = Client("samaajconnect.com");
+        var client = Client();
         var forged = Guid.NewGuid();
         client.DefaultRequestHeaders.Add(TenantResolutionMiddleware.TenantHeader, forged.ToString());
 
@@ -123,98 +143,114 @@ public sealed class TenantResolutionMiddlewareTests : IAsyncLifetime
     }
 
     [Fact]
-    public async Task An_apex_host_reaches_the_service_with_no_tenant_at_all()
+    public async Task A_token_for_a_Samaaj_that_no_longer_exists_is_refused()
     {
-        var body = await Client("samaajconnect.com").GetStringAsync("/v1/identity/register");
+        var gone = Guid.NewGuid();
+        _resolver.ResolveAsync(gone, Arg.Any<CancellationToken>()).Returns((ResolvedTenant?)null);
 
-        body.Should().Contain("\"tenantId\":\"\"");
+        SignInTo(gone, "Member");
+
+        var response = await Client().GetAsync("/v1/members");
+
+        response.StatusCode.Should().Be(HttpStatusCode.Forbidden);
     }
 
     [Fact]
-    public async Task An_unknown_Samaaj_is_refused_before_any_service_sees_the_request()
+    public async Task A_token_outliving_a_deactivation_is_refused()
     {
-        _resolver.ResolveAsync("ghost", Arg.Any<CancellationToken>()).Returns((ResolvedTenant?)null);
+        var dormant = Guid.NewGuid();
+        _resolver.ResolveAsync(dormant, Arg.Any<CancellationToken>())
+            .Returns(new ResolvedTenant(dormant, "dormant", "Inactive", []));
 
-        var response = await Client("ghost.samaajconnect.com").GetAsync("/v1/identity/me");
+        SignInTo(dormant, "Member");
 
-        response.StatusCode.Should().Be(HttpStatusCode.NotFound);
+        var response = await Client().GetAsync("/v1/members");
+
+        // 403, not 404: the caller holds a valid token, so this is "your Samaaj
+        // is not available", not "no such address".
+        response.StatusCode.Should().Be(HttpStatusCode.Forbidden);
     }
 
     [Fact]
-    public async Task An_inactive_Samaaj_is_also_a_404_rather_than_a_distinguishable_403()
+    public async Task Identity_being_unreachable_is_a_502_and_not_a_403()
     {
-        _resolver.ResolveAsync("dormant", Arg.Any<CancellationToken>())
-            .Returns(new ResolvedTenant(Guid.NewGuid(), "dormant", "Inactive", []));
-
-        var response = await Client("dormant.samaajconnect.com").GetAsync("/v1/identity/me");
-
-        // Probing subdomains must not reveal which Samaaj exist but are off.
-        response.StatusCode.Should().Be(HttpStatusCode.NotFound);
-    }
-
-    [Fact]
-    public async Task Identity_being_unreachable_is_a_502_and_not_a_404()
-    {
-        _resolver.ResolveAsync("mahavir-samaj", Arg.Any<CancellationToken>())
+        // Otherwise one service being down would look like every member's
+        // Samaaj having been deactivated.
+        _resolver.ResolveAsync(MahavirId, Arg.Any<CancellationToken>())
             .Returns<ResolvedTenant?>(_ => throw new HttpRequestException("identity is down"));
 
-        var response = await Client("mahavir-samaj.samaajconnect.com").GetAsync("/v1/identity/me");
+        SignInTo(MahavirId, "Member");
+
+        var response = await Client().GetAsync("/v1/members");
 
         response.StatusCode.Should().Be(HttpStatusCode.BadGateway);
     }
 
     [Fact]
-    public async Task A_tenant_override_from_a_Samaaj_subdomain_is_refused()
-    {
-        SignInAs("SuperAdmin");
-
-        var client = Client("mahavir-samaj.samaajconnect.com");
-        client.DefaultRequestHeaders.Add(
-            TenantResolutionMiddleware.TenantOverrideHeader, Guid.NewGuid().ToString());
-
-        var response = await client.GetAsync("/v1/identity/me");
-
-        response.StatusCode.Should().Be(HttpStatusCode.Forbidden);
-    }
-
-    [Fact]
     public async Task A_tenant_override_from_a_caller_who_is_not_a_Super_Admin_is_refused()
     {
-        SignInAs("SamaajAdmin");
+        SignInTo(MahavirId, "SamaajAdmin");
 
-        var client = Client("admin.samaajconnect.com");
+        var client = Client();
         client.DefaultRequestHeaders.Add(
             TenantResolutionMiddleware.TenantOverrideHeader, Guid.NewGuid().ToString());
 
-        var response = await client.GetAsync("/v1/identity/me");
+        var response = await client.GetAsync("/v1/members");
 
         response.StatusCode.Should().Be(HttpStatusCode.Forbidden);
     }
 
     [Fact]
-    public async Task A_Super_Admin_override_from_the_admin_console_is_passed_through()
+    public async Task An_override_from_an_anonymous_caller_is_refused()
     {
-        SignInAs("SuperAdmin");
+        var client = Client();
+        client.DefaultRequestHeaders.Add(
+            TenantResolutionMiddleware.TenantOverrideHeader, MahavirId.ToString());
 
-        var target = Guid.NewGuid();
-        var client = Client("admin.samaajconnect.com");
-        client.DefaultRequestHeaders.Add(TenantResolutionMiddleware.TenantOverrideHeader, target.ToString());
+        var response = await client.GetAsync("/v1/members");
 
-        var body = await client.GetStringAsync("/v1/identity/me");
-
-        body.Should().Contain(target.ToString());
+        response.StatusCode.Should().Be(HttpStatusCode.Forbidden);
     }
 
     [Fact]
-    public async Task A_malformed_override_is_rejected_rather_than_ignored()
+    public async Task A_Super_Admin_override_is_forwarded_as_an_override_not_as_a_plain_tenant()
     {
-        SignInAs("SuperAdmin");
+        SignInTo(tenantId: null, "SuperAdmin");
 
-        var client = Client("admin.samaajconnect.com");
+        var client = Client();
+        client.DefaultRequestHeaders.Add(
+            TenantResolutionMiddleware.TenantOverrideHeader, MahavirId.ToString());
+
+        var body = await client.GetStringAsync("/v1/members");
+
+        // Services treat it like a normal tenant, but the distinct header is
+        // what lets them log that it happened.
+        body.Should().Contain($"\"overrideId\":\"{MahavirId}\"");
+        body.Should().Contain("\"tenantId\":\"\"");
+    }
+
+    [Fact]
+    public async Task An_override_naming_a_Samaaj_that_does_not_exist_is_refused()
+    {
+        var gone = Guid.NewGuid();
+        _resolver.ResolveAsync(gone, Arg.Any<CancellationToken>()).Returns((ResolvedTenant?)null);
+
+        SignInTo(tenantId: null, "SuperAdmin");
+
+        var client = Client();
+        client.DefaultRequestHeaders.Add(TenantResolutionMiddleware.TenantOverrideHeader, gone.ToString());
+
+        (await client.GetAsync("/v1/members")).StatusCode.Should().Be(HttpStatusCode.Forbidden);
+    }
+
+    [Fact]
+    public async Task A_malformed_override_is_refused_rather_than_ignored()
+    {
+        SignInTo(tenantId: null, "SuperAdmin");
+
+        var client = Client();
         client.DefaultRequestHeaders.Add(TenantResolutionMiddleware.TenantOverrideHeader, "not-a-guid");
 
-        var response = await client.GetAsync("/v1/identity/me");
-
-        response.StatusCode.Should().Be(HttpStatusCode.BadRequest);
+        (await client.GetAsync("/v1/members")).StatusCode.Should().Be(HttpStatusCode.Forbidden);
     }
 }

@@ -6,7 +6,7 @@ using Microsoft.Extensions.Options;
 namespace Sangam.Gateway.Tenancy;
 
 /// <summary>
-/// Resolves a slug through <see cref="ITenantCache"/>, falling back to
+/// Resolves a tenant id through <see cref="ITenantCache"/>, falling back to
 /// identity-tenant-service on a miss.
 /// </summary>
 public sealed class CachedTenantResolver(
@@ -21,27 +21,32 @@ public sealed class CachedTenantResolver(
 
     private readonly GatewayOptions _options = options.Value;
 
-    public async Task<ResolvedTenant?> ResolveAsync(string slug, CancellationToken cancellationToken = default)
+    public async Task<ResolvedTenant?> ResolveAsync(
+        Guid tenantId,
+        CancellationToken cancellationToken = default)
     {
-        if (await cache.GetAsync(slug) is { } cached)
+        var key = tenantId.ToString();
+
+        if (await cache.GetAsync(key) is { } cached)
         {
             return cached.Found ? cached.Tenant : null;
         }
 
-        var tenant = await FetchAsync(slug, cancellationToken);
+        var tenant = await FetchAsync(tenantId, cancellationToken);
 
-        // Negative results are cached too. Otherwise a mistyped or probed
-        // subdomain becomes an unthrottled stream of lookups against identity.
-        await cache.SetAsync(slug, tenant, TimeSpan.FromSeconds(_options.TenantCacheSeconds));
+        // Negative results are cached too. A token naming a Samaaj that no
+        // longer exists would otherwise re-ask identity on every request until
+        // it expired.
+        await cache.SetAsync(key, tenant, TimeSpan.FromSeconds(_options.TenantCacheSeconds));
 
         return tenant;
     }
 
-    private async Task<ResolvedTenant?> FetchAsync(string slug, CancellationToken cancellationToken)
+    private async Task<ResolvedTenant?> FetchAsync(Guid tenantId, CancellationToken cancellationToken)
     {
         var client = httpClientFactory.CreateClient(HttpClientName);
 
-        var response = await client.GetAsync($"/v1/identity/tenants/{slug}", cancellationToken);
+        var response = await client.GetAsync($"/v1/identity/tenants/by-id/{tenantId}", cancellationToken);
 
         if (response.StatusCode == HttpStatusCode.NotFound)
         {
@@ -50,7 +55,7 @@ public sealed class CachedTenantResolver(
 
         // Anything else means "we could not check", which must not be reported
         // as "no such Samaaj". The middleware turns the resulting exception
-        // into a 502 rather than a 404.
+        // into a 502 rather than a 403.
         response.EnsureSuccessStatusCode();
 
         return await response.Content.ReadFromJsonAsync<ResolvedTenant>(JsonOptions, cancellationToken);

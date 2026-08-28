@@ -1,8 +1,7 @@
-import { DOCUMENT, isPlatformBrowser } from '@angular/common';
-import { Component, PLATFORM_ID, inject, signal } from '@angular/core';
+import { Component, inject, signal } from '@angular/core';
 import { FormBuilder, ReactiveFormsModule, Validators } from '@angular/forms';
 import { ActivatedRoute, Router, RouterLink } from '@angular/router';
-import { AuthService, TenantService, describeError } from '@samaajconnect/shared';
+import { AuthService, describeError } from '@samaajconnect/shared';
 
 type SignInMethod = 'password' | 'otp';
 
@@ -121,8 +120,6 @@ export class LoginComponent {
   private readonly auth = inject(AuthService);
   private readonly router = inject(Router);
   private readonly route = inject(ActivatedRoute);
-  private readonly document = inject(DOCUMENT);
-  private readonly platformId = inject(PLATFORM_ID);
   private readonly formBuilder = inject(FormBuilder);
 
   readonly method = signal<SignInMethod>('password');
@@ -158,7 +155,7 @@ export class LoginComponent {
     this.auth.login(mobileOrEmail, password).subscribe({
       next: (result) => {
         this.busy.set(false);
-        this.goToSamaaj(result.tenantSlug);
+        this.goHome();
       },
       error: (failure: unknown) => {
         this.busy.set(false);
@@ -175,25 +172,13 @@ export class LoginComponent {
    * on localhost, where subdomains do not exist - this is a plain in-app
    * navigation instead.
    */
-  private goToSamaaj(slug: string): void {
-    const returnUrl = this.route.snapshot.queryParamMap.get('returnUrl') ?? '/home';
-
-    if (!slug || !isPlatformBrowser(this.platformId)) {
-      void this.router.navigateByUrl(returnUrl);
-      return;
-    }
-
-    const location = this.document.location;
-    const currentSlug = TenantService.slugFromHost(location.hostname);
-
-    if (currentSlug === slug || currentSlug === null) {
-      void this.router.navigateByUrl(returnUrl);
-      return;
-    }
-
-    const domain = location.hostname.split('.').slice(1).join('.');
-    const port = location.port ? `:${location.port}` : '';
-
-    location.assign(`${location.protocol}//${slug}.${domain}${port}${returnUrl}`);
+  /**
+   * The wireframe sent a member to their Samaaj's subdomain after signing in.
+   * The platform is single-domain now, so there is nowhere else to go: the
+   * token already names the Samaaj and the gateway reads it from there.
+   */
+  private goHome(): void {
+    void this.router.navigateByUrl(
+      this.route.snapshot.queryParamMap.get('returnUrl') ?? '/home');
   }
 }

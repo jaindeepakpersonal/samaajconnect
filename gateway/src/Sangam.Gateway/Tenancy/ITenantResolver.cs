@@ -3,10 +3,10 @@ namespace Sangam.Gateway.Tenancy;
 public interface ITenantResolver
 {
     /// <summary>
-    /// Resolves a subdomain slug to a Samaaj, or null when no such Samaaj
-    /// exists. A resolution failure against the identity service is thrown, not
-    /// returned as null: "the Samaaj does not exist" and "we could not check"
-    /// must not produce the same 404.
+    /// Looks up the Samaaj named by a token's <c>tenant_id</c> claim, or null
+    /// when no such Samaaj exists. A failure to reach identity-tenant-service
+    /// is thrown, not returned as null: "the Samaaj is gone" and "we could not
+    /// check" must not produce the same answer.
     /// </summary>
-    Task<ResolvedTenant?> ResolveAsync(string slug, CancellationToken cancellationToken = default);
+    Task<ResolvedTenant?> ResolveAsync(Guid tenantId, CancellationToken cancellationToken = default);
 }

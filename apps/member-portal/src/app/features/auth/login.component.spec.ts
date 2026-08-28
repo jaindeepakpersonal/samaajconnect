@@ -97,7 +97,7 @@ describe('LoginComponent', () => {
     expect(component.busy()).toBe(false);
   });
 
-  it('navigates to the return url after signing in on the same host', async () => {
+  it("goes to the return url after signing in - there is no subdomain to move to", async () => {
     setup({ returnUrl: '/home' });
 
     const router = TestBed.inject(Router);
@@ -110,9 +110,8 @@ describe('LoginComponent', () => {
       accessToken: 't',
       expiresAt: new Date().toISOString(),
       userId: 'u1',
-      tenantId: 't1',
-      // Empty slug: a platform account has no Samaaj subdomain to be sent to.
-      tenantSlug: '',
+      tenantId: "t1",
+      tenantSlug: "mahavir-samaj",
       fullName: 'Ravi Shah',
       roles: ['SuperAdmin'],
     });

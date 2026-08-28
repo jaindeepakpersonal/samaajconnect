@@ -25,7 +25,7 @@ apps/member-portal/src/app/
 libs/shared/src/           imported as @samaajconnect/shared
 ├── api/                   API_CONFIG token, problem-details mapping
 ├── auth/                  token store, interceptor, service, guard, models
-└── tenant/                slug resolution and the URL interceptor
+└── tenant/                the URL interceptor
 ```
 
 Anything both apps will need goes in `libs/shared`; anything only this app
@@ -51,19 +51,17 @@ given, so the shared library would otherwise have nowhere to put its tests.
 
 ## Decisions worth knowing before you change this
 
-**The dev server supplies the Samaaj, not a header.** ARCHITECTURE.md §7
-sketches "an explicit header override" for local development. That was not
-built: the gateway strips every inbound tenant header before routing, and that
-is the control stopping a client from choosing its own Samaaj — a dev-only
-exception to it would be a hole with a friendly name. `proxy.conf.json` sets
-the `Host` header the gateway already resolves subdomains from instead. **To
-develop against a different Samaaj, change the slug in that file.**
+**The client says nothing about the Samaaj.** The platform runs on one domain
+and a member's Samaaj travels in their token, so there is nothing to attach and
+nothing to configure. `proxy.conf.json` only points `/v1` at the gateway's port.
+To work as a different Samaaj, sign in as a member of it.
 
 **A token is scoped to one Samaaj, so the interceptor drops it on
-`403 Tenant.Mismatch` as well as on `401`.** Holding another Samaaj's token
-does not merely fail the pages that need auth — the services refuse a
-mismatched token before checking whether the request needed authentication at
-all, so even the anonymous registration directory fails until it is cleared.
+`403 Tenant.Mismatch` as well as on `401`.** Less likely now that the tenant
+comes from the token rather than the host, but still the right behaviour: the
+services refuse a mismatched token before checking whether the request needed
+authentication at all, so even the anonymous registration directory would fail
+until it is cleared.
 
 **The wireframe's numbers are not in the shipped Home.** It showed 1,248
 members, 4 family, 6 events. Those services do not exist, and the skill is
@@ -80,6 +78,10 @@ and are always present.
 forgot-password link are both present, because they are in the signed-off
 wireframe, and both explain that the feature is not available yet. Neither
 calls anything. When the backend lands, wire them; do not fake them sooner.
+
+**After signing in the portal simply navigates to Home.** The wireframe sent a
+member to their Samaaj's subdomain; there is no subdomain now, so there is
+nowhere else to go.
 
 **Login and Register are client-rendered, not prerendered.** They are forms
 whose server-rendered output would be an empty shell, and Home is behind the

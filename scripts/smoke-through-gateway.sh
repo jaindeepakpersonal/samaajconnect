@@ -4,15 +4,13 @@
 # CLAUDE.md section 9 asks for: a route that works when curled directly at a
 # service but was never wired into YARP is a common and easy-to-miss failure.
 #
-# Assumes `docker compose up -d --build` has finished and the stack is healthy.
+# Assumes `docker compose up -d --build` has finished.
 #
-# Subdomains are supplied with an explicit Host header rather than through DNS,
-# so this works on a laptop with no /etc/hosts entries and no wildcard record.
+# One domain, no Host headers: a member signs in and the token decides which
+# Samaaj they belong to (root CLAUDE.md section 6).
 set -euo pipefail
 
 GATEWAY="${GATEWAY:-http://localhost:8080}"
-APEX_HOST="${APEX_HOST:-samaajconnect.com}"
-ADMIN_HOST="${ADMIN_HOST:-admin.samaajconnect.com}"
 SLUG="${SLUG:-smoke-samaj}"
 SUPERADMIN="${SUPERADMIN:-superadmin@samaajconnect.local}"
 SUPERADMIN_PASSWORD="${SUPERADMIN_PASSWORD:-change-me-immediately}"
@@ -43,14 +41,19 @@ json_field() {
   grep -o "\"$1\":\"[^\"]*\"" | head -1 | cut -d'"' -f4
 }
 
-wait_for_gateway() {
+wait_for_stack() {
   # The services have no healthcheck of their own (the aspnet image ships no
   # curl), so readiness is established here rather than by compose --wait.
+  #
+  # Waiting on the gateway alone is not enough: it comes up before the services
+  # behind it have finished migrating, and the first requests then fail with a
+  # 502 that looks like a routing bug. So this waits on a real route.
   local attempt=0
-  until [ "$(status "$GATEWAY/health")" = "200" ]; do
+  until [ "$(status "$GATEWAY/health")" = "200" ] \
+     && [ "$(status "$GATEWAY/v1/identity/tenants/directory")" = "200" ]; do
     attempt=$((attempt + 1))
-    if [ "$attempt" -ge 60 ]; then
-      echo "  FAIL  gateway did not become healthy"
+    if [ "$attempt" -ge 90 ]; then
+      echo "  FAIL  the stack did not become ready"
       exit 1
     fi
     sleep 2
@@ -59,21 +62,21 @@ wait_for_gateway() {
 
 echo "Gateway smoke test against $GATEWAY"
 
-wait_for_gateway
+wait_for_stack
 
 echo
 echo "Gateway itself"
 check "health" 200 "$(status "$GATEWAY/health")"
 
 echo
-echo "Tenant resolution"
-check "unknown Samaaj subdomain is 404" 404 \
-  "$(status -H "Host: no-such-samaj.$APEX_HOST" "$GATEWAY/v1/identity/me")"
+echo "Anonymous surface"
+check "unauthenticated /me is refused" 401 "$(status "$GATEWAY/v1/identity/me")"
+check "the Samaaj directory is public" 200 "$(status "$GATEWAY/v1/identity/tenants/directory")"
 
 echo
-echo "Super Admin signs in through the gateway (apex host, no Samaaj)"
+echo "Super Admin signs in"
 ADMIN_TOKEN=$(curl -s -X POST "$GATEWAY/v1/identity/login" \
-  -H "Host: $APEX_HOST" -H 'Content-Type: application/json' \
+  -H 'Content-Type: application/json' \
   -d "{\"mobileOrEmail\":\"$SUPERADMIN\",\"password\":\"$SUPERADMIN_PASSWORD\"}" | json_field accessToken)
 
 if [ -z "$ADMIN_TOKEN" ]; then
@@ -84,30 +87,29 @@ echo "  ok    got a Super Admin token"
 pass=$((pass + 1))
 
 echo
-echo "Super Admin creates and activates a Samaaj through the gateway"
+echo "Super Admin creates and activates a Samaaj"
 CREATE_BODY=$(curl -s -X POST "$GATEWAY/v1/identity/tenants" \
-  -H "Host: $ADMIN_HOST" -H 'Content-Type: application/json' \
-  -H "Authorization: Bearer $ADMIN_TOKEN" \
+  -H 'Content-Type: application/json' -H "Authorization: Bearer $ADMIN_TOKEN" \
   -d "{\"name\":\"Smoke Samaaj\",\"slug\":\"$SLUG\",\"enabledModules\":[\"Pathshala\"]}")
 
 TENANT_ID=$(printf '%s' "$CREATE_BODY" | json_field id)
 
 if [ -z "$TENANT_ID" ]; then
   echo "  note  Samaaj '$SLUG' already exists; resolving it instead"
-  TENANT_ID=$(curl -s -H "Host: $APEX_HOST" "$GATEWAY/v1/identity/tenants/$SLUG" | json_field id)
+  TENANT_ID=$(curl -s "$GATEWAY/v1/identity/tenants/$SLUG" | json_field id)
 else
   echo "  ok    created Samaaj $TENANT_ID"
   pass=$((pass + 1))
 fi
 
 check "activate" 200 "$(status -X PATCH "$GATEWAY/v1/identity/tenants/$TENANT_ID/status" \
-  -H "Host: $ADMIN_HOST" -H 'Content-Type: application/json' \
-  -H "Authorization: Bearer $ADMIN_TOKEN" -d '{"status":"Active"}')"
+  -H 'Content-Type: application/json' -H "Authorization: Bearer $ADMIN_TOKEN" \
+  -d '{"status":"Active"}')"
 
 echo
-echo "Member registers and signs in through the gateway"
+echo "Member registers, choosing their Samaaj from the directory"
 REGISTER_STATUS=$(status -X POST "$GATEWAY/v1/identity/register" \
-  -H "Host: $APEX_HOST" -H 'Content-Type: application/json' \
+  -H 'Content-Type: application/json' \
   -d "{\"tenantSlug\":\"$SLUG\",\"fullName\":\"Smoke Member\",\"mobileOrEmail\":\"$MEMBER\",\"password\":\"$MEMBER_PASSWORD\"}")
 
 if [ "$REGISTER_STATUS" = "409" ]; then
@@ -116,9 +118,14 @@ else
   check "register" 201 "$REGISTER_STATUS"
 fi
 
-MEMBER_TOKEN=$(curl -s -X POST "$GATEWAY/v1/identity/login" \
-  -H "Host: $APEX_HOST" -H 'Content-Type: application/json' \
-  -d "{\"mobileOrEmail\":\"$MEMBER\",\"password\":\"$MEMBER_PASSWORD\"}" | json_field accessToken)
+echo
+echo "Member signs in and the token decides their Samaaj"
+MEMBER_LOGIN=$(curl -s -X POST "$GATEWAY/v1/identity/login" \
+  -H 'Content-Type: application/json' \
+  -d "{\"mobileOrEmail\":\"$MEMBER\",\"password\":\"$MEMBER_PASSWORD\"}")
+
+MEMBER_TOKEN=$(printf '%s' "$MEMBER_LOGIN" | json_field accessToken)
+RESOLVED_SLUG=$(printf '%s' "$MEMBER_LOGIN" | json_field tenantSlug)
 
 if [ -z "$MEMBER_TOKEN" ]; then
   echo "  FAIL  member could not sign in through the gateway"
@@ -128,26 +135,28 @@ else
   pass=$((pass + 1))
 fi
 
+check "login resolved the Samaaj without being told" "$SLUG" "$RESOLVED_SLUG"
+
 echo
-echo "Routing to each service, on the Samaaj subdomain"
-check "identity /me" 200 "$(status -H "Host: $SLUG.$APEX_HOST" \
-  -H "Authorization: Bearer $MEMBER_TOKEN" "$GATEWAY/v1/identity/me")"
+echo "Routing to each service"
+check "identity /me" 200 "$(status -H "Authorization: Bearer $MEMBER_TOKEN" \
+  "$GATEWAY/v1/identity/me")"
 
-check "audit log is refused to a member" 403 "$(status -H "Host: $SLUG.$APEX_HOST" \
-  -H "Authorization: Bearer $MEMBER_TOKEN" "$GATEWAY/v1/audit/logs")"
+check "audit log is refused to a member" 403 "$(status -H "Authorization: Bearer $MEMBER_TOKEN" \
+  "$GATEWAY/v1/audit/logs")"
 
-check "audit log is served to a Super Admin" 200 "$(status -H "Host: $ADMIN_HOST" \
-  -H "Authorization: Bearer $ADMIN_TOKEN" "$GATEWAY/v1/audit/logs")"
+check "audit log is served to a Super Admin overriding into the Samaaj" 200 \
+  "$(status -H "Authorization: Bearer $ADMIN_TOKEN" \
+     -H "X-Tenant-Override-Id: $TENANT_ID" "$GATEWAY/v1/audit/logs")"
 
-check "notifications" 200 "$(status -H "Host: $SLUG.$APEX_HOST" \
-  -H "Authorization: Bearer $MEMBER_TOKEN" "$GATEWAY/v1/notifications")"
+check "notifications" 200 "$(status -H "Authorization: Bearer $MEMBER_TOKEN" \
+  "$GATEWAY/v1/notifications")"
 
 echo
 echo "Member profile, created by the registration event rather than by a call"
 profile_ready=0
 for attempt in $(seq 1 30); do
-  if [ "$(status -H "Host: $SLUG.$APEX_HOST" -H "Authorization: Bearer $MEMBER_TOKEN" \
-        "$GATEWAY/v1/members/me")" = "200" ]; then
+  if [ "$(status -H "Authorization: Bearer $MEMBER_TOKEN" "$GATEWAY/v1/members/me")" = "200" ]; then
     profile_ready=1
     break
   fi
@@ -155,25 +164,24 @@ for attempt in $(seq 1 30); do
 done
 check "profile arrives over Kafka" 1 "$profile_ready"
 
-check "member directory" 200 "$(status -H "Host: $SLUG.$APEX_HOST" \
-  -H "Authorization: Bearer $MEMBER_TOKEN" "$GATEWAY/v1/members")"
+check "member directory" 200 "$(status -H "Authorization: Bearer $MEMBER_TOKEN" \
+  "$GATEWAY/v1/members")"
 
-check "family before joining one" 404 "$(status -H "Host: $SLUG.$APEX_HOST" \
-  -H "Authorization: Bearer $MEMBER_TOKEN" "$GATEWAY/v1/families/mine")"
+check "family before joining one" 404 "$(status -H "Authorization: Bearer $MEMBER_TOKEN" \
+  "$GATEWAY/v1/families/mine")"
 
 echo
 echo "Header forgery"
 check "a forged tenant header does not change the answer" 200 \
-  "$(status -H "Host: $SLUG.$APEX_HOST" -H "X-Tenant-Id: 11111111-1111-1111-1111-111111111111" \
+  "$(status -H "X-Tenant-Id: 11111111-1111-1111-1111-111111111111" \
      -H "Authorization: Bearer $MEMBER_TOKEN" "$GATEWAY/v1/identity/me")"
 
-check "an override from a Samaaj subdomain is refused" 403 \
-  "$(status -H "Host: $SLUG.$APEX_HOST" -H "X-Tenant-Override-Id: $TENANT_ID" \
+check "an override from a member is refused" 403 \
+  "$(status -H "X-Tenant-Override-Id: $TENANT_ID" \
      -H "Authorization: Bearer $MEMBER_TOKEN" "$GATEWAY/v1/identity/me")"
 
-check "an override from a member on the admin host is refused" 403 \
-  "$(status -H "Host: $ADMIN_HOST" -H "X-Tenant-Override-Id: $TENANT_ID" \
-     -H "Authorization: Bearer $MEMBER_TOKEN" "$GATEWAY/v1/identity/me")"
+check "an override from an anonymous caller is refused" 403 \
+  "$(status -H "X-Tenant-Override-Id: $TENANT_ID" "$GATEWAY/v1/members")"
 
 echo
 echo "$pass passed, $fail failed"

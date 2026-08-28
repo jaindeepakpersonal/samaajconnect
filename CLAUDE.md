@@ -153,8 +153,21 @@ TenantId; }`. Each service's `DbContext` applies `HasQueryFilter` to
 every such entity type in `OnModelCreating` (via reflection over
 `ITenantScopedEntity` implementers — write this once per service, not
 per entity). `ITenantContext.TenantId` is request-scoped, populated
-from the `X-Tenant-Id` header the gateway injects after resolving the
-subdomain.
+from the `X-Tenant-Id` header the gateway injects.
+
+**The platform runs on a single domain.** There is no Samaaj subdomain.
+A member signs in once and the system decides which Samaaj they belong
+to, because a login identifier is unique platform-wide and therefore
+names exactly one Samaaj. The gateway reads the `tenant_id` claim off
+the validated token and injects `X-Tenant-Id` from it; an anonymous
+request (login, registration, the Samaaj directory) simply carries no
+tenant. Registration is the one place a Samaaj is chosen by hand, from
+the directory, and it is resolved server-side by slug.
+
+> This supersedes the subdomain-per-Samaaj design in
+> `docs/product/ARCHITECTURE.md` §3 and §6, which came from the original
+> uploaded architecture doc. Anywhere those still say "subdomain", this
+> file wins.
 
 **Writes independently re-validate** the target entity's `TenantId`
 against `ITenantContext.TenantId` in the handler — never rely on the
@@ -165,6 +178,12 @@ Super Admin tenant-override (`X-Tenant-Override-Id`) populates the
 same `ITenantContext` — there is no separate "admin bypass" code path
 in any service. The override is logged at the gateway on every request
 that carries it.
+
+On a single domain there is no admin hostname to gate the override by,
+so the SuperAdmin role on the validated token is the whole gate. That
+makes the audit log the only record of who acted on whose Samaaj, which
+is why it is written on every overridden request rather than once per
+session.
 
 ## 7. Frontend conventions (Angular)
 

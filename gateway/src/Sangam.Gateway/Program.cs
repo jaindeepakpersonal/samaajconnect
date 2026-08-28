@@ -7,7 +7,6 @@ using StackExchange.Redis;
 var builder = WebApplication.CreateBuilder(args);
 
 builder.Services.Configure<GatewayOptions>(builder.Configuration.GetSection(GatewayOptions.SectionName));
-builder.Services.AddSingleton<HostSlugExtractor>();
 
 builder.Services.AddReverseProxy()
     .LoadFromConfig(builder.Configuration.GetSection("ReverseProxy"));
@@ -19,9 +18,9 @@ builder.Services.AddHttpClient(CachedTenantResolver.HttpClientName, client =>
 {
     client.BaseAddress = new Uri(gatewayOptions.IdentityServiceUrl);
 
-    // Short on purpose: slug resolution sits in front of every request, so a
-    // slow identity service must fail fast into a 502 rather than hold the
-    // whole gateway open.
+    // Short on purpose: a tenant lookup sits in front of every authenticated
+    // request, so a slow identity service must fail fast into a 502 rather
+    // than hold the whole gateway open.
     client.Timeout = TimeSpan.FromSeconds(5);
 });
 
@@ -74,6 +73,11 @@ builder.Services
     .AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
     .AddJwtBearer(jwt =>
     {
+        // Off, so a claim arrives named as it was issued. Left on, the handler
+        // rewrites "role" to the long WS-Federation URI and every role check
+        // here silently stops matching - which is exactly what happened.
+        jwt.MapInboundClaims = false;
+
         jwt.TokenValidationParameters = new TokenValidationParameters
         {
             ValidateIssuer = true,

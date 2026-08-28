@@ -11,4 +11,3 @@ export * from './auth/auth.models';
 export * from './auth/auth.service';
 export * from './auth/token.store';
 export * from './tenant/tenant.interceptor';
-export * from './tenant/tenant.service';

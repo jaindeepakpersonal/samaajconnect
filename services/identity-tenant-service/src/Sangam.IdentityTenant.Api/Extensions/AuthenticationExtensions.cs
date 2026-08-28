@@ -45,6 +45,11 @@ internal sealed class ConfigureJwtBearerOptions(IOptions<JwtOptions> jwtOptions)
 
         var jwt = jwtOptions.Value;
 
+        // Off, so a claim arrives named as it was issued. Left on, the handler
+        // rewrites "role" to the long WS-Federation URI and every role check
+        // downstream silently stops matching.
+        options.MapInboundClaims = false;
+
         options.TokenValidationParameters = new TokenValidationParameters
         {
             ValidateIssuer = true,

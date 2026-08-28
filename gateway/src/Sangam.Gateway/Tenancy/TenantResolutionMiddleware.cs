@@ -1,56 +1,66 @@
 using System.Security.Claims;
-using Microsoft.Extensions.Options;
 
 namespace Sangam.Gateway.Tenancy;
 
 /// <summary>
-/// Turns the request host into an <c>X-Tenant-Id</c> header the downstream
-/// services can trust, and rejects unknown or inactive Samaaj before any
-/// service sees the request (ARCHITECTURE.md section 6).
+/// Decides which Samaaj a request belongs to and tells the services behind it,
+/// via a header they can trust.
 /// </summary>
+/// <remarks>
+/// The platform runs on a single domain, so there is no subdomain to read: a
+/// member signs in once and the token they get names their Samaaj. This
+/// middleware turns that signed claim into an <c>X-Tenant-Id</c> header, having
+/// first confirmed the Samaaj is still active — a token outlives a
+/// deactivation, and the gateway is where that gets caught before any service
+/// sees the request (root CLAUDE.md §6).
+/// </remarks>
 public sealed class TenantResolutionMiddleware(
     RequestDelegate next,
-    HostSlugExtractor slugExtractor,
-    IOptions<GatewayOptions> options,
     ILogger<TenantResolutionMiddleware> logger)
 {
     public const string TenantHeader = "X-Tenant-Id";
     public const string TenantOverrideHeader = "X-Tenant-Override-Id";
     public const string TenantSlugHeader = "X-Tenant-Slug";
 
+    /// <summary>Claim identity-tenant-service puts the Samaaj id in.</summary>
+    public const string TenantClaimType = "tenant_id";
+
+    public const string SuperAdminRole = "SuperAdmin";
+
     /// <summary>Set on HttpContext.Items so the module gate can read it without resolving twice.</summary>
     public const string TenantItemKey = "gateway.tenant";
 
-    private readonly GatewayOptions _options = options.Value;
-
     public async Task InvokeAsync(HttpContext context, ITenantResolver resolver)
     {
-        // Stripped unconditionally and first. Downstream services treat these
-        // headers as gateway-issued facts, so a client must never be able to
-        // supply its own and pick a Samaaj.
-        var clientOverride = context.Request.Headers[TenantOverrideHeader].ToString();
+        // Stripped unconditionally and first. Services treat these headers as
+        // gateway-issued facts, so a client must never be able to supply its
+        // own and pick a Samaaj.
+        var requestedOverride = context.Request.Headers[TenantOverrideHeader].ToString();
 
         context.Request.Headers.Remove(TenantHeader);
         context.Request.Headers.Remove(TenantOverrideHeader);
         context.Request.Headers.Remove(TenantSlugHeader);
 
-        switch (await TryApplyOverrideAsync(context, clientOverride))
+        var tenantId = ResolveTenantId(context, requestedOverride, out var isOverride);
+
+        if (tenantId is null)
         {
-            case OverrideOutcome.Applied:
-                await next(context);
+            if (!string.IsNullOrWhiteSpace(requestedOverride))
+            {
+                // An override was asked for and refused; ResolveTenantId has
+                // already logged why.
+                await WriteProblemAsync(
+                    context,
+                    StatusCodes.Status403Forbidden,
+                    "Tenant.OverrideDenied",
+                    "You are not allowed to act on another Samaaj.");
+
                 return;
+            }
 
-            case OverrideOutcome.Rejected:
-                // TryApplyOverrideAsync has already written the response.
-                return;
-        }
-
-        var slug = slugExtractor.Extract(context.Request.Host.Value);
-
-        if (slug is null)
-        {
-            // An apex-host request carries no Samaaj. Registration and common
-            // login both live here, so this is normal rather than an error.
+            // Anonymous, or a token with no tenant claim - a Super Admin, who
+            // belongs to the platform rather than to a Samaaj. Both are normal:
+            // login, registration and the Samaaj directory all live here.
             await next(context);
             return;
         }
@@ -59,11 +69,11 @@ public sealed class TenantResolutionMiddleware(
 
         try
         {
-            tenant = await resolver.ResolveAsync(slug, context.RequestAborted);
+            tenant = await resolver.ResolveAsync(tenantId.Value, context.RequestAborted);
         }
         catch (Exception exception)
         {
-            logger.LogError(exception, "Could not resolve Samaaj {Slug}", slug);
+            logger.LogError(exception, "Could not resolve Samaaj {TenantId}", tenantId);
 
             await WriteProblemAsync(
                 context,
@@ -76,96 +86,93 @@ public sealed class TenantResolutionMiddleware(
 
         if (tenant is null || !tenant.IsActive)
         {
-            // 404 for both. An inactive Samaaj is not distinguishable from one
-            // that never existed, so probing subdomains reveals nothing.
-            logger.LogInformation("Rejecting request for unknown or inactive Samaaj {Slug}", slug);
+            // 403 rather than 404: the caller holds a valid token, so this is
+            // "your Samaaj is not available", not "no such address".
+            logger.LogInformation(
+                "Refusing request for unknown or inactive Samaaj {TenantId}", tenantId);
 
             await WriteProblemAsync(
-                context, StatusCodes.Status404NotFound, "Tenant.NotFound", "No Samaaj matches that address.");
+                context,
+                StatusCodes.Status403Forbidden,
+                "Tenant.Unavailable",
+                "Your Samaaj is not currently active. Please contact your Samaaj administrator.");
 
             return;
         }
 
         context.Items[TenantItemKey] = tenant;
-        context.Request.Headers[TenantHeader] = tenant.Id.ToString();
         context.Request.Headers[TenantSlugHeader] = tenant.Slug;
+
+        // Downstream services treat an override exactly like a normal tenant
+        // header; the distinct name exists so they can log that it happened,
+        // not so they can behave differently (root CLAUDE.md §6).
+        context.Request.Headers[isOverride ? TenantOverrideHeader : TenantHeader] =
+            tenant.Id.ToString();
 
         await next(context);
     }
 
-    /// <summary>What the override check decided about this request.</summary>
-    private enum OverrideOutcome
+    /// <summary>
+    /// Returns the Samaaj this request should run against, or null when there
+    /// is none — which covers both an anonymous caller and a refused override.
+    /// </summary>
+    private Guid? ResolveTenantId(HttpContext context, string requestedOverride, out bool isOverride)
     {
-        /// <summary>No override header; carry on with normal slug resolution.</summary>
-        None,
+        isOverride = false;
 
-        /// <summary>Override accepted and forwarded downstream.</summary>
-        Applied,
+        if (!string.IsNullOrWhiteSpace(requestedOverride))
+        {
+            // With one domain there is no admin hostname to gate on, so the
+            // role on the validated token is the whole gate.
+            if (!IsSuperAdmin(context.User))
+            {
+                logger.LogWarning(
+                    "Refused tenant override from a caller who is not a Super Admin: {Path}",
+                    context.Request.Path);
 
-        /// <summary>Override refused; the response has already been written.</summary>
-        Rejected,
+                return null;
+            }
+
+            if (!Guid.TryParse(requestedOverride, out var overrideTenantId))
+            {
+                logger.LogWarning("Refused malformed tenant override header");
+
+                return null;
+            }
+
+            // SECURITY-CHECKLIST.md: logged on every request that carries one,
+            // with both the actor and the Samaaj acted upon. On a single domain
+            // this log is the only record of who did what to whose Samaaj.
+            logger.LogWarning(
+                "Tenant override: actor {ActorUserId} acting on Samaaj {TenantId} for {Method} {Path}",
+                ActorOf(context.User),
+                overrideTenantId,
+                context.Request.Method,
+                context.Request.Path);
+
+            isOverride = true;
+
+            return overrideTenantId;
+        }
+
+        if (context.User.Identity?.IsAuthenticated != true)
+        {
+            return null;
+        }
+
+        return Guid.TryParse(context.User.FindFirstValue(TenantClaimType), out var claimTenantId)
+            && claimTenantId != Guid.Empty
+                ? claimTenantId
+                : null;
     }
 
-    /// <summary>Handles a Super Admin acting on another Samaaj.</summary>
-    private async Task<OverrideOutcome> TryApplyOverrideAsync(HttpContext context, string clientOverride)
-    {
-        if (string.IsNullOrWhiteSpace(clientOverride))
-        {
-            return OverrideOutcome.None;
-        }
-
-        if (!slugExtractor.IsAdminHost(context.Request.Host.Value))
-        {
-            logger.LogWarning(
-                "Refused tenant override from non-admin host {Host}", context.Request.Host.Value);
-
-            await WriteProblemAsync(
-                context, StatusCodes.Status403Forbidden, "Tenant.OverrideDenied",
-                "Tenant override is only available from the admin console.");
-
-            return OverrideOutcome.Rejected;
-        }
-
-        if (!Guid.TryParse(clientOverride, out var overrideTenantId))
-        {
-            await WriteProblemAsync(
-                context, StatusCodes.Status400BadRequest, "Tenant.OverrideInvalid",
-                "The tenant override header is not a valid id.");
-
-            return OverrideOutcome.Rejected;
-        }
-
-        if (!IsSuperAdmin(context.User))
-        {
-            logger.LogWarning(
-                "Refused tenant override for {TenantId} from a caller who is not a Super Admin",
-                overrideTenantId);
-
-            await WriteProblemAsync(
-                context, StatusCodes.Status403Forbidden, "Tenant.OverrideDenied",
-                "You are not allowed to act on another Samaaj.");
-
-            return OverrideOutcome.Rejected;
-        }
-
-        // SECURITY-CHECKLIST.md: logged on every request that carries one, with
-        // both the actor and the Samaaj being acted upon - not only at sign-in.
-        logger.LogWarning(
-            "Tenant override: actor {ActorUserId} acting on Samaaj {TenantId} for {Method} {Path}",
-            context.User.FindFirstValue(ClaimTypes.NameIdentifier) ?? context.User.FindFirstValue("sub"),
-            overrideTenantId,
-            context.Request.Method,
-            context.Request.Path);
-
-        context.Request.Headers[TenantOverrideHeader] = overrideTenantId.ToString();
-
-        return OverrideOutcome.Applied;
-    }
+    private static string? ActorOf(ClaimsPrincipal user) =>
+        user.FindFirstValue(ClaimTypes.NameIdentifier) ?? user.FindFirstValue("sub");
 
     private static bool IsSuperAdmin(ClaimsPrincipal user) =>
         user.Identity?.IsAuthenticated == true
-        && (user.IsInRole("SuperAdmin")
-            || user.FindAll("role").Any(c => c.Value == "SuperAdmin"));
+        && (user.IsInRole(SuperAdminRole)
+            || user.FindAll("role").Any(claim => claim.Value == SuperAdminRole));
 
     private static Task WriteProblemAsync(
         HttpContext context, int statusCode, string title, string detail)

@@ -3,6 +3,7 @@ using Sangam.IdentityTenant.Api.Extensions;
 using Sangam.IdentityTenant.Application.Tenants;
 using Sangam.IdentityTenant.Application.Tenants.Commands.ChangeTenantStatus;
 using Sangam.IdentityTenant.Application.Tenants.Commands.CreateTenant;
+using Sangam.IdentityTenant.Application.Tenants.Queries.GetTenantById;
 using Sangam.IdentityTenant.Application.Tenants.Queries.GetTenantBySlug;
 using Sangam.IdentityTenant.Application.Tenants.Queries.ListRegisterableTenants;
 
@@ -64,6 +65,21 @@ public static class TenantEndpoints
             .ProducesProblem(StatusCodes.Status403Forbidden)
             .ProducesProblem(StatusCodes.Status404NotFound)
             .ProducesProblem(StatusCodes.Status409Conflict);
+
+        group.MapGet("/by-id/{id:guid}", async (
+                Guid id,
+                ISender sender,
+                CancellationToken cancellationToken) =>
+            {
+                var result = await sender.Send(new GetTenantByIdQuery(id), cancellationToken);
+
+                return result.ToApiResult();
+            })
+            .AllowAnonymous()
+            .WithName("GetTenantById")
+            .WithSummary("Resolve a tenant id to its public summary. Called by the gateway on every authenticated request.")
+            .Produces<TenantSummaryResponse>()
+            .ProducesProblem(StatusCodes.Status404NotFound);
 
         group.MapGet("/directory", async (ISender sender, CancellationToken cancellationToken) =>
             {

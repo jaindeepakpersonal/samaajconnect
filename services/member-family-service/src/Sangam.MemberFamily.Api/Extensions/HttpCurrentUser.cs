@@ -15,10 +15,12 @@ public sealed class HttpCurrentUser : ICurrentUser
 
         IsAuthenticated = principal?.Identity?.IsAuthenticated ?? false;
 
+        // One claim name, not two. The JwtBearer options turn inbound claim
+        // mapping off, so a role arrives named exactly as it was issued -
+        // reading both names here would only hide it if that ever changed.
         _roles = principal is null
             ? new HashSet<string>(StringComparer.OrdinalIgnoreCase)
-            : principal.FindAll(ClaimTypes.Role)
-                .Concat(principal.FindAll(PlatformClaimTypes.Role))
+            : principal.FindAll(PlatformClaimTypes.Role)
                 .Select(c => c.Value)
                 .ToHashSet(StringComparer.OrdinalIgnoreCase);
 

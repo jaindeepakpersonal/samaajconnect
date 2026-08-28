@@ -4,7 +4,7 @@ using StackExchange.Redis;
 namespace Sangam.Gateway.Tenancy;
 
 /// <summary>
-/// A cached slug lookup. <paramref name="Found"/> distinguishes "we cached the
+/// A cached tenant lookup. <paramref name="Found"/> distinguishes "we cached the
 /// fact that this Samaaj does not exist" from "we have nothing cached", which a
 /// plain nullable tenant could not express.
 /// </summary>
@@ -12,9 +12,9 @@ public sealed record CachedTenantLookup(bool Found, ResolvedTenant? Tenant);
 
 public interface ITenantCache
 {
-    Task<CachedTenantLookup?> GetAsync(string slug);
+    Task<CachedTenantLookup?> GetAsync(string tenantId);
 
-    Task SetAsync(string slug, ResolvedTenant? tenant, TimeSpan ttl);
+    Task SetAsync(string tenantId, ResolvedTenant? tenant, TimeSpan ttl);
 }
 
 /// <summary>
@@ -27,23 +27,23 @@ public interface ITenantCache
 /// </remarks>
 public sealed class NullTenantCache : ITenantCache
 {
-    public Task<CachedTenantLookup?> GetAsync(string slug) => Task.FromResult<CachedTenantLookup?>(null);
+    public Task<CachedTenantLookup?> GetAsync(string tenantId) => Task.FromResult<CachedTenantLookup?>(null);
 
-    public Task SetAsync(string slug, ResolvedTenant? tenant, TimeSpan ttl) => Task.CompletedTask;
+    public Task SetAsync(string tenantId, ResolvedTenant? tenant, TimeSpan ttl) => Task.CompletedTask;
 }
 
 public sealed class RedisTenantCache(IConnectionMultiplexer redis, ILogger<RedisTenantCache> logger)
     : ITenantCache
 {
     /// <summary>
-    /// Stored in place of a tenant to remember "this slug does not exist".
+    /// Stored in place of a tenant to remember "this Samaaj does not exist".
     /// Not valid JSON, so it can never be mistaken for a cached Samaaj.
     /// </summary>
     private const string NegativeCacheMarker = "-";
 
     private static readonly JsonSerializerOptions JsonOptions = new(JsonSerializerDefaults.Web);
 
-    public async Task<CachedTenantLookup?> GetAsync(string slug)
+    public async Task<CachedTenantLookup?> GetAsync(string tenantId)
     {
         if (!redis.IsConnected)
         {
@@ -52,7 +52,7 @@ public sealed class RedisTenantCache(IConnectionMultiplexer redis, ILogger<Redis
 
         try
         {
-            var value = await redis.GetDatabase().StringGetAsync(Key(slug));
+            var value = await redis.GetDatabase().StringGetAsync(Key(tenantId));
 
             if (value.IsNullOrEmpty)
             {
@@ -68,13 +68,13 @@ public sealed class RedisTenantCache(IConnectionMultiplexer redis, ILogger<Redis
             // A cache failure degrades to a cache miss, never to a failed
             // request: Redis must not become a second thing that can take the
             // whole platform down.
-            logger.LogWarning(exception, "Redis lookup failed for {Slug}; treating as a miss", slug);
+            logger.LogWarning(exception, "Redis lookup failed for {TenantId}; treating as a miss", tenantId);
 
             return null;
         }
     }
 
-    public async Task SetAsync(string slug, ResolvedTenant? tenant, TimeSpan ttl)
+    public async Task SetAsync(string tenantId, ResolvedTenant? tenant, TimeSpan ttl)
     {
         if (!redis.IsConnected)
         {
@@ -87,13 +87,13 @@ public sealed class RedisTenantCache(IConnectionMultiplexer redis, ILogger<Redis
                 ? NegativeCacheMarker
                 : JsonSerializer.Serialize(tenant, JsonOptions);
 
-            await redis.GetDatabase().StringSetAsync(Key(slug), payload, ttl);
+            await redis.GetDatabase().StringSetAsync(Key(tenantId), payload, ttl);
         }
         catch (Exception exception)
         {
-            logger.LogWarning(exception, "Failed to cache Samaaj {Slug}", slug);
+            logger.LogWarning(exception, "Failed to cache Samaaj {TenantId}", tenantId);
         }
     }
 
-    private static string Key(string slug) => $"gateway:tenant:{slug}";
+    private static string Key(string tenantId) => $"gateway:tenant:{tenantId}";
 }

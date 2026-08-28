@@ -8,13 +8,12 @@ version of the plan; the reasoning behind the ordering lives in
 ## Current Status
 
 - **Stage:** Stage 0 complete; starting Phase 1 - Platform Foundation
-- **Last updated:** 2026-08-28 - `member-family-service` built: profiles created
-  from the registration event over Kafka, the privacy-filtered directory, and
-  the family join flow. 305 tests green (261 backend, 44 frontend) plus 17
-  smoke checks against a stack built from scratch.
-- **Blocking item:** the **adult-child conversion** open decision below now
-  blocks the next piece of work (children). Recommended default is
-  admin-approved. Everything else in Phase 1 is unblocked.
+- **Last updated:** 2026-08-28 - single-domain tenant resolution. The Samaaj
+  now comes from the token, not a subdomain, per the decision below. 292
+  tests green (250 backend, 42 frontend) plus 19 smoke checks against a stack
+  built from scratch.
+- **Blocking item:** none. Adult-child conversion is decided (admin-approved),
+  so children and conversion are next, then the DPDP capabilities.
 
 *(Update these three lines at the start/end of every work session —
 they're what a coding agent or a teammate should read first to know
@@ -118,18 +117,22 @@ Flagged in the requirements docs as suggestions, not yet resolved.
 Resolve each before the phase that depends on it starts — don't let
 these sit unresolved into the sprint that needs them.
 
-- [ ] **Adult-child conversion:** admin-approved vs. self-service.
-      Recommended: admin-approved initially (safer default, easy to
-      relax later). Needed before Phase 1 Children work.
+- [x] **Adult-child conversion: admin-approved.** Decided 2026-08-28. A child
+      who turns 18 requests conversion; a Samaaj admin approves it before the
+      login is created. Safer default and easy to relax later.
 - [ ] **Boli anti-abuse rules:** minimum bid increment + anti-sniping
       auto-extend window. Needed before Phase 5.
-- [ ] **Custom domain (CNAME) per tenant:** needed before the SSL/cert
-      strategy is finalized — decide early even though it's low
-      priority, since it's expensive to retrofit.
-- [ ] **Eventing library:** confirm native Kafka Outbox (current
-      convention, see `CLAUDE.md` §5) vs. MassTransit and make sure
-      the skill and this repo agree — don't let them drift.
-- [ ] **DPDP Act, 2023 compliance review** (India's data protection
-      law) — confirm with someone qualified how consent records and
-      data export/erasure requests should work before Phase 1 ships
-      to real users.
+- [x] **Single domain, no per-Samaaj subdomain or CNAME.** Decided
+      2026-08-28. A member signs in once and the system decides which Samaaj
+      they belong to, because a login identifier is unique platform-wide.
+      One certificate, no wildcard DNS, and the tenant travels in the token.
+      This superseded the subdomain design in `docs/product/ARCHITECTURE.md`
+      §3 and §6; root `CLAUDE.md` §6 is now the source of truth. The `Domain`
+      column on `Tenant` is retained but unused.
+- [x] **Eventing: native Kafka Outbox, no MassTransit.** Settled by
+      `CLAUDE.md` §5 and built that way in every service.
+- [ ] **DPDP Act, 2023 compliance review — required.** Confirmed 2026-08-28 as
+      in scope. The technical capabilities (consent records, data export,
+      erasure) are ours to build; how they are worded and what retention
+      periods apply still needs someone qualified in Indian data protection
+      law. Must land before Phase 1 ships to real users.

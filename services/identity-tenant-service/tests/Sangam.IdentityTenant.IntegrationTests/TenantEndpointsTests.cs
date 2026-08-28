@@ -211,4 +211,58 @@ public sealed class TenantEndpointsTests(IdentityTenantApiFactory factory)
         entry.TryGetProperty("contactEmail", out _).Should().BeFalse();
         entry.TryGetProperty("contactPerson", out _).Should().BeFalse();
     }
+
+    [Fact]
+    public async Task A_tenant_can_be_resolved_by_id_without_a_token()
+    {
+        // The gateway calls this on every authenticated request, while deciding
+        // whether the request may proceed at all.
+        var created = await SuperAdminClient().PostAsJsonAsync(TenantsUrl, NewTenantPayload());
+        var id = (await created.Content.ReadFromJsonAsync<JsonElement>()).GetProperty("id").GetGuid();
+
+        var body = await factory.CreateClient()
+            .GetFromJsonAsync<JsonElement>($"{TenantsUrl}/by-id/{id}");
+
+        body.GetProperty("slug").GetString().Should().Be("mumbai-samaaj");
+        body.GetProperty("status").GetString().Should().Be("Inactive");
+    }
+
+    [Fact]
+    public async Task Resolving_by_id_reports_the_status_so_the_gateway_can_refuse_an_inactive_Samaaj()
+    {
+        var admin = SuperAdminClient();
+        var created = await admin.PostAsJsonAsync(TenantsUrl, NewTenantPayload());
+        var id = (await created.Content.ReadFromJsonAsync<JsonElement>()).GetProperty("id").GetGuid();
+
+        await admin.PatchAsJsonAsync($"{TenantsUrl}/{id}/status", new { status = "Active" });
+
+        var active = await factory.CreateClient().GetFromJsonAsync<JsonElement>($"{TenantsUrl}/by-id/{id}");
+        active.GetProperty("status").GetString().Should().Be("Active");
+
+        await admin.PatchAsJsonAsync($"{TenantsUrl}/{id}/status", new { status = "Inactive" });
+
+        var inactive = await factory.CreateClient().GetFromJsonAsync<JsonElement>($"{TenantsUrl}/by-id/{id}");
+        inactive.GetProperty("status").GetString().Should().Be("Inactive");
+    }
+
+    [Fact]
+    public async Task Resolving_by_id_does_not_expose_contact_details()
+    {
+        var created = await SuperAdminClient().PostAsJsonAsync(TenantsUrl, NewTenantPayload());
+        var id = (await created.Content.ReadFromJsonAsync<JsonElement>()).GetProperty("id").GetGuid();
+
+        var body = await factory.CreateClient()
+            .GetFromJsonAsync<JsonElement>($"{TenantsUrl}/by-id/{id}");
+
+        body.TryGetProperty("contactEmail", out _).Should().BeFalse();
+        body.TryGetProperty("contactPerson", out _).Should().BeFalse();
+    }
+
+    [Fact]
+    public async Task An_unknown_tenant_id_is_a_404()
+    {
+        var response = await factory.CreateClient().GetAsync($"{TenantsUrl}/by-id/{Guid.NewGuid()}");
+
+        response.StatusCode.Should().Be(HttpStatusCode.NotFound);
+    }
 }

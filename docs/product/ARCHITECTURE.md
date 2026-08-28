@@ -12,7 +12,7 @@ each service does, see `SERVICES.md`. For entities, see `DATA-MODEL.md`.
                     v                                  v
         --------------------------------------------------------
                     YARP API Gateway (.NET 8/9)
-        - subdomain -> TenantId resolution (Redis-cached)
+        - token claim -> TenantId resolution (Redis-cached status check)
         - JWT validation
         - per-tenant module feature-flag gate
         - routes /v1/{resource}/** to the owning service
@@ -110,18 +110,25 @@ consolidated into one "tenant database."
 
 ## 6. Gateway responsibilities
 
-- **Tenant resolution:** extract subdomain slug → look up `TenantId` in
-  Redis (backed by `identity-tenant-service`) → inject `X-Tenant-Id`
-  header downstream. Reject unknown/inactive tenants at the gateway,
-  before any service sees the request.
+- **Tenant resolution:** read the `tenant_id` claim off the validated
+  token, confirm the Samaaj is still active (Redis-cached, backed by
+  `identity-tenant-service`), and inject the `X-Tenant-Id` header
+  downstream. Reject unknown or inactive tenants at the gateway, before
+  any service sees the request. Anonymous requests carry no tenant.
+
+  > Superseded the original subdomain-per-Samaaj design. The platform
+  > runs on a single domain and a login identifier is unique
+  > platform-wide, so signing in already determines the Samaaj — see
+  > root `CLAUDE.md` §6.
 - **Auth:** validate the JWT signature and expiry; downstream services
   still re-check role/permission claims themselves (defense in depth —
   the gateway is not the only authorization boundary).
-- **Super Admin tenant override:** `admin.samaajconnect.com` requests
-  from a Super Admin may carry `X-Tenant-Override-Id`; the gateway logs
-  this explicitly so it's auditable, and every downstream service
-  treats it exactly like a normal `X-Tenant-Id` — there is no separate
-  "admin bypass" code path in the services themselves.
+- **Super Admin tenant override:** a request from a Super Admin may
+  carry `X-Tenant-Override-Id`; the gateway logs this explicitly so it
+  is auditable, and every downstream service treats it exactly like a
+  normal `X-Tenant-Id` — there is no separate "admin bypass" code path
+  in the services themselves. With one domain there is no admin
+  hostname to gate on, so the SuperAdmin role is the whole gate.
 - **Module feature-flag gate:** each tenant has an `EnabledModules`
   list (e.g. a Samaaj with no Pathshala program disables that module).
   The gateway rejects routes for disabled modules with a 404 rather
@@ -132,9 +139,9 @@ consolidated into one "tenant database."
 
 - **Monorepo:** `/apps/member-portal` (SSR), `/apps/admin-portal`
   (SPA), `/libs` for shared UI + HTTP interceptors.
-- **Tenant interceptor:** reads the resolved subdomain and attaches it
-  to outgoing requests (used for local dev against non-subdomain URLs
-  too, via an explicit header override).
+- **Tenant handling:** nothing to attach. The platform runs on one
+  domain and the tenant travels in the token, so the shared interceptor
+  only rewrites relative URLs to the gateway (root `CLAUDE.md` §6).
 - **Role-aware rendering:** route guards + structural directives hide
   navigation/actions based on JWT claims — but this is a UX
   convenience, never the actual authorization boundary (see

@@ -9,8 +9,10 @@ namespace Sangam.Gateway.Tests;
 
 public sealed class CachedTenantResolverTests
 {
+    private static readonly Guid MahavirId = Guid.NewGuid();
+
     private static readonly ResolvedTenant Mahavir = new(
-        Guid.NewGuid(), "mahavir-samaj", "Active", ["Pathshala"]);
+        MahavirId, "mahavir-samaj", "Active", ["Pathshala"]);
 
     private readonly ITenantCache _cache = Substitute.For<ITenantCache>();
     private readonly StubHandler _handler = new();
@@ -30,9 +32,9 @@ public sealed class CachedTenantResolverTests
     [Fact]
     public async Task A_cache_hit_does_not_call_the_identity_service()
     {
-        _cache.GetAsync("mahavir-samaj").Returns(new CachedTenantLookup(true, Mahavir));
+        _cache.GetAsync(MahavirId.ToString()).Returns(new CachedTenantLookup(true, Mahavir));
 
-        var tenant = await _resolver.ResolveAsync("mahavir-samaj");
+        var tenant = await _resolver.ResolveAsync(MahavirId);
 
         tenant.Should().Be(Mahavir);
         _handler.Calls.Should().Be(0);
@@ -41,39 +43,45 @@ public sealed class CachedTenantResolverTests
     [Fact]
     public async Task A_cached_negative_result_is_honoured_without_calling_identity()
     {
-        // Otherwise a probed subdomain becomes an unthrottled stream of lookups.
-        _cache.GetAsync("ghost").Returns(new CachedTenantLookup(false, null));
+        // A token naming a Samaaj that no longer exists would otherwise re-ask
+        // identity on every request until it expired.
+        var missing = Guid.NewGuid();
+        _cache.GetAsync(missing.ToString()).Returns(new CachedTenantLookup(false, null));
 
-        (await _resolver.ResolveAsync("ghost")).Should().BeNull();
+        (await _resolver.ResolveAsync(missing)).Should().BeNull();
         _handler.Calls.Should().Be(0);
     }
 
     [Fact]
-    public async Task A_cache_miss_fetches_from_identity_and_caches_the_result()
+    public async Task A_cache_miss_fetches_by_id_and_caches_the_result()
     {
-        _cache.GetAsync("mahavir-samaj").Returns((CachedTenantLookup?)null);
+        _cache.GetAsync(MahavirId.ToString()).Returns((CachedTenantLookup?)null);
         _handler.Respond(HttpStatusCode.OK, $$"""
-            {"id":"{{Mahavir.Id}}","slug":"mahavir-samaj","status":"Active","enabledModules":["Pathshala"]}
+            {"id":"{{MahavirId}}","slug":"mahavir-samaj","status":"Active","enabledModules":["Pathshala"]}
             """);
 
-        var tenant = await _resolver.ResolveAsync("mahavir-samaj");
+        var tenant = await _resolver.ResolveAsync(MahavirId);
 
         tenant.Should().NotBeNull();
         tenant!.Slug.Should().Be("mahavir-samaj");
         tenant.EnabledModules.Should().ContainSingle().Which.Should().Be("Pathshala");
 
-        await _cache.Received(1).SetAsync("mahavir-samaj", Arg.Any<ResolvedTenant>(), Arg.Any<TimeSpan>());
+        _handler.LastPath.Should().Be($"/v1/identity/tenants/by-id/{MahavirId}");
+
+        await _cache.Received(1).SetAsync(
+            MahavirId.ToString(), Arg.Any<ResolvedTenant>(), Arg.Any<TimeSpan>());
     }
 
     [Fact]
     public async Task A_404_from_identity_is_a_missing_Samaaj_and_is_cached_as_such()
     {
-        _cache.GetAsync("ghost").Returns((CachedTenantLookup?)null);
+        var missing = Guid.NewGuid();
+        _cache.GetAsync(missing.ToString()).Returns((CachedTenantLookup?)null);
         _handler.Respond(HttpStatusCode.NotFound, "{}");
 
-        (await _resolver.ResolveAsync("ghost")).Should().BeNull();
+        (await _resolver.ResolveAsync(missing)).Should().BeNull();
 
-        await _cache.Received(1).SetAsync("ghost", null, Arg.Any<TimeSpan>());
+        await _cache.Received(1).SetAsync(missing.ToString(), null, Arg.Any<TimeSpan>());
     }
 
     [Theory]
@@ -84,11 +92,11 @@ public sealed class CachedTenantResolverTests
         HttpStatusCode statusCode)
     {
         // "We could not check" must not be cached, or reported, as
-        // "this Samaaj does not exist".
-        _cache.GetAsync("mahavir-samaj").Returns((CachedTenantLookup?)null);
+        // "this Samaaj is gone" - that would lock every member out.
+        _cache.GetAsync(MahavirId.ToString()).Returns((CachedTenantLookup?)null);
         _handler.Respond(statusCode, "{}");
 
-        var act = async () => await _resolver.ResolveAsync("mahavir-samaj");
+        var act = async () => await _resolver.ResolveAsync(MahavirId);
 
         await act.Should().ThrowAsync<HttpRequestException>();
         await _cache.DidNotReceive().SetAsync(
@@ -102,6 +110,8 @@ public sealed class CachedTenantResolverTests
 
         public int Calls { get; private set; }
 
+        public string? LastPath { get; private set; }
+
         public void Respond(HttpStatusCode statusCode, string body)
         {
             _statusCode = statusCode;
@@ -112,6 +122,7 @@ public sealed class CachedTenantResolverTests
             HttpRequestMessage request, CancellationToken cancellationToken)
         {
             Calls++;
+            LastPath = request.RequestUri?.AbsolutePath;
 
             return Task.FromResult(new HttpResponseMessage(_statusCode)
             {

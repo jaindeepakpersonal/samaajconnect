@@ -28,9 +28,12 @@ and expose its endpoints behind the gateway at the route prefix shown.
 - **Gateway route prefix:** `/v1/identity/**`
 - **Tenant role(s) that can invoke first command:** `SuperAdmin` only
   (tenant creation); `Anonymous` for `RegisterMemberCommand`
-- **Notes:** This service resolves subdomain → `TenantId` for the
-  gateway's tenant-extraction step (see `ARCHITECTURE.md` §3). It is the
-  only service allowed to issue JWTs.
+- **Notes:** This service is the only one allowed to issue JWTs, and the
+  `tenant_id` claim it puts in them is what every other service scopes
+  by. It also serves the public Samaaj directory the registration form
+  picks from, and the by-id lookup the gateway uses to confirm a Samaaj
+  is still active. The platform runs on a single domain — there is no
+  subdomain resolution step (root `CLAUDE.md` §6).
 
 ## 2. member-family-service
 
