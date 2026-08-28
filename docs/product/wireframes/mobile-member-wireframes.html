@@ -1,0 +1,92 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>samaajconnect - Mobile Member App Wireframes (v2)</title>
+<style>
+*{box-sizing:border-box}body{margin:0;background:#e9eaee;font-family:Arial,sans-serif;color:#171a21}
+.wrap{max-width:430px;margin:0 auto;background:#f6f7f9;min-height:100vh;box-shadow:0 0 30px #0002}
+.top{height:58px;background:#fff;border-bottom:1px solid #ddd;display:flex;align-items:center;justify-content:space-between;padding:0 16px;position:sticky;top:0;z-index:5}
+.brand{font-weight:800}.screen{display:none;padding:16px 14px 85px}.screen.active{display:block}
+h1{font-size:24px;margin:4px 0 5px}.sub{font-size:13px;color:#697386;margin-bottom:16px}
+.card{background:#fff;border:1px solid #dce0e6;border-radius:12px;padding:14px;margin-bottom:12px}.grid{display:grid;grid-template-columns:1fr 1fr;gap:10px}.stat{font-size:25px;font-weight:800;margin-top:4px}
+.btn{border:0;border-radius:8px;padding:10px 12px;background:#6848f5;color:#fff;font-weight:600}.btn.alt{background:#edf0f4;color:#303744}.btn.red{background:#d83b3b}.actions{display:flex;gap:7px;flex-wrap:wrap;margin-top:10px}
+.input,select,textarea{width:100%;padding:10px;border:1px solid #d7dce4;border-radius:8px;margin:4px 0 10px;background:#fff;font-family:inherit}.pill{font-size:11px;padding:4px 8px;border-radius:20px;background:#eeeafe;color:#4e3db2}
+.bottom{position:fixed;bottom:0;width:100%;max-width:430px;background:#fff;border-top:1px solid #ddd;display:flex;justify-content:space-around;padding:7px 4px;z-index:5}.bottom button{border:0;background:none;font-size:10px;color:#596273;padding:5px;position:relative}.bottom button.active{color:#6848f5;font-weight:700}
+.list{display:flex;align-items:center;justify-content:space-between;padding:12px 0;border-bottom:1px solid #eee}.list:last-child{border-bottom:0}
+.notice{background:#fff7db;border:1px solid #efd47d;padding:11px;border-radius:9px;margin-bottom:12px;font-size:13px}
+.switch{display:flex;background:#eceef2;border-radius:9px;padding:3px;margin:12px 0}.switch button{flex:1;border:0;background:transparent;padding:9px;border-radius:7px}.switch button.on{background:#fff;font-weight:700;box-shadow:0 1px 3px #0001}
+.login{padding:50px 18px}.logo{font-size:25px;font-weight:800;margin-bottom:20px}
+.small{font-size:11px;color:#697386}.back{border:0;background:none;font-size:20px}
+.bellwrap{position:relative}.dot{position:absolute;top:2px;right:2px;width:7px;height:7px;background:#ff5c5c;border-radius:50%}
+.badge{position:absolute;top:-2px;right:16px;background:#ff5c5c;color:#fff;font-size:9px;border-radius:20px;padding:1px 4px}
+</style>
+</head>
+<body>
+<div class="wrap">
+<div class="top"><button class="back" onclick="go('home')">‹</button><div class="brand" id="appTitle">samaajconnect</div><button class="bellwrap" onclick="go('notifications')" style="border:0;background:none;font-size:18px">🔔<span class="dot"></span></button></div>
+
+<section id="login" class="screen active login">
+<div class="logo">samaajconnect</div>
+<div class="card"><h1>Login</h1><p class="sub">Common login. Tenant is detected automatically.</p>
+<div class="switch"><button class="on" id="mLoginPw" onclick="loginMode('pw')">Password</button><button id="mLoginOtp" onclick="loginMode('otp')">OTP</button></div>
+<label>Mobile / Email</label><input class="input" placeholder="Enter mobile or email">
+<div id="mPwField"><label>Password</label><input class="input" type="password" placeholder="Password"></div>
+<div id="mOtpField" style="display:none"><label>OTP</label><input class="input" placeholder="6-digit code"></div>
+<button class="btn" style="width:100%" onclick="go('home')">Login</button>
+<p class="small" style="margin-top:8px"><a href="#" onclick="go('forgot');return false">Forgot password?</a> · Demo: routes to mahavir-samaj.samaajconnect.com</p></div>
+</section>
+
+<section id="forgot" class="screen login"><div class="card"><button class="back" onclick="go('login')">‹</button><h1>Reset Password</h1><p class="sub">We'll text a one-time code.</p><label>Mobile / Email</label><input class="input"><button class="btn" style="width:100%" onclick="go('login')">Send Code</button></div></section>
+
+<section id="home" class="screen">
+<h1>Good evening 👋</h1><p class="sub">Mahavir Samaaj</p>
+<div class="grid"><div class="card" onclick="go('members')"><b>Members</b><div class="stat">1,248</div></div><div class="card" onclick="go('family')"><b>Family</b><div class="stat">4</div></div><div class="card" onclick="go('events')"><b>Events</b><div class="stat">6</div></div><div class="card" onclick="go('groups')"><b>Volunteer</b><div class="stat">3</div></div></div>
+<div class="card"><b>Upcoming</b><div class="list"><span>Paryushan Lecture<br><small>05 Sep • 6:00 PM</small></span><button class="btn alt" onclick="go('events')">View</button></div><div class="list"><span>Community Seva Day<br><small>12 Sep • 8:00 AM</small></span><button class="btn alt" onclick="go('events')">View</button></div></div>
+<div class="card"><b>Jain Pathshala</b><p class="sub">Aarav • Class 8 • Attendance 92%</p><button class="btn" onclick="go('pathshala')">Open Pathshala</button></div>
+</section>
+
+<section id="members" class="screen"><h1>Members</h1><p class="sub">Mahavir Samaaj member directory</p><input class="input" placeholder="Search members"><div class="card"><div class="list"><span><b>Rajesh Jain</b><br><small>Business • Hiran Magri</small></span><button class="btn alt">View</button></div><div class="list"><span><b>Neha Jain</b><br><small>Teacher • Surajpole</small></span><button class="btn alt">View</button></div><div class="list"><span><b>Manish Jain</b><br><small>CA • Shobhagpura</small></span><button class="btn alt">View</button></div></div></section>
+
+<section id="family" class="screen"><h1>My Family</h1><p class="sub">Manage family relationships</p><div class="card"><h3>Jain Family</h3><p>Deepak • Spouse • 2 Children</p><span class="pill">Family Head</span><div class="actions"><button class="btn">Add Member</button><button class="btn alt">Invite</button></div></div><div class="card"><b>Family Requests</b><p class="sub">1 request waiting for your action</p><button class="btn">Review</button></div></section>
+
+<section id="children" class="screen"><h1>Children</h1><p class="sub">Family child profiles</p><div class="card"><b>Aarav Jain</b><p class="sub">14 May 2008 • Age 18</p><div class="notice">Eligible to register as a main account while remaining part of the family.</div><button class="btn" onclick="alert('Prototype: conversion flow')">Register Main Account</button></div><div class="card"><b>Anaya Jain</b><p class="sub">02 Feb 2015 • Age 11</p><button class="btn alt">Edit Child</button></div></section>
+
+<section id="timeline" class="screen"><h1>Timeline</h1><p class="sub">Samaaj announcements & approved posts</p><div class="card"><textarea class="input" placeholder="Share something..."></textarea><button class="btn">Post for Review</button></div><div class="card"><small>Mahavir Samaaj • 2h ago</small><h3>Annual Paryushan Program</h3><p class="sub">Schedule and venue details are available.</p></div><div class="card"><small>Member Post • Approved</small><h3>Community Seva Drive</h3><p class="sub">Volunteers are welcome.</p></div></section>
+
+<section id="groups" class="screen"><h1>Volunteer Groups</h1><p class="sub">Find groups and apply</p><div class="card"><h3>Seva Group</h3><p>President: Rajesh Jain</p><span class="pill">Social Service</span><div class="actions"><button class="btn">Apply</button></div></div><div class="card"><h3>Yuva Mandal</h3><p>President: Neha Jain</p><span class="pill">Youth</span><div class="actions"><button class="btn">Apply</button></div></div></section>
+
+<section id="events" class="screen"><h1>Events</h1><p class="sub">Upcoming Samaaj events</p><div class="card"><h3>Paryushan Lecture</h3><p>05 Sep 2026 • 6:00 PM</p><p class="sub">Education Group • 186/200 registered</p><button class="btn">RSVP</button></div><div class="card"><h3>Community Seva Day</h3><p>12 Sep 2026 • 8:00 AM</p><p class="sub">Seva Group • Open</p><button class="btn">RSVP</button></div></section>
+
+<section id="issues" class="screen"><h1>Social Issues</h1><p class="sub">Submit issues for approval</p><div class="card"><input class="input" placeholder="Issue title"><select class="input"><option>Community</option><option>Education</option><option>Environment</option></select><textarea class="input" placeholder="Describe issue"></textarea><button class="btn">Submit</button></div><div class="card"><b>Published Issues</b><div class="list">Road safety near school <span class="pill">Approved</span></div><div class="list">Senior citizen support <span class="pill">In Progress</span></div></div></section>
+
+<section id="celebrity" class="screen"><h1>Celebrities</h1><p class="sub">Vote for Samaaj members</p><div class="notice">Voting closes 20 Sep 2026. Top 10 winners will be declared.</div><div class="card"><h3>Candidate 01</h3><p class="sub">Community Service</p><button class="btn" onclick="alert('Vote recorded in prototype')">Vote</button></div><div class="card"><h3>Candidate 02</h3><p class="sub">Education</p><button class="btn" onclick="alert('Vote recorded in prototype')">Vote</button></div></section>
+
+<section id="pathshala" class="screen"><h1>Jain Pathshala</h1><p class="sub">Parent / student education hub</p><div class="card"><b>Shri Mahavir Jain Pathshala</b><p class="sub">Aarav Jain • Class 8</p><div class="grid"><button class="btn alt" onclick="go('myclass')">My Class</button><button class="btn alt" onclick="go('attendance')">Attendance</button><button class="btn alt" onclick="go('exams')">My Exams</button><button class="btn alt" onclick="go('progress')">Progress</button></div></div></section>
+
+<section id="myclass" class="screen"><h1>My Class</h1><p class="sub">Class 8 • Jain Studies</p><div class="card"><b>Teacher</b><p>Kavita Jain</p><b>Room</b><p>2</p><b>Students</b><p>24</p></div></section>
+<section id="attendance" class="screen"><h1>My Attendance</h1><p class="sub">Academic session 2026–27</p><div class="card"><div class="stat">92%</div><p class="sub">46 present • 4 absent</p></div></section>
+<section id="exams" class="screen"><h1>My Exams</h1><div class="card"><b>Ahimsa & Jain Philosophy</b><p class="sub">18 Sep 2026 • Upcoming</p></div><div class="card"><b>Jain History</b><p class="sub">10 Aug 2026 • Score 88%</p></div></section>
+<section id="progress" class="screen"><h1>My Progress</h1><div class="grid"><div class="card"><b>Studies</b><div class="stat">88%</div></div><div class="card"><b>Attendance</b><div class="stat">92%</div></div></div></section>
+
+<section id="boli" class="screen"><h1>Auctions / Boli</h1><p class="sub">Active bidding and results</p><div class="card"><span class="pill">ACTIVE</span><h3>Annual Community Fundraiser</h3><p>3 active Boli items</p><button class="btn">View & Bid</button></div><div class="card"><h3>Published Results</h3><p class="sub">Last published 15 Aug 2026</p><button class="btn alt">View Results</button></div></section>
+
+<section id="notifications" class="screen"><h1>Notifications</h1><p class="sub">Approvals, events and updates</p>
+<div class="card"><div class="list"><span>🗳️ Voting closes in 2 days</span><span class="pill">New</span></div><div class="list"><span>✅ Timeline post approved</span><span class="pill">New</span></div><div class="list"><span>👥 Seva Group application accepted</span><span class="small">Read</span></div></div></section>
+
+<section id="profile" class="screen"><h1>My Profile</h1><div class="card"><label>Name</label><input class="input" value="Deepak Jain"><label>Mobile</label><input class="input" value="+91 98xxxxxx10"><label>Email</label><input class="input" value="deepak@example.com"><label>Address</label><textarea class="input">Udaipur, Rajasthan</textarea><button class="btn">Save</button></div>
+<div class="card"><b>Privacy</b><div class="list"><span>Mobile number visibility</span><select style="width:120px;margin:0"><option>Samaaj only</option><option>Private</option></select></div></div></section>
+
+<section id="menu" class="screen"><h1>More</h1><div class="card"><div class="list" onclick="go('profile')">Profile →</div><div class="list" onclick="go('children')">Children →</div><div class="list" onclick="go('issues')">Social Issues →</div><div class="list" onclick="go('celebrity')">Celebrity Voting →</div><div class="list" onclick="go('boli')">Auctions / Boli →</div><div class="list" onclick="go('notifications')">Notifications →</div><div class="list" onclick="go('login')">Logout →</div></div></section>
+
+<div class="bottom">
+<button onclick="go('home')">⌂<br>Home</button><button onclick="go('timeline')">▤<br>Timeline</button><button onclick="go('members')">👥<br>Members</button><button onclick="go('pathshala')">📚<br>Pathshala</button><button onclick="go('menu')">☰<br>More</button>
+</div>
+</div>
+
+<script>
+function go(id){document.querySelectorAll('.screen').forEach(s=>s.classList.remove('active'));document.getElementById(id).classList.add('active');document.getElementById('appTitle').textContent=id==='login'||id==='forgot'?'samaajconnect':(id==='home'?'Mahavir Samaaj':'samaajconnect');scrollTo(0,0)}
+function loginMode(mode){document.getElementById('mLoginPw').classList.toggle('on',mode==='pw');document.getElementById('mLoginOtp').classList.toggle('on',mode==='otp');document.getElementById('mPwField').style.display=mode==='pw'?'block':'none';document.getElementById('mOtpField').style.display=mode==='otp'?'block':'none';}
+</script>
+</body></html>

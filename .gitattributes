@@ -1,0 +1,15 @@
+# Normalise to LF in the repository; check out native on Windows.
+* text=auto
+
+# These are read by Linux containers. A CRLF checkout makes the Postgres
+# entrypoint fail to execute the init script, so pin them to LF.
+*.sh text eol=lf
+Dockerfile text eol=lf
+*.yml text eol=lf
+*.yaml text eol=lf
+
+# Binary
+*.docx binary
+*.png binary
+*.jpg binary
+*.ico binary

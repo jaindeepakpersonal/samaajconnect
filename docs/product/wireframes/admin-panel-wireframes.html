@@ -1,0 +1,277 @@
+<!doctype html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>samaajconnect - Unified Admin Panel Wireframes (v2)</title>
+<style>
+*{box-sizing:border-box}body{margin:0;font-family:Arial,Helvetica,sans-serif;background:#f4f5f7;color:#17202a}
+.app{display:flex;min-height:100vh}.side{width:250px;background:#171a21;color:white;position:fixed;left:0;top:0;bottom:0;padding:18px 12px;overflow:auto}
+.brand{font-weight:800;font-size:18px;padding:8px 10px 18px}.scope{font-size:11px;color:#aeb6c4;padding:0 10px 12px}
+.nav button{display:block;width:100%;border:0;background:transparent;color:#dce1e8;text-align:left;padding:10px;border-radius:8px;margin:2px 0;cursor:pointer}
+.nav button:hover,.nav button.active{background:#2b303a;color:#fff}.grp{font-size:10px;color:#8993a3;padding:14px 10px 5px;text-transform:uppercase}
+main{margin-left:250px;width:calc(100% - 250px);padding:24px}.bar{display:flex;align-items:center;justify-content:space-between;margin-bottom:22px;gap:12px;flex-wrap:wrap}
+select,.input,textarea{border:1px solid #d8dde6;border-radius:8px;padding:10px;background:white;width:100%;margin:5px 0 12px;font-family:inherit}
+.tenantSelect{width:260px;margin:0}.profile{border:1px solid #d8dde6;background:white;border-radius:20px;padding:8px 12px;cursor:pointer}
+.screen{display:none}.screen.active{display:block}.title{font-size:28px;margin:0 0 6px}.sub{color:#667085;margin:0 0 20px}
+.grid{display:grid;grid-template-columns:repeat(3,1fr);gap:15px}.grid2{display:grid;grid-template-columns:repeat(2,1fr);gap:15px}
+.card{background:white;border:1px solid #d8dde6;border-radius:12px;padding:16px}.card h3{margin:0 0 8px}.muted{color:#667085;font-size:13px}.num{font-size:27px;font-weight:800}.btn{border:0;background:#6848f5;color:#fff;border-radius:8px;padding:9px 13px;cursor:pointer;font-size:14px}.btn.alt{background:#edf0f4;color:#26303b}.btn.red{background:#d83b3b}.btn.link{background:none;color:#6848f5;padding:0;text-decoration:underline}.actions{display:flex;gap:7px;flex-wrap:wrap;margin-top:10px}.pill{display:inline-block;background:#eeeafe;color:#4e3db2;padding:4px 8px;border-radius:20px;font-size:11px}
+.pill.warn{background:#fff2cc;color:#8a6400}.pill.off{background:#f1f2f4;color:#667085}
+table{border-collapse:collapse;width:100%;background:white;border:1px solid #d8dde6}th,td{padding:11px;border-bottom:1px solid #e4e7ec;text-align:left;font-size:13px}th{background:#f8f9fb}
+.notice{background:#fff7db;border:1px solid #efd47d;padding:12px;border-radius:9px;margin:10px 0}
+.step{display:flex;gap:8px;margin:12px 0;flex-wrap:wrap}.step span{padding:8px 10px;border-radius:7px;background:#eef0f4;font-size:12px}.step .on{background:#6848f5;color:white}.step .done{background:#dff5e3;color:#1c7c3c}
+.login{max-width:430px;margin:70px auto}.login .card{padding:25px}
+.modal-card{max-width:640px;margin:0 auto}
+.toggle-row{display:flex;justify-content:space-between;align-items:center;padding:10px 0;border-bottom:1px solid #eee}.toggle-row:last-child{border-bottom:0}
+.matrix{width:100%;border-collapse:collapse}.matrix th,.matrix td{border:1px solid #e4e7ec;padding:8px;text-align:center;font-size:12px}.matrix td:first-child,.matrix th:first-child{text-align:left}
+.back{background:none;border:0;color:#6848f5;cursor:pointer;font-size:13px;padding:0;margin-bottom:10px}
+@media(max-width:950px){.side{width:200px}main{margin-left:200px;width:calc(100% - 200px)}.grid,.grid2{grid-template-columns:1fr}}
+</style>
+</head>
+<body>
+<div class="app">
+<aside class="side">
+<div class="brand">samaajconnect<br>Unified Admin</div>
+<div class="scope">ADMIN.SAMAAJCONNECT.COM</div>
+<div class="nav">
+<div class="grp">Overview</div>
+<button data-s="dashboard">Dashboard</button>
+<div class="grp">Platform</div>
+<button data-s="tenants">Samaaj / Tenants</button>
+<button data-s="admins">Admin Users & Roles</button>
+<button data-s="audit">Audit Logs</button>
+<div class="grp">Community</div>
+<button data-s="members">Members</button>
+<button data-s="families">Families & Children</button>
+<button data-s="content">Timeline / Moderation</button>
+<button data-s="groups">Volunteer Groups</button>
+<button data-s="events">Events</button>
+<button data-s="issues">Social Issues</button>
+<button data-s="celebrity">Celebrities / Voting</button>
+<div class="grp">Education</div>
+<button data-s="pathshala">Jain Pathshala</button>
+<div class="grp">Boli</div>
+<button data-s="boli">Auctions / Boli</button>
+<div class="grp">Operations</div>
+<button data-s="notifications">Notifications</button>
+<button data-s="reports">Reports & Analytics</button>
+<button data-s="settings">Settings</button>
+</div></aside>
+
+<main>
+<div class="bar">
+<div>
+<b id="crumb">Dashboard</b>
+<div class="muted">Unified administration workspace</div>
+</div>
+<select class="tenantSelect" id="tenant" onchange="tenantChange()">
+<option value="all">All Samaaj • Super Admin</option>
+<option value="mahavir">Mahavir Samaaj • mahavir-samaj</option>
+<option value="adinath">Adinath Samaaj • adinath-samaj</option>
+</select>
+<div class="profile">Super Admin ▾</div>
+</div>
+
+<section id="dashboard" class="screen active">
+<h1 class="title">Dashboard</h1><p class="sub">Global platform overview with tenant-aware operational queues.</p>
+<div class="grid">
+<div class="card"><div class="muted">Active Samaaj</div><div class="num">12</div></div>
+<div class="card"><div class="muted">Total Members</div><div class="num">18,420</div></div>
+<div class="card"><div class="muted">Pending Approvals</div><div class="num">37</div></div>
+<div class="card"><div class="muted">Upcoming Events</div><div class="num">26</div></div>
+<div class="card"><div class="muted">Pathshala Students</div><div class="num">2,180</div></div>
+<div class="card"><div class="muted">Active Boli</div><div class="num">8</div></div>
+</div>
+<div class="grid2" style="margin-top:15px">
+<div class="card"><h3>Pending Work</h3><p>12 social issues awaiting review</p><p>9 timeline posts awaiting moderation</p><p>6 volunteer applications escalated</p><p>10 admin requests</p><div class="actions"><button class="btn" onclick="go('issues')">Review Issues</button><button class="btn alt" onclick="go('content')">Moderation</button></div></div>
+<div class="card"><h3>Recent Activity</h3><p class="muted">09:42 — Mahavir Admin published event</p><p class="muted">09:17 — Pathshala created new class</p><p class="muted">08:56 — Boli result submitted for publication</p><p class="muted">08:21 — New tenant activated</p><div class="actions"><button class="btn link" onclick="go('audit')">View full Audit Log →</button></div></div>
+</div>
+</section>
+
+<section id="tenants" class="screen">
+<h1 class="title">Samaaj / Tenants</h1><p class="sub">Super Admin only • manage all tenant organizations.</p>
+<div class="actions"><button class="btn" onclick="go('createtenant')">+ Create Samaaj</button></div>
+<table style="margin-top:14px"><tr><th>Samaaj</th><th>Subdomain</th><th>Members</th><th>Status</th><th>Actions</th></tr>
+<tr><td>Mahavir Samaaj</td><td>mahavir-samaj.samaajconnect.com</td><td>1,248</td><td><span class="pill">Active</span></td><td><button class="btn alt" onclick="setTenant('mahavir')">Open</button></td></tr>
+<tr><td>Adinath Samaaj</td><td>adinath-samaj.samaajconnect.com</td><td>982</td><td><span class="pill">Active</span></td><td><button class="btn alt" onclick="setTenant('adinath')">Open</button></td></tr>
+<tr><td>Parshwanath Samaaj</td><td>parshwanath-samaj.samaajconnect.com</td><td>642</td><td><span class="pill off">Inactive</span></td><td><button class="btn alt">View</button></td></tr>
+</table>
+</section>
+
+<section id="createtenant" class="screen">
+<button class="back" onclick="go('tenants')">‹ Back to Samaaj / Tenants</button>
+<h1 class="title">Create Samaaj</h1><p class="sub">Slug must be unique across the platform and cannot be changed after activation.</p>
+<div class="card modal-card"><label>Samaaj Name</label><input class="input" placeholder="e.g. Parshwanath Samaaj">
+<label>Subdomain Slug</label><input class="input" placeholder="e.g. parshwanath-samaj"><p class="muted" style="margin-top:-8px">Preview: parshwanath-samaj.samaajconnect.com <span class="pill">Available</span></p>
+<label>Contact Person</label><input class="input" placeholder="Name"><label>Contact Email</label><input class="input" placeholder="admin@example.com">
+<label>Logo</label><div class="actions" style="margin-top:0"><button class="btn alt">Upload Logo</button></div>
+<label style="margin-top:12px;display:block">Enabled Modules</label>
+<div class="toggle-row"><span>Timeline & Volunteer Groups</span><input type="checkbox" checked></div>
+<div class="toggle-row"><span>Social Issues</span><input type="checkbox" checked></div>
+<div class="toggle-row"><span>Celebrities of Samaaj</span><input type="checkbox" checked></div>
+<div class="toggle-row"><span>Jain Pathshala</span><input type="checkbox" checked></div>
+<div class="toggle-row"><span>Auctions / Boli</span><input type="checkbox"></div>
+<div class="actions"><button class="btn" onclick="alert('Demo: tenant created in Inactive state, pending first Samaaj Admin invite')">Create Samaaj (Inactive)</button></div>
+</div>
+</section>
+
+<section id="admins" class="screen">
+<h1 class="title">Admin Users & Roles</h1><p class="sub">Role and tenant scoped access management.</p>
+<div class="actions"><button class="btn" onclick="go('inviteadmin')">+ Invite Admin</button><button class="btn alt" onclick="go('rolematrix')">Role & Permission Matrix</button></div>
+<table style="margin-top:14px"><tr><th>Admin</th><th>Role</th><th>Tenant Scope</th><th>Status</th><th></th></tr>
+<tr><td>Rajesh Jain</td><td>Samaaj Admin</td><td>Mahavir Samaaj</td><td><span class="pill">Active</span></td><td><button class="btn alt">Edit</button></td></tr>
+<tr><td>Neha Jain</td><td>Pathshala Admin</td><td>Mahavir Samaaj</td><td><span class="pill">Active</span></td><td><button class="btn alt">Edit</button></td></tr>
+<tr><td>System Admin</td><td>Super Admin</td><td>All</td><td><span class="pill">Active</span></td><td><button class="btn alt">Edit</button></td></tr>
+</table>
+</section>
+
+<section id="inviteadmin" class="screen">
+<button class="back" onclick="go('admins')">‹ Back to Admin Users & Roles</button>
+<h1 class="title">Invite Admin</h1><p class="sub">Invited admins receive a set-password link and must complete access policy setup.</p>
+<div class="card modal-card"><label>Full Name</label><input class="input"><label>Email</label><input class="input">
+<label>Role(s)</label><select class="input" multiple size="4"><option>Samaaj Admin</option><option>Content Moderator</option><option>Pathshala Admin/Teacher</option><option>Boli Manager</option></select>
+<label>Tenant Scope</label><select class="input"><option>Mahavir Samaaj</option><option>Adinath Samaaj</option></select>
+<div class="toggle-row"><span>Require OTP step-up for sensitive actions</span><input type="checkbox" checked></div>
+<div class="actions"><button class="btn" onclick="alert('Demo: invite sent')">Send Invite</button></div></div>
+</section>
+
+<section id="rolematrix" class="screen">
+<button class="back" onclick="go('admins')">‹ Back to Admin Users & Roles</button>
+<h1 class="title">Role & Permission Matrix</h1><p class="sub">Backend authorization enforces this matrix — this screen edits it, not just displays it.</p>
+<table class="matrix"><tr><th>Permission</th><th>Super Admin</th><th>Samaaj Admin</th><th>Content Moderator</th><th>Volunteer Group President</th><th>Pathshala Teacher</th><th>Boli Manager</th></tr>
+<tr><td>Tenant.Manage</td><td>✔</td><td>—</td><td>—</td><td>—</td><td>—</td><td>—</td></tr>
+<tr><td>Members.Write</td><td>✔</td><td>✔</td><td>—</td><td>—</td><td>—</td><td>—</td></tr>
+<tr><td>Timeline.Moderate</td><td>✔</td><td>✔</td><td>✔</td><td>—</td><td>—</td><td>—</td></tr>
+<tr><td>VolunteerGroups.Manage</td><td>✔</td><td>✔</td><td>—</td><td><input type="checkbox" checked></td><td>—</td><td>—</td></tr>
+<tr><td>SocialIssues.Approve</td><td>✔</td><td>✔</td><td><input type="checkbox" checked></td><td>—</td><td>—</td><td>—</td></tr>
+<tr><td>CelebrityVoting.Configure</td><td>✔</td><td>✔</td><td>—</td><td>—</td><td>—</td><td>—</td></tr>
+<tr><td>Pathshala.Attendance.Write</td><td>✔</td><td>—</td><td>—</td><td>—</td><td><input type="checkbox" checked></td><td>—</td></tr>
+<tr><td>Boli.PublishResults</td><td>✔</td><td>—</td><td>—</td><td>—</td><td>—</td><td><input type="checkbox" checked></td></tr>
+</table>
+<div class="actions"><button class="btn">Save Matrix</button></div>
+</section>
+
+<section id="members" class="screen">
+<h1 class="title">Members</h1><p class="sub">Manage members within the selected tenant context.</p>
+<div class="card"><input class="input" placeholder="Search by name, member ID, locality..."><div class="actions"><button class="btn">Search</button><button class="btn alt">Export</button></div></div>
+<table style="margin-top:14px"><tr><th>Member</th><th>ID</th><th>Family</th><th>Status</th><th></th></tr>
+<tr><td>Deepak Jain</td><td>MEM-00124</td><td>Jain Family</td><td><span class="pill">Active</span></td><td><button class="btn alt">View</button></td></tr>
+<tr><td>Rajesh Jain</td><td>MEM-00125</td><td>Shah Family</td><td><span class="pill">Active</span></td><td><button class="btn alt">View</button></td></tr>
+</table>
+</section>
+
+<section id="families" class="screen">
+<h1 class="title">Families & Children</h1><p class="sub">Family relationship administration and adult-child conversion monitoring.</p>
+<div class="grid2"><div class="card"><h3>Family Requests</h3><div class="num">8</div><p class="muted">Join requests requiring review.</p><button class="btn">Review</button></div>
+<div class="card"><h3>Adult Child Conversion</h3><div class="num">14</div><p class="muted">Eligible children aged over 18.</p><button class="btn" onclick="go('conversionqueue')">Review</button></div></div>
+</section>
+
+<section id="conversionqueue" class="screen">
+<button class="back" onclick="go('families')">‹ Back to Families & Children</button>
+<h1 class="title">Adult Child Conversion Queue</h1><p class="sub">Approving preserves the family relationship and historical child/Pathshala records.</p>
+<table><tr><th>Child</th><th>Family</th><th>Age</th><th>Requested</th><th>Action</th></tr>
+<tr><td>Aarav Jain</td><td>Jain Family</td><td>18</td><td>2 days ago</td><td><button class="btn">Approve</button> <button class="btn alt">Review</button></td></tr>
+<tr><td>Sanya Mehta</td><td>Mehta Family</td><td>19</td><td>5 days ago</td><td><button class="btn">Approve</button> <button class="btn alt">Review</button></td></tr>
+</table>
+</section>
+
+<section id="content" class="screen">
+<h1 class="title">Timeline / Content Moderation</h1><p class="sub">Approve, reject, hide or restore member content.</p>
+<table><tr><th>Post</th><th>Author</th><th>Status</th><th>Submitted</th><th>Action</th></tr>
+<tr><td>Community Seva Drive</td><td>Member 1024</td><td><span class="pill warn">Pending</span></td><td>Today</td><td><button class="btn">Review</button></td></tr>
+<tr><td>Event announcement</td><td>Yuva Mandal</td><td><span class="pill">Approved</span></td><td>Yesterday</td><td><button class="btn alt">View</button></td></tr>
+</table>
+</section>
+
+<section id="groups" class="screen">
+<h1 class="title">Volunteer Groups</h1><p class="sub">Groups, presidents, roles and applications.</p>
+<div class="actions"><button class="btn">+ Create Group</button></div>
+<table style="margin-top:14px"><tr><th>Group</th><th>President</th><th>Members</th><th>Applications</th><th></th></tr>
+<tr><td>Seva Group</td><td>Rajesh Jain</td><td>82</td><td>4</td><td><button class="btn alt">Manage</button></td></tr>
+<tr><td>Yuva Mandal</td><td>Neha Jain</td><td>54</td><td>7</td><td><button class="btn alt">Manage</button></td></tr>
+</table>
+</section>
+
+<section id="events" class="screen">
+<h1 class="title">Events</h1><p class="sub">Create, publish and monitor Samaaj and group events.</p>
+<div class="actions"><button class="btn">+ Create Event</button></div>
+<table style="margin-top:14px"><tr><th>Event</th><th>Organizer</th><th>Date</th><th>RSVP</th><th>Status</th></tr>
+<tr><td>Paryushan Lecture</td><td>Education Group</td><td>05 Sep 2026</td><td>186 / 200</td><td><span class="pill">Published</span></td></tr>
+<tr><td>Community Seva Day</td><td>Seva Group</td><td>12 Sep 2026</td><td>94</td><td><span class="pill warn">Draft</span></td></tr>
+</table>
+</section>
+
+<section id="issues" class="screen">
+<h1 class="title">Social Issues</h1><p class="sub">Approval queue for member-submitted social issues.</p>
+<div class="step"><span>Submitted</span><span class="on">Under Review</span><span>Approved</span><span>Published</span></div>
+<div class="card"><h3>Road safety near community school</h3><p class="muted">Submitted by Member 1088 • Evidence attached • Locality: Hiran Magri</p><div class="actions"><button class="btn">Approve</button><button class="btn red">Reject</button><button class="btn alt">Request Changes</button></div></div>
+</section>
+
+<section id="celebrity" class="screen">
+<h1 class="title">Celebrities / Voting</h1><p class="sub">Configure campaign, candidates, voting and Top 10 publication.</p>
+<div class="grid"><div class="card"><h3>2026 Samaaj Celebrity</h3><p>Voting: 01–20 Sep 2026</p><p>Eligible voters: 1,104</p><p>Votes: 782</p><span class="pill">Active</span><div class="actions"><button class="btn">Manage</button></div></div>
+<div class="card"><h3>Candidate Management</h3><p>24 candidates / nominations</p><button class="btn alt">Candidates</button></div>
+<div class="card"><h3>Result</h3><p>Top 10 generated after validation.</p><button class="btn" onclick="alert('Demo: results validated, ready to publish')">Generate / Validate</button></div></div>
+</section>
+
+<section id="pathshala" class="screen">
+<h1 class="title">Jain Pathshala</h1><p class="sub">Super Admin creates Pathshala masters; authorized admins manage operations.</p>
+<div class="actions"><button class="btn">+ Create Pathshala</button></div>
+<div class="grid" style="margin-top:14px"><div class="card"><h3>Shri Mahavir Jain Pathshala</h3><p>Teachers: 18 • Students: 126 • Classes: 8</p><div class="actions"><button class="btn">Teachers</button><button class="btn alt">Students</button></div></div>
+<div class="card"><h3>Academic Session 2026–27</h3><p>Attendance • Exams • Progress • Events</p><div class="actions"><button class="btn" onclick="alert('Prototype: class management')">Classes</button><button class="btn alt">Schedules</button></div></div>
+<div class="card"><h3>Enrollment Queue</h3><div class="num">11</div><p>Children awaiting enrollment processing.</p><button class="btn">Review</button></div></div>
+</section>
+
+<section id="boli" class="screen">
+<h1 class="title">Auctions / Boli</h1><p class="sub">Occasion → Boli Type → Bid → Result → Publish.</p>
+<div class="step"><span class="on">Occasion</span><span>Boli Types</span><span>Bids</span><span>Results</span><span>Publish</span></div>
+<div class="grid"><div class="card"><h3>Annual Community Fundraiser</h3><p>3 Boli types • 18 active bids</p><button class="btn">Manage Occasion</button></div>
+<div class="card"><h3>Active Boli</h3><div class="num">3</div><p>Monitor current bidding.</p><button class="btn">View Bids</button></div>
+<div class="card"><h3>Results Awaiting Publication</h3><div class="num">2</div><p>Validated results awaiting authorized publication.</p><button class="btn" onclick="go('publishboli')">Review & Publish</button></div></div>
+</section>
+
+<section id="publishboli" class="screen">
+<button class="back" onclick="go('boli')">‹ Back to Auctions / Boli</button>
+<h1 class="title">Publish Boli Result — Mangal Deep</h1><p class="sub">Publishing locks the result. Corrections after this point require the audited correction workflow.</p>
+<div class="card modal-card"><p><b>Winning Bid:</b> ₹18,400 — Member ID 1042</p><p><b>Recorded by:</b> Boli Manager • 15 Aug 2026, 5:12 PM</p>
+<div class="notice">This action is irreversible through the standard workflow. Confirm the amount and winner before publishing.</div>
+<div class="actions"><button class="btn" onclick="alert('Demo: result published and locked')">Confirm & Publish</button><button class="btn alt" onclick="go('boli')">Cancel</button></div></div>
+</section>
+
+<section id="notifications" class="screen">
+<h1 class="title">Notifications</h1><p class="sub">Manage operational and tenant announcements.</p>
+<div class="card"><h3>Compose Notification</h3><label>Title</label><input class="input" placeholder="Notification title"><label>Message</label><textarea class="input" placeholder="Message"></textarea><label>Audience</label><select class="input"><option>Selected Samaaj</option><option>All Members</option><option>Specific Role</option></select><label>Channel</label><select class="input"><option>In-App</option><option>In-App + Email</option><option>In-App + SMS/WhatsApp</option></select><button class="btn">Send</button></div>
+<div class="card" style="margin-top:14px"><h3>Recent Notifications</h3><table><tr><th>Title</th><th>Audience</th><th>Sent</th><th>Status</th></tr><tr><td>Paryushan schedule update</td><td>Mahavir Samaaj</td><td>Today, 9:10 AM</td><td><span class="pill">Delivered</span></td></tr></table></div>
+</section>
+
+<section id="reports" class="screen">
+<h1 class="title">Reports & Analytics</h1><p class="sub">Tenant-aware operational reporting.</p>
+<div class="grid"><div class="card"><h3>Members</h3><div class="num">+8.4%</div><p>Registration growth</p></div><div class="card"><h3>Pathshala</h3><div class="num">92%</div><p>Average attendance</p></div><div class="card"><h3>Events</h3><div class="num">1,482</div><p>Registrations this year</p></div></div>
+<div class="card" style="margin-top:15px"><h3>Tenant comparison</h3><p class="muted">Super Admin-only reporting view.</p><table><tr><th>Samaaj</th><th>Members</th><th>Events</th><th>Pathshala Students</th></tr><tr><td>Mahavir</td><td>1,248</td><td>24</td><td>126</td></tr><tr><td>Adinath</td><td>982</td><td>18</td><td>88</td></tr></table></div>
+</section>
+
+<section id="audit" class="screen">
+<h1 class="title">Audit Logs</h1><p class="sub">Trace critical administrative activity.</p>
+<div class="card"><input class="input" placeholder="Filter by actor, entity, or action..."></div>
+<table><tr><th>Time</th><th>Actor</th><th>Tenant</th><th>Action</th><th>Entity</th></tr>
+<tr><td>09:42</td><td>Rajesh Jain</td><td>Mahavir</td><td>Published Event</td><td>EVT-882</td></tr>
+<tr><td>09:17</td><td>Super Admin</td><td>All</td><td>Created Tenant</td><td>TEN-013</td></tr>
+<tr><td>08:56</td><td>Boli Manager</td><td>Mahavir</td><td>Submitted Result</td><td>BOL-122</td></tr>
+</table>
+</section>
+
+<section id="settings" class="screen">
+<h1 class="title">Settings</h1><p class="sub">Platform and tenant configuration.</p>
+<div class="grid2"><div class="card"><h3>Tenant Branding</h3><p>Logo, colors, contact details, subdomain.</p><button class="btn">Configure</button></div><div class="card"><h3>Module Controls</h3><p>Enable/disable modules per tenant.</p><button class="btn" onclick="go('createtenant')">Configure</button></div><div class="card"><h3>Security</h3><p>Password, OTP, session and access policies.</p><button class="btn">Configure</button></div><div class="card"><h3>Notification Providers</h3><p>Email/SMS/WhatsApp adapters.</p><button class="btn">Configure</button></div></div>
+</section>
+
+</main></div>
+<script>
+const names={dashboard:"Dashboard",tenants:"Samaaj / Tenants",createtenant:"Create Samaaj",admins:"Admin Users & Roles",inviteadmin:"Invite Admin",rolematrix:"Role & Permission Matrix",audit:"Audit Logs",members:"Members",families:"Families & Children",conversionqueue:"Adult Child Conversion",content:"Timeline / Moderation",groups:"Volunteer Groups",events:"Events",issues:"Social Issues",celebrity:"Celebrities / Voting",pathshala:"Jain Pathshala",boli:"Auctions / Boli",publishboli:"Publish Boli Result",notifications:"Notifications",reports:"Reports & Analytics",settings:"Settings"};
+function go(id){document.querySelectorAll('.screen').forEach(s=>s.classList.remove('active'));document.getElementById(id).classList.add('active');document.querySelectorAll('.nav button').forEach(b=>b.classList.toggle('active',b.dataset.s===id));document.getElementById('crumb').textContent=names[id];scrollTo(0,0)}
+document.querySelectorAll('.nav button').forEach(b=>b.addEventListener('click',()=>go(b.dataset.s)));
+function tenantChange(){let v=document.getElementById('tenant').value;if(v!=="all") alert("Prototype: switched Admin tenant context to "+(v==="mahavir"?"Mahavir Samaaj":"Adinath Samaaj")+". All tenant-scoped screens now operate in this context. This switch is logged to the Audit Log.");}
+function setTenant(v){document.getElementById('tenant').value=v;tenantChange();go('dashboard')}
+</script>
+</body>
+</html>

@@ -1,0 +1,17 @@
+# Host build output must never enter the image: project.assets.json carries
+# absolute Windows paths that break restore inside a Linux container.
+**/bin/
+**/obj/
+**/.vs/
+**/.vscode/
+**/.idea/
+
+**/node_modules/
+**/dist/
+**/.angular/
+
+.git/
+.github/
+**/TestResults/
+**/*.user
+docs/
