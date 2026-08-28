@@ -127,7 +127,7 @@ export class AdminLoginComponent {
         this.busy.set(false);
 
         if (!result.roles.some((role) => ADMIN_ROLES.includes(role as never))) {
-          this.auth.signOut();
+          this.auth.signOut().subscribe();
           this.error.set(
             'That account does not administer anything on this platform. ' +
               'Members sign in through the member portal.',

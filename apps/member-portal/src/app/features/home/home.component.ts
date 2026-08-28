@@ -203,7 +203,12 @@ export class HomeComponent implements OnInit {
   }
 
   signOut(): void {
-    this.auth.signOut();
+    // Navigates immediately rather than waiting: the tokens are already gone
+    // locally, and holding a member on the page while a network call finishes
+    // would make signing out feel broken on a bad connection. The server call
+    // is what actually revokes the session, so it is fired regardless.
+    this.auth.signOut().subscribe();
+
     void this.router.navigate(['/login']);
   }
 

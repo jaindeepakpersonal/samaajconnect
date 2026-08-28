@@ -1,6 +1,7 @@
 import { HttpClient, provideHttpClient, withInterceptors } from '@angular/common/http';
 import { HttpTestingController, provideHttpClientTesting } from '@angular/common/http/testing';
 import { TestBed } from '@angular/core/testing';
+import { TokenStore } from '@samaajconnect/shared';
 import { AdminScope, adminScopeInterceptor } from './admin-scope';
 import { Tenant } from './admin.models';
 
@@ -22,6 +23,7 @@ describe('AdminScope', () => {
   let scope: AdminScope;
   let http: HttpTestingController;
   let client: HttpClient;
+  let tokens: TokenStore;
 
   beforeEach(() => {
     sessionStorage.clear();
@@ -36,6 +38,10 @@ describe('AdminScope', () => {
     scope = TestBed.inject(AdminScope);
     http = TestBed.inject(HttpTestingController);
     client = TestBed.inject(HttpClient);
+    tokens = TestBed.inject(TokenStore);
+
+    // Signed in, as every request that legitimately carries an override is.
+    tokens.set("access-token", "refresh-token");
   });
 
   afterEach(() => {
@@ -75,6 +81,22 @@ describe('AdminScope', () => {
 
     expect(request.request.headers.has('X-Tenant-Override-Id')).toBe(false);
     request.flush([]);
+  });
+
+  it('sends no override on an anonymous request, whatever the stored scope says', () => {
+    // The scope outlives a sign-out, so without this the *login* request goes
+    // out with a Samaaj attached and the gateway refuses an override from a
+    // caller with no token - telling an admin they may not act on another
+    // Samaaj while they are trying to sign in.
+    scope.select(TENANT);
+    tokens.clear();
+
+    client.post('/v1/identity/login', {}).subscribe();
+
+    const request = http.expectOne('/v1/identity/login');
+
+    expect(request.request.headers.has('X-Tenant-Override-Id')).toBe(false);
+    request.flush({});
   });
 
   it('remembers the chosen Samaaj across a reload', () => {

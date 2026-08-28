@@ -2,6 +2,8 @@ using MediatR;
 using Sangam.IdentityTenant.Api.Extensions;
 using Sangam.IdentityTenant.Application.Users;
 using Sangam.IdentityTenant.Application.Users.Commands.Login;
+using Sangam.IdentityTenant.Application.Users.Commands.RefreshSession;
+using Sangam.IdentityTenant.Application.Users.Commands.SignOut;
 using Sangam.IdentityTenant.Application.Users.Commands.RegisterMember;
 using Sangam.IdentityTenant.Application.Users.Queries.GetCurrentUser;
 
@@ -56,6 +58,39 @@ public static class AuthEndpoints
             .ProducesProblem(StatusCodes.Status401Unauthorized)
             .ProducesProblem(StatusCodes.Status403Forbidden);
 
+        group.MapPost("/token/refresh", async (
+                RefreshRequest request,
+                ISender sender,
+                CancellationToken cancellationToken) =>
+            {
+                var result = await sender.Send(
+                    new RefreshSessionCommand(request.RefreshToken), cancellationToken);
+
+                return result.ToApiResult();
+            })
+            .AllowAnonymous()
+            .WithName("RefreshSession")
+            .WithSummary("Exchange a refresh token for a new access token and the next refresh token.")
+            .Produces<RefreshSessionResponse>()
+            .ProducesValidationProblem()
+            .ProducesProblem(StatusCodes.Status401Unauthorized);
+
+        group.MapPost("/logout", async (
+                SignOutRequest request,
+                ISender sender,
+                CancellationToken cancellationToken) =>
+            {
+                var result = await sender.Send(
+                    new SignOutCommand(request.RefreshToken, request.Everywhere), cancellationToken);
+
+                return result.ToApiResult();
+            })
+            .AllowAnonymous()
+            .WithName("SignOut")
+            .WithSummary("End this session, or every session for the account.")
+            .Produces<SignOutResponse>()
+            .ProducesValidationProblem();
+
         group.MapGet("/me", async (ISender sender, CancellationToken cancellationToken) =>
             {
                 var result = await sender.Send(new GetCurrentUserQuery(), cancellationToken);
@@ -86,4 +121,12 @@ public static class AuthEndpoints
         string? NoticeVersion);
 
     public sealed record LoginRequest(string MobileOrEmail, string Password);
+
+    public sealed record RefreshRequest(string RefreshToken);
+
+    /// <summary>
+    /// <paramref name="Everywhere"/> ends every session for the account rather
+    /// than only this one - "sign out on all my devices".
+    /// </summary>
+    public sealed record SignOutRequest(string RefreshToken, bool Everywhere = false);
 }

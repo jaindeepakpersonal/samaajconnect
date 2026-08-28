@@ -107,17 +107,33 @@ what is actually enforced rather than a second copy that can drift.
 
 ## Session & auth
 
-- [ ] Sessions/JWTs are tenant-scoped and expire; refresh tokens are
+- [x] Sessions/JWTs are tenant-scoped and expire; refresh tokens are
       revocable server-side (e.g. on suspicious activity or admin
-      forced logout). **Half built.** Tokens carry `tenant_id` and expire, and
-      a token is refused the moment its Samaaj is deactivated. There are **no
-      refresh tokens and no server-side revocation**: a stolen token is valid
-      until it expires, and `POST /v1/identity/logout` in `API-CONTRACTS.md`
-      does not exist — the portals only discard the token locally. Erasure
-      clears the account's role grants, so a stale token loses its authority
-      even though it still authenticates. Closing this properly needs a refresh
-      token store, rotation, and a revocation list the services consult; it is
-      its own piece of work and is tracked in `DEVELOPMENT_PLAN.md`.
+      forced logout). Access tokens carry `tenant_id` and now last **15
+      minutes**, not an hour. Refresh tokens are rows: stored as hashes,
+      single-use, rotated on every use, and revocable. `POST
+      /v1/identity/logout` ends the session — or every session for the account
+      with `everywhere` — and erasing an account ends all of them. Refreshing
+      re-reads the account, its Samaaj and its roles, so suspending an account,
+      deactivating a Samaaj or revoking a role all take effect within one access
+      token's lifetime instead of at the next sign-in.
+
+      **Reuse is treated as theft.** A refresh token presented twice means two
+      parties hold it; there is no way to tell which is the member, so the whole
+      session chain is revoked and both must sign in again. That revocation is
+      written on its own connection, because the request that detects it returns
+      a failure and `TransactionBehavior` would otherwise roll the revocation
+      back with it.
+
+      **What remains open, precisely.** An access token cannot be withdrawn —
+      that is what makes it stateless, and what lets every service authorize
+      without calling identity-tenant-service. So a stolen access token, or one
+      belonging to an account erased a moment ago, keeps working for up to
+      fifteen minutes. Closing that last window means a revocation check on
+      every request in every service, which trades away the property the design
+      was chosen for. Fifteen minutes is the deliberate price; if it is ever
+      judged too long, lower `Jwt:AccessTokenMinutes` before reaching for the
+      per-request lookup.
 - [x] Rate limiting and brute-force lockout on `/login` and any OTP
       endpoint. Both halves. Per-account lockout after five wrong passwords,
       and five wrong activation guesses kill the code; per-source rate limits

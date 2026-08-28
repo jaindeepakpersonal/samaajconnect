@@ -2,6 +2,14 @@
 export interface LoginResult {
   readonly accessToken: string;
   readonly expiresAt: string;
+
+  /**
+   * Buys the next access token. Single-use: spending it returns a replacement,
+   * and spending one twice ends the whole session, because two parties holding
+   * one means one of them is not the member.
+   */
+  readonly refreshToken: string;
+  readonly refreshTokenExpiresAt: string;
   readonly userId: string;
   readonly tenantId: string;
   /** Empty for a platform account, which has no Samaaj subdomain to go to. */
@@ -22,6 +30,19 @@ export interface CurrentUser {
   readonly lastLoginAt: string | null;
   readonly roles: readonly string[];
   readonly permissions: readonly string[];
+}
+
+/** Mirrors RefreshSessionResponse. The same shape as a login, by design. */
+export interface RefreshResult {
+  readonly accessToken: string;
+  readonly expiresAt: string;
+  readonly refreshToken: string;
+  readonly refreshTokenExpiresAt: string;
+  readonly userId: string;
+  readonly tenantId: string;
+  readonly tenantSlug: string;
+  readonly fullName: string;
+  readonly roles: readonly string[];
 }
 
 export interface RegisterRequest {

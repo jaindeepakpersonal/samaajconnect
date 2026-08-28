@@ -19,6 +19,7 @@ public sealed class LoginCommandHandlerTests
     private readonly IPasswordHasher _passwordHasher = Substitute.For<IPasswordHasher>();
     private readonly IFailedLoginRecorder _failedLogins = Substitute.For<IFailedLoginRecorder>();
     private readonly ITokenIssuer _tokenIssuer = Substitute.For<ITokenIssuer>();
+    private readonly ISessionService _sessions = Substitute.For<ISessionService>();
     private readonly IUnitOfWork _unitOfWork = Substitute.For<IUnitOfWork>();
     private readonly IDateTimeProvider _clock = Substitute.For<IDateTimeProvider>();
     private readonly LoginCommandHandler _handler;
@@ -47,8 +48,12 @@ public sealed class LoginCommandHandlerTests
                 Arg.Any<IReadOnlyCollection<string>>(), Arg.Any<IReadOnlyCollection<string>>())
             .Returns(new AccessToken("signed-token", Now.AddHours(1)));
 
+        _sessions.Begin(Arg.Any<Guid>(), Arg.Any<Guid>()).Returns(
+            new IssuedSession(_user.Id, _tenant.Id, Guid.NewGuid(), "refresh-token", Now.AddDays(14)));
+
         _handler = new LoginCommandHandler(
-            _users, _tenants, _passwordHasher, _failedLogins, _tokenIssuer, _unitOfWork, _clock);
+            _users, _tenants, _passwordHasher, _failedLogins, _tokenIssuer, _sessions,
+            _unitOfWork, _clock);
     }
 
     private Task<Result<Application.Users.LoginResponse>> Login(

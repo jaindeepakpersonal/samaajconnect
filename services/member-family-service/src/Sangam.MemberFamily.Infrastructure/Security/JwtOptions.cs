@@ -16,5 +16,10 @@ public sealed class JwtOptions
     /// <summary>HS256 signing key. Must be at least 32 characters.</summary>
     public string SigningKey { get; set; } = string.Empty;
 
-    public int AccessTokenMinutes { get; set; } = 60;
+    /// <summary>
+    /// Unused here. This service validates tokens and never issues one, so the
+    /// lifetime is identity-tenant-service's decision; the property stays only
+    /// because the three services share one Jwt configuration shape.
+    /// </summary>
+    public int AccessTokenMinutes { get; set; } = 15;
 }

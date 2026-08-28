@@ -105,6 +105,7 @@ public sealed class EraseMyAccountCommandHandlerTests
 
     private readonly IUserRepository _users = Substitute.For<IUserRepository>();
     private readonly IPasswordHasher _hasher = Substitute.For<IPasswordHasher>();
+    private readonly ISessionService _sessions = Substitute.For<ISessionService>();
     private readonly IUnitOfWork _unitOfWork = Substitute.For<IUnitOfWork>();
     private readonly ICurrentUser _currentUser = Substitute.For<ICurrentUser>();
     private readonly IDateTimeProvider _clock = Substitute.For<IDateTimeProvider>();
@@ -122,7 +123,7 @@ public sealed class EraseMyAccountCommandHandlerTests
         _users.GetByIdAsync(_user.Id, Arg.Any<CancellationToken>()).Returns(_user);
 
         _handler = new EraseMyAccountCommandHandler(
-            _users, _hasher, _unitOfWork, _currentUser, _clock,
+            _users, _hasher, _sessions, _unitOfWork, _currentUser, _clock,
             NullLogger<EraseMyAccountCommandHandler>.Instance);
     }
 

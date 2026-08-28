@@ -12,6 +12,7 @@ public sealed class LoginCommandHandler(
     IPasswordHasher passwordHasher,
     IFailedLoginRecorder failedLoginRecorder,
     ITokenIssuer tokenIssuer,
+    ISessionService sessions,
     IUnitOfWork unitOfWork,
     IDateTimeProvider clock)
     : IRequestHandler<LoginCommand, Result<LoginResponse>>
@@ -84,6 +85,11 @@ public sealed class LoginCommandHandler(
 
         user.RecordSuccessfulLogin(now);
 
+        // Begun before the save, so the session row and the recorded login
+        // commit together. A login that succeeded without leaving a session
+        // would hand out an access token nothing could ever renew.
+        var session = sessions.Begin(user.Id, user.TenantId);
+
         await unitOfWork.SaveChangesAsync(cancellationToken);
 
         var token = tokenIssuer.Issue(
@@ -92,6 +98,8 @@ public sealed class LoginCommandHandler(
         return Result.Success(new LoginResponse(
             token.Token,
             token.ExpiresAt,
+            session.RefreshToken,
+            session.ExpiresAt,
             user.Id,
             user.TenantId,
             tenant?.Slug ?? string.Empty,

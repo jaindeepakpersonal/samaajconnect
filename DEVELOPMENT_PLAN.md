@@ -8,18 +8,17 @@ version of the plan; the reasoning behind the ordering lives in
 ## Current Status
 
 - **Stage:** Stage 0 complete; Phase 1 - Platform Foundation nearly done
-- **Last updated:** 2026-08-29 - a full `SECURITY-CHECKLIST.md` pass over the
-  three services and the gateway. 535 tests green (476 backend, 59 frontend)
-  plus 81 smoke checks against a stack built from empty volumes.
-- **Blocking item:** none. Five Phase 1 items remain, all of them known and
-  none blocking: session revocation, step-up auth on deactivating a Samaaj, a
-  member-portal surface for the DPDP rights, an editable role matrix, and the
-  two DPDP obligations that need a notification channel first. The checklist
-  now records what is asserted and what is missing rather than reading as
-  though it were all done. The five questions in
-  `docs/product/DPDP-COMPLIANCE.md` need counsel before this ships to real
-  users. Next: either session revocation, which is the largest open security
-  item, or Phase 2.
+- **Last updated:** 2026-08-29 - session revocation: rotating single-use refresh
+  tokens, reuse detection, real sign-out, and 15-minute access tokens. 555 tests
+  green (490 backend, 65 frontend) plus 92 smoke checks against a stack built
+  from empty volumes.
+- **Blocking item:** none. Four Phase 1 items remain, none blocking: step-up
+  auth on deactivating a Samaaj, a member-portal surface for the DPDP rights, an
+  editable role matrix, and the two DPDP obligations that need a notification
+  channel first. `SECURITY-CHECKLIST.md` is now 14 ticked and 4 open, and all
+  four open ones are deployment concerns or wait on file storage. The five
+  questions in `docs/product/DPDP-COMPLIANCE.md` need counsel before this ships
+  to real users. Next: Phase 2, starting with the timeline and volunteer groups.
 
 *(Update these three lines at the start/end of every work session —
 they're what a coding agent or a teammate should read first to know
@@ -127,11 +126,13 @@ unit tested.
       gateway, before-state on corrections and status changes, audit events for
       data exports, and validation of the photo links that were previously only
       length-checked
-- [ ] Session revocation: refresh tokens, rotation, and a server-side
-      revocation list, plus the `POST /v1/identity/logout` that
-      `API-CONTRACTS.md` already promises. Today a token is valid until it
-      expires and signing out only discards it locally, which is the largest
-      open item in `SECURITY-CHECKLIST.md`
+- [x] Session revocation: refresh tokens stored as hashes, single-use and
+      rotating, with reuse treated as theft and the whole chain revoked;
+      `POST /v1/identity/logout` ending one session or all of them; erasure
+      ending every session; and the access token down from 60 minutes to 15.
+      Refreshing re-reads the account, its Samaaj and its roles, so a
+      suspension or a revoked role bites within one token lifetime. Both
+      portals renew silently rather than sending members to the login screen
 - [ ] Step-up authentication on deactivating a Samaaj. Erasing an account
       already re-asks for the password; deactivating a whole Samaaj is at least
       as consequential and does not

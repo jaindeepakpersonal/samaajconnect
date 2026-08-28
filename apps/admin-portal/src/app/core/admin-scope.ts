@@ -1,5 +1,6 @@
 import { HttpInterceptorFn } from '@angular/common/http';
 import { Injectable, computed, inject, signal } from '@angular/core';
+import { TokenStore } from '@samaajconnect/shared';
 import { Tenant } from './admin.models';
 
 const STORAGE_KEY = 'samaajconnect.admin.scope';
@@ -64,16 +65,22 @@ function restore(): Tenant | null {
  * Attaches the Super Admin tenant override when a Samaaj is selected.
  *
  * Only ever added to requests this app makes, and only when an admin has
- * actively chosen a Samaaj. The gateway refuses the header from a caller
- * without the SuperAdmin role, so a Samaaj Admin sending it by accident would
- * get a 403 rather than someone else's data - but the panel does not offer them
- * the selector in the first place.
+ * actively chosen a Samaaj <i>and</i> is signed in. The gateway refuses the
+ * header from a caller without the SuperAdmin role, so a Samaaj Admin sending
+ * it by accident would get a 403 rather than someone else's data - but the
+ * panel does not offer them the selector in the first place.
  */
 export const adminScopeInterceptor: HttpInterceptorFn = (request, next) => {
   const scope = inject(AdminScope);
+  const tokens = inject(TokenStore);
   const tenantId = scope.tenantId();
 
-  if (tenantId === null) {
+  // Nothing anonymous carries an override. The scope outlives a sign-out - it
+  // is in sessionStorage and a forced sign-out does not clear it - so without
+  // this the *login* request goes out with a Samaaj attached, the gateway
+  // rightly refuses an override from a caller with no token, and the admin is
+  // told they may not act on another Samaaj while trying to sign in.
+  if (tenantId === null || tokens.token() === null) {
     return next(request);
   }
 

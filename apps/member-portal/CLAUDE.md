@@ -92,9 +92,19 @@ time also means calling the gateway from the build, which is why the generated
 default of `RenderMode.Prerender` fails. The SSR setup is kept for the public
 screens still to come.
 
-**`sessionStorage`, not `localStorage`, for the token.** A shared or family
+**An expired access token no longer means the login screen.** Access tokens
+last fifteen minutes; the interceptor spends a refresh token, retries the
+original request, and the member notices nothing. It ends the session only
+when there is no refresh token, or the refresh is itself refused. Signing out
+now calls the server as well as clearing storage - clearing alone left the
+refresh token live for a fortnight, which is not signing out.
+
+**`sessionStorage`, not `localStorage`, for the tokens.** A shared or family
 device is common in this platform's audience, and a session that survives
-closing the tab is longer than a community app needs.
+closing the tab is longer than a community app needs. That goes double for the refresh token,
+which can mint access tokens for a fortnight. Not a cookie either: a cookie
+is sent automatically on every request, which is what makes cookies useful
+and what makes them need CSRF protection - and this platform has none.
 
 ## Accessibility
 

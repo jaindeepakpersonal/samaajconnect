@@ -14,6 +14,15 @@ public sealed record RegisterMemberResponse(
 public sealed record LoginResponse(
     string AccessToken,
     DateTimeOffset ExpiresAt,
+
+    /// <summary>
+    /// The credential that buys the next access token. Plaintext here and
+    /// nowhere else - the database keeps only a hash - and single-use: spending
+    /// it returns a replacement. See RefreshToken for what happens if one is
+    /// spent twice.
+    /// </summary>
+    string RefreshToken,
+    DateTimeOffset RefreshTokenExpiresAt,
     Guid UserId,
     Guid TenantId,
     string TenantSlug,

@@ -30,8 +30,9 @@ public sealed class JwtTokenIssuer(IOptions<JwtOptions> options, IDateTimeProvid
 
         // Permissions are embedded rather than looked up per request so a
         // downstream service can authorize without calling back here. The cost
-        // is that a revoked permission stays valid until the token expires,
-        // which is why the lifetime is short.
+        // is that a revoked permission stays valid until the token expires -
+        // which is the whole reason AccessTokenMinutes is 15 and why refreshing
+        // re-reads roles rather than carrying them through the session.
         claims.AddRange(roles.Select(role => new Claim(PlatformClaimTypes.Role, role)));
         claims.AddRange(permissions.Select(permission => new Claim(PlatformClaimTypes.Permission, permission)));
 

@@ -40,6 +40,8 @@ public static class DependencyInjection
         services.AddScoped<ITokenIssuer, JwtTokenIssuer>();
         services.AddScoped<IFailedLoginRecorder, FailedLoginRecorder>();
         services.AddScoped<IDataExportRecorder, DataExportRecorder>();
+        services.AddScoped<IRefreshTokenRepository, RefreshTokenRepository>();
+        services.AddScoped<ISessionService, SessionService>();
         services.AddScoped<IFailedActivationRecorder, FailedActivationRecorder>();
 
         // Bound and validated here rather than in Api: this service issues

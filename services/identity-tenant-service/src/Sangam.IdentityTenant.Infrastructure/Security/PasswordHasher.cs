@@ -18,6 +18,20 @@ public sealed class PasswordHasher : IPasswordHasher
 
     private static readonly HashAlgorithmName Algorithm = HashAlgorithmName.SHA256;
 
+    /// <summary>
+    /// SHA-256 of the value, hex encoded. See
+    /// <see cref="IPasswordHasher.HashDeterministic"/> for why this is neither
+    /// salted nor slow, and why that is only acceptable for a high-entropy
+    /// random secret.
+    /// </summary>
+    public string HashDeterministic(string value)
+    {
+        ArgumentException.ThrowIfNullOrEmpty(value);
+
+        return "sha256:" + Convert.ToHexString(
+            SHA256.HashData(System.Text.Encoding.UTF8.GetBytes(value))).ToLowerInvariant();
+    }
+
     public string Hash(string password)
     {
         ArgumentException.ThrowIfNullOrEmpty(password);

@@ -55,6 +55,7 @@ public sealed class EraseMyAccountCommandValidator : AbstractValidator<EraseMyAc
 public sealed class EraseMyAccountCommandHandler(
     IUserRepository users,
     IPasswordHasher passwordHasher,
+    ISessionService sessions,
     IUnitOfWork unitOfWork,
     ICurrentUser currentUser,
     IDateTimeProvider clock,
@@ -97,6 +98,13 @@ public sealed class EraseMyAccountCommandHandler(
         }
 
         user.Erase(clock.UtcNow);
+
+        // Every session for this account ends now. The access token cannot be
+        // withdrawn and outlives this by its remaining lifetime, but nothing
+        // can renew it - so the residual window is minutes rather than
+        // "until somebody notices".
+        await sessions.EndAllForUserAsync(
+            user.Id, SessionEndReason.AccountErased, cancellationToken);
 
         await unitOfWork.SaveChangesAsync(cancellationToken);
 

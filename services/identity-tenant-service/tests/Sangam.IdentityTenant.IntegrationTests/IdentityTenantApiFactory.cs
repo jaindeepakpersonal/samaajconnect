@@ -101,8 +101,12 @@ public sealed class IdentityTenantApiFactory : WebApplicationFactory<Program>, I
         await dbContext.Database.ExecuteSqlRawAsync(
             // roles, permissions and role_permissions are migration-seeded
             // reference data and must survive a reset.
-            "TRUNCATE TABLE consent_records, user_roles, users, tenants, outbox_messages "
-            + "RESTART IDENTITY CASCADE;");
+            // Every tenant-scoped table belongs here. A table missing from this
+            // list leaks rows between tests, and the symptom is a test that
+            // passes alone and fails in the suite - which is how refresh_tokens
+            // announced itself.
+            "TRUNCATE TABLE refresh_tokens, consent_records, user_roles, users, tenants, "
+            + "outbox_messages RESTART IDENTITY CASCADE;");
 
         Publisher.Clear();
     }

@@ -649,6 +649,70 @@ fi
 echo
 
 echo
+
+echo
+echo "Sessions: rotation, reuse detection and sign-out"
+
+SESSION_LOGIN=$(curl -s -X POST "$GATEWAY/v1/identity/login" -H 'Content-Type: application/json' \
+  -d "{\"mobileOrEmail\":\"$MEMBER\",\"password\":\"$MEMBER_PASSWORD\"}")
+
+REFRESH_1=$(printf '%s' "$SESSION_LOGIN" | json_field refreshToken)
+
+if [ -n "$REFRESH_1" ]; then
+  echo "  ok    signing in returns a refresh token"
+  pass=$((pass + 1))
+else
+  echo "  FAIL  signing in returns a refresh token"
+  fail=$((fail + 1))
+fi
+
+REFRESHED=$(curl -s -X POST "$GATEWAY/v1/identity/token/refresh" -H 'Content-Type: application/json' \
+  -d "{\"refreshToken\":\"$REFRESH_1\"}")
+
+REFRESH_2=$(printf '%s' "$REFRESHED" | json_field refreshToken)
+ACCESS_2=$(printf '%s' "$REFRESHED" | json_field accessToken)
+
+if [ -n "$REFRESH_2" ] && [ "$REFRESH_2" != "$REFRESH_1" ]; then
+  echo "  ok    refreshing rotates the token"
+  pass=$((pass + 1))
+else
+  echo "  FAIL  refreshing rotates the token"
+  fail=$((fail + 1))
+fi
+
+check "the new access token works" 200 \
+  "$(status -H "Authorization: Bearer $ACCESS_2" "$GATEWAY/v1/identity/me")"
+
+check "spending a refresh token twice is refused" 401 \
+  "$(status -X POST "$GATEWAY/v1/identity/token/refresh" -H 'Content-Type: application/json' \
+     -d "{\"refreshToken\":\"$REFRESH_1\"}")"
+
+# The theft response: the live token in that chain dies with the replayed one.
+check "and kills the live token in the same session" 401 \
+  "$(status -X POST "$GATEWAY/v1/identity/token/refresh" -H 'Content-Type: application/json' \
+     -d "{\"refreshToken\":\"$REFRESH_2\"}")"
+
+SESSION_LOGIN=$(curl -s -X POST "$GATEWAY/v1/identity/login" -H 'Content-Type: application/json' \
+  -d "{\"mobileOrEmail\":\"$MEMBER\",\"password\":\"$MEMBER_PASSWORD\"}")
+REFRESH_3=$(printf '%s' "$SESSION_LOGIN" | json_field refreshToken)
+
+check "signing out is accepted" 200 \
+  "$(status -X POST "$GATEWAY/v1/identity/logout" -H 'Content-Type: application/json' \
+     -d "{\"refreshToken\":\"$REFRESH_3\"}")"
+
+check "and the session cannot be continued afterwards" 401 \
+  "$(status -X POST "$GATEWAY/v1/identity/token/refresh" -H 'Content-Type: application/json' \
+     -d "{\"refreshToken\":\"$REFRESH_3\"}")"
+
+check "signing out with an unknown token is not an error" 200 \
+  "$(status -X POST "$GATEWAY/v1/identity/logout" -H 'Content-Type: application/json' \
+     -d '{"refreshToken":"not-a-real-token"}')"
+
+check "a refresh token nobody issued is refused" 401 \
+  "$(status -X POST "$GATEWAY/v1/identity/token/refresh" -H 'Content-Type: application/json' \
+     -d '{"refreshToken":"not-a-real-token"}')"
+
+echo
 echo "Header forgery"
 check "a forged tenant header does not change the answer" 200 \
   "$(status -H "X-Tenant-Id: 11111111-1111-1111-1111-111111111111" \

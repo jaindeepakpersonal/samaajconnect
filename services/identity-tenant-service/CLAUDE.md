@@ -19,6 +19,7 @@ a `Tenant`'s own `Id` **is** the tenant id every other service references.
 | `Role`, `Permission`, `RolePermission` | built | Seeded by migration from `AuthorizationCatalog`. |
 | `UserRole` | built | A null `TenantScope` is the platform-wide grant, i.e. Super Admin. |
 | `ConsentRecord` | built | Append-only. One row per decision, per purpose. |
+| `RefreshToken` | built | A session step. Hashed, single-use, rotating. Deliberately not tenant-scoped. |
 
 `Tenant` deliberately does not implement `ITenantScopedEntity`. Applying the
 global query filter to it would make the gateway's own lookups impossible,
@@ -38,6 +39,8 @@ since those happen *before* a tenant is established.
 | `WithdrawConsentCommand` | any authenticated role | built |
 | `SetGrievanceContactCommand` | `SuperAdmin`, `SamaajAdmin` + `AdminUsers.Manage` | built |
 | `EraseMyAccountCommand` | any authenticated role, self only | built |
+| `RefreshSessionCommand` | anonymous (the refresh token is the credential) | built |
+| `SignOutCommand` | anonymous (same) | built |
 | `AssignRoleCommand` | `SuperAdmin`, `SamaajAdmin` + `AdminUsers.Manage` | built |
 | `InviteAdminCommand` | `SuperAdmin`, `SamaajAdmin` + `AdminUsers.Manage` | built |
 | `SetTenantModulesCommand` | `SuperAdmin` + `Tenant.Manage` | built |
@@ -109,6 +112,8 @@ offsets for messages it did nothing with.
 | PUT | `/v1/identity/tenants/{id}/modules` | `SuperAdmin` + `Tenant.Manage` |
 | POST | `/v1/identity/register` | anonymous |
 | POST | `/v1/identity/login` | anonymous |
+| POST | `/v1/identity/token/refresh` | anonymous |
+| POST | `/v1/identity/logout` | anonymous |
 | GET | `/v1/identity/me` | any authenticated role |
 | GET | `/v1/identity/activations/pending` | `SamaajAdmin` + `AdminUsers.Manage` |
 | POST | `/v1/identity/activations/{userId}/code` | `SamaajAdmin` + `AdminUsers.Manage` |
@@ -199,6 +204,71 @@ new one.
 Same reason as `IFailedLoginRecorder`: the command returns a failure,
 `TransactionBehavior` rolls it back, and a counter on the tracked aggregate
 would be rolled back with it - leaving the code guessable without limit.
+
+
+## Sessions
+
+A sign-in produces two things, and they are opposites on purpose.
+
+The **access token** is a JWT. Every service validates it without calling here,
+which is what makes the platform's authorization cheap - and what makes the
+token impossible to withdraw. It lasts **15 minutes**, and that number *is* the
+security property: it is exactly how long a revoked role, a suspended account or
+a stolen token keeps working.
+
+The **refresh token** is a row in `refresh_tokens`. Rows can be revoked. It is
+stored as a hash, lasts 14 days, and is what decides whether a session
+continues.
+
+**Refresh tokens are single-use and rotate.** Redeeming one issues a
+replacement in the same `SessionId` chain and marks the old one used. That is
+what makes theft detectable rather than merely possible: a token that never
+changed would work forever and look exactly like the real one.
+
+**A reused token is treated as theft, bluntly.** Presenting an already-redeemed
+token means two parties hold it and one is not the member. Nothing can tell
+which, so the entire chain is revoked and both are made to sign in again. A
+member who hits this is inconvenienced; an attacker loses access. A run of
+`ReuseDetected` on one account is the closest thing this platform has to an
+intrusion signal - treat it as an incident.
+
+**That revocation is written on its own connection.** Refreshing is a command,
+so `TransactionBehavior` rolls it back when the handler returns a failure - and
+detecting a stolen token *is* a failure. Revoking on the ambient context would
+be undone by the very request that found the theft, leaving the attacker live
+and a log line claiming otherwise. `SessionService.RevokeSessionOutOfBandAsync`
+is the same shape, and exists for the same reason, as `IFailedLoginRecorder`.
+
+**Refreshing re-reads the account, its Samaaj and its roles.** They are not
+carried through the session. This is what makes suspending an account,
+deactivating a Samaaj or revoking a role bite within one access token's lifetime
+rather than at the next sign-in - and it is why the refresh path, not the login
+path, is where those checks matter most.
+
+**Every refusal answers the same way.** "No such token", "already used",
+"expired" and "your Samaaj was deactivated" are one 401 saying *please sign in
+again*. The reason is logged. Telling a caller which of those applied tells
+whoever holds a stolen token what to try next.
+
+**Signing out is anonymous, and that is deliberate.** The refresh token is the
+credential. Requiring a valid access token would mean the moment you most want
+to end a session - an expired token, a device you want to abandon - is the
+moment you cannot. Presenting a token only ever destroys the presenter's own
+session, and signing out twice looks exactly like signing out once, because a
+count that distinguished them would say which tokens exist.
+
+**`RefreshToken` is not an `ITenantScopedEntity`** despite carrying a tenant id.
+A caller redeeming one has no access token and so no resolved tenant; a query
+filter would compare against `Guid.Empty` and turn every refresh into a
+sign-out. Nothing is lost: the only way to find a row is to present its 256-bit
+secret.
+
+**The hash is deterministic, unlike a password's.** The lookup *is* by hash, so
+a per-value salt would make it impossible. Dropping the salt is safe here and
+would not be for a password: a salt defends against precomputation over a
+guessable space, and the input is 256 bits of randomness. That is also why it is
+fast - slowness buys nothing against an input nobody can enumerate. Never pass
+anything a human typed to `HashDeterministic`.
 
 ## Consent and the DPDP Act
 
