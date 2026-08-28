@@ -52,6 +52,16 @@ public sealed class TenantAuthorizationBehavior<TRequest, TResponse>(
             }
         }
 
+        if (tenantContext.HasTenantConflict)
+        {
+            logger.LogError(
+                "Rejected {Request}: the X-Tenant-Id header disagrees with the tenant the token was issued for",
+                typeof(TRequest).Name);
+
+            return Task.FromResult(ResultFactory.Failure<TResponse>(Error.Forbidden(
+                "Tenant.Mismatch", "This request does not belong to the Samaaj you are signed in to.")));
+        }
+
         var policy = Policies.GetOrAdd(typeof(TRequest), static type => new RequestPolicy(
             type.GetCustomAttribute<AllowAnonymousRequestAttribute>() is not null,
             type.GetCustomAttribute<RequiresRolesAttribute>()?.Roles ?? [],

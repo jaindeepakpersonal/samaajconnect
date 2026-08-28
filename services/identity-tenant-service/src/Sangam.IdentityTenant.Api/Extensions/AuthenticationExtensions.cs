@@ -2,41 +2,20 @@ using System.Text;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.Extensions.Options;
 using Microsoft.IdentityModel.Tokens;
+using Sangam.IdentityTenant.Infrastructure.Security;
 
 namespace Sangam.IdentityTenant.Api.Extensions;
-
-public sealed class JwtOptions
-{
-    public const string SectionName = "Jwt";
-
-    public string Issuer { get; set; } = "samaajconnect";
-
-    public string Audience { get; set; } = "samaajconnect";
-
-    /// <summary>HS256 signing key. Must be at least 32 characters.</summary>
-    public string SigningKey { get; set; } = string.Empty;
-
-    public int AccessTokenMinutes { get; set; } = 60;
-}
 
 public static class AuthenticationExtensions
 {
     /// <summary>
     /// Validates incoming JWTs. Every service does this, not just the gateway:
     /// the gateway is a filter, not the authorization boundary
-    /// (ARCHITECTURE.md section 6).
+    /// (ARCHITECTURE.md section 6). JwtOptions itself is bound and validated by
+    /// AddInfrastructure, which also owns token issuance.
     /// </summary>
-    public static IServiceCollection AddJwtAuthentication(
-        this IServiceCollection services,
-        IConfiguration configuration)
+    public static IServiceCollection AddJwtAuthentication(this IServiceCollection services)
     {
-        services.AddOptions<JwtOptions>()
-            .Bind(configuration.GetSection(JwtOptions.SectionName))
-            .Validate(
-                options => !string.IsNullOrWhiteSpace(options.SigningKey) && options.SigningKey.Length >= 32,
-                "Jwt:SigningKey must be configured and at least 32 characters long.")
-            .ValidateOnStart();
-
         services.ConfigureOptions<ConfigureJwtBearerOptions>();
 
         services
@@ -48,9 +27,9 @@ public static class AuthenticationExtensions
 }
 
 /// <summary>
-/// Binds the validation parameters from <see cref="JwtOptions"/> at resolution
-/// time rather than at registration time, so configuration sources added after
-/// service registration still apply.
+/// Binds the validation parameters at resolution time rather than at
+/// registration time, so configuration sources added after service registration
+/// still apply.
 /// </summary>
 internal sealed class ConfigureJwtBearerOptions(IOptions<JwtOptions> jwtOptions)
     : IConfigureNamedOptions<JwtBearerOptions>
@@ -76,7 +55,7 @@ internal sealed class ConfigureJwtBearerOptions(IOptions<JwtOptions> jwtOptions)
             IssuerSigningKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(jwt.SigningKey)),
             ValidateLifetime = true,
             ClockSkew = TimeSpan.FromSeconds(30),
-            RoleClaimType = "role",
+            RoleClaimType = JwtTokenIssuer.RoleClaimType,
             NameClaimType = "sub",
         };
     }

@@ -105,6 +105,20 @@ public sealed class TenantAuthorizationBehaviorTests
     }
 
     [Fact]
+    public async Task Refuses_a_request_whose_tenant_header_disagrees_with_its_token()
+    {
+        _tenantContext.HasTenantConflict.Returns(true);
+        _currentUser.IsAuthenticated.Returns(true);
+        _currentUser.IsInRole(Roles.SuperAdmin).Returns(true);
+        _currentUser.HasPermission(PermissionKeys.TenantManage).Returns(true);
+
+        var result = await BehaviorFor<PermissionGuardedRequest>()
+            .Handle(new PermissionGuardedRequest(), Next, CancellationToken.None);
+
+        result.Error.Code.Should().Be("Tenant.Mismatch");
+    }
+
+    [Fact]
     public async Task Refuses_a_tenant_override_from_a_caller_who_is_not_a_Super_Admin()
     {
         _tenantContext.IsOverride.Returns(true);

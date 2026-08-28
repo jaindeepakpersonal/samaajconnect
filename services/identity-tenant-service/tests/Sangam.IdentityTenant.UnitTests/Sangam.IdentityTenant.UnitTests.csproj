@@ -17,6 +17,9 @@
   <ItemGroup>
     <ProjectReference Include="..\..\src\Sangam.IdentityTenant.Application\Sangam.IdentityTenant.Application.csproj" />
     <ProjectReference Include="..\..\src\Sangam.IdentityTenant.Domain\Sangam.IdentityTenant.Domain.csproj" />
+    <!-- The password hasher and token issuer are Infrastructure concerns with
+         no I/O, so they are unit-testable and belong in this project. -->
+    <ProjectReference Include="..\..\src\Sangam.IdentityTenant.Infrastructure\Sangam.IdentityTenant.Infrastructure.csproj" />
   </ItemGroup>
 
 </Project>

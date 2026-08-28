@@ -31,6 +31,8 @@ public sealed class IdentityTenantDbContextFactory : IDesignTimeDbContextFactory
 
         public bool IsOverride => false;
 
+        public bool HasTenantConflict => false;
+
         public Guid RequireTenantId() =>
             throw new InvalidOperationException("No tenant context exists at design time.");
     }

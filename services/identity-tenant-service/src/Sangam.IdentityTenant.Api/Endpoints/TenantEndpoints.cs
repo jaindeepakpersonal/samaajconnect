@@ -1,6 +1,7 @@
 using MediatR;
 using Sangam.IdentityTenant.Api.Extensions;
 using Sangam.IdentityTenant.Application.Tenants;
+using Sangam.IdentityTenant.Application.Tenants.Commands.ChangeTenantStatus;
 using Sangam.IdentityTenant.Application.Tenants.Commands.CreateTenant;
 using Sangam.IdentityTenant.Application.Tenants.Queries.GetTenantBySlug;
 
@@ -43,6 +44,26 @@ public static class TenantEndpoints
             .ProducesProblem(StatusCodes.Status403Forbidden)
             .ProducesProblem(StatusCodes.Status409Conflict);
 
+        group.MapPatch("/{id:guid}/status", async (
+                Guid id,
+                ChangeStatusRequest request,
+                ISender sender,
+                CancellationToken cancellationToken) =>
+            {
+                var result = await sender.Send(
+                    new ChangeTenantStatusCommand(id, request.Status), cancellationToken);
+
+                return result.ToApiResult();
+            })
+            .RequireAuthorization()
+            .WithName("ChangeTenantStatus")
+            .WithSummary("Activate, deactivate or archive a Samaaj (Super Admin only).")
+            .Produces<TenantResponse>()
+            .ProducesValidationProblem()
+            .ProducesProblem(StatusCodes.Status403Forbidden)
+            .ProducesProblem(StatusCodes.Status404NotFound)
+            .ProducesProblem(StatusCodes.Status409Conflict);
+
         group.MapGet("/{slug}", async (
                 string slug,
                 ISender sender,
@@ -65,6 +86,8 @@ public static class TenantEndpoints
     /// Wire format for tenant creation. Separate from the command so the public
     /// contract can evolve independently of the internal one.
     /// </summary>
+    public sealed record ChangeStatusRequest(string Status);
+
     public sealed record CreateTenantRequest(
         string Name,
         string Slug,

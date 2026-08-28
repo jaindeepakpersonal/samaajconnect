@@ -22,6 +22,503 @@ namespace Sangam.IdentityTenant.Infrastructure.Persistence.Migrations
 
             NpgsqlModelBuilderExtensions.UseIdentityByDefaultColumns(modelBuilder);
 
+            modelBuilder.Entity("Sangam.IdentityTenant.Domain.Authorization.Permission", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<string>("Key")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)")
+                        .HasColumnName("key");
+
+                    b.HasKey("Id")
+                        .HasName("pk_permissions");
+
+                    b.HasIndex("Key")
+                        .IsUnique()
+                        .HasDatabaseName("ix_permissions_key");
+
+                    b.ToTable("permissions", (string)null);
+
+                    b.HasData(
+                        new
+                        {
+                            Id = new Guid("b0000000-0000-0000-0000-000000000001"),
+                            Key = "Tenant.Manage"
+                        },
+                        new
+                        {
+                            Id = new Guid("b0000000-0000-0000-0000-000000000002"),
+                            Key = "AdminUsers.Manage"
+                        },
+                        new
+                        {
+                            Id = new Guid("b0000000-0000-0000-0000-000000000003"),
+                            Key = "Members.Read"
+                        },
+                        new
+                        {
+                            Id = new Guid("b0000000-0000-0000-0000-000000000004"),
+                            Key = "Members.Write"
+                        },
+                        new
+                        {
+                            Id = new Guid("b0000000-0000-0000-0000-000000000005"),
+                            Key = "Family.Write"
+                        },
+                        new
+                        {
+                            Id = new Guid("b0000000-0000-0000-0000-000000000006"),
+                            Key = "Family.ApproveConversion"
+                        },
+                        new
+                        {
+                            Id = new Guid("b0000000-0000-0000-0000-000000000007"),
+                            Key = "Timeline.Post"
+                        },
+                        new
+                        {
+                            Id = new Guid("b0000000-0000-0000-0000-000000000008"),
+                            Key = "Timeline.Moderate"
+                        },
+                        new
+                        {
+                            Id = new Guid("b0000000-0000-0000-0000-000000000009"),
+                            Key = "VolunteerGroups.Manage"
+                        },
+                        new
+                        {
+                            Id = new Guid("b0000000-0000-0000-0000-00000000000a"),
+                            Key = "Events.Publish"
+                        },
+                        new
+                        {
+                            Id = new Guid("b0000000-0000-0000-0000-00000000000b"),
+                            Key = "SocialIssues.Approve"
+                        },
+                        new
+                        {
+                            Id = new Guid("b0000000-0000-0000-0000-00000000000c"),
+                            Key = "CelebrityVoting.Configure"
+                        },
+                        new
+                        {
+                            Id = new Guid("b0000000-0000-0000-0000-00000000000d"),
+                            Key = "Pathshala.Manage"
+                        },
+                        new
+                        {
+                            Id = new Guid("b0000000-0000-0000-0000-00000000000e"),
+                            Key = "Pathshala.Attendance.Write"
+                        },
+                        new
+                        {
+                            Id = new Guid("b0000000-0000-0000-0000-00000000000f"),
+                            Key = "Pathshala.Exams.Write"
+                        },
+                        new
+                        {
+                            Id = new Guid("b0000000-0000-0000-0000-000000000010"),
+                            Key = "Boli.Manage"
+                        },
+                        new
+                        {
+                            Id = new Guid("b0000000-0000-0000-0000-000000000011"),
+                            Key = "Boli.PublishResults"
+                        },
+                        new
+                        {
+                            Id = new Guid("b0000000-0000-0000-0000-000000000012"),
+                            Key = "Audit.Read"
+                        });
+                });
+
+            modelBuilder.Entity("Sangam.IdentityTenant.Domain.Authorization.Role", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasMaxLength(60)
+                        .HasColumnType("character varying(60)")
+                        .HasColumnName("name");
+
+                    b.HasKey("Id")
+                        .HasName("pk_roles");
+
+                    b.HasIndex("Name")
+                        .IsUnique()
+                        .HasDatabaseName("ix_roles_name");
+
+                    b.ToTable("roles", (string)null);
+
+                    b.HasData(
+                        new
+                        {
+                            Id = new Guid("a0000000-0000-0000-0000-000000000001"),
+                            Name = "SuperAdmin"
+                        },
+                        new
+                        {
+                            Id = new Guid("a0000000-0000-0000-0000-000000000002"),
+                            Name = "SamaajAdmin"
+                        },
+                        new
+                        {
+                            Id = new Guid("a0000000-0000-0000-0000-000000000003"),
+                            Name = "Member"
+                        },
+                        new
+                        {
+                            Id = new Guid("a0000000-0000-0000-0000-000000000004"),
+                            Name = "FamilyHead"
+                        },
+                        new
+                        {
+                            Id = new Guid("a0000000-0000-0000-0000-000000000005"),
+                            Name = "VolunteerGroupPresident"
+                        },
+                        new
+                        {
+                            Id = new Guid("a0000000-0000-0000-0000-000000000006"),
+                            Name = "PathshalaTeacher"
+                        },
+                        new
+                        {
+                            Id = new Guid("a0000000-0000-0000-0000-000000000007"),
+                            Name = "PathshalaStudent"
+                        },
+                        new
+                        {
+                            Id = new Guid("a0000000-0000-0000-0000-000000000008"),
+                            Name = "ContentModerator"
+                        },
+                        new
+                        {
+                            Id = new Guid("a0000000-0000-0000-0000-000000000009"),
+                            Name = "BoliManager"
+                        });
+                });
+
+            modelBuilder.Entity("Sangam.IdentityTenant.Domain.Authorization.RolePermission", b =>
+                {
+                    b.Property<Guid>("RoleId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("role_id");
+
+                    b.Property<Guid>("PermissionId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("permission_id");
+
+                    b.HasKey("RoleId", "PermissionId")
+                        .HasName("pk_role_permissions");
+
+                    b.HasIndex("PermissionId")
+                        .HasDatabaseName("ix_role_permissions_permission_id");
+
+                    b.ToTable("role_permissions", (string)null);
+
+                    b.HasData(
+                        new
+                        {
+                            RoleId = new Guid("a0000000-0000-0000-0000-000000000001"),
+                            PermissionId = new Guid("b0000000-0000-0000-0000-000000000001")
+                        },
+                        new
+                        {
+                            RoleId = new Guid("a0000000-0000-0000-0000-000000000001"),
+                            PermissionId = new Guid("b0000000-0000-0000-0000-000000000002")
+                        },
+                        new
+                        {
+                            RoleId = new Guid("a0000000-0000-0000-0000-000000000001"),
+                            PermissionId = new Guid("b0000000-0000-0000-0000-000000000003")
+                        },
+                        new
+                        {
+                            RoleId = new Guid("a0000000-0000-0000-0000-000000000001"),
+                            PermissionId = new Guid("b0000000-0000-0000-0000-000000000004")
+                        },
+                        new
+                        {
+                            RoleId = new Guid("a0000000-0000-0000-0000-000000000001"),
+                            PermissionId = new Guid("b0000000-0000-0000-0000-000000000005")
+                        },
+                        new
+                        {
+                            RoleId = new Guid("a0000000-0000-0000-0000-000000000001"),
+                            PermissionId = new Guid("b0000000-0000-0000-0000-000000000006")
+                        },
+                        new
+                        {
+                            RoleId = new Guid("a0000000-0000-0000-0000-000000000001"),
+                            PermissionId = new Guid("b0000000-0000-0000-0000-000000000007")
+                        },
+                        new
+                        {
+                            RoleId = new Guid("a0000000-0000-0000-0000-000000000001"),
+                            PermissionId = new Guid("b0000000-0000-0000-0000-000000000008")
+                        },
+                        new
+                        {
+                            RoleId = new Guid("a0000000-0000-0000-0000-000000000001"),
+                            PermissionId = new Guid("b0000000-0000-0000-0000-000000000009")
+                        },
+                        new
+                        {
+                            RoleId = new Guid("a0000000-0000-0000-0000-000000000001"),
+                            PermissionId = new Guid("b0000000-0000-0000-0000-00000000000a")
+                        },
+                        new
+                        {
+                            RoleId = new Guid("a0000000-0000-0000-0000-000000000001"),
+                            PermissionId = new Guid("b0000000-0000-0000-0000-00000000000b")
+                        },
+                        new
+                        {
+                            RoleId = new Guid("a0000000-0000-0000-0000-000000000001"),
+                            PermissionId = new Guid("b0000000-0000-0000-0000-00000000000c")
+                        },
+                        new
+                        {
+                            RoleId = new Guid("a0000000-0000-0000-0000-000000000001"),
+                            PermissionId = new Guid("b0000000-0000-0000-0000-00000000000d")
+                        },
+                        new
+                        {
+                            RoleId = new Guid("a0000000-0000-0000-0000-000000000001"),
+                            PermissionId = new Guid("b0000000-0000-0000-0000-00000000000e")
+                        },
+                        new
+                        {
+                            RoleId = new Guid("a0000000-0000-0000-0000-000000000001"),
+                            PermissionId = new Guid("b0000000-0000-0000-0000-00000000000f")
+                        },
+                        new
+                        {
+                            RoleId = new Guid("a0000000-0000-0000-0000-000000000001"),
+                            PermissionId = new Guid("b0000000-0000-0000-0000-000000000010")
+                        },
+                        new
+                        {
+                            RoleId = new Guid("a0000000-0000-0000-0000-000000000001"),
+                            PermissionId = new Guid("b0000000-0000-0000-0000-000000000011")
+                        },
+                        new
+                        {
+                            RoleId = new Guid("a0000000-0000-0000-0000-000000000001"),
+                            PermissionId = new Guid("b0000000-0000-0000-0000-000000000012")
+                        },
+                        new
+                        {
+                            RoleId = new Guid("a0000000-0000-0000-0000-000000000002"),
+                            PermissionId = new Guid("b0000000-0000-0000-0000-000000000002")
+                        },
+                        new
+                        {
+                            RoleId = new Guid("a0000000-0000-0000-0000-000000000002"),
+                            PermissionId = new Guid("b0000000-0000-0000-0000-000000000003")
+                        },
+                        new
+                        {
+                            RoleId = new Guid("a0000000-0000-0000-0000-000000000002"),
+                            PermissionId = new Guid("b0000000-0000-0000-0000-000000000004")
+                        },
+                        new
+                        {
+                            RoleId = new Guid("a0000000-0000-0000-0000-000000000002"),
+                            PermissionId = new Guid("b0000000-0000-0000-0000-000000000005")
+                        },
+                        new
+                        {
+                            RoleId = new Guid("a0000000-0000-0000-0000-000000000002"),
+                            PermissionId = new Guid("b0000000-0000-0000-0000-000000000006")
+                        },
+                        new
+                        {
+                            RoleId = new Guid("a0000000-0000-0000-0000-000000000002"),
+                            PermissionId = new Guid("b0000000-0000-0000-0000-000000000007")
+                        },
+                        new
+                        {
+                            RoleId = new Guid("a0000000-0000-0000-0000-000000000002"),
+                            PermissionId = new Guid("b0000000-0000-0000-0000-000000000008")
+                        },
+                        new
+                        {
+                            RoleId = new Guid("a0000000-0000-0000-0000-000000000002"),
+                            PermissionId = new Guid("b0000000-0000-0000-0000-000000000009")
+                        },
+                        new
+                        {
+                            RoleId = new Guid("a0000000-0000-0000-0000-000000000002"),
+                            PermissionId = new Guid("b0000000-0000-0000-0000-00000000000a")
+                        },
+                        new
+                        {
+                            RoleId = new Guid("a0000000-0000-0000-0000-000000000002"),
+                            PermissionId = new Guid("b0000000-0000-0000-0000-00000000000b")
+                        },
+                        new
+                        {
+                            RoleId = new Guid("a0000000-0000-0000-0000-000000000002"),
+                            PermissionId = new Guid("b0000000-0000-0000-0000-00000000000c")
+                        },
+                        new
+                        {
+                            RoleId = new Guid("a0000000-0000-0000-0000-000000000002"),
+                            PermissionId = new Guid("b0000000-0000-0000-0000-000000000010")
+                        },
+                        new
+                        {
+                            RoleId = new Guid("a0000000-0000-0000-0000-000000000002"),
+                            PermissionId = new Guid("b0000000-0000-0000-0000-000000000011")
+                        },
+                        new
+                        {
+                            RoleId = new Guid("a0000000-0000-0000-0000-000000000002"),
+                            PermissionId = new Guid("b0000000-0000-0000-0000-000000000012")
+                        },
+                        new
+                        {
+                            RoleId = new Guid("a0000000-0000-0000-0000-000000000003"),
+                            PermissionId = new Guid("b0000000-0000-0000-0000-000000000003")
+                        },
+                        new
+                        {
+                            RoleId = new Guid("a0000000-0000-0000-0000-000000000003"),
+                            PermissionId = new Guid("b0000000-0000-0000-0000-000000000007")
+                        },
+                        new
+                        {
+                            RoleId = new Guid("a0000000-0000-0000-0000-000000000004"),
+                            PermissionId = new Guid("b0000000-0000-0000-0000-000000000003")
+                        },
+                        new
+                        {
+                            RoleId = new Guid("a0000000-0000-0000-0000-000000000004"),
+                            PermissionId = new Guid("b0000000-0000-0000-0000-000000000007")
+                        },
+                        new
+                        {
+                            RoleId = new Guid("a0000000-0000-0000-0000-000000000004"),
+                            PermissionId = new Guid("b0000000-0000-0000-0000-000000000005")
+                        },
+                        new
+                        {
+                            RoleId = new Guid("a0000000-0000-0000-0000-000000000005"),
+                            PermissionId = new Guid("b0000000-0000-0000-0000-000000000003")
+                        },
+                        new
+                        {
+                            RoleId = new Guid("a0000000-0000-0000-0000-000000000005"),
+                            PermissionId = new Guid("b0000000-0000-0000-0000-000000000007")
+                        },
+                        new
+                        {
+                            RoleId = new Guid("a0000000-0000-0000-0000-000000000005"),
+                            PermissionId = new Guid("b0000000-0000-0000-0000-000000000009")
+                        },
+                        new
+                        {
+                            RoleId = new Guid("a0000000-0000-0000-0000-000000000005"),
+                            PermissionId = new Guid("b0000000-0000-0000-0000-00000000000a")
+                        },
+                        new
+                        {
+                            RoleId = new Guid("a0000000-0000-0000-0000-000000000006"),
+                            PermissionId = new Guid("b0000000-0000-0000-0000-000000000003")
+                        },
+                        new
+                        {
+                            RoleId = new Guid("a0000000-0000-0000-0000-000000000006"),
+                            PermissionId = new Guid("b0000000-0000-0000-0000-00000000000e")
+                        },
+                        new
+                        {
+                            RoleId = new Guid("a0000000-0000-0000-0000-000000000006"),
+                            PermissionId = new Guid("b0000000-0000-0000-0000-00000000000f")
+                        },
+                        new
+                        {
+                            RoleId = new Guid("a0000000-0000-0000-0000-000000000007"),
+                            PermissionId = new Guid("b0000000-0000-0000-0000-000000000003")
+                        },
+                        new
+                        {
+                            RoleId = new Guid("a0000000-0000-0000-0000-000000000008"),
+                            PermissionId = new Guid("b0000000-0000-0000-0000-000000000003")
+                        },
+                        new
+                        {
+                            RoleId = new Guid("a0000000-0000-0000-0000-000000000008"),
+                            PermissionId = new Guid("b0000000-0000-0000-0000-000000000008")
+                        },
+                        new
+                        {
+                            RoleId = new Guid("a0000000-0000-0000-0000-000000000008"),
+                            PermissionId = new Guid("b0000000-0000-0000-0000-00000000000b")
+                        },
+                        new
+                        {
+                            RoleId = new Guid("a0000000-0000-0000-0000-000000000009"),
+                            PermissionId = new Guid("b0000000-0000-0000-0000-000000000003")
+                        },
+                        new
+                        {
+                            RoleId = new Guid("a0000000-0000-0000-0000-000000000009"),
+                            PermissionId = new Guid("b0000000-0000-0000-0000-000000000010")
+                        },
+                        new
+                        {
+                            RoleId = new Guid("a0000000-0000-0000-0000-000000000009"),
+                            PermissionId = new Guid("b0000000-0000-0000-0000-000000000011")
+                        });
+                });
+
+            modelBuilder.Entity("Sangam.IdentityTenant.Domain.Authorization.UserRole", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<DateTimeOffset>("AssignedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("assigned_at");
+
+                    b.Property<Guid>("RoleId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("role_id");
+
+                    b.Property<Guid?>("TenantScope")
+                        .HasColumnType("uuid")
+                        .HasColumnName("tenant_scope");
+
+                    b.Property<Guid>("UserId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("user_id");
+
+                    b.HasKey("Id")
+                        .HasName("pk_user_roles");
+
+                    b.HasIndex("RoleId")
+                        .HasDatabaseName("ix_user_roles_role_id");
+
+                    b.HasIndex("UserId", "RoleId", "TenantScope")
+                        .IsUnique()
+                        .HasDatabaseName("ix_user_roles_user_id_role_id_tenant_scope");
+
+                    b.ToTable("user_roles", (string)null);
+                });
+
             modelBuilder.Entity("Sangam.IdentityTenant.Domain.Tenants.Tenant", b =>
                 {
                     b.Property<Guid>("Id")
@@ -91,6 +588,80 @@ namespace Sangam.IdentityTenant.Infrastructure.Persistence.Migrations
                     b.ToTable("tenants", (string)null);
                 });
 
+            modelBuilder.Entity("Sangam.IdentityTenant.Domain.Users.User", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<string>("AuthMethod")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)")
+                        .HasColumnName("auth_method");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at");
+
+                    b.Property<int>("FailedLoginAttempts")
+                        .HasColumnType("integer")
+                        .HasColumnName("failed_login_attempts");
+
+                    b.Property<string>("FullName")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)")
+                        .HasColumnName("full_name");
+
+                    b.Property<bool>("IsContactVerified")
+                        .HasColumnType("boolean")
+                        .HasColumnName("is_contact_verified");
+
+                    b.Property<DateTimeOffset?>("LastLoginAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("last_login_at");
+
+                    b.Property<DateTimeOffset?>("LockedOutUntil")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("locked_out_until");
+
+                    b.Property<string>("MobileOrEmail")
+                        .IsRequired()
+                        .HasMaxLength(320)
+                        .HasColumnType("character varying(320)")
+                        .HasColumnName("mobile_or_email");
+
+                    b.Property<string>("PasswordHash")
+                        .IsRequired()
+                        .HasMaxLength(512)
+                        .HasColumnType("character varying(512)")
+                        .HasColumnName("password_hash");
+
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)")
+                        .HasColumnName("status");
+
+                    b.Property<Guid>("TenantId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("tenant_id");
+
+                    b.HasKey("Id")
+                        .HasName("pk_users");
+
+                    b.HasIndex("MobileOrEmail")
+                        .IsUnique()
+                        .HasDatabaseName("ix_users_mobile_or_email");
+
+                    b.HasIndex("TenantId")
+                        .HasDatabaseName("ix_users_tenant_id");
+
+                    b.ToTable("users", (string)null);
+                });
+
             modelBuilder.Entity("Sangam.IdentityTenant.Infrastructure.Persistence.OutboxMessage", b =>
                 {
                     b.Property<Guid>("Id")
@@ -144,6 +715,45 @@ namespace Sangam.IdentityTenant.Infrastructure.Persistence.Migrations
                         .HasFilter("processed_at IS NULL");
 
                     b.ToTable("outbox_messages", (string)null);
+                });
+
+            modelBuilder.Entity("Sangam.IdentityTenant.Domain.Authorization.RolePermission", b =>
+                {
+                    b.HasOne("Sangam.IdentityTenant.Domain.Authorization.Permission", null)
+                        .WithMany()
+                        .HasForeignKey("PermissionId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired()
+                        .HasConstraintName("fk_role_permissions_permissions_permission_id");
+
+                    b.HasOne("Sangam.IdentityTenant.Domain.Authorization.Role", null)
+                        .WithMany()
+                        .HasForeignKey("RoleId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired()
+                        .HasConstraintName("fk_role_permissions_roles_role_id");
+                });
+
+            modelBuilder.Entity("Sangam.IdentityTenant.Domain.Authorization.UserRole", b =>
+                {
+                    b.HasOne("Sangam.IdentityTenant.Domain.Authorization.Role", null)
+                        .WithMany()
+                        .HasForeignKey("RoleId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_user_roles_roles_role_id");
+
+                    b.HasOne("Sangam.IdentityTenant.Domain.Users.User", null)
+                        .WithMany("Roles")
+                        .HasForeignKey("UserId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired()
+                        .HasConstraintName("fk_user_roles_users_user_id");
+                });
+
+            modelBuilder.Entity("Sangam.IdentityTenant.Domain.Users.User", b =>
+                {
+                    b.Navigation("Roles");
                 });
 #pragma warning restore 612, 618
         }

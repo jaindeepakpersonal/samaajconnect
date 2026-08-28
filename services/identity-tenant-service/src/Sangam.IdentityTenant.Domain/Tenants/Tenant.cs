@@ -81,6 +81,27 @@ public sealed class Tenant : AggregateRoot
     }
 
     /// <summary>
+    /// Moves the Samaaj between Active, Inactive and Archived. Returns false
+    /// when the status is already the requested one, so a caller can report
+    /// "nothing to do" without an event being published for a non-change.
+    /// </summary>
+    public bool ChangeStatus(TenantStatus status, DateTimeOffset occurredAt)
+    {
+        if (Status == status)
+        {
+            return false;
+        }
+
+        var previous = Status;
+        Status = status;
+
+        Raise(new TenantStatusChangedDomainEvent(
+            Id, previous.ToString(), status.ToString(), occurredAt));
+
+        return true;
+    }
+
+    /// <summary>
     /// Lowercases and trims a slug so "  Mumbai-Samaaj " and "mumbai-samaaj"
     /// can never become two different tenants.
     /// </summary>

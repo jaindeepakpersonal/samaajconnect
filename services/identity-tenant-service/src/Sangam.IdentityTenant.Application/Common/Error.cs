@@ -22,6 +22,40 @@ public sealed record Error(string Code, string Description, ErrorType Type)
     public IReadOnlyDictionary<string, string[]> FieldErrors { get; init; } =
         new Dictionary<string, string[]>();
 
+    /// <summary>
+    /// Compared structurally, including the field errors. The compiler-generated
+    /// record equality would compare the dictionary by reference, so two
+    /// identical "invalid credentials" errors would come out unequal - which
+    /// silently breaks any code, or test, that asserts two paths fail the same
+    /// way.
+    /// </summary>
+    public bool Equals(Error? other) =>
+        other is not null
+        && Code == other.Code
+        && Description == other.Description
+        && Type == other.Type
+        && FieldErrorsEqual(FieldErrors, other.FieldErrors);
+
+    public override int GetHashCode() => HashCode.Combine(Code, Description, Type, FieldErrors.Count);
+
+    private static bool FieldErrorsEqual(
+        IReadOnlyDictionary<string, string[]> left,
+        IReadOnlyDictionary<string, string[]> right)
+    {
+        if (ReferenceEquals(left, right))
+        {
+            return true;
+        }
+
+        if (left.Count != right.Count)
+        {
+            return false;
+        }
+
+        return left.All(entry =>
+            right.TryGetValue(entry.Key, out var messages) && entry.Value.SequenceEqual(messages));
+    }
+
     public static Error Failure(string code, string description) =>
         new(code, description, ErrorType.Failure);
 

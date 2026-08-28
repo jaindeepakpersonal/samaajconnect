@@ -1,5 +1,7 @@
 using System.IdentityModel.Tokens.Jwt;
+using System.Net.Http.Json;
 using System.Security.Claims;
+using System.Text.Json;
 using System.Text;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc.Testing;
@@ -25,6 +27,10 @@ namespace Sangam.IdentityTenant.IntegrationTests;
 public sealed class IdentityTenantApiFactory : WebApplicationFactory<Program>, IAsyncLifetime
 {
     public const string SigningKey = "integration-test-signing-key-at-least-32-chars";
+
+    public const string BootstrapIdentifier = "superadmin@samaajconnect.test";
+
+    public const string BootstrapPassword = "bootstrap-password-long-enough";
 
     private readonly PostgreSqlContainer _postgres = new PostgreSqlBuilder()
         .WithImage("postgres:16-alpine")
@@ -55,6 +61,9 @@ public sealed class IdentityTenantApiFactory : WebApplicationFactory<Program>, I
                 ["Jwt:SigningKey"] = SigningKey,
                 ["Jwt:Issuer"] = "samaajconnect",
                 ["Jwt:Audience"] = "samaajconnect",
+                ["Bootstrap:SuperAdminIdentifier"] = BootstrapIdentifier,
+                ["Bootstrap:SuperAdminPassword"] = BootstrapPassword,
+                ["Bootstrap:SuperAdminName"] = "Platform Super Admin",
             });
         });
 
@@ -90,9 +99,24 @@ public sealed class IdentityTenantApiFactory : WebApplicationFactory<Program>, I
         var dbContext = scope.ServiceProvider.GetRequiredService<IdentityTenantDbContext>();
 
         await dbContext.Database.ExecuteSqlRawAsync(
-            "TRUNCATE TABLE tenants, outbox_messages RESTART IDENTITY CASCADE;");
+            // roles, permissions and role_permissions are migration-seeded
+            // reference data and must survive a reset.
+            "TRUNCATE TABLE user_roles, users, tenants, outbox_messages RESTART IDENTITY CASCADE;");
 
         Publisher.Clear();
+    }
+
+    /// <summary>
+    /// Re-runs the Super Admin bootstrap. Needed because ResetDatabaseAsync
+    /// truncates users, and the bootstrap itself only runs at host startup.
+    /// </summary>
+    public async Task BootstrapSuperAdminAsync()
+    {
+        await using var scope = Services.CreateAsyncScope();
+
+        await scope.ServiceProvider
+            .GetRequiredService<Infrastructure.Security.SuperAdminBootstrapper>()
+            .EnsureSuperAdminAsync();
     }
 
     /// <summary>Runs one dispatcher cycle against the real database.</summary>
@@ -101,6 +125,35 @@ public sealed class IdentityTenantApiFactory : WebApplicationFactory<Program>, I
         var dispatcher = ActivatorUtilities.CreateInstance<OutboxDispatcher>(Services);
 
         return await dispatcher.DispatchBatchAsync(CancellationToken.None);
+    }
+
+    /// <summary>
+    /// Creates a Samaaj and activates it. Registration is only open on an
+    /// active Samaaj, and tenants are deliberately created inactive, so most
+    /// auth tests need both steps.
+    /// </summary>
+    public async Task<(Guid Id, string Slug)> SeedActiveTenantAsync(string slug = "mumbai-samaaj")
+    {
+        var client = CreateClientWith(Application.Security.PermissionKeys.TenantManage);
+
+        var created = await client.PostAsJsonAsync("/v1/identity/tenants", new
+        {
+            name = "Mumbai Samaaj",
+            slug,
+            enabledModules = Array.Empty<string>(),
+        });
+
+        created.EnsureSuccessStatusCode();
+
+        var body = await created.Content.ReadFromJsonAsync<JsonElement>();
+        var id = body.GetProperty("id").GetGuid();
+
+        var activated = await client.PatchAsJsonAsync(
+            $"/v1/identity/tenants/{id}/status", new { status = "Active" });
+
+        activated.EnsureSuccessStatusCode();
+
+        return (id, slug);
     }
 
     public HttpClient CreateClientWith(params string[] permissions) =>

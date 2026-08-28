@@ -1,12 +1,27 @@
 using Sangam.IdentityTenant.Application.Abstractions;
+using Sangam.IdentityTenant.Infrastructure.Security;
 
 namespace Sangam.IdentityTenant.Api.Extensions;
 
 /// <summary>
-/// Reads the tenant the gateway resolved from the subdomain. Never reads a
-/// tenant id from the request body or query string - that would hand any
-/// caller the ability to name their own tenant (SECURITY-CHECKLIST.md).
+/// Resolves the tenant for one request. Never reads a tenant id from the
+/// request body or query string - that would let any caller name their own
+/// tenant (SECURITY-CHECKLIST.md).
 /// </summary>
+/// <remarks>
+/// Precedence matters here:
+/// <list type="number">
+/// <item>a Super Admin override header, which the pipeline separately refuses
+/// to anyone who is not a Super Admin;</item>
+/// <item>the <c>tenant_id</c> claim on the validated token, because a signed
+/// claim outranks an unsigned header;</item>
+/// <item>the gateway's <c>X-Tenant-Id</c> header, which is all an anonymous
+/// request has.</item>
+/// </list>
+/// A token claim that disagrees with the header is reported as a conflict
+/// rather than silently resolved: that combination is what an attempt to point
+/// one Samaaj's token at another Samaaj's data looks like.
+/// </remarks>
 public sealed class HttpTenantContext : ITenantContext
 {
     public const string TenantHeader = "X-Tenant-Id";
@@ -19,7 +34,7 @@ public sealed class HttpTenantContext : ITenantContext
         if (httpContext is null)
         {
             // Background work (the outbox dispatcher) has no request and no
-            // tenant. Legitimate, so this is null rather than an exception.
+            // tenant. Legitimate, so this stays null rather than throwing.
             return;
         }
 
@@ -30,15 +45,28 @@ public sealed class HttpTenantContext : ITenantContext
             return;
         }
 
-        if (TryReadGuid(httpContext, TenantHeader, out var tenantId))
+        var hasHeader = TryReadGuid(httpContext, TenantHeader, out var headerTenantId);
+
+        var claim = httpContext.User.FindFirst(JwtTokenIssuer.TenantClaimType)?.Value;
+
+        if (httpContext.User.Identity?.IsAuthenticated == true && Guid.TryParse(claim, out var claimTenantId))
         {
-            TenantId = tenantId;
+            TenantId = claimTenantId;
+            HasTenantConflict = hasHeader && headerTenantId != claimTenantId;
+            return;
+        }
+
+        if (hasHeader)
+        {
+            TenantId = headerTenantId;
         }
     }
 
     public Guid? TenantId { get; }
 
     public bool IsOverride { get; }
+
+    public bool HasTenantConflict { get; }
 
     public Guid RequireTenantId() => TenantId
         ?? throw new InvalidOperationException(

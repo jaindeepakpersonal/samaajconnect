@@ -5,6 +5,7 @@ using Sangam.IdentityTenant.Application.Abstractions;
 using Sangam.IdentityTenant.Infrastructure.Messaging;
 using Sangam.IdentityTenant.Infrastructure.Persistence;
 using Sangam.IdentityTenant.Infrastructure.Repositories;
+using Sangam.IdentityTenant.Infrastructure.Security;
 
 namespace Sangam.IdentityTenant.Infrastructure;
 
@@ -32,7 +33,23 @@ public static class DependencyInjection
 
         services.AddScoped<IUnitOfWork, UnitOfWork>();
         services.AddScoped<ITenantRepository, TenantRepository>();
+        services.AddScoped<IUserRepository, UserRepository>();
         services.AddSingleton<IDateTimeProvider, SystemDateTimeProvider>();
+        services.AddSingleton<IPasswordHasher, PasswordHasher>();
+        services.AddScoped<ITokenIssuer, JwtTokenIssuer>();
+        services.AddScoped<IFailedLoginRecorder, FailedLoginRecorder>();
+
+        // Bound and validated here rather than in Api: this service issues
+        // tokens as well as validating them, and both halves must agree.
+        services.AddOptions<JwtOptions>()
+            .Bind(configuration.GetSection(JwtOptions.SectionName))
+            .Validate(
+                jwt => !string.IsNullOrWhiteSpace(jwt.SigningKey) && jwt.SigningKey.Length >= 32,
+                "Jwt:SigningKey must be configured and at least 32 characters long.")
+            .ValidateOnStart();
+
+        services.Configure<BootstrapOptions>(configuration.GetSection(BootstrapOptions.SectionName));
+        services.AddScoped<SuperAdminBootstrapper>();
 
         services.Configure<KafkaOptions>(configuration.GetSection(KafkaOptions.SectionName));
         services.Configure<OutboxOptions>(configuration.GetSection(OutboxOptions.SectionName));

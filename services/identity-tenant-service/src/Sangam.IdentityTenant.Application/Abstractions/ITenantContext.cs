@@ -15,6 +15,14 @@ public interface ITenantContext
     bool IsOverride { get; }
 
     /// <summary>
+    /// True when the request carried a tenant header that disagrees with the
+    /// tenant its token was issued for. A caller holding a valid token for one
+    /// Samaaj must not be able to point it at another simply by setting a
+    /// header, so the pipeline refuses such a request outright.
+    /// </summary>
+    bool HasTenantConflict { get; }
+
+    /// <summary>
     /// Throws when a tenant-scoped operation runs without a resolved tenant.
     /// Use in handlers that must never fall back to "all tenants".
     /// </summary>

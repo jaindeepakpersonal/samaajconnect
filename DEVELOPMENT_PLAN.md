@@ -8,10 +8,11 @@ version of the plan; the reasoning behind the ordering lives in
 ## Current Status
 
 - **Stage:** Stage 0 - Walking Skeleton, in progress
-- **Last updated:** 2026-08-28 - shared infra + `identity-tenant-service`
-  scaffolded with the `Tenant` aggregate; 70 tests green
-- **Blocking item:** none. Next up is the `User` aggregate
-  (`RegisterMemberCommand`, `LoginCommand`) in the same service.
+- **Last updated:** 2026-08-28 - `identity-tenant-service` complete for Stage 0:
+  Tenant + User + roles/permissions, register, common login, JWT issuance,
+  Super Admin bootstrap. 135 tests green.
+- **Blocking item:** none. Next up is `audit-notification-service` (one Kafka
+  consumer end to end), then the gateway.
 
 *(Update these three lines at the start/end of every work session —
 they're what a coding agent or a teammate should read first to know
@@ -29,8 +30,10 @@ vertical slice working end-to-end, not broad partial progress.
       start by `infra/postgres/init-databases.sh`
 - [x] `identity-tenant-service` scaffolded (`.claude/skills/new-microservice`)
   - [x] `Tenant` aggregate + `CreateTenantCommand` + `GetTenantBySlugQuery`
-  - [ ] `User` aggregate + `RegisterMemberCommand` + `LoginCommand`
-  - [x] `dotnet build` / `dotnet test` pass (55 unit, 15 integration)
+  - [x] `User` aggregate + `RegisterMemberCommand` + `LoginCommand`, plus
+        seeded roles/permissions, `/me`, tenant activation and a configurable
+        Super Admin bootstrap
+  - [x] `dotnet build` / `dotnet test` pass (101 unit, 34 integration)
 - [ ] `audit-notification-service` scaffolded (shell is fine — one
       event consumer wired end-to-end is the point, not full coverage)
 - [ ] Gateway: subdomain → tenant resolution + JWT validation wired

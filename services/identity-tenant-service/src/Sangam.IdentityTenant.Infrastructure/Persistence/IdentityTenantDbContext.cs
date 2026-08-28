@@ -2,8 +2,10 @@ using System.Linq.Expressions;
 using System.Text.Json;
 using Microsoft.EntityFrameworkCore;
 using Sangam.IdentityTenant.Application.Abstractions;
+using Sangam.IdentityTenant.Domain.Authorization;
 using Sangam.IdentityTenant.Domain.Common;
 using Sangam.IdentityTenant.Domain.Tenants;
+using Sangam.IdentityTenant.Domain.Users;
 
 namespace Sangam.IdentityTenant.Infrastructure.Persistence;
 
@@ -15,6 +17,16 @@ public sealed class IdentityTenantDbContext(
     private static readonly JsonSerializerOptions PayloadSerializerOptions = new(JsonSerializerDefaults.Web);
 
     public DbSet<Tenant> Tenants => Set<Tenant>();
+
+    public DbSet<User> Users => Set<User>();
+
+    public DbSet<Role> Roles => Set<Role>();
+
+    public DbSet<Permission> Permissions => Set<Permission>();
+
+    public DbSet<RolePermission> RolePermissions => Set<RolePermission>();
+
+    public DbSet<UserRole> UserRoles => Set<UserRole>();
 
     public DbSet<OutboxMessage> OutboxMessages => Set<OutboxMessage>();
 

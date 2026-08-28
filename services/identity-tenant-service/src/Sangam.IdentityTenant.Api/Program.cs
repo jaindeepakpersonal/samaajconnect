@@ -5,6 +5,7 @@ using Sangam.IdentityTenant.Application;
 using Sangam.IdentityTenant.Application.Abstractions;
 using Sangam.IdentityTenant.Infrastructure;
 using Sangam.IdentityTenant.Infrastructure.Persistence;
+using Sangam.IdentityTenant.Infrastructure.Security;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -16,7 +17,7 @@ builder.Services.AddScoped<ICorrelationContext, HttpCorrelationContext>();
 builder.Services.AddApplication();
 builder.Services.AddInfrastructure(builder.Configuration);
 
-builder.Services.AddJwtAuthentication(builder.Configuration);
+builder.Services.AddJwtAuthentication();
 builder.Services.AddAuthorization();
 
 builder.Services.AddProblemDetails();
@@ -36,6 +37,10 @@ if (app.Environment.IsDevelopment())
     await using var scope = app.Services.CreateAsyncScope();
     var dbContext = scope.ServiceProvider.GetRequiredService<IdentityTenantDbContext>();
     await dbContext.Database.MigrateAsync();
+
+    // Runs after migrations so the seeded roles it references already exist.
+    await scope.ServiceProvider.GetRequiredService<SuperAdminBootstrapper>()
+        .EnsureSuperAdminAsync();
 }
 
 app.UseExceptionHandler();
@@ -48,6 +53,7 @@ app.MapGet("/health", () => Results.Ok(new { status = "healthy" }))
     .ExcludeFromDescription();
 
 app.MapTenantEndpoints();
+app.MapAuthEndpoints();
 
 await app.RunAsync();
 
