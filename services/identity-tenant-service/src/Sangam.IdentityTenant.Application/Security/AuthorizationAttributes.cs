@@ -29,3 +29,16 @@ public sealed class RequiresPermissionAttribute(string permissionKey) : Attribut
 /// </summary>
 [AttributeUsage(AttributeTargets.Class, AllowMultiple = false, Inherited = true)]
 public sealed class AllowAnonymousRequestAttribute : Attribute;
+
+/// <summary>
+/// Marks a request this service raises for itself, from a Kafka consumer rather
+/// than from an HTTP endpoint.
+/// </summary>
+/// <remarks>
+/// Distinct from <see cref="AllowAnonymousRequestAttribute"/> on purpose.
+/// "Anonymous" means a real caller reached us without a token; this means there
+/// is no caller at all. Keeping them separate makes the genuinely
+/// externally-reachable unauthenticated surface greppable on its own.
+/// </remarks>
+[AttributeUsage(AttributeTargets.Class, AllowMultiple = false, Inherited = true)]
+public sealed class InternalRequestAttribute : Attribute;

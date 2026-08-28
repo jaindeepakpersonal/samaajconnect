@@ -31,6 +31,23 @@ public sealed class UserConfiguration : IEntityTypeConfiguration<User>
         // The gateway and admin screens both list users a Samaaj at a time.
         builder.HasIndex(u => u.TenantId);
 
+        builder.Property(u => u.ConvertedFromChildProfileId);
+
+        // Owned rather than a table of its own: a code has no life apart from
+        // the account it belongs to, and is deleted with it.
+        builder.OwnsOne(u => u.ActivationCode, code =>
+        {
+            code.Property(c => c.Hash).HasColumnName("activation_code_hash").HasMaxLength(512);
+            code.Property(c => c.IssuedAt).HasColumnName("activation_code_issued_at");
+            code.Property(c => c.ExpiresAt).HasColumnName("activation_code_expires_at");
+            code.Property(c => c.IssuedBy).HasColumnName("activation_code_issued_by");
+            code.Property(c => c.FailedAttempts).HasColumnName("activation_code_failed_attempts");
+        });
+
+        // The admin's pending list, and the consumer's idempotency check.
+        builder.HasIndex(u => new { u.TenantId, u.Status });
+        builder.HasIndex(u => u.ConvertedFromChildProfileId);
+
         builder.HasMany(u => u.Roles)
             .WithOne()
             .HasForeignKey(r => r.UserId)

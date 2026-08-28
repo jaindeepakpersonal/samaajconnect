@@ -109,6 +109,14 @@ public static class AuthorizationCatalog
         new(RoleIds.Member, PermissionIds.MembersRead),
         new(RoleIds.Member, PermissionIds.TimelinePost),
 
+        // Every member may manage a family, because every member may create
+        // one and become its head. Which family they may manage is decided in
+        // member-family-service against the data - "are you the head of this
+        // one?" - which is a stronger check than a role claim. Without this the
+        // child endpoints were unreachable: nothing grants FamilyHead, so no
+        // member could ever satisfy Family.Write.
+        new(RoleIds.Member, PermissionIds.FamilyWrite),
+
         new(RoleIds.FamilyHead, PermissionIds.MembersRead),
         new(RoleIds.FamilyHead, PermissionIds.TimelinePost),
         new(RoleIds.FamilyHead, PermissionIds.FamilyWrite),

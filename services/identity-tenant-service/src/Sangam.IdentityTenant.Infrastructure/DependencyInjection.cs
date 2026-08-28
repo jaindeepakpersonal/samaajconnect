@@ -38,6 +38,7 @@ public static class DependencyInjection
         services.AddSingleton<IPasswordHasher, PasswordHasher>();
         services.AddScoped<ITokenIssuer, JwtTokenIssuer>();
         services.AddScoped<IFailedLoginRecorder, FailedLoginRecorder>();
+        services.AddScoped<IFailedActivationRecorder, FailedActivationRecorder>();
 
         // Bound and validated here rather than in Api: this service issues
         // tokens as well as validating them, and both halves must agree.
@@ -55,7 +56,14 @@ public static class DependencyInjection
         services.Configure<OutboxOptions>(configuration.GetSection(OutboxOptions.SectionName));
 
         services.AddSingleton<IEventPublisher, KafkaProducer>();
+        services.Configure<ConsumerOptions>(configuration.GetSection(ConsumerOptions.SectionName));
+
         services.AddHostedService<OutboxDispatcher>();
+
+        // This service's first consumer. It publishes far more than it consumes,
+        // but an approved child conversion is decided in member-family-service
+        // and the account it implies can only be created here.
+        services.AddHostedService<IntegrationEventConsumer>();
 
         return services;
     }

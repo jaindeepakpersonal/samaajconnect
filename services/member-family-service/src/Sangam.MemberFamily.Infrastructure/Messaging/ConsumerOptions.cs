@@ -5,13 +5,22 @@ public sealed class ConsumerOptions
     public const string SectionName = "Consumer";
 
     /// <summary>
-    /// Only the one topic this service acts on. Narrow on purpose, unlike
-    /// audit-notification-service, which subscribes to everything: this
-    /// service reacts to registrations, and consuming events it has no
-    /// handler for would mean quietly committing offsets for messages it did
-    /// nothing with.
+    /// The topics this service acts on, named explicitly.
     /// </summary>
-    public string TopicPattern { get; set; } = "^identity[.]user[.]registered[.]v[0-9]+$";
+    /// <remarks>
+    /// A list rather than the regex audit-notification-service uses, for two
+    /// reasons. This service <i>acts</i> on what it consumes, so subscribing to
+    /// anything it has no handler for would mean quietly committing offsets for
+    /// messages it did nothing with. And librdkafka's regex support is not the
+    /// full grammar: a pattern with alternation silently matched nothing here,
+    /// which looks exactly like a broker problem and is not one. An explicit
+    /// list cannot fail that way.
+    /// </remarks>
+    public string[] Topics { get; set; } =
+    [
+        "identity.user.registered.v1",
+        "identity.child-conversion.completed.v1",
+    ];
 
     public string GroupId { get; set; } = "member-family-service";
 
@@ -21,10 +30,9 @@ public sealed class ConsumerOptions
     public int RetryDelayMilliseconds { get; set; } = 500;
 
     /// <summary>
-    /// How often to re-read broker metadata. Kafka only matches a regex
-    /// subscription against topics it knows about, so this is how long a newly
-    /// deployed service waits before its events start being audited.
-    /// Confluent defaults to five minutes, which is a long hole in the trail.
+    /// How often to re-read broker metadata. Confluent defaults to five
+    /// minutes, which is a long time for a topic that has just been created to
+    /// go unnoticed.
     /// </summary>
     public int MetadataRefreshIntervalMilliseconds { get; set; } = 30_000;
 }

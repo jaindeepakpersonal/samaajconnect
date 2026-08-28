@@ -63,7 +63,8 @@ public sealed class TenantAuthorizationBehavior<TRequest, TResponse>(
         }
 
         var policy = Policies.GetOrAdd(typeof(TRequest), static type => new RequestPolicy(
-            type.GetCustomAttribute<AllowAnonymousRequestAttribute>() is not null,
+            type.GetCustomAttribute<AllowAnonymousRequestAttribute>() is not null
+                || type.GetCustomAttribute<InternalRequestAttribute>() is not null,
             type.GetCustomAttribute<RequiresRolesAttribute>()?.Roles ?? [],
             type.GetCustomAttribute<RequiresPermissionAttribute>()?.PermissionKey));
 

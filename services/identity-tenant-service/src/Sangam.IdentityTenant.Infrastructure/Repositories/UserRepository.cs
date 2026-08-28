@@ -55,5 +55,34 @@ public sealed class UserRepository(IdentityTenantDbContext dbContext) : IUserRep
         return new UserAuthorization(roles, permissions);
     }
 
+    public Task<User?> GetByConvertedChildAsync(
+        Guid childProfileId, CancellationToken cancellationToken = default) =>
+        dbContext.Users
+            // The consumer that calls this has no request and so no tenant.
+            .IgnoreQueryFilters()
+            .FirstOrDefaultAsync(u => u.ConvertedFromChildProfileId == childProfileId, cancellationToken);
+
+    public async Task<IReadOnlyList<User>> ListPendingActivationAsync(
+        CancellationToken cancellationToken = default) =>
+        // Tenant-filtered: this one is reachable over HTTP.
+        await dbContext.Users
+            .AsNoTracking()
+            .Include(u => u.ActivationCode)
+            .Where(u => u.Status == UserStatus.PendingActivation)
+            .OrderBy(u => u.CreatedAt)
+            .ToListAsync(cancellationToken);
+
+    public Task<User?> FindPendingActivationAsync(
+        string mobileOrEmail, CancellationToken cancellationToken = default) =>
+        dbContext.Users
+            // Activation happens before the caller can sign in, so like login
+            // there is no tenant to filter by yet. The tenant is read off
+            // whichever account is found, never supplied.
+            .IgnoreQueryFilters()
+            .Include(u => u.ActivationCode)
+            .FirstOrDefaultAsync(
+                u => u.MobileOrEmail == mobileOrEmail && u.Status == UserStatus.PendingActivation,
+                cancellationToken);
+
     public void Add(User user) => dbContext.Users.Add(user);
 }

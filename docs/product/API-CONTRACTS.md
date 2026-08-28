@@ -22,6 +22,9 @@ enforced by `TenantAuthorizationBehavior`, not just UI hiding.
 | GET | `/tenants/directory` | Anonymous | Active Samaaj a visitor can register into |
 | POST | `/register` | Anonymous | Member registration into one Samaaj |
 | POST | `/login` | Anonymous | Common login → returns tenant-scoped JWT |
+| GET | `/activations/pending` | SamaajAdmin | Accounts awaiting activation |
+| POST | `/activations/{userId}/code` | SamaajAdmin | Mint a one-time activation code (returned once) |
+| POST | `/activations/redeem` | Anonymous | Redeem a code and set a first password |
 | POST | `/logout` | Authenticated | Revoke current session/refresh token |
 | GET | `/me` | Authenticated | Current user + roles + tenant |
 | POST | `/admin-users` | SuperAdmin, SamaajAdmin | Invite/create admin user |

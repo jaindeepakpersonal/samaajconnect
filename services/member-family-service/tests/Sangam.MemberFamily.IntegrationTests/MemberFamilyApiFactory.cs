@@ -31,7 +31,11 @@ public sealed class MemberFamilyApiFactory : WebApplicationFactory<Program>, IAs
     public const string SigningKey = "integration-test-signing-key-at-least-32-chars";
 
     /// <summary>Topics the consumer's regex subscription must find at startup.</summary>
-    private static readonly string[] SeedTopics = ["identity.user.registered.v1"];
+    private static readonly string[] SeedTopics =
+    [
+        "identity.user.registered.v1",
+        "identity.child-conversion.completed.v1",
+    ];
 
     private readonly PostgreSqlContainer _postgres = new PostgreSqlBuilder()
         .WithImage("postgres:16-alpine")

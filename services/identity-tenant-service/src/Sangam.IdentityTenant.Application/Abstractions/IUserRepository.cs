@@ -20,6 +20,21 @@ public interface IUserRepository
 
     Task<User?> GetByIdAsync(Guid id, CancellationToken cancellationToken = default);
 
+    /// <summary>
+    /// The account created for a converted child, if one exists. Ignores the
+    /// tenant filter for the same reason as the login lookup: the consumer that
+    /// calls it has no request and so no resolved tenant.
+    /// </summary>
+    Task<User?> GetByConvertedChildAsync(
+        Guid childProfileId, CancellationToken cancellationToken = default);
+
+    /// <summary>Accounts in this Samaaj waiting to be activated.</summary>
+    Task<IReadOnlyList<User>> ListPendingActivationAsync(CancellationToken cancellationToken = default);
+
+    /// <summary>Finds an account awaiting activation by its identifier, across tenants.</summary>
+    Task<User?> FindPendingActivationAsync(
+        string mobileOrEmail, CancellationToken cancellationToken = default);
+
     /// <summary>True if the identifier is taken anywhere on the platform.</summary>
     Task<bool> IdentifierExistsAsync(string mobileOrEmail, CancellationToken cancellationToken = default);
 

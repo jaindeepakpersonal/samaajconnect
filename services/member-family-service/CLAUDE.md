@@ -52,12 +52,17 @@ worked example of a cross-service flow with no synchronous call.
 
 ## Events consumed
 
-`identity.user.registered.v1`, to create the initial profile.
+| Topic | Why |
+|---|---|
+| `identity.user.registered.v1` | Create the initial profile |
+| `identity.child-conversion.completed.v1` | Mark the child Converted and link the account |
 
-The subscription is a single topic, unlike audit-notification-service's
-catch-all regex. This service *acts* on what it consumes, and subscribing to
-events it has no handler for would mean quietly committing offsets for messages
-it did nothing with.
+An explicit topic list, unlike audit-notification-service's catch-all regex.
+This service *acts* on what it consumes, so subscribing to anything it has no
+handler for would mean quietly committing offsets for messages it did nothing
+with. It is also a list rather than a pattern because librdkafka's regex support
+is not the full grammar - a pattern with alternation silently matched nothing
+here, which looks exactly like a broker problem and is not one.
 
 ## API endpoints
 
@@ -125,9 +130,15 @@ parent comes back as Modified rather than Added, and the save fails with a
 concurrency exception against a row that was never there. This cost an hour;
 apply the same setting to any future domain-assigned key.
 
-**An unusable `UserRegistered` payload is skipped, not retried.** The consumer
-would otherwise exhaust its retries on one bad message and stall every
-registration queued behind it. The Warning log is the signal.
+**An unusable consumed payload is skipped, not retried.** The consumer would
+otherwise exhaust its retries on one bad message and stall everything queued
+behind it. The Warning log is the signal.
+
+**The completion consumer reads children through `GetForConsumerAsync`.** A
+consumer has no request and so no resolved tenant, and the ordinary
+tenant-filtered lookup therefore finds nothing - which reads as "this child was
+deleted" and silently drops the event. Any new consumer path needs the same
+treatment; this caught us twice.
 
 ## Adult-child conversion
 
@@ -157,10 +168,10 @@ identity-tenant-service has consumed the event and created it. A child record
 claiming an account nobody can sign in to would be worse than one that lags by a
 second.
 
-**Still missing:** the identity side. Nothing consumes
-`members.child-conversion.approved.v1` yet, so an approved conversion currently
-announces itself and stops. That consumer, and how the new member sets their
-first password without a notification channel, is the next piece of work.
+The loop closes in identity-tenant-service, which consumes the approval,
+creates a `PendingActivation` account, and announces
+`identity.child-conversion.completed.v1` once the new member has redeemed an
+activation code. Only then does the child record here become `Converted`.
 
 ## Dependencies
 

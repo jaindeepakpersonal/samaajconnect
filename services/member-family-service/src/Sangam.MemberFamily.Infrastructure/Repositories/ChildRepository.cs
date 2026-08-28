@@ -10,6 +10,9 @@ public sealed class ChildRepository(MemberFamilyDbContext dbContext) : IChildRep
     public Task<ChildProfile?> GetByIdAsync(Guid id, CancellationToken cancellationToken = default) =>
         dbContext.ChildProfiles.FirstOrDefaultAsync(c => c.Id == id, cancellationToken);
 
+    public Task<ChildProfile?> GetForConsumerAsync(Guid id, CancellationToken cancellationToken = default) =>
+        dbContext.ChildProfiles.IgnoreQueryFilters().FirstOrDefaultAsync(c => c.Id == id, cancellationToken);
+
     public async Task<IReadOnlyList<ChildProfile>> ListForFamilyAsync(
         Guid familyId, CancellationToken cancellationToken = default) =>
         await dbContext.ChildProfiles

@@ -5,12 +5,10 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
-using Sangam.MemberFamily.Application.Common;
-using Sangam.MemberFamily.Application.IntegrationEvents;
-using Sangam.MemberFamily.Application.IntegrationEvents.Commands.CompleteChildConversion;
-using Sangam.MemberFamily.Application.IntegrationEvents.Commands.CreateProfileForNewUser;
+using Sangam.IdentityTenant.Application.IntegrationEvents;
+using Sangam.IdentityTenant.Application.IntegrationEvents.Commands.CreateAccountForConvertedChild;
 
-namespace Sangam.MemberFamily.Infrastructure.Messaging;
+namespace Sangam.IdentityTenant.Infrastructure.Messaging;
 
 /// <summary>
 /// Consumes the platform events this service acts on.
@@ -114,14 +112,8 @@ public sealed class IntegrationEventConsumer(
                 await using var scope = scopeFactory.CreateAsyncScope();
                 var sender = scope.ServiceProvider.GetRequiredService<ISender>();
 
-                // One consumer, two topics. A switch here rather than a
-                // registry: with two entries a lookup table would be more
-                // indirection than the thing it indexes. The two commands
-                // return different payloads, so only the outcome is compared.
-                Result outcome =
-                    envelope.Topic.Contains("child-conversion.completed", StringComparison.Ordinal)
-                        ? await sender.Send(new CompleteChildConversionCommand(envelope), stoppingToken)
-                        : await sender.Send(new CreateProfileForNewUserCommand(envelope), stoppingToken);
+                var outcome = await sender.Send(
+                    new CreateAccountForConvertedChildCommand(envelope), stoppingToken);
 
                 if (outcome.IsSuccess)
                 {

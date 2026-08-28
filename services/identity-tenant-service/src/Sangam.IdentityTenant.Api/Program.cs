@@ -54,6 +54,7 @@ app.MapGet("/health", () => Results.Ok(new { status = "healthy" }))
 
 app.MapTenantEndpoints();
 app.MapAuthEndpoints();
+app.MapActivationEndpoints();
 
 await app.RunAsync();
 

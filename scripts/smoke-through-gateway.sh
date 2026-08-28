@@ -172,8 +172,17 @@ check "profile arrives over Kafka" 1 "$profile_ready"
 check "member directory" 200 "$(status -H "Authorization: Bearer $MEMBER_TOKEN" \
   "$GATEWAY/v1/members")"
 
-check "family before joining one" 404 "$(status -H "Authorization: Bearer $MEMBER_TOKEN" \
-  "$GATEWAY/v1/families/mine")"
+# Either answer is correct: 404 on a clean database, 200 on a re-run, because
+# the conversion section below gives this member a family.
+FAMILY_LOOKUP=$(status -H "Authorization: Bearer $MEMBER_TOKEN" "$GATEWAY/v1/families/mine")
+
+if [ "$FAMILY_LOOKUP" = "404" ] || [ "$FAMILY_LOOKUP" = "200" ]; then
+  echo "  ok    family lookup routes ($FAMILY_LOOKUP)"
+  pass=$((pass + 1))
+else
+  echo "  FAIL  family lookup routes (got $FAMILY_LOOKUP)"
+  fail=$((fail + 1))
+fi
 
 check "children of a member with no family" 200 "$(status -H "Authorization: Bearer $MEMBER_TOKEN" \
   "$GATEWAY/v1/children")"
@@ -181,6 +190,116 @@ check "children of a member with no family" 200 "$(status -H "Authorization: Bea
 check "conversion queue is refused to a member" 403 "$(status -H "Authorization: Bearer $MEMBER_TOKEN" \
   "$GATEWAY/v1/children/conversion-requests")"
 
+
+echo
+echo "Adult-child conversion, end to end across three services"
+
+# A fresh identifier per run: the flow creates a real account, and re-running
+# must not collide with the one the last run made.
+CHILD_EMAIL="converted-$(date +%s)@example.com"
+CHILD_PASSWORD="a-long-enough-password"
+ADMIN_TENANT_HEADER="X-Tenant-Override-Id: $TENANT_ID"
+
+# The member may already head a family from an earlier run.
+FAMILY_STATUS=$(status -X POST "$GATEWAY/v1/families" -H "Authorization: Bearer $MEMBER_TOKEN")
+
+if [ "$FAMILY_STATUS" = "201" ] || [ "$FAMILY_STATUS" = "409" ]; then
+  echo "  ok    member heads a family ($FAMILY_STATUS)"
+  pass=$((pass + 1))
+else
+  echo "  FAIL  member heads a family (got $FAMILY_STATUS)"
+  fail=$((fail + 1))
+fi
+
+DOB=$(date -d '20 years ago' +%Y-%m-%d 2>/dev/null || date -v-20y +%Y-%m-%d)
+
+CHILD_ID=$(curl -s -X POST "$GATEWAY/v1/children" \
+  -H 'Content-Type: application/json' -H "Authorization: Bearer $MEMBER_TOKEN" \
+  -d "{\"fullName\":\"Aarav Jain\",\"dateOfBirth\":\"$DOB\",\"gender\":\"Male\"}" | json_field id)
+
+if [ -n "$CHILD_ID" ]; then
+  echo "  ok    added a child who has turned 18"
+  pass=$((pass + 1))
+else
+  echo "  FAIL  could not add a child"
+  fail=$((fail + 1))
+fi
+
+REQUEST_ID=$(curl -s -X POST "$GATEWAY/v1/children/$CHILD_ID/conversion" \
+  -H 'Content-Type: application/json' -H "Authorization: Bearer $MEMBER_TOKEN" \
+  -d "{\"mobileOrEmail\":\"$CHILD_EMAIL\"}" | json_field id)
+
+if [ -n "$REQUEST_ID" ]; then
+  echo "  ok    family head requested conversion"
+  pass=$((pass + 1))
+else
+  echo "  FAIL  could not request conversion"
+  fail=$((fail + 1))
+fi
+
+check "the head cannot approve their own request" 403 \
+  "$(status -X POST "$GATEWAY/v1/children/conversion-requests/$REQUEST_ID/decide" \
+     -H 'Content-Type: application/json' -H "Authorization: Bearer $MEMBER_TOKEN" \
+     -d '{"approve":true}')"
+
+check "a Samaaj admin approves it" 200 \
+  "$(status -X POST "$GATEWAY/v1/children/conversion-requests/$REQUEST_ID/decide" \
+     -H 'Content-Type: application/json' -H "Authorization: Bearer $ADMIN_TOKEN" \
+     -H "$ADMIN_TENANT_HEADER" -d '{"approve":true,"note":"Verified in person"}')"
+
+# identity-tenant-service consumes the approval and creates the account.
+NEW_USER_ID=""
+for attempt in $(seq 1 30); do
+  NEW_USER_ID=$(curl -s -H "Authorization: Bearer $ADMIN_TOKEN" -H "$ADMIN_TENANT_HEADER" \
+    "$GATEWAY/v1/identity/activations/pending" \
+    | tr '}' '\n' | { grep "$CHILD_EMAIL" || true; } | json_field userId)
+
+  [ -n "$NEW_USER_ID" ] && break
+  sleep 2
+done
+
+if [ -n "$NEW_USER_ID" ]; then
+  echo "  ok    identity created the account over Kafka, awaiting activation"
+  pass=$((pass + 1))
+else
+  echo "  FAIL  the account never appeared on the pending list"
+  fail=$((fail + 1))
+fi
+
+ACTIVATION_CODE=$(curl -s -X POST "$GATEWAY/v1/identity/activations/$NEW_USER_ID/code" \
+  -H "Authorization: Bearer $ADMIN_TOKEN" -H "$ADMIN_TENANT_HEADER" | json_field code)
+
+if [ -n "$ACTIVATION_CODE" ]; then
+  echo "  ok    admin issued a one-time activation code"
+  pass=$((pass + 1))
+else
+  echo "  FAIL  could not issue an activation code"
+  fail=$((fail + 1))
+fi
+
+check "the new member redeems it and sets a password" 200 \
+  "$(status -X POST "$GATEWAY/v1/identity/activations/redeem" -H 'Content-Type: application/json' \
+     -d "{\"mobileOrEmail\":\"$CHILD_EMAIL\",\"code\":\"$ACTIVATION_CODE\",\"password\":\"$CHILD_PASSWORD\"}")"
+
+check "the code cannot be redeemed twice" 403 \
+  "$(status -X POST "$GATEWAY/v1/identity/activations/redeem" -H 'Content-Type: application/json' \
+     -d "{\"mobileOrEmail\":\"$CHILD_EMAIL\",\"code\":\"$ACTIVATION_CODE\",\"password\":\"$CHILD_PASSWORD\"}")"
+
+check "the converted child can now sign in" 200 \
+  "$(status -X POST "$GATEWAY/v1/identity/login" -H 'Content-Type: application/json' \
+     -d "{\"mobileOrEmail\":\"$CHILD_EMAIL\",\"password\":\"$CHILD_PASSWORD\"}")"
+
+# member-family consumes the activation and closes the loop.
+converted=0
+for attempt in $(seq 1 30); do
+  if curl -s -H "Authorization: Bearer $MEMBER_TOKEN" "$GATEWAY/v1/children" \
+     | tr '}' '\n' | grep -q '"status":"Converted"'; then
+    converted=1
+    break
+  fi
+  sleep 2
+done
+check "the child record is marked Converted" 1 "$converted"
 echo
 echo "Header forgery"
 check "a forged tenant header does not change the answer" 200 \

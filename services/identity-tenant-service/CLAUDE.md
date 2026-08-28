@@ -2,9 +2,10 @@
 
 ## Purpose
 
-Source of truth for **who a Samaaj is** and **who a user is**. Resolves a
-subdomain slug to a `TenantId` for the gateway, and is the only service on
-the platform allowed to issue JWTs.
+Source of truth for **who a Samaaj is** and **who a user is**, and the only
+service on the platform allowed to issue JWTs. The `tenant_id` claim it puts in
+a token is what every other service scopes by - the platform runs on a single
+domain and there is no subdomain resolution step (root `CLAUDE.md` §6).
 
 This is also the one service whose primary aggregate is *not* tenant-scoped:
 a `Tenant`'s own `Id` **is** the tenant id every other service references.
@@ -19,19 +20,20 @@ a `Tenant`'s own `Id` **is** the tenant id every other service references.
 | `UserRole` | built | A null `TenantScope` is the platform-wide grant, i.e. Super Admin. |
 
 `Tenant` deliberately does not implement `ITenantScopedEntity`. Applying the
-global query filter to it would make anonymous slug resolution impossible,
-since that lookup happens *before* any tenant is known. The reflection-based
-filter in `IdentityTenantDbContext` is already written and will pick up `User`
-and the rest the moment they land.
+global query filter to it would make the gateway's own lookups impossible,
+since those happen *before* a tenant is established.
 
 ## Commands
 
 | Command | Policy | Status |
 |---|---|---|
 | `CreateTenantCommand` | `SuperAdmin` + `Tenant.Manage` | built |
-| `ChangeTenantStatusCommand` | `SuperAdmin` + `Tenant.Manage` | built |
 | `RegisterMemberCommand` | anonymous | built |
 | `LoginCommand` | anonymous | built |
+| `ChangeTenantStatusCommand` | `SuperAdmin` + `Tenant.Manage` | built |
+| `CreateAccountForConvertedChildCommand` | `[InternalRequest]` | built |
+| `IssueActivationCodeCommand` | `SamaajAdmin` + `AdminUsers.Manage` | built |
+| `ActivateAccountCommand` | anonymous | built |
 | `AssignRoleCommand` | `SuperAdmin`, `SamaajAdmin` + `AdminUsers.Manage` | not built |
 
 A new Samaaj is created **Inactive**. Creating the record and letting it serve
@@ -43,6 +45,9 @@ traffic are two separately audited decisions, so activation is its own command.
 |---|---|---|
 | `GetTenantBySlugQuery` | anonymous | built |
 | `GetCurrentUserQuery` | any authenticated role | built |
+| `GetTenantByIdQuery` | anonymous | built |
+| `ListRegisterableTenantsQuery` | anonymous | built |
+| `ListPendingActivationsQuery` | `SamaajAdmin` + `AdminUsers.Manage` | built |
 | `ListTenantsQuery` | `SuperAdmin` | not built |
 
 `GetTenantBySlugQuery` returns `TenantSummaryResponse`, not `TenantResponse`.
@@ -58,13 +63,20 @@ tenant is reported as 404 rather than as a distinct state, for the same reason.
 | `TenantStatusChangedDomainEvent` | `identity.tenant.status-changed.v1` | `Tenant.ChangeStatus` |
 | `UserRegisteredDomainEvent` | `identity.user.registered.v1` | `User.Register` |
 | `UserLoggedInDomainEvent` | `identity.user.logged-in.v1` | `User.RecordSuccessfulLogin` |
+| `UserActivatedFromChildDomainEvent` | `identity.child-conversion.completed.v1` | `User.Activate` |
 
 Delivery is at-least-once by design (see `Messaging/OutboxDispatcher.cs`).
 Consumers must be idempotent.
 
 ## Events consumed
 
-None. This service is the source of tenant truth.
+`members.child-conversion.approved.v1`, to create the account behind an
+approved adult-child conversion.
+
+This is the only thing it consumes, and the subscription is an explicit topic
+list rather than a pattern. This service publishes far more than it reacts to,
+and subscribing to anything it has no handler for would mean quietly committing
+offsets for messages it did nothing with.
 
 ## API endpoints
 
@@ -73,9 +85,14 @@ None. This service is the source of tenant truth.
 | POST | `/v1/identity/tenants` | `SuperAdmin` + `Tenant.Manage` |
 | PATCH | `/v1/identity/tenants/{id}/status` | `SuperAdmin` + `Tenant.Manage` |
 | GET | `/v1/identity/tenants/{slug}` | anonymous |
+| GET | `/v1/identity/tenants/by-id/{id}` | anonymous (the gateway calls it) |
+| GET | `/v1/identity/tenants/directory` | anonymous |
 | POST | `/v1/identity/register` | anonymous |
 | POST | `/v1/identity/login` | anonymous |
 | GET | `/v1/identity/me` | any authenticated role |
+| GET | `/v1/identity/activations/pending` | `SamaajAdmin` + `AdminUsers.Manage` |
+| POST | `/v1/identity/activations/{userId}/code` | `SamaajAdmin` + `AdminUsers.Manage` |
+| POST | `/v1/identity/activations/redeem` | anonymous |
 | GET | `/health` | anonymous |
 
 Paths are absolute, not gateway-relative, so the same URL works whether you
@@ -116,31 +133,54 @@ either way.
 **A Super Admin has `TenantId == Guid.Empty`** (`User.PlatformTenantId`). It is
 a sentinel rather than a nullable column so the tenant query filter needs no
 special case. `LoginCommand` skips the Samaaj status check for such an account
-and returns an empty `TenantSlug`, since there is no subdomain to redirect to.
+and returns an empty `TenantSlug`, since a platform account belongs to no
+Samaaj.
 
-**Registration takes a slug, not a tenant id.** Registration happens on the
-apex domain where no subdomain has been resolved, so the Samaaj comes from the
-form. The slug is resolved server-side against the tenant table exactly as the
-gateway would, and a request that arrives with a resolved tenant that disagrees
-is rejected. This is not the "client-supplied TenantId" that
-SECURITY-CHECKLIST.md forbids.
+**Registration takes a slug, not a tenant id.** A visitor has no token yet, so
+there is no claim to read a Samaaj from; they pick one from the public
+directory. The slug is resolved server-side against the tenant table, and a
+request arriving with a resolved tenant that disagrees is rejected. This is not
+the "client-supplied TenantId" that SECURITY-CHECKLIST.md forbids.
 
 **OTP verification is deferred.** The wireframe shows registration continuing
 to "Verify Mobile". No notification channel exists yet, and gating login behind
-an OTP nobody can send would make the Stage 0 end-to-end path untestable.
-Registration therefore creates an active account with
-`IsContactVerified = false`, and publishes `UserRegistered` for
-`audit-notification-service` to pick up. Close this when that service lands.
+an OTP nobody can send would make the end-to-end path untestable. Registration
+therefore creates an active account with `IsContactVerified = false`, and
+publishes `UserRegistered`. Close this when a delivery channel lands.
+
+**A converted child's account is created without a password.** Approving a
+conversion establishes that this person is *entitled* to an account; nobody has
+yet proved they are the one asking for it. The account sits in
+`PendingActivation` - unsignable-into - until an activation code is redeemed.
+
+**Activation codes are stored as a hash and shown once.** With no notification
+channel, the plaintext is returned to the issuing admin in the response and
+passed on in person, which for a community organisation is realistic and
+involves no channel that can be intercepted. Storing the hash means a database
+copy is not a set of working credentials. A lost code is re-issued, never
+looked up, and re-issuing kills the previous one.
+
+**Every way of failing activation returns one identical response.** "No such
+account", "already activated" and "wrong code" are indistinguishable, or someone
+with a list of identifiers could sort it into those mid-conversion and those
+not. Five wrong guesses kill the code - not the account - and an admin issues a
+new one.
+
+**Wrong activation guesses are counted through `IFailedActivationRecorder`.**
+Same reason as `IFailedLoginRecorder`: the command returns a failure,
+`TransactionBehavior` rolls it back, and a counter on the tracked aggregate
+would be rolled back with it - leaving the code guessable without limit.
 
 ## Dependencies
 
 - **Postgres** `samaajconnect_identity` — `ConnectionStrings__Default`
-- **Kafka** — `Kafka__BootstrapServers`, outbound only
+- **Kafka** — `Kafka__BootstrapServers`, publishing and, since adult-child
+  conversion, consuming
 - **Jwt** — `Jwt__SigningKey` (≥32 chars) is validated at startup and the
   service refuses to boot without it. Development supplies one from
   `appsettings.Development.json`; every other environment must supply it
   from a secret store.
-- No Redis dependency yet. The gateway, not this service, caches slug lookups.
+- No Redis dependency. The gateway, not this service, caches tenant lookups.
 - **Bootstrap** - `Bootstrap__SuperAdminIdentifier` and
   `Bootstrap__SuperAdminPassword` create the first Super Admin on an empty
   database. Without it a fresh deployment cannot create a Samaaj, because
@@ -168,6 +208,6 @@ dotnet test services/identity-tenant-service/Sangam.IdentityTenant.sln
 hand-minted tokens: bootstrap a Super Admin, sign in, create and activate a
 Samaaj, register a member, sign in as them.
 
-Still missing: a test that curls this service **through the gateway**
-(CLAUDE.md §9). The gateway does not exist yet; add it in the same change
-that adds the YARP route.
+`scripts/smoke-through-gateway.sh` covers this service through the gateway
+(CLAUDE.md §9), including the whole adult-child conversion loop across three
+services and two Kafka topics.

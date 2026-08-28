@@ -159,23 +159,39 @@ public sealed class IdentityTenantApiFactory : WebApplicationFactory<Program>, I
     public HttpClient CreateClientWith(params string[] permissions) =>
         CreateClientAs(Guid.NewGuid(), ["SuperAdmin"], permissions);
 
-    public HttpClient CreateClientAs(Guid userId, string[] roles, string[] permissions)
+    public HttpClient CreateClientAs(Guid userId, string[] roles, string[] permissions) =>
+        CreateClientAs(userId, tenantId: null, roles, permissions);
+
+    /// <summary>
+    /// A client whose token names a Samaaj, as a real member's does. Without
+    /// the claim the tenant query filter compares against Guid.Empty and every
+    /// tenant-scoped read comes back empty - which looks like a missing row.
+    /// </summary>
+    public HttpClient CreateClientAs(
+        Guid userId, Guid? tenantId, string[] roles, string[] permissions)
     {
         var client = CreateClient();
 
         client.DefaultRequestHeaders.Authorization =
-            new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", CreateToken(userId, roles, permissions));
+            new System.Net.Http.Headers.AuthenticationHeaderValue(
+                "Bearer", CreateToken(userId, tenantId, roles, permissions));
 
         return client;
     }
 
-    private static string CreateToken(Guid userId, string[] roles, string[] permissions)
+    private static string CreateToken(
+        Guid userId, Guid? tenantId, string[] roles, string[] permissions)
     {
         var claims = new List<Claim>
         {
             new(JwtRegisteredClaimNames.Sub, userId.ToString()),
             new(ClaimTypes.NameIdentifier, userId.ToString()),
         };
+
+        if (tenantId is { } tenant)
+        {
+            claims.Add(new Claim("tenant_id", tenant.ToString()));
+        }
 
         claims.AddRange(roles.Select(r => new Claim("role", r)));
         claims.AddRange(permissions.Select(p => new Claim("permission", p)));

@@ -53,6 +53,12 @@ public sealed class User : AggregateRoot, ITenantScopedEntity
     /// </summary>
     public bool IsContactVerified { get; private set; }
 
+    /// <summary>Set when this account came from an approved adult-child conversion.</summary>
+    public Guid? ConvertedFromChildProfileId { get; private set; }
+
+    /// <summary>Present only while the account is waiting to be activated.</summary>
+    public ActivationCode? ActivationCode { get; private set; }
+
     public DateTimeOffset? LastLoginAt { get; private set; }
     public int FailedLoginAttempts { get; private set; }
     public DateTimeOffset? LockedOutUntil { get; private set; }
@@ -126,6 +132,79 @@ public sealed class User : AggregateRoot, ITenantScopedEntity
     }
 
     public bool IsPlatformAdministrator => TenantId == PlatformTenantId;
+
+    /// <summary>
+    /// Creates the account behind an approved adult-child conversion.
+    /// </summary>
+    /// <remarks>
+    /// No password. The Samaaj admin approved that this person is entitled to an
+    /// account; nobody has yet proved they are the one asking for it. That
+    /// proof is redeeming an activation code, and until then the account
+    /// cannot be signed into.
+    /// </remarks>
+    public static User CreateFromChildConversion(
+        Guid tenantId,
+        string mobileOrEmail,
+        string fullName,
+        Guid childProfileId,
+        Guid memberRoleId,
+        DateTimeOffset createdAt)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(mobileOrEmail);
+        ArgumentException.ThrowIfNullOrWhiteSpace(fullName);
+
+        var user = new User
+        {
+            Id = Guid.NewGuid(),
+            TenantId = tenantId,
+            MobileOrEmail = NormalizeIdentifier(mobileOrEmail),
+            FullName = fullName.Trim(),
+            // Not an empty string: a blank hash would verify against nothing,
+            // but leaving the column meaningfully empty invites someone to
+            // "fix" it later. PendingActivation is what actually gates sign-in.
+            PasswordHash = string.Empty,
+            AuthMethod = AuthMethod.Password,
+            Status = UserStatus.PendingActivation,
+            IsContactVerified = false,
+            ConvertedFromChildProfileId = childProfileId,
+            CreatedAt = createdAt,
+        };
+
+        user._roles.Add(new UserRole(user.Id, memberRoleId, tenantId, createdAt));
+
+        return user;
+    }
+
+    /// <summary>
+    /// Attaches a freshly issued activation code, replacing any earlier one.
+    /// Re-issuing is normal: codes expire, and paper gets lost.
+    /// </summary>
+    public void AttachActivationCode(ActivationCode code)
+    {
+        ActivationCode = code;
+    }
+
+    /// <summary>
+    /// Completes activation: sets the first password and opens the account.
+    /// </summary>
+    public void Activate(string passwordHash, DateTimeOffset now)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(passwordHash);
+
+        PasswordHash = passwordHash;
+        Status = UserStatus.Active;
+
+        // Redeeming a code proves the person holds the contact detail an admin
+        // wrote down for them, which is the same assurance OTP would give.
+        IsContactVerified = true;
+
+        // Spent, and kept spent: a code that still worked after activation
+        // would be a second way into the account.
+        ActivationCode = null;
+
+        Raise(new UserActivatedFromChildDomainEvent(
+            Id, TenantId, ConvertedFromChildProfileId ?? Guid.Empty, MobileOrEmail, now));
+    }
 
     public bool IsLockedOut(DateTimeOffset now) => LockedOutUntil is not null && LockedOutUntil > now;
 

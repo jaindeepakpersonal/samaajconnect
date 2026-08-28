@@ -2,6 +2,7 @@
 using System;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 using Sangam.IdentityTenant.Infrastructure.Persistence;
@@ -11,9 +12,11 @@ using Sangam.IdentityTenant.Infrastructure.Persistence;
 namespace Sangam.IdentityTenant.Infrastructure.Persistence.Migrations
 {
     [DbContext(typeof(IdentityTenantDbContext))]
-    partial class IdentityTenantDbContextModelSnapshot : ModelSnapshot
+    [Migration("20260828121832_AddAccountActivation")]
+    partial class AddAccountActivation
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -395,11 +398,6 @@ namespace Sangam.IdentityTenant.Infrastructure.Persistence.Migrations
                         {
                             RoleId = new Guid("a0000000-0000-0000-0000-000000000003"),
                             PermissionId = new Guid("b0000000-0000-0000-0000-000000000007")
-                        },
-                        new
-                        {
-                            RoleId = new Guid("a0000000-0000-0000-0000-000000000003"),
-                            PermissionId = new Guid("b0000000-0000-0000-0000-000000000005")
                         },
                         new
                         {
