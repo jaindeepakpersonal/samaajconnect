@@ -1,0 +1,80 @@
+import { Routes } from '@angular/router';
+import { authGuard } from '@samaajconnect/shared';
+import { currentUserGuard } from './core/current-user.guard';
+import { ShellComponent } from './shell/shell.component';
+
+/**
+ * The wireframe's left nav, as routes. Screens whose backend does not exist yet
+ * are not routed at all - the nav lists them disabled with a reason, which is
+ * more honest than a route that lands on an empty page.
+ *
+ * `authGuard` is a UX convenience only. Every endpoint behind these screens
+ * re-checks roles and permissions server-side, and that check is the
+ * authorization boundary (root `CLAUDE.md` §7).
+ */
+export const routes: Routes = [
+  {
+    path: 'login',
+    title: 'Sign in - samaajconnect admin',
+    loadComponent: () => import('./features/auth/login.component').then((m) => m.AdminLoginComponent),
+  },
+  {
+    path: '',
+    component: ShellComponent,
+    canActivate: [authGuard, currentUserGuard],
+    children: [
+      {
+        path: 'dashboard',
+        title: 'Dashboard - samaajconnect admin',
+        loadComponent: () =>
+          import('./features/dashboard/dashboard.component').then((m) => m.DashboardComponent),
+      },
+      {
+        path: 'tenants',
+        title: 'Samaaj - samaajconnect admin',
+        loadComponent: () =>
+          import('./features/tenants/tenant-list.component').then((m) => m.TenantListComponent),
+      },
+      {
+        path: 'tenants/new',
+        title: 'Create Samaaj - samaajconnect admin',
+        loadComponent: () =>
+          import('./features/tenants/create-tenant.component').then((m) => m.CreateTenantComponent),
+      },
+      {
+        path: 'admins',
+        title: 'Admin users - samaajconnect admin',
+        loadComponent: () =>
+          import('./features/admins/admin-list.component').then((m) => m.AdminListComponent),
+      },
+      {
+        path: 'admins/invite',
+        title: 'Invite admin - samaajconnect admin',
+        loadComponent: () =>
+          import('./features/admins/invite-admin.component').then((m) => m.InviteAdminComponent),
+      },
+      {
+        path: 'roles',
+        title: 'Role matrix - samaajconnect admin',
+        loadComponent: () =>
+          import('./features/admins/role-matrix.component').then((m) => m.RoleMatrixComponent),
+      },
+      {
+        path: 'conversions',
+        title: 'Conversion queue - samaajconnect admin',
+        loadComponent: () =>
+          import('./features/conversions/conversion-queue.component').then(
+            (m) => m.ConversionQueueComponent,
+          ),
+      },
+      {
+        path: 'audit',
+        title: 'Audit logs - samaajconnect admin',
+        loadComponent: () =>
+          import('./features/audit/audit-log.component').then((m) => m.AuditLogComponent),
+      },
+      { path: '', pathMatch: 'full', redirectTo: 'dashboard' },
+      { path: '**', redirectTo: 'dashboard' },
+    ],
+  },
+];

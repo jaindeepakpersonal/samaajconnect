@@ -9,10 +9,13 @@
   "scripts": {
     "ng": "ng",
     "start": "ng serve member-portal",
+    "start:admin": "ng serve admin-portal",
     "build": "ng build member-portal",
+    "build:admin": "ng build admin-portal",
     "test:app": "ng test member-portal --watch=false",
+    "test:admin": "ng test admin-portal --watch=false",
     "test:libs": "vitest run",
-    "test": "npm run test:libs && npm run test:app"
+    "test": "npm run test:libs && npm run test:app && npm run test:admin"
   },
   "devDependencies": {
     "@angular/cli": "^20.3.35",

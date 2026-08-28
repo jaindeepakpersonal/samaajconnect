@@ -65,6 +65,43 @@ public static class KnownEvents
             EntityName: "User",
             EntityIdProperty: "userId",
             ActorIdProperty: "userId"),
+
+        // The administrative events below all name someone *other* than the
+        // subject as the actor, which is exactly why they are described here
+        // rather than left to the derived defaults. "Who granted this?" is the
+        // first question asked when an account turns out to have been able to
+        // do something it should not have, and a derived descriptor answers it
+        // with a blank.
+        ["identity.admin.invited.v1"] = new(
+            Action: "AdminInvited",
+            EntityName: "User",
+            EntityIdProperty: "userId",
+            ActorIdProperty: "invitedBy"),
+
+        ["identity.user.role-granted.v1"] = new(
+            Action: "RoleGranted",
+            EntityName: "User",
+            EntityIdProperty: "userId",
+            ActorIdProperty: "grantedBy"),
+
+        ["identity.user.role-revoked.v1"] = new(
+            Action: "RoleRevoked",
+            EntityName: "User",
+            EntityIdProperty: "userId",
+            ActorIdProperty: "revokedBy"),
+
+        ["identity.tenant.modules-changed.v1"] = new(
+            Action: "TenantModulesChanged",
+            EntityName: "Tenant",
+            EntityIdProperty: "tenantId"),
+
+        // Erasure is handled by ErasePersonalDataCommandHandler rather than
+        // recorded through this path, and it writes its own row with no actor
+        // deliberately. Listed here so the omission reads as a decision.
+        ["identity.user.erased.v1"] = new(
+            Action: "Erased",
+            EntityName: "User",
+            EntityIdProperty: "userId"),
     };
 
     public static EventDescriptor Describe(string topic) =>

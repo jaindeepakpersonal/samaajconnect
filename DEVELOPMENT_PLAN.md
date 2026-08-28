@@ -8,13 +8,14 @@ version of the plan; the reasoning behind the ordering lives in
 ## Current Status
 
 - **Stage:** Stage 0 complete; Phase 1 - Platform Foundation in progress
-- **Last updated:** 2026-08-28 - the admin portal's backend surface: the Super
-  Admin tenant list, a closed module catalogue with runtime toggles, the role
-  matrix, and inviting and re-roling administrators. 500 tests green (452
-  backend, 48 frontend) plus 79 smoke checks against a stack built from empty
-  volumes.
-- **Blocking item:** none. Next: the admin-portal Angular app itself, which now
-  has real endpoints behind every screen it needs. The five questions in
+- **Last updated:** 2026-08-28 - the admin portal: an Angular SPA with the
+  Samaaj list and module toggles, administrators and role assignment, the role
+  matrix, the conversion queue and the audit log, all against real endpoints.
+  511 tests green (452 backend, 59 frontend) plus 79 smoke checks against a
+  stack built from empty volumes.
+- **Blocking item:** none. Next: a `docs/product/SECURITY-CHECKLIST.md` pass
+  over the Stage-0 and Phase-1 services, which is the last item standing
+  between Phase 1 and Phase 2. The five questions in
   `docs/product/DPDP-COMPLIANCE.md` need counsel before Phase 1 ships to real
   users; none blocks work today.
 
@@ -106,8 +107,11 @@ unit tested.
       closed `ModuleCatalog` with runtime toggles, the read-only role and
       permission matrix, listing administrators, inviting one with a one-time
       activation code, and granting/revoking a role
-- [ ] Admin: tenant CRUD screens
-- [ ] Admin: admin user + role assignment screens
+- [x] Admin portal: the Angular SPA itself — sign-in, the Samaaj list with
+      status and module toggles, Create Samaaj, administrators with role
+      assignment, Invite Admin with its one-time code, the read-only role
+      matrix, the adult-child conversion queue, and the audit log. Screens with
+      no service appear in the nav, disabled, saying why
 - [ ] Admin: an editable role and permission matrix. `GET /v1/identity/roles`
       reports what the backend enforces and says `editable: false`; making it
       editable needs per-tenant role definitions, an audit trail of matrix

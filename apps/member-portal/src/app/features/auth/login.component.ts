@@ -30,6 +30,13 @@ type SignInMethod = 'password' | 'otp';
           <p class="notice info" role="status">Your session ended. Please sign in again.</p>
         }
 
+        @if (otherSamaaj()) {
+          <p class="notice info" role="status">
+            That link belongs to a different Samaaj from the one you were signed in
+            to. Please sign in again.
+          </p>
+        }
+
         @if (justRegistered()) {
           <p class="notice info" role="status">
             Your account is ready. Sign in to continue. We will ask you to verify your mobile
@@ -153,7 +160,7 @@ export class LoginComponent {
     const { mobileOrEmail, password } = this.form.getRawValue();
 
     this.auth.login(mobileOrEmail, password).subscribe({
-      next: (result) => {
+      next: () => {
         this.busy.set(false);
         this.goHome();
       },
@@ -164,14 +171,6 @@ export class LoginComponent {
     });
   }
 
-  /**
-   * The wireframe's "successful login -> mahavir-samaj.samaajconnect.com".
-   *
-   * A member's session belongs on their own Samaaj's subdomain, because that is
-   * what the gateway reads to resolve the tenant. If we are already there - or
-   * on localhost, where subdomains do not exist - this is a plain in-app
-   * navigation instead.
-   */
   /**
    * The wireframe sent a member to their Samaaj's subdomain after signing in.
    * The platform is single-domain now, so there is nowhere else to go: the

@@ -20,9 +20,13 @@ public sealed class GetCurrentUserQueryHandler(
                 Error.Unauthorized("Auth.Required", "Authentication is required for this request."));
         }
 
-        // Goes through the tenant query filter, so a token minted for one
-        // Samaaj cannot read an account in another even if the ids were swapped.
-        var user = await users.GetByIdAsync(userId, cancellationToken);
+        // Bypasses the tenant filter, and only this query may. The id is the
+        // validated token's subject rather than anything the caller supplied,
+        // so it can only return the caller to themselves - and a Super Admin
+        // acting on a Samaaj through the gateway override would otherwise be
+        // told their own account does not exist, because it lives at the
+        // platform tenant and the override names a real one.
+        var user = await users.GetSelfAsync(userId, cancellationToken);
 
         if (user is null)
         {

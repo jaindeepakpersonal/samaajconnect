@@ -89,13 +89,20 @@ jobs:
       - name: Shared library tests
         run: npm run test:libs
 
-      - name: Application tests
+      - name: Member portal tests
         run: npm run test:app
 
+      - name: Admin portal tests
+        run: npm run test:admin
+
       # Production configuration, so budget violations and the
-      # environment.production.ts replacement are both exercised.
-      - name: Build
+      # environment.production.ts replacement are both exercised. Both apps,
+      # because a build break in one does not show up in the other.
+      - name: Build member portal
         run: npm run build
+
+      - name: Build admin portal
+        run: npm run build:admin
 
   migrations:
     name: EF migrations are up to date

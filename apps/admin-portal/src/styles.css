@@ -1,0 +1,380 @@
+/*
+ * Design tokens and primitives for the admin panel. The values carry over from
+ * `docs/product/wireframes/admin-panel-wireframes.html` so the shipped panel
+ * looks like what was signed off; the prototype's inline classes do not ship.
+ *
+ * Deliberately close to member-portal's tokens but not shared: the two apps
+ * look related and are not the same product, and a shared stylesheet would
+ * make every visual change to one a change to both.
+ */
+
+:root {
+  --bg: #f4f5f7;
+  --panel: #ffffff;
+  --ink: #17202a;
+  --muted: #667085;
+  --line: #d8dde6;
+  --line-soft: #e4e7ec;
+  --accent: #6848f5;
+  --accent-ink: #4e3db2;
+  --soft: #eeeafe;
+
+  --side: #171a21;
+  --side-ink: #dce1e8;
+  --side-hover: #2b303a;
+  --side-group: #8993a3;
+  --side-scope: #aeb6c4;
+
+  --danger: #a12b2b;
+  --danger-strong: #d83b3b;
+  --danger-soft: #ffe1e1;
+  --danger-line: #f0b5b5;
+  --warn-ink: #8a6400;
+  --warn-soft: #fff7db;
+  --warn-line: #efd47d;
+  --ok-ink: #1c7c3c;
+  --ok-soft: #dff5e3;
+
+  --radius-sm: 8px;
+  --radius-md: 12px;
+  --radius-pill: 20px;
+
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-5: 24px;
+
+  --font: Inter, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Arial, sans-serif;
+
+  --side-width: 250px;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  margin: 0;
+  padding: 0;
+  min-height: 100%;
+}
+
+body {
+  font-family: var(--font);
+  background: var(--bg);
+  color: var(--ink);
+  line-height: 1.5;
+}
+
+h1,
+h2,
+h3 {
+  margin: 0;
+  line-height: 1.25;
+}
+
+/* Focus is restyled, never removed: the requirements call for WCAG 2.1 AA and
+   an admin panel is heavily keyboard-driven. */
+:focus-visible {
+  outline: 3px solid var(--accent);
+  outline-offset: 2px;
+}
+
+.title {
+  font-size: 28px;
+  font-weight: 800;
+  margin-bottom: var(--space-1);
+}
+
+.sub {
+  color: var(--muted);
+  margin: 0 0 var(--space-5);
+}
+
+.muted {
+  color: var(--muted);
+  font-size: 13px;
+}
+
+.small {
+  font-size: 12px;
+  color: var(--muted);
+}
+
+.num {
+  font-size: 27px;
+  font-weight: 800;
+}
+
+.card {
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-md);
+  padding: var(--space-4);
+}
+
+.card h3 {
+  margin: 0 0 var(--space-2);
+}
+
+.grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+  gap: 15px;
+}
+
+.grid2 {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+  gap: 15px;
+}
+
+.btn {
+  border: 0;
+  background: var(--accent);
+  color: #fff;
+  border-radius: var(--radius-sm);
+  padding: 9px 13px;
+  cursor: pointer;
+  font-size: 14px;
+  font-family: inherit;
+  text-decoration: none;
+  display: inline-block;
+}
+
+.btn:hover:not(:disabled) {
+  filter: brightness(1.08);
+}
+
+.btn:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+.btn.alt {
+  background: #edf0f4;
+  color: #26303b;
+}
+
+.btn.red {
+  background: var(--danger-strong);
+}
+
+.btn.link {
+  background: none;
+  color: var(--accent);
+  padding: 0;
+  text-decoration: underline;
+}
+
+.btn.small {
+  padding: 6px 10px;
+  font-size: 13px;
+}
+
+.actions {
+  display: flex;
+  gap: 7px;
+  flex-wrap: wrap;
+  margin-top: 10px;
+}
+
+.back {
+  background: none;
+  border: 0;
+  color: var(--accent);
+  cursor: pointer;
+  font-size: 13px;
+  padding: 0;
+  margin-bottom: 10px;
+  text-decoration: none;
+  display: inline-block;
+  font-family: inherit;
+}
+
+label {
+  display: block;
+  font-size: 14px;
+  font-weight: 600;
+  margin-top: var(--space-3);
+}
+
+.input,
+select.input,
+textarea.input {
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+  padding: 10px;
+  background: #fff;
+  width: 100%;
+  margin: 5px 0 var(--space-3);
+  font-family: inherit;
+  font-size: 15px;
+  color: inherit;
+}
+
+.input[aria-invalid='true'] {
+  border-color: var(--danger);
+}
+
+.field-error {
+  color: var(--danger);
+  font-size: 13px;
+  margin: 0 0 var(--space-2);
+}
+
+.field-hint {
+  color: var(--muted);
+  font-size: 12px;
+  margin: -8px 0 var(--space-3);
+}
+
+.pill {
+  display: inline-block;
+  background: var(--soft);
+  color: var(--accent-ink);
+  padding: 4px 8px;
+  border-radius: var(--radius-pill);
+  font-size: 11px;
+  white-space: nowrap;
+}
+
+.pill.warn {
+  background: #fff2cc;
+  color: var(--warn-ink);
+}
+
+.pill.off {
+  background: #f1f2f4;
+  color: var(--muted);
+}
+
+.pill.ok {
+  background: var(--ok-soft);
+  color: var(--ok-ink);
+}
+
+.notice {
+  background: var(--warn-soft);
+  border: 1px solid var(--warn-line);
+  padding: var(--space-3);
+  border-radius: 9px;
+  margin: 10px 0;
+  font-size: 14px;
+  color: var(--warn-ink);
+}
+
+.notice.error {
+  background: var(--danger-soft);
+  border-color: var(--danger-line);
+  color: var(--danger);
+}
+
+.notice.ok {
+  background: var(--ok-soft);
+  border-color: #b7e2c3;
+  color: var(--ok-ink);
+}
+
+.notice.plain {
+  background: var(--panel);
+  border-color: var(--line);
+  color: var(--ink);
+}
+
+/* Tables scroll inside their own container rather than pushing the page wide;
+   the matrix in particular is much wider than a laptop. */
+.table-wrap {
+  overflow-x: auto;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-md);
+  background: var(--panel);
+}
+
+table {
+  border-collapse: collapse;
+  width: 100%;
+  background: var(--panel);
+}
+
+th,
+td {
+  padding: 11px;
+  border-bottom: 1px solid var(--line-soft);
+  text-align: left;
+  font-size: 13px;
+  vertical-align: top;
+}
+
+th {
+  background: #f8f9fb;
+  font-weight: 700;
+}
+
+tbody tr:last-child td {
+  border-bottom: 0;
+}
+
+.matrix th,
+.matrix td {
+  border: 1px solid var(--line-soft);
+  text-align: center;
+  font-size: 12px;
+  white-space: nowrap;
+}
+
+.matrix td:first-child,
+.matrix th:first-child {
+  text-align: left;
+  position: sticky;
+  left: 0;
+  background: var(--panel);
+}
+
+.matrix th:first-child {
+  background: #f8f9fb;
+}
+
+.toggle-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: var(--space-3);
+  padding: 10px 0;
+  border-bottom: 1px solid #eee;
+}
+
+.toggle-row:last-child {
+  border-bottom: 0;
+}
+
+.toggle-row label {
+  margin: 0;
+  font-weight: 500;
+}
+
+.modal-card {
+  max-width: 640px;
+}
+
+.empty {
+  padding: var(--space-5);
+  text-align: center;
+  color: var(--muted);
+}
+
+/* Visually hidden but still announced - used for live regions reporting
+   loading and error states to screen readers. */
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}

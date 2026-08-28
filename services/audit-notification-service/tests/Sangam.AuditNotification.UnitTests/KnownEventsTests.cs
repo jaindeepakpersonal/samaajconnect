@@ -90,4 +90,21 @@ public sealed class KnownEventsTests
     {
         KnownEvents.Describe("identity.user.logged-in.v1").Notification.Should().BeNull();
     }
+
+    [Theory]
+    [InlineData("identity.admin.invited.v1", "AdminInvited", "invitedBy")]
+    [InlineData("identity.user.role-granted.v1", "RoleGranted", "grantedBy")]
+    [InlineData("identity.user.role-revoked.v1", "RoleRevoked", "revokedBy")]
+    public void An_administrative_event_names_the_admin_who_acted_not_its_subject(
+        string topic, string action, string actorProperty)
+    {
+        // These are the rows read when an account turns out to have had
+        // authority it should not have. Recorded by the derived defaults they
+        // would carry no actor at all, which answers the question with a blank.
+        var descriptor = KnownEvents.Describe(topic);
+
+        descriptor.Action.Should().Be(action);
+        descriptor.ActorIdProperty.Should().Be(actorProperty);
+        descriptor.EntityIdProperty.Should().Be("userId");
+    }
 }

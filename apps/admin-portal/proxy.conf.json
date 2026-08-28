@@ -1,0 +1,8 @@
+{
+  "//": "Local development only. Sends API calls to the gateway, which runs on its own port. The platform is single-domain: which Samaaj an admin is acting on travels in their token, or in the Super Admin override header the app sets deliberately.",
+  "/v1": {
+    "target": "http://localhost:8080",
+    "secure": false,
+    "changeOrigin": false
+  }
+}

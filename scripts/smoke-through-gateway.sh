@@ -368,6 +368,23 @@ check "the tenant list is refused to a member" 403 \
 check "the tenant list is served to a Super Admin" 200 \
   "$(status -H "Authorization: Bearer $ADMIN_TOKEN" "$GATEWAY/v1/identity/tenants")"
 
+# The admin panel signs an admin out if /me fails, so this being right is the
+# difference between an unusable panel and a working one.
+check "a Super Admin overriding into a Samaaj can still read their own account" 200 \
+  "$(status -H "Authorization: Bearer $ADMIN_TOKEN" -H "$ADMIN_TENANT_HEADER" \
+     "$GATEWAY/v1/identity/me")"
+
+OVERRIDDEN_ME=$(curl -s -H "Authorization: Bearer $ADMIN_TOKEN" -H "$ADMIN_TENANT_HEADER" \
+  "$GATEWAY/v1/identity/me" | json_field tenantId)
+
+if [ "$OVERRIDDEN_ME" = "00000000-0000-0000-0000-000000000000" ]; then
+  echo "  ok    and is still themselves, not somebody in the Samaaj they administer"
+  pass=$((pass + 1))
+else
+  echo "  FAIL  the override changed who /me says the caller is (got $OVERRIDDEN_ME)"
+  fail=$((fail + 1))
+fi
+
 check "a nonsense status is refused, not answered with an empty list" 400 \
   "$(status -H "Authorization: Bearer $ADMIN_TOKEN" "$GATEWAY/v1/identity/tenants?status=Dormant")"
 

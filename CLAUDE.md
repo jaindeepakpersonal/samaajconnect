@@ -237,6 +237,8 @@ session.
 | Security/authorization checklist, permission-key naming | `docs/product/SECURITY-CHECKLIST.md` |
 | Phased plan (why) / live tracker (what's done) | `docs/product/ROADMAP.md` / `DEVELOPMENT_PLAN.md` |
 | UI reference | `docs/product/wireframes/*.html` |
+| Member-facing app conventions | `apps/member-portal/CLAUDE.md` |
+| Admin panel conventions | `apps/admin-portal/CLAUDE.md` |
 | Scaffold a new bounded-context service | `.claude/skills/new-microservice/SKILL.md` |
 | Add a command/query to an existing service | `.claude/skills/add-service-feature/SKILL.md` |
 | Turn a wireframe screen into a real component | `.claude/skills/wireframe-to-angular/SKILL.md` |

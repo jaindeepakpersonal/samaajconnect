@@ -30,6 +30,12 @@ public sealed class UserRepository(IdentityTenantDbContext dbContext) : IUserRep
             .Include(u => u.Roles)
             .FirstOrDefaultAsync(u => u.Id == id, cancellationToken);
 
+    public Task<User?> GetSelfAsync(Guid id, CancellationToken cancellationToken = default) =>
+        dbContext.Users
+            .IgnoreQueryFilters()
+            .Include(u => u.Roles)
+            .FirstOrDefaultAsync(u => u.Id == id, cancellationToken);
+
     public Task<bool> IdentifierExistsAsync(string mobileOrEmail, CancellationToken cancellationToken = default) =>
         dbContext.Users
             .IgnoreQueryFilters()

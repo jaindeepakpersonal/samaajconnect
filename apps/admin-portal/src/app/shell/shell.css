@@ -1,0 +1,148 @@
+.app {
+  display: flex;
+  min-height: 100vh;
+}
+
+.side {
+  width: var(--side-width);
+  background: var(--side);
+  color: #fff;
+  position: fixed;
+  left: 0;
+  top: 0;
+  bottom: 0;
+  padding: 18px 12px;
+  overflow: auto;
+}
+
+.brand {
+  font-weight: 800;
+  font-size: 18px;
+  padding: 8px 10px 4px;
+}
+
+.brand span {
+  font-weight: 500;
+}
+
+.scope {
+  font-size: 11px;
+  color: var(--side-scope);
+  padding: 8px 10px 12px;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.nav a,
+.nav .disabled {
+  display: block;
+  width: 100%;
+  border: 0;
+  background: transparent;
+  color: var(--side-ink);
+  text-align: left;
+  padding: 10px;
+  border-radius: var(--radius-sm);
+  margin: 2px 0;
+  cursor: pointer;
+  font-size: 14px;
+  text-decoration: none;
+}
+
+.nav a:hover,
+.nav a.active {
+  background: var(--side-hover);
+  color: #fff;
+}
+
+/* A screen with no backend is shown, not hidden: the wireframe promised it,
+   and an admin should be able to see what is coming. It is plainly inert. */
+.nav .disabled {
+  color: var(--side-group);
+  cursor: not-allowed;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.nav .disabled > span:first-child {
+  flex: 1;
+}
+
+.nav .disabled em {
+  font-style: normal;
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  border: 1px solid #3a4150;
+  border-radius: var(--radius-pill);
+  padding: 1px 7px;
+}
+
+.grp {
+  font-size: 10px;
+  color: var(--side-group);
+  padding: 14px 10px 5px;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+
+main {
+  margin-left: var(--side-width);
+  width: calc(100% - var(--side-width));
+  padding: var(--space-5);
+}
+
+.bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 22px;
+  gap: var(--space-3);
+  flex-wrap: wrap;
+}
+
+.scope-picker .input {
+  width: 280px;
+  margin: 0;
+}
+
+.profile {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  border: 1px solid var(--line);
+  background: var(--panel);
+  border-radius: var(--radius-pill);
+  padding: 8px 14px;
+  font-size: 14px;
+}
+
+@media (max-width: 950px) {
+  :root {
+    --side-width: 200px;
+  }
+
+  .scope-picker .input {
+    width: 100%;
+  }
+}
+
+@media (max-width: 700px) {
+  .side {
+    position: static;
+    width: 100%;
+    bottom: auto;
+  }
+
+  .app {
+    flex-direction: column;
+  }
+
+  main {
+    margin-left: 0;
+    width: 100%;
+    padding: var(--space-4);
+  }
+}

@@ -21,6 +21,23 @@ public interface IUserRepository
     Task<User?> GetByIdAsync(Guid id, CancellationToken cancellationToken = default);
 
     /// <summary>
+    /// The caller reading their own account, bypassing the tenant filter.
+    /// </summary>
+    /// <remarks>
+    /// Narrow by design and used only by GetCurrentUserQuery. A Super Admin
+    /// acting on a Samaaj through the gateway override has that Samaaj in
+    /// ITenantContext, while their own account sits at User.PlatformTenantId -
+    /// so the filtered lookup finds nothing and "who am I?" answers 404 the
+    /// moment a platform admin starts administering anything.
+    ///
+    /// Bypassing the filter is safe here in a way it would not be elsewhere:
+    /// the id is the subject of the validated token, never a value the caller
+    /// supplied, so this can only ever return the caller to themselves. Do not
+    /// reuse it for a lookup whose id comes from a route or a body.
+    /// </remarks>
+    Task<User?> GetSelfAsync(Guid id, CancellationToken cancellationToken = default);
+
+    /// <summary>
     /// The account created for a converted child, if one exists. Ignores the
     /// tenant filter for the same reason as the login lookup: the consumer that
     /// calls it has no request and so no resolved tenant.

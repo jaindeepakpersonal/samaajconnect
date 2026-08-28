@@ -1,0 +1,31 @@
+.login-wrap {
+  max-width: 430px;
+  margin: 70px auto;
+  padding: 0 var(--space-4);
+}
+
+.brand {
+  font-weight: 800;
+  font-size: 22px;
+  margin-bottom: 18px;
+}
+
+.brand span {
+  font-weight: 500;
+  color: var(--muted);
+  font-size: 15px;
+}
+
+.login-wrap .card {
+  padding: 25px;
+}
+
+.login-heading {
+  font-size: 24px;
+  font-weight: 800;
+  margin-bottom: var(--space-1);
+}
+
+.login-footer {
+  margin-top: var(--space-4);
+}

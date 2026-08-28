@@ -42,6 +42,44 @@ public sealed class AdminEndpointsTests(IdentityTenantApiFactory factory)
     private HttpClient Member() =>
         factory.CreateClientAs(Guid.NewGuid(), _tenantId, [Roles.Member], []);
 
+
+    [Fact]
+    public async Task A_Super_Admin_acting_on_a_Samaaj_can_still_read_their_own_account()
+    {
+        // A regression the admin panel found. /me went through the tenant
+        // filter, and a Super Admin's own account lives at the platform tenant
+        // - so the moment they overrode into a Samaaj, "who am I?" answered
+        // 404 and the panel signed them out.
+        await factory.BootstrapSuperAdminAsync();
+
+        var login = await factory.CreateClient().PostAsJsonAsync("/v1/identity/login", new
+        {
+            mobileOrEmail = IdentityTenantApiFactory.BootstrapIdentifier,
+            password = IdentityTenantApiFactory.BootstrapPassword,
+        });
+
+        var token = (await login.Content.ReadFromJsonAsync<JsonElement>())
+            .GetProperty("accessToken").GetString()!;
+
+        var platformAdmin = factory.CreateClient();
+        platformAdmin.DefaultRequestHeaders.Authorization = new("Bearer", token);
+
+        // The same header the gateway forwards once it has checked the
+        // SuperAdmin role and written the audit entry.
+        platformAdmin.DefaultRequestHeaders.Add("X-Tenant-Override-Id", _tenantId.ToString());
+
+        var response = await platformAdmin.GetAsync("/v1/identity/me");
+
+        response.StatusCode.Should().Be(HttpStatusCode.OK);
+
+        var body = await response.Content.ReadFromJsonAsync<JsonElement>();
+
+        // Still themselves, not somebody in the Samaaj they are administering.
+        body.GetProperty("tenantId").GetGuid().Should().Be(Guid.Empty);
+        body.GetProperty("roles").EnumerateArray().Select(r => r.GetString())
+            .Should().Contain("SuperAdmin");
+    }
+
     // ---- The tenant list -------------------------------------------------
 
     [Fact]

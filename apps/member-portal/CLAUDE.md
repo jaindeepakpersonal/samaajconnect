@@ -29,8 +29,10 @@ libs/shared/src/           imported as @samaajconnect/shared
 ```
 
 Anything both apps will need goes in `libs/shared`; anything only this app
-needs does not. `admin-portal` has not been built yet, so treat that boundary
-as a prediction to re-check when it is.
+needs does not. `admin-portal` exists now, and the boundary held: it shares the
+API config, the problem-details mapping, the token store, the auth service,
+guard and interceptors, and keeps its own models and its Samaaj-scope
+interceptor to itself.
 
 ## Running it
 
