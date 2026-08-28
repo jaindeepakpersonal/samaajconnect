@@ -55,7 +55,7 @@ internal sealed class ConfigureJwtBearerOptions(IOptions<JwtOptions> jwtOptions)
             IssuerSigningKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(jwt.SigningKey)),
             ValidateLifetime = true,
             ClockSkew = TimeSpan.FromSeconds(30),
-            RoleClaimType = JwtTokenIssuer.RoleClaimType,
+            RoleClaimType = PlatformClaimTypes.Role,
             NameClaimType = "sub",
         };
     }

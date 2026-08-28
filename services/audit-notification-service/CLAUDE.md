@@ -1,0 +1,123 @@
+# audit-notification-service
+
+## Purpose
+
+Cross-cutting consumer. Every state change anywhere on the platform ends up
+here as an immutable audit row, and some of them also become a notification
+for a member.
+
+It is scaffolded early rather than last on purpose: every other service needs
+somewhere to publish to from day one, and retrofitting audit logging once five
+services exist means revisiting all five (`docs/product/ROADMAP.md`).
+
+## Entities
+
+| Entity | Status | Notes |
+|---|---|---|
+| `AuditLog` | built | Append-only. No mutating method, no update or delete endpoint. |
+| `Notification` | built | `RecipientUserId == null` is a Samaaj-wide broadcast. |
+| `NotificationTemplate` | not built | Needed when a real email/SMS channel lands. |
+
+## Commands
+
+| Command | Policy | Status |
+|---|---|---|
+| `RecordIntegrationEventCommand` | `[InternalRequest]` | built |
+| `MarkNotificationReadCommand` | any authenticated role | not built |
+
+`RecordIntegrationEventCommand` is raised by this service's own Kafka consumer
+and is not mapped to any endpoint. It carries `[InternalRequest]` rather than
+`[AllowAnonymousRequest]`: "anonymous" means a real caller reached us without a
+token, this means there is no caller at all. Keeping them distinct leaves the
+genuinely externally-reachable unauthenticated surface greppable on its own.
+
+## Queries
+
+| Query | Policy | Status |
+|---|---|---|
+| `ListAuditLogsQuery` | `SuperAdmin`/`SamaajAdmin` + `Audit.Read` | built |
+| `GetMyNotificationsQuery` | any authenticated role | built |
+
+## Events published
+
+None yet. `NotificationSent` belongs here once a delivery channel exists. The
+Outbox tables and dispatcher are already wired so the first event raised cannot
+be lost.
+
+## Events consumed
+
+**Every versioned platform topic**, by regex subscription
+(`^[a-z0-9-]+[.][a-z0-9.-]+[.]v[0-9]+$`) rather than an explicit list. A new
+service's events are therefore audited the day it ships. A topic this service
+has never been taught about still produces a row, with the action derived from
+the topic name — `boli.bid.placed.v1` becomes action `Placed` on entity `Bid`.
+An audit trail with a hole in it is worse than one containing an event nobody
+has described yet.
+
+Topics with specific handling are listed in
+`Application/IntegrationEvents/KnownEvents.cs`. Today that is the four
+`identity.*` topics; `identity.user.registered.v1` is the only one that also
+raises a notification.
+
+## API endpoints
+
+| Method | Path | Roles |
+|---|---|---|
+| GET | `/v1/audit/logs` | `SuperAdmin`, `SamaajAdmin` + `Audit.Read` |
+| GET | `/v1/notifications` | any authenticated role |
+| GET | `/health` | anonymous |
+
+## Decisions worth knowing before you change this service
+
+**The dedupe checks bypass the tenant query filter; the read paths never do.**
+A Kafka consumer has no request and so no resolved tenant. A filtered
+"have I seen this message?" check would compare against `Guid.Empty`, match
+nothing, and turn every redelivery into a duplicate row — the exact failure the
+check exists to prevent. `IAuditLogRepository` and `INotificationRepository`
+therefore call `IgnoreQueryFilters`, and `IAuditLogQueries` — everything
+reachable over HTTP — deliberately does not. That split is why the read side is
+a separate interface.
+
+**Idempotency is a unique index, not just a pre-check.** `SourceMessageId` is
+unique on both tables. The handler's check is the readable path; the index is
+what holds when two consumer instances process the same partition during a
+rebalance.
+
+**A message that will not record is eventually committed and skipped.** After
+`Consumer:MaxAttempts` tries the consumer logs the full payload at Critical and
+moves on. Committing an unrecorded message loses it, which is bad; refusing to
+commit stalls the partition and loses everything queued behind it, which is
+worse. The Critical log is the recovery path — treat one as an incident.
+
+**Metadata refresh is 30s, not Confluent's five-minute default.** Kafka only
+matches a regex subscription against topics it already knows about, so the
+default would leave a five-minute hole in the trail every time a new service
+first publishes.
+
+**An unparseable payload is still audited.** The raw text goes into
+`AfterState`; only the actor, entity id and any notification are skipped.
+
+## Dependencies
+
+- **Postgres** `samaajconnect_audit_notification` — `ConnectionStrings__Default`
+- **Kafka** — `Kafka__BootstrapServers`, consumer *and* producer
+- **Jwt** — `Jwt__SigningKey`, validation only. This service never mints tokens.
+- No Redis dependency.
+
+## Testing
+
+- `Sangam.AuditNotification.UnitTests` — the topic catalogue and the recording
+  handler. No I/O.
+- `Sangam.AuditNotification.IntegrationTests` — Testcontainers Postgres **and
+  Testcontainers Kafka**. Nothing is faked, unlike the identity service's
+  tests: the whole claim this service makes is "events published elsewhere end
+  up in the audit log", and a fake broker would let that pass while the
+  consumer loop, the header contract or the regex subscription were all broken.
+
+```
+dotnet test services/audit-notification-service/Sangam.AuditNotification.sln
+```
+
+Still missing: a test that curls this service **through the gateway**
+(CLAUDE.md §9). The gateway does not exist yet; add it in the same change that
+adds the YARP route.

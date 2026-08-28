@@ -1,3 +1,4 @@
+using System.Text;
 using Confluent.Kafka;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
@@ -44,15 +45,22 @@ public sealed class KafkaProducer : IEventPublisher, IDisposable
             .Build();
     }
 
-    public async Task PublishAsync(
-        string topic,
-        string key,
-        string payload,
-        CancellationToken cancellationToken = default)
+    public async Task PublishAsync(OutboxEnvelope envelope, CancellationToken cancellationToken = default)
     {
-        var message = new Message<string, string> { Key = key, Value = payload };
+        var message = new Message<string, string>
+        {
+            Key = envelope.Key,
+            Value = envelope.Payload,
+            Headers =
+            [
+                new Header(EventHeaders.MessageId, Encoding.UTF8.GetBytes(envelope.MessageId.ToString())),
+                new Header(EventHeaders.EventType, Encoding.UTF8.GetBytes(envelope.EventType)),
+                new Header(EventHeaders.TenantId, Encoding.UTF8.GetBytes(envelope.Key)),
+                new Header(EventHeaders.OccurredAt, Encoding.UTF8.GetBytes(envelope.OccurredAt.ToString("O"))),
+            ],
+        };
 
-        var delivery = await _producer.ProduceAsync(topic, message, cancellationToken);
+        var delivery = await _producer.ProduceAsync(envelope.Topic, message, cancellationToken);
 
         _logger.LogDebug(
             "Published to {Topic} partition {Partition} offset {Offset}",

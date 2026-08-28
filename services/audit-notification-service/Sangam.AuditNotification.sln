@@ -1,0 +1,64 @@
+﻿
+Microsoft Visual Studio Solution File, Format Version 12.00
+# Visual Studio Version 17
+VisualStudioVersion = 17.0.31903.59
+MinimumVisualStudioVersion = 10.0.40219.1
+Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "src", "src", "{095640B4-8368-4D8F-9BD9-57B18560896C}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Sangam.AuditNotification.Api", "src\Sangam.AuditNotification.Api\Sangam.AuditNotification.Api.csproj", "{A25A34CF-50E9-431C-B6A3-E9B0D29F253C}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Sangam.AuditNotification.Application", "src\Sangam.AuditNotification.Application\Sangam.AuditNotification.Application.csproj", "{36AE281D-FC3E-4FD8-B3FE-C82194A4E634}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Sangam.AuditNotification.Domain", "src\Sangam.AuditNotification.Domain\Sangam.AuditNotification.Domain.csproj", "{2A0FF1D3-718A-4519-814C-88456D21D3D6}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Sangam.AuditNotification.Infrastructure", "src\Sangam.AuditNotification.Infrastructure\Sangam.AuditNotification.Infrastructure.csproj", "{4F33D52D-9B13-4C27-A2E3-E860D047A2F0}"
+EndProject
+Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "tests", "tests", "{F394E704-C944-495B-BA3E-010BC57FDD40}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Sangam.AuditNotification.UnitTests", "tests\Sangam.AuditNotification.UnitTests\Sangam.AuditNotification.UnitTests.csproj", "{F16AACFB-4C7D-4F3E-81F5-AB7C2CA41196}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Sangam.AuditNotification.IntegrationTests", "tests\Sangam.AuditNotification.IntegrationTests\Sangam.AuditNotification.IntegrationTests.csproj", "{F0BEFA15-959F-42F9-AD25-A8A46288DEEA}"
+EndProject
+Global
+	GlobalSection(SolutionConfigurationPlatforms) = preSolution
+		Debug|Any CPU = Debug|Any CPU
+		Release|Any CPU = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(SolutionProperties) = preSolution
+		HideSolutionNode = FALSE
+	EndGlobalSection
+	GlobalSection(ProjectConfigurationPlatforms) = postSolution
+		{A25A34CF-50E9-431C-B6A3-E9B0D29F253C}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{A25A34CF-50E9-431C-B6A3-E9B0D29F253C}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{A25A34CF-50E9-431C-B6A3-E9B0D29F253C}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{A25A34CF-50E9-431C-B6A3-E9B0D29F253C}.Release|Any CPU.Build.0 = Release|Any CPU
+		{36AE281D-FC3E-4FD8-B3FE-C82194A4E634}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{36AE281D-FC3E-4FD8-B3FE-C82194A4E634}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{36AE281D-FC3E-4FD8-B3FE-C82194A4E634}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{36AE281D-FC3E-4FD8-B3FE-C82194A4E634}.Release|Any CPU.Build.0 = Release|Any CPU
+		{2A0FF1D3-718A-4519-814C-88456D21D3D6}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{2A0FF1D3-718A-4519-814C-88456D21D3D6}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{2A0FF1D3-718A-4519-814C-88456D21D3D6}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{2A0FF1D3-718A-4519-814C-88456D21D3D6}.Release|Any CPU.Build.0 = Release|Any CPU
+		{4F33D52D-9B13-4C27-A2E3-E860D047A2F0}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{4F33D52D-9B13-4C27-A2E3-E860D047A2F0}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{4F33D52D-9B13-4C27-A2E3-E860D047A2F0}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{4F33D52D-9B13-4C27-A2E3-E860D047A2F0}.Release|Any CPU.Build.0 = Release|Any CPU
+		{F16AACFB-4C7D-4F3E-81F5-AB7C2CA41196}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{F16AACFB-4C7D-4F3E-81F5-AB7C2CA41196}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{F16AACFB-4C7D-4F3E-81F5-AB7C2CA41196}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{F16AACFB-4C7D-4F3E-81F5-AB7C2CA41196}.Release|Any CPU.Build.0 = Release|Any CPU
+		{F0BEFA15-959F-42F9-AD25-A8A46288DEEA}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{F0BEFA15-959F-42F9-AD25-A8A46288DEEA}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{F0BEFA15-959F-42F9-AD25-A8A46288DEEA}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{F0BEFA15-959F-42F9-AD25-A8A46288DEEA}.Release|Any CPU.Build.0 = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(NestedProjects) = preSolution
+		{A25A34CF-50E9-431C-B6A3-E9B0D29F253C} = {095640B4-8368-4D8F-9BD9-57B18560896C}
+		{36AE281D-FC3E-4FD8-B3FE-C82194A4E634} = {095640B4-8368-4D8F-9BD9-57B18560896C}
+		{2A0FF1D3-718A-4519-814C-88456D21D3D6} = {095640B4-8368-4D8F-9BD9-57B18560896C}
+		{4F33D52D-9B13-4C27-A2E3-E860D047A2F0} = {095640B4-8368-4D8F-9BD9-57B18560896C}
+		{F16AACFB-4C7D-4F3E-81F5-AB7C2CA41196} = {F394E704-C944-495B-BA3E-010BC57FDD40}
+		{F0BEFA15-959F-42F9-AD25-A8A46288DEEA} = {F394E704-C944-495B-BA3E-010BC57FDD40}
+	EndGlobalSection
+EndGlobal

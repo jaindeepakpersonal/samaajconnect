@@ -37,6 +37,7 @@ KRaft Kafka broker, and every service built so far.
 | Service | Local URL |
 |---|---|
 | identity-tenant-service | http://localhost:5101 (Swagger at `/swagger`) |
+| audit-notification-service | http://localhost:5102 (Swagger at `/swagger`) |
 
 Run a service's tests - integration tests need Docker for Testcontainers:
 

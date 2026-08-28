@@ -106,6 +106,21 @@ services:
     ports:
       - "5101:8080"
 
+  audit-notification-service:
+    <<: *service-defaults
+    build:
+      context: .
+      dockerfile: services/audit-notification-service/Dockerfile
+    container_name: samaajconnect-audit
+    environment:
+      <<: *service-environment
+      ConnectionStrings__Default: "Host=postgres;Port=5432;Database=samaajconnect_audit_notification;Username=samaajconnect;Password=samaajconnect"
+      Jwt__SigningKey: "${JWT_SIGNING_KEY:-local-development-signing-key-do-not-use-in-production}"
+      Outbox__PollIntervalSeconds: "5"
+      Consumer__GroupId: "audit-notification-service"
+    ports:
+      - "5102:8080"
+
 volumes:
   postgres-data:
   redis-data:

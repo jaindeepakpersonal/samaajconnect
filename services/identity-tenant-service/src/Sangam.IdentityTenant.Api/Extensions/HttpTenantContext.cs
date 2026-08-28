@@ -47,7 +47,7 @@ public sealed class HttpTenantContext : ITenantContext
 
         var hasHeader = TryReadGuid(httpContext, TenantHeader, out var headerTenantId);
 
-        var claim = httpContext.User.FindFirst(JwtTokenIssuer.TenantClaimType)?.Value;
+        var claim = httpContext.User.FindFirst(PlatformClaimTypes.TenantId)?.Value;
 
         if (httpContext.User.Identity?.IsAuthenticated == true && Guid.TryParse(claim, out var claimTenantId))
         {

@@ -92,9 +92,13 @@ public sealed class OutboxDispatcher(
             try
             {
                 await publisher.PublishAsync(
-                    message.Topic,
-                    message.TenantId.ToString(),
-                    message.Payload,
+                    new OutboxEnvelope(
+                        message.Id,
+                        message.Topic,
+                        message.TenantId.ToString(),
+                        message.Type,
+                        message.Payload,
+                        message.OccurredAt),
                     cancellationToken);
 
                 message.ProcessedAt = DateTimeOffset.UtcNow;

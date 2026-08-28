@@ -1,12 +1,11 @@
 using System.Security.Claims;
 using Sangam.IdentityTenant.Application.Abstractions;
+using Sangam.IdentityTenant.Infrastructure.Security;
 
 namespace Sangam.IdentityTenant.Api.Extensions;
 
 public sealed class HttpCurrentUser : ICurrentUser
 {
-    public const string PermissionClaimType = "permission";
-
     private readonly HashSet<string> _roles;
     private readonly HashSet<string> _permissions;
 
@@ -19,13 +18,13 @@ public sealed class HttpCurrentUser : ICurrentUser
         _roles = principal is null
             ? new HashSet<string>(StringComparer.OrdinalIgnoreCase)
             : principal.FindAll(ClaimTypes.Role)
-                .Concat(principal.FindAll("role"))
+                .Concat(principal.FindAll(PlatformClaimTypes.Role))
                 .Select(c => c.Value)
                 .ToHashSet(StringComparer.OrdinalIgnoreCase);
 
         _permissions = principal is null
             ? new HashSet<string>(StringComparer.OrdinalIgnoreCase)
-            : principal.FindAll(PermissionClaimType)
+            : principal.FindAll(PlatformClaimTypes.Permission)
                 .Select(c => c.Value)
                 .ToHashSet(StringComparer.OrdinalIgnoreCase);
 

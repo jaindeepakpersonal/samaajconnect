@@ -9,13 +9,6 @@ namespace Sangam.IdentityTenant.Infrastructure.Security;
 
 public sealed class JwtTokenIssuer(IOptions<JwtOptions> options, IDateTimeProvider clock) : ITokenIssuer
 {
-    /// <summary>Claim carrying the Samaaj this token is scoped to.</summary>
-    public const string TenantClaimType = "tenant_id";
-
-    public const string RoleClaimType = "role";
-
-    public const string PermissionClaimType = "permission";
-
     public AccessToken Issue(
         Guid userId,
         Guid tenantId,
@@ -31,7 +24,7 @@ public sealed class JwtTokenIssuer(IOptions<JwtOptions> options, IDateTimeProvid
         {
             new(JwtRegisteredClaimNames.Sub, userId.ToString()),
             new(JwtRegisteredClaimNames.Jti, Guid.NewGuid().ToString()),
-            new(TenantClaimType, tenantId.ToString()),
+            new(PlatformClaimTypes.TenantId, tenantId.ToString()),
             new(JwtRegisteredClaimNames.UniqueName, mobileOrEmail),
         };
 
@@ -39,8 +32,8 @@ public sealed class JwtTokenIssuer(IOptions<JwtOptions> options, IDateTimeProvid
         // downstream service can authorize without calling back here. The cost
         // is that a revoked permission stays valid until the token expires,
         // which is why the lifetime is short.
-        claims.AddRange(roles.Select(role => new Claim(RoleClaimType, role)));
-        claims.AddRange(permissions.Select(permission => new Claim(PermissionClaimType, permission)));
+        claims.AddRange(roles.Select(role => new Claim(PlatformClaimTypes.Role, role)));
+        claims.AddRange(permissions.Select(permission => new Claim(PlatformClaimTypes.Permission, permission)));
 
         var credentials = new SigningCredentials(
             new SymmetricSecurityKey(Encoding.UTF8.GetBytes(jwt.SigningKey)),

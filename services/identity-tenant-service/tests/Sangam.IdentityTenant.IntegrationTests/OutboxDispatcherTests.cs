@@ -63,6 +63,23 @@ public sealed class OutboxDispatcherTests(IdentityTenantApiFactory factory)
     }
 
     [Fact]
+    public async Task Carries_the_outbox_row_id_so_a_consumer_can_recognise_a_replay()
+    {
+        await SeedOneTenantAsync();
+
+        await factory.DispatchOutboxAsync();
+
+        var stored = await factory.WithDbContextAsync(db =>
+            db.OutboxMessages.AsNoTracking().SingleAsync());
+
+        var published = factory.Publisher.Published.Single();
+
+        published.MessageId.Should().Be(stored.Id);
+        published.EventType.Should().Be(stored.Type);
+        published.OccurredAt.Should().Be(stored.OccurredAt);
+    }
+
+    [Fact]
     public async Task Does_not_republish_a_row_that_was_already_sent()
     {
         await SeedOneTenantAsync();
