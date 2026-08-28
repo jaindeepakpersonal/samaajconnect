@@ -25,6 +25,13 @@ public sealed class ChildRepository(MemberFamilyDbContext dbContext) : IChildRep
         CancellationToken cancellationToken = default) =>
         await dbContext.ChildProfiles.AsNoTracking().ToListAsync(cancellationToken);
 
+    public async Task<IReadOnlyList<ChildProfile>> ListForConsumerAsync(
+        Guid familyId, CancellationToken cancellationToken = default) =>
+        await dbContext.ChildProfiles
+            .IgnoreQueryFilters()
+            .Where(c => c.FamilyId == familyId)
+            .ToListAsync(cancellationToken);
+
     public void Add(ChildProfile child) => dbContext.ChildProfiles.Add(child);
 }
 

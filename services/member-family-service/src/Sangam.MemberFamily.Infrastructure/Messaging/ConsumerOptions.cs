@@ -20,6 +20,7 @@ public sealed class ConsumerOptions
     [
         "identity.user.registered.v1",
         "identity.child-conversion.completed.v1",
+        "identity.user.erased.v1",
     ];
 
     public string GroupId { get; set; } = "member-family-service";

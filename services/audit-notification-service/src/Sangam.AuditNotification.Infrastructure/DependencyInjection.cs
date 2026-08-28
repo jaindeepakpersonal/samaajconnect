@@ -35,6 +35,7 @@ public static class DependencyInjection
         services.AddScoped<IAuditLogRepository, AuditLogRepository>();
         services.AddScoped<IAuditLogQueries, AuditLogQueries>();
         services.AddScoped<INotificationRepository, NotificationRepository>();
+        services.AddScoped<IErasureRepository, ErasureRepository>();
         services.AddSingleton<IDateTimeProvider, SystemDateTimeProvider>();
 
         services.AddOptions<JwtOptions>()

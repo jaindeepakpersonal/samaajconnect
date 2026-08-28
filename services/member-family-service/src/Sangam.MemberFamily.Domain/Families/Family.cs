@@ -96,6 +96,25 @@ public sealed class Family : AggregateRoot, ITenantScopedEntity
         return request;
     }
 
+    /// <summary>
+    /// Removes one member's link to this household. Returns false when they
+    /// were never in it, which is a normal outcome under at-least-once
+    /// delivery rather than an error.
+    /// </summary>
+    public bool RemoveMember(Guid memberProfileId)
+    {
+        var existing = FindMember(memberProfileId);
+
+        if (existing is null)
+        {
+            return false;
+        }
+
+        _members.Remove(existing);
+
+        return true;
+    }
+
     public bool DecideJoinRequest(Guid requestId, bool accepted, Guid decidedBy, DateTimeOffset decidedAt)
     {
         var request = _members.FirstOrDefault(

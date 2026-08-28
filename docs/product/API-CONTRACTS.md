@@ -29,6 +29,7 @@ enforced by `TenantAuthorizationBehavior`, not just UI hiding.
 | GET | `/consent-notice` | Anonymous | The consent notice and its version (DPDP s.5) |
 | POST | `/me/consents/{purpose}/withdraw` | Authenticated | Withdraw one consent (DPDP s.6(4)) |
 | GET | `/me/data-export` | Authenticated | What this service holds about you (DPDP s.11) |
+| POST | `/me/erase` | Authenticated | Erase this account and, by event, everything the platform holds (DPDP s.12) |
 | POST | `/logout` | Authenticated | Revoke current session/refresh token |
 | GET | `/me` | Authenticated | Current user + roles + tenant |
 | POST | `/admin-users` | SuperAdmin, SamaajAdmin | Invite/create admin user |

@@ -13,5 +13,10 @@ public interface IFamilyRepository
 
     Task<bool> CodeExistsAsync(string familyCode, CancellationToken cancellationToken = default);
 
+    /// <summary>Bypasses the tenant filter, for consumers.</summary>
+    Task<Family?> GetForConsumerAsync(
+        Guid memberProfileId, CancellationToken cancellationToken = default);
+
     void Add(Family family);
+
 }

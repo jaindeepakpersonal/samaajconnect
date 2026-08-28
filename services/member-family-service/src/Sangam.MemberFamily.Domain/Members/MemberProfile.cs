@@ -78,6 +78,37 @@ public sealed class MemberProfile : AggregateRoot, ITenantScopedEntity
         return profile;
     }
 
+    /// <summary>
+    /// Erases the person from this profile, keeping the row so family links do
+    /// not dangle (DPDP section 12).
+    /// </summary>
+    /// <remarks>
+    /// Every field a person could be recognised by goes, and the privacy
+    /// settings are reset to the most closed value rather than left as they
+    /// were - an erased profile should not still be carrying an instruction to
+    /// publish anything. No event is raised: this is the *result* of an
+    /// erasure announced elsewhere, and re-announcing it would loop.
+    /// </summary>
+    public void Erase(DateTimeOffset erasedAt)
+    {
+        FullName = "Erased member";
+        PhotoUrl = null;
+        DateOfBirth = null;
+        Gender = Gender.Unspecified;
+        Mobile = null;
+        Email = null;
+        Address = null;
+        Locality = null;
+        Profession = null;
+        Privacy = new FieldPrivacy(
+            PrivacyLevel.Private,
+            PrivacyLevel.Private,
+            PrivacyLevel.Private,
+            PrivacyLevel.Private,
+            PrivacyLevel.Private);
+        UpdatedAt = erasedAt;
+    }
+
     public void Update(
         string fullName,
         string? photoUrl,

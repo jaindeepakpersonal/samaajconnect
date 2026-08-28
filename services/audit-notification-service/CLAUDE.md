@@ -14,7 +14,7 @@ services exist means revisiting all five (`docs/product/ROADMAP.md`).
 
 | Entity | Status | Notes |
 |---|---|---|
-| `AuditLog` | built | Append-only. No mutating method, no update or delete endpoint. |
+| `AuditLog` | built | Append-only. No mutating method, no update or delete endpoint. One de-identifying exception - see below. |
 | `Notification` | built | `RecipientUserId == null` is a Samaaj-wide broadcast. |
 | `NotificationTemplate` | not built | Needed when a real email/SMS channel lands. |
 
@@ -23,6 +23,7 @@ services exist means revisiting all five (`docs/product/ROADMAP.md`).
 | Command | Policy | Status |
 |---|---|---|
 | `RecordIntegrationEventCommand` | `[InternalRequest]` | built |
+| `ErasePersonalDataCommand` | `[InternalRequest]` | built |
 | `MarkNotificationReadCommand` | any authenticated role | not built |
 
 `RecordIntegrationEventCommand` is raised by this service's own Kafka consumer
@@ -54,6 +55,9 @@ has never been taught about still produces a row, with the action derived from
 the topic name — `boli.bid.placed.v1` becomes action `Placed` on entity `Bid`.
 An audit trail with a hole in it is worse than one containing an event nobody
 has described yet.
+
+`identity.user.erased.v1` is the one topic this service acts on rather than
+simply records; see "Erasure" below.
 
 Topics with specific handling are listed in
 `Application/IntegrationEvents/KnownEvents.cs`. Today that is the four
@@ -105,6 +109,35 @@ first publishes.
 
 **An unparseable payload is still audited.** The raw text goes into
 `AfterState`; only the actor, entity id and any notification are skipped.
+
+**Erasure is the one exception to append-only, and it is deliberately hard to
+reach.** DPDP s.8(7) and s.12 require erasure; SECURITY-CHECKLIST.md requires
+audit rows to be immutable "ever". The resolution
+(`docs/product/DPDP-COMPLIANCE.md`): the fact that an action happened survives,
+and the person disappears from it. Notifications are deleted outright - they
+are messages to a person and nothing else. Audit rows keep their action,
+entity, topic and both timestamps, and lose the actor, the actor role and the
+payload, which is where a name usually is.
+
+The whole capability lives in `ErasePersonalDataCommandHandler` and
+`IErasureRepository`. There is no endpoint, the handler is reachable only from
+the consumer and only for `identity.user.erased.v1`, and neither repository
+method takes arbitrary criteria - so the exception cannot be reached by
+accident, and if counsel decides audit rows must be deleted outright, those two
+files are the whole change.
+
+**The erasure itself is recorded, after the de-identifying pass.** A Samaaj has
+to be able to show it honoured the request, and a row written before the update
+would have been wiped by it. That row carries the tombstone id in `EntityId`
+and no actor: the account it refers to no longer exists and no other row still
+carries it, so it maps to nobody.
+
+**The de-identify and delete bypass the tenant filter, like the dedupe checks.**
+Same reason - a consumer has no request and so no tenant. `ExecuteUpdate` and
+`ExecuteDelete` run as SQL and never load an entity, which is what lets them
+reach properties whose setters are private on an aggregate that exposes no
+mutating method at all. There is an integration test against a real Postgres,
+because none of that is provable against a substituted repository.
 
 ## Dependencies
 

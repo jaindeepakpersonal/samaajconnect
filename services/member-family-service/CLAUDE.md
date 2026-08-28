@@ -32,6 +32,7 @@ worked example of a cross-service flow with no synchronous call.
 | `CreateChildProfileCommand` | head of that family + `Family.Write` | built |
 | `RequestChildConversionCommand` | head of that family + `Family.Write` | built |
 | `DecideChildConversionCommand` | `SamaajAdmin` + `Family.ApproveConversion` | built |
+| `EraseMemberDataCommand` | `[InternalRequest]` | built |
 
 ## Queries
 
@@ -59,6 +60,7 @@ worked example of a cross-service flow with no synchronous call.
 |---|---|
 | `identity.user.registered.v1` | Create the initial profile |
 | `identity.child-conversion.completed.v1` | Mark the child Converted and link the account |
+| `identity.user.erased.v1` | Erase everything this service holds about that member |
 
 An explicit topic list, unlike audit-notification-service's catch-all regex.
 This service *acts* on what it consumes, so subscribing to anything it has no
@@ -201,6 +203,30 @@ innocuous-looking analytics call.
 **Withdrawing parental consent is erasure, not a toggle.** Unlike a member's own
 consent, this is not a switch: the record exists because of it. That is why
 `ParentalConsent` sits on the child rather than in a log of decisions.
+
+## Erasure
+
+A member erased their account in identity-tenant-service; everything here has
+to follow. `docs/product/DPDP-COMPLIANCE.md` has the platform-wide picture.
+
+**Children go with the head who vouched for them.** Their records exist on that
+person's parental consent (s.9), and consent that no longer exists cannot keep
+justifying the data it covered. The birth year survives, shifted to 1 January:
+age is what decides conversion eligibility so the row still has to behave, and
+the exact birthday is how a child would be recognised.
+
+**The household stays; the membership row goes.** Who was in whose household is
+personal data about the erased member, so their `FamilyMember` row is removed
+in every case. Deleting the `Family` itself was the alternative and is wrong:
+it would take the remaining members' join with it and orphan the child rows -
+other people's records restructured because one person exercised their own
+right. The cost is that a household whose head has erased can no longer decide
+a join request. Re-heading one is a known gap and belongs in an admin command,
+not in a consumer.
+
+**Privacy levels are closed as well as the fields cleared.** A profile left
+`Public` keeps appearing in the directory as a visible row, which is not what
+erasure means to the person who asked for it.
 
 ## Dependencies
 

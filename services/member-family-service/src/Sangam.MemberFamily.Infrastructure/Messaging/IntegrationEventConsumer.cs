@@ -9,6 +9,7 @@ using Sangam.MemberFamily.Application.Common;
 using Sangam.MemberFamily.Application.IntegrationEvents;
 using Sangam.MemberFamily.Application.IntegrationEvents.Commands.CompleteChildConversion;
 using Sangam.MemberFamily.Application.IntegrationEvents.Commands.CreateProfileForNewUser;
+using Sangam.MemberFamily.Application.IntegrationEvents.Commands.EraseMemberData;
 
 namespace Sangam.MemberFamily.Infrastructure.Messaging;
 
@@ -114,14 +115,18 @@ public sealed class IntegrationEventConsumer(
                 await using var scope = scopeFactory.CreateAsyncScope();
                 var sender = scope.ServiceProvider.GetRequiredService<ISender>();
 
-                // One consumer, two topics. A switch here rather than a
-                // registry: with two entries a lookup table would be more
-                // indirection than the thing it indexes. The two commands
-                // return different payloads, so only the outcome is compared.
-                Result outcome =
-                    envelope.Topic.Contains("child-conversion.completed", StringComparison.Ordinal)
-                        ? await sender.Send(new CompleteChildConversionCommand(envelope), stoppingToken)
-                        : await sender.Send(new CreateProfileForNewUserCommand(envelope), stoppingToken);
+                // One consumer, three topics. A switch here rather than a
+                // registry: at this size a lookup table would be more
+                // indirection than the thing it indexes. The commands return
+                // different payloads, so only the outcome is compared.
+                Result outcome = envelope.Topic switch
+                {
+                    var t when t.Contains("child-conversion.completed", StringComparison.Ordinal) =>
+                        await sender.Send(new CompleteChildConversionCommand(envelope), stoppingToken),
+                    var t when t.Contains("user.erased", StringComparison.Ordinal) =>
+                        await sender.Send(new EraseMemberDataCommand(envelope), stoppingToken),
+                    _ => await sender.Send(new CreateProfileForNewUserCommand(envelope), stoppingToken),
+                };
 
                 if (outcome.IsSuccess)
                 {

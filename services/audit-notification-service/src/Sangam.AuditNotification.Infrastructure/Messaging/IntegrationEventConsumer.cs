@@ -6,6 +6,8 @@ using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using Sangam.AuditNotification.Application.IntegrationEvents;
+using Sangam.AuditNotification.Application.Common;
+using Sangam.AuditNotification.Application.IntegrationEvents.Commands.ErasePersonalData;
 using Sangam.AuditNotification.Application.IntegrationEvents.Commands.RecordIntegrationEvent;
 
 namespace Sangam.AuditNotification.Infrastructure.Messaging;
@@ -112,8 +114,10 @@ public sealed class IntegrationEventConsumer(
                 await using var scope = scopeFactory.CreateAsyncScope();
                 var sender = scope.ServiceProvider.GetRequiredService<ISender>();
 
-                var outcome = await sender.Send(
-                    new RecordIntegrationEventCommand(envelope), stoppingToken);
+                // Erasure is the one thing this service does other than record.
+                Result outcome = envelope.Topic.Contains("user.erased", StringComparison.Ordinal)
+                    ? await sender.Send(new ErasePersonalDataCommand(envelope), stoppingToken)
+                    : await sender.Send(new RecordIntegrationEventCommand(envelope), stoppingToken);
 
                 if (outcome.IsSuccess)
                 {

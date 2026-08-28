@@ -37,6 +37,7 @@ since those happen *before* a tenant is established.
 | `ActivateAccountCommand` | anonymous | built |
 | `WithdrawConsentCommand` | any authenticated role | built |
 | `SetGrievanceContactCommand` | `SuperAdmin`, `SamaajAdmin` + `AdminUsers.Manage` | built |
+| `EraseMyAccountCommand` | any authenticated role, self only | built |
 | `AssignRoleCommand` | `SuperAdmin`, `SamaajAdmin` + `AdminUsers.Manage` | not built |
 
 A new Samaaj is created **Inactive**. Creating the record and letting it serve
@@ -70,6 +71,7 @@ tenant is reported as 404 rather than as a distinct state, for the same reason.
 | `UserLoggedInDomainEvent` | `identity.user.logged-in.v1` | `User.RecordSuccessfulLogin` |
 | `UserActivatedFromChildDomainEvent` | `identity.child-conversion.completed.v1` | `User.Activate` |
 | `ConsentRecordedDomainEvent` | `identity.consent.recorded.v1` | `ConsentRecord.Grant` and `.Withdraw` |
+| `UserErasedDomainEvent` | `identity.user.erased.v1` | `User.Erase` |
 
 Delivery is at-least-once by design (see `Messaging/OutboxDispatcher.cs`).
 Consumers must be idempotent.
@@ -102,6 +104,7 @@ offsets for messages it did nothing with.
 | GET | `/v1/identity/consent-notice` | anonymous |
 | POST | `/v1/identity/me/consents/{purpose}/withdraw` | any authenticated role |
 | GET | `/v1/identity/me/data-export` | any authenticated role |
+| POST | `/v1/identity/me/erase` | any authenticated role |
 | PUT | `/v1/identity/tenants/{id}/grievance-contact` | `SuperAdmin`, `SamaajAdmin` + `AdminUsers.Manage` |
 | GET | `/health` | anonymous |
 
@@ -220,6 +223,30 @@ operator would make it stale by design.
 three services, and having one reach synchronously into the others would undo
 the service boundaries for a feature used a handful of times a year. The
 response names what it does not cover.
+
+
+**Erasure is the member's own call, and the password is the gate.** Section 12
+gives the Data Principal a right, not a request for permission, so no admin
+approves it - unlike adult-child conversion, where an admin decides whether to
+*create* something. The password proves the person at the keyboard is the
+account holder, which is the identity check needed before something with no
+undo, and it stops a mis-click being enough.
+
+**A Super Admin cannot erase through this route.** Nothing but the bootstrap on
+an empty database can recreate one, and there is no second Super Admin to
+notice the platform has become unadministrable.
+
+**Erasure frees the identifier.** `MobileOrEmail` is unique platform-wide, so
+keeping it would mean someone who left could never come back - a penalty for
+exercising a right rather than a consequence of it. It is replaced with a
+per-account value at an unroutable domain, which satisfies the uniqueness
+constraint without leaving anything to sign in as.
+
+**The event carries two ids and nothing else.** It travels to
+audit-notification-service, which records every payload verbatim into an
+append-only table, so a name on it would land somewhere deliberately impossible
+to redact. `User.Erase` and the outbox row commit together, so an erasure that
+succeeds here is always announced to the other two services.
 
 ## Dependencies
 

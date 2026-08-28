@@ -26,5 +26,8 @@ public interface IMemberProfileRepository
     Task<IReadOnlyList<MemberProfile>> SearchAsync(
         string? term, string? locality, int limit, CancellationToken cancellationToken = default);
 
+    /// <summary>Bypasses the tenant filter, for consumers. See ExistsAsync.</summary>
+    Task<MemberProfile?> GetForConsumerAsync(Guid id, CancellationToken cancellationToken = default);
+
     void Add(MemberProfile profile);
 }

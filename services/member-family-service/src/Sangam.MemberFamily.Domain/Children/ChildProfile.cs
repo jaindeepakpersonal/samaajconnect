@@ -107,6 +107,23 @@ public sealed class ChildProfile : AggregateRoot, ITenantScopedEntity
     /// Records that conversion completed and a login now exists. Called only
     /// after a Samaaj admin approved the request.
     /// </summary>
+    /// <summary>
+    /// Erases the child from this record. Called when the family head who gave
+    /// the parental consent erases their own account: the consent was the
+    /// basis on which this data was held, so it cannot outlive them.
+    /// </summary>
+    public void Erase()
+    {
+        FullName = "Erased child";
+        PhotoUrl = null;
+
+        // Kept, because age is what decides eligibility and the row still has
+        // to behave; shifted to the first of its year so it is no longer a
+        // birthday anyone could be recognised by.
+        DateOfBirth = new DateOnly(DateOfBirth.Year, 1, 1);
+        Gender = Gender.Unspecified;
+    }
+
     public void MarkConverted(Guid convertedMemberId)
     {
         Status = ChildStatus.Converted;

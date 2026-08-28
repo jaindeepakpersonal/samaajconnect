@@ -7,15 +7,16 @@ version of the plan; the reasoning behind the ordering lives in
 
 ## Current Status
 
-- **Stage:** Stage 0 complete; starting Phase 1 - Platform Foundation
-- **Last updated:** 2026-08-28 - DPDP: parental consent on child records,
-  exports from all three services, and a published grievance contact. 461
-  tests green (413 backend, 48 frontend) plus 43 smoke checks against a stack
-  built from scratch.
-- **Blocking item:** erasure is genuinely blocked on question 1 in
-  `docs/product/DPDP-COMPLIANCE.md` - whether de-identifying audit rows counts
-  as erasure. The other four questions there need counsel before Phase 1 ships
-  to real users but block nothing today. Next unblocked work: the admin portal.
+- **Stage:** Stage 0 complete; Phase 1 - Platform Foundation in progress
+- **Last updated:** 2026-08-28 - DPDP: the right to erasure, end to end across
+  all three services. 432 tests green (384 backend, 48 frontend) plus 54 smoke
+  checks against a stack built from empty volumes.
+- **Blocking item:** none. Erasure is built on the reading set out in
+  `docs/product/DPDP-COMPLIANCE.md` - audit rows de-identified rather than
+  deleted - and confined to two files per service so counsel's answer to
+  question 1 changes little if it goes the other way. All five questions there
+  need counsel before Phase 1 ships to real users; none blocks work today.
+  Next: the admin portal.
 
 *(Update these three lines at the start/end of every work session —
 they're what a coding agent or a teammate should read first to know
@@ -90,12 +91,17 @@ unit tested.
 - [x] DPDP Act: parental consent required to create a `ChildProfile` (s.9),
       data exports from all three services (s.11), and a published grievance
       contact per Samaaj (s.13)
-- [ ] DPDP Act, remaining: erasure requests, including de-identifying audit
-      rows rather than deleting them. **Waiting on counsel** - question 1 in
-      `docs/product/DPDP-COMPLIANCE.md` decides the design, and building it
-      twice is the waste worth avoiding
+- [x] DPDP Act: the right to erasure (s.8(7), s.12) - `POST /v1/identity/me/erase`,
+      password-gated and with no admin in the way, fanning out over
+      `identity.user.erased.v1` to clear the profile, the children held on that
+      member's parental consent and the household link, delete their
+      notifications, and de-identify rather than delete their audit rows
 - [ ] DPDP Act, remaining: breach notification (s.8(6)) and the right to
       nominate (s.14), both of which need a notification channel first
+- [ ] DPDP Act: a member-portal surface for consent withdrawal, data export and
+      erasure. The endpoints exist and are exercised end to end, but a right
+      only reachable with curl is not one a member has. No wireframe covers an
+      account/privacy screen, so this needs one first
 - [ ] Admin: tenant CRUD screens
 - [ ] Admin: admin user + role assignment screens
 - [ ] `docs/product/SECURITY-CHECKLIST.md` pass on both Stage-0 +
@@ -153,7 +159,11 @@ these sit unresolved into the sprint that needs them.
 - [x] **Eventing: native Kafka Outbox, no MassTransit.** Settled by
       `CLAUDE.md` §5 and built that way in every service.
 - [ ] **DPDP Act, 2023 compliance review — required.** Confirmed 2026-08-28 as
-      in scope. The technical capabilities (consent records, data export,
-      erasure) are ours to build; how they are worded and what retention
-      periods apply still needs someone qualified in Indian data protection
-      law. Must land before Phase 1 ships to real users.
+      in scope. The technical capabilities are built: consent records, data
+      export, and erasure across all three services. What is still open is not
+      engineering - how the notice is worded, what retention periods apply,
+      what makes parental consent "verifiable", and whether de-identifying
+      audit rows is a defensible reading of the s.8(7) retention exception.
+      The five questions at the end of `docs/product/DPDP-COMPLIANCE.md` need
+      someone qualified in Indian data protection law, and must be answered
+      before Phase 1 ships to real users.

@@ -32,5 +32,16 @@ public sealed class FamilyRepository(MemberFamilyDbContext dbContext) : IFamilyR
     public Task<bool> CodeExistsAsync(string familyCode, CancellationToken cancellationToken = default) =>
         dbContext.Families.AnyAsync(f => f.FamilyCode == familyCode, cancellationToken);
 
+    public Task<Family?> GetForConsumerAsync(
+        Guid memberProfileId, CancellationToken cancellationToken = default) =>
+        dbContext.Families
+            .IgnoreQueryFilters()
+            .Include(f => f.Members)
+            .FirstOrDefaultAsync(
+                f => f.Members.Any(m =>
+                    m.MemberProfileId == memberProfileId
+                    && m.Status != FamilyMemberStatus.Rejected),
+                cancellationToken);
+
     public void Add(Family family) => dbContext.Families.Add(family);
 }

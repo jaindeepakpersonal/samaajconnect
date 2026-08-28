@@ -33,11 +33,11 @@ deferrable — it attaches the moment the first child record is created.
 | 8(1) | Process only for the consented purpose | partial | Purpose is recorded; enforcement is by code review, not by a runtime check |
 | 8(4) | Reasonable security safeguards | partial | See "Security" below |
 | 8(6) | Breach notification to the Board and affected principals | **not built** | Needs a process and a notification channel |
-| 8(7) | Erase when consent is withdrawn or the purpose is served | **not built** | Next cycle; see "Erasure vs. the audit log" |
+| 8(7) | Erase when consent is withdrawn or the purpose is served | **built** | `POST /v1/identity/me/erase`; see "Erasure vs. the audit log" |
 | 9 | **Verifiable parental consent for under-18s** | partial | `ParentalConsent` on `ChildProfile`, required to create one; "verifiable" needs counsel |
 | 9(3) | No tracking or behavioural monitoring of children | **built by absence** | The platform does none. Keep it that way. |
 | 11 | Right to access a summary of data and processing | **built** | A `/me/data-export` in each of the three services |
-| 12 | Right to correction and erasure | partial | Correction exists (profile edit); erasure does not |
+| 12 | Right to correction and erasure | **built** | Correction is the profile edit; erasure is `POST /v1/identity/me/erase` |
 | 13 | Right to grievance redressal | **built** | `GrievanceContact` per Samaaj, published on the public summary |
 | 14 | Right to nominate | **not built** | |
 
@@ -117,7 +117,7 @@ refused, because that is not a means of redressal.
 §8(7) and §12 require erasure. `SECURITY-CHECKLIST.md` requires the audit log
 to be immutable, "no update/delete endpoint for AuditLog, ever".
 
-Both are right, and they collide. The resolution the platform will take:
+Both are right, and they collide. The resolution the platform takes:
 
 - **Personal data is erased.** Profile, contact details, family links, the
   login itself.
@@ -132,6 +132,57 @@ Both are right, and they collide. The resolution the platform will take:
 **Needs counsel:** whether that reading of the retention exception is correct
 for this platform, and how long audit rows may be kept.
 
+### How it runs
+
+`POST /v1/identity/me/erase` takes the caller's password and nothing else.
+There is no admin approval: §12 gives the Data Principal a right, not a request
+for permission, so an admin deciding it would be the wrong shape. The password
+is the identity check a Fiduciary needs before acting on something with no undo.
+A Super Admin cannot erase this way — nothing but the bootstrap on an empty
+database can recreate one, and there is no second Super Admin to notice.
+
+identity-tenant-service clears the account and publishes
+`identity.user.erased.v1` **in the same transaction**, so an erasure that
+commits is always announced. The event carries two ids and nothing else,
+because audit-notification-service records every payload verbatim.
+
+| Service | What it does on that event |
+|---|---|
+| identity-tenant-service | Clears name, contact, password hash, roles and any outstanding activation code; status becomes `Erased` |
+| member-family-service | Clears the profile and closes its privacy settings; erases the children this member headed; removes their household membership |
+| audit-notification-service | Deletes their notifications; de-identifies the audit rows where they were the actor; records the erasure itself |
+
+Three decisions inside that are worth knowing:
+
+**The identifier is freed.** `MobileOrEmail` is unique platform-wide, so
+keeping it would mean a person who left could never come back. It is replaced
+with a per-account value at an unroutable domain, which keeps the uniqueness
+constraint satisfiable without leaving anything to sign in as.
+
+**Children go with the head who vouched for them.** Their records exist on that
+person's parental consent (§9), and consent that no longer exists cannot keep
+justifying the data it covered. The birth year survives, shifted to 1 January,
+because age is what decides conversion eligibility and the row still has to
+behave; the exact birthday is how a child would be recognised.
+
+**The household itself stays.** Deleting it would take the remaining members'
+join with it and orphan the child rows — other people's records restructured
+because one person exercised their own right. A household whose head has erased
+can no longer decide a join request; re-heading one is a known gap and belongs
+in an admin command.
+
+The single narrowly-scoped exception to append-only audit lives in
+`ErasePersonalDataCommandHandler` and `IErasureRepository`. Nothing else on the
+platform changes or removes an audit row, there is no endpoint for it, and the
+update cannot touch the action, entity, topic or timestamps. If counsel decides
+audit rows must be deleted rather than de-identified, those two files are the
+whole change.
+
+**What erasure does not reach:** anything published before it. Delivery is
+at-least-once and one-way, so a service that consumes platform events and is
+built later will not see the erasures that happened before it existed. Any new
+consumer needs to subscribe to `identity.user.erased.v1` on the day it ships,
+the way member-family-service and audit-notification-service do.
 ## Security safeguards (§8(4))
 
 In place: passwords hashed with PBKDF2-HMAC-SHA256 at 210,000 iterations with

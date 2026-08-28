@@ -245,6 +245,41 @@ public sealed class User : AggregateRoot, ITenantScopedEntity
     /// </summary>
     public void Suspend() => Status = UserStatus.Suspended;
 
+    /// <summary>
+    /// Erases the person from this account, keeping only the shell needed to
+    /// stop other services' references dangling.
+    /// </summary>
+    /// <remarks>
+    /// The identifier is replaced rather than blanked, because it is uniquely
+    /// indexed platform-wide: blanking every erased account to the same empty
+    /// string would make the second erasure fail on a unique violation. The
+    /// replacement is derived from the row id, so it is unique, obviously not
+    /// a real address, and cannot be reversed into the original.
+    /// </remarks>
+    public void Erase(DateTimeOffset now)
+    {
+        if (Status == UserStatus.Erased)
+        {
+            return;
+        }
+
+        MobileOrEmail = $"erased-{Id:N}@invalid";
+        FullName = "Erased member";
+        PasswordHash = string.Empty;
+        Status = UserStatus.Erased;
+        IsContactVerified = false;
+        LastLoginAt = null;
+        FailedLoginAttempts = 0;
+        LockedOutUntil = null;
+        ActivationCode = null;
+
+        // Roles go: they say what this person was allowed to do, which is as
+        // much about them as their name.
+        _roles.Clear();
+
+        Raise(new UserErasedDomainEvent(Id, TenantId, now));
+    }
+
     public void Reinstate()
     {
         Status = UserStatus.Active;

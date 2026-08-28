@@ -50,5 +50,8 @@ public sealed class MemberProfileRepository(MemberFamilyDbContext dbContext) : I
             .ToListAsync(cancellationToken);
     }
 
+    public Task<MemberProfile?> GetForConsumerAsync(Guid id, CancellationToken cancellationToken = default) =>
+        dbContext.MemberProfiles.IgnoreQueryFilters().FirstOrDefaultAsync(p => p.Id == id, cancellationToken);
+
     public void Add(MemberProfile profile) => dbContext.MemberProfiles.Add(profile);
 }

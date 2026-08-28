@@ -356,6 +356,113 @@ GRIEVANCE=$(curl -s "$GATEWAY/v1/identity/tenants/$SLUG" | json_field email)
 check "it is published to anyone, as section 13 requires" "grievances@example.com" "$GRIEVANCE"
 
 echo
+
+echo
+echo "DPDP section 12: erasure, across all three services"
+
+# A throwaway account, because everything below this point still needs the
+# member registered at the top to be able to sign in.
+ERASE_EMAIL="erasable-$(date +%s)@example.com"
+
+check "a throwaway member registers" 201 \
+  "$(status -X POST "$GATEWAY/v1/identity/register" -H 'Content-Type: application/json' \
+     -d "{\"tenantSlug\":\"$SLUG\",\"fullName\":\"Erasable Member\",\"mobileOrEmail\":\"$ERASE_EMAIL\",\"password\":\"$MEMBER_PASSWORD\",\"consentedPurposes\":[\"Membership\"],\"noticeVersion\":\"$NOTICE_VERSION\"}")"
+
+ERASE_TOKEN=$(curl -s -X POST "$GATEWAY/v1/identity/login" -H 'Content-Type: application/json' \
+  -d "{\"mobileOrEmail\":\"$ERASE_EMAIL\",\"password\":\"$MEMBER_PASSWORD\"}" | json_field accessToken)
+
+ERASE_USER_ID=$(curl -s -H "Authorization: Bearer $ERASE_TOKEN" "$GATEWAY/v1/identity/me" \
+  | json_field userId)
+
+# There has to be something to erase before erasing proves anything.
+erasable_profile=0
+for attempt in $(seq 1 30); do
+  if curl -s -H "Authorization: Bearer $ERASE_TOKEN" "$GATEWAY/v1/members/me" \
+     | grep -q "Erasable Member"; then
+    erasable_profile=1
+    break
+  fi
+  sleep 2
+done
+check "the throwaway profile arrives over Kafka" 1 "$erasable_profile"
+
+# Both waits below are for something to *disappear*, so each needs proof it was
+# there first - otherwise a check that runs before the event is consumed passes
+# for the wrong reason.
+listed_before=0
+for attempt in $(seq 1 30); do
+  if curl -s -H "Authorization: Bearer $MEMBER_TOKEN" "$GATEWAY/v1/members?search=Erasable" \
+     | grep -q "Erasable Member"; then
+    listed_before=1
+    break
+  fi
+  sleep 2
+done
+check "the throwaway member is in the directory first" 1 "$listed_before"
+
+actor_recorded=0
+for attempt in $(seq 1 30); do
+  if curl -s -H "Authorization: Bearer $ADMIN_TOKEN" -H "$ADMIN_TENANT_HEADER" \
+     "$GATEWAY/v1/audit/logs?limit=200" | grep -q "\"actorUserId\":\"$ERASE_USER_ID\""; then
+    actor_recorded=1
+    break
+  fi
+  sleep 2
+done
+check "their actions are on the audit record first" 1 "$actor_recorded"
+
+check "a wrong password erases nothing" 401 \
+  "$(status -X POST "$GATEWAY/v1/identity/me/erase" -H 'Content-Type: application/json' \
+     -H "Authorization: Bearer $ERASE_TOKEN" -d '{"password":"not-the-password"}')"
+
+check "still signed in after the refused attempt" 200 \
+  "$(status -H "Authorization: Bearer $ERASE_TOKEN" "$GATEWAY/v1/identity/me")"
+
+check "the member erases their own account" 200 \
+  "$(status -X POST "$GATEWAY/v1/identity/me/erase" -H 'Content-Type: application/json' \
+     -H "Authorization: Bearer $ERASE_TOKEN" -d "{\"password\":\"$MEMBER_PASSWORD\"}")"
+
+check "an erased member cannot sign in" 401 \
+  "$(status -X POST "$GATEWAY/v1/identity/login" -H 'Content-Type: application/json' \
+     -d "{\"mobileOrEmail\":\"$ERASE_EMAIL\",\"password\":\"$MEMBER_PASSWORD\"}")"
+
+# member-family-service consumes identity.user.erased.v1.
+profile_erased=0
+for attempt in $(seq 1 30); do
+  if ! curl -s -H "Authorization: Bearer $MEMBER_TOKEN" "$GATEWAY/v1/members?search=Erasable" \
+     | grep -q "Erasable Member"; then
+    profile_erased=1
+    break
+  fi
+  sleep 2
+done
+check "the profile is erased in member-family-service" 1 "$profile_erased"
+
+# audit-notification-service consumes it too, and de-identifies rather than
+# deletes: the actions survive, the actor does not.
+actor_gone=0
+for attempt in $(seq 1 30); do
+  if ! curl -s -H "Authorization: Bearer $ADMIN_TOKEN" -H "$ADMIN_TENANT_HEADER" \
+     "$GATEWAY/v1/audit/logs?limit=200" | grep -q "\"actorUserId\":\"$ERASE_USER_ID\"" ; then
+    actor_gone=1
+    break
+  fi
+  sleep 2
+done
+check "the audit rows no longer name the actor" 1 "$actor_gone"
+
+ERASURE_RECORDED=$(curl -s -H "Authorization: Bearer $ADMIN_TOKEN" -H "$ADMIN_TENANT_HEADER" \
+  "$GATEWAY/v1/audit/logs?limit=200" | grep -c '"action":"Erased"' || true)
+
+if [ "$ERASURE_RECORDED" -ge 1 ]; then
+  echo "  ok    the erasure itself is on the record"
+  pass=$((pass + 1))
+else
+  echo "  FAIL  the erasure itself is on the record (found none)"
+  fail=$((fail + 1))
+fi
+
+echo
 echo "Header forgery"
 check "a forged tenant header does not change the answer" 200 \
   "$(status -H "X-Tenant-Id: 11111111-1111-1111-1111-111111111111" \
