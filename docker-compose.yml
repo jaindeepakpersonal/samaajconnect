@@ -136,6 +136,19 @@ services:
     ports:
       - "5103:8080"
 
+  timeline-service:
+    <<: *service-defaults
+    build:
+      context: .
+      dockerfile: services/timeline-service/Dockerfile
+    container_name: samaajconnect-timeline
+    environment:
+      <<: *service-environment
+      ConnectionStrings__Default: "Host=postgres;Port=5432;Database=samaajconnect_timeline;Username=samaajconnect;Password=samaajconnect"
+      Jwt__SigningKey: "${JWT_SIGNING_KEY:-local-development-signing-key-do-not-use-in-production}"
+      Outbox__PollIntervalSeconds: "5"
+    ports:
+      - "5104:8080"
   gateway:
     build:
       context: .
@@ -150,6 +163,8 @@ services:
       audit-notification-service:
         condition: service_started
       member-family-service:
+        condition: service_started
+      timeline-service:
         condition: service_started
     environment:
       ASPNETCORE_ENVIRONMENT: Development

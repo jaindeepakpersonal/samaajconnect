@@ -239,6 +239,7 @@ session.
 | UI reference | `docs/product/wireframes/*.html` |
 | Member-facing app conventions | `apps/member-portal/CLAUDE.md` |
 | Admin panel conventions | `apps/admin-portal/CLAUDE.md` |
+| Module-gated service, worked example | `services/timeline-service/CLAUDE.md` |
 | Scaffold a new bounded-context service | `.claude/skills/new-microservice/SKILL.md` |
 | Add a command/query to an existing service | `.claude/skills/add-service-feature/SKILL.md` |
 | Turn a wireframe screen into a real component | `.claude/skills/wireframe-to-angular/SKILL.md` |

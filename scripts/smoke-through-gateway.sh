@@ -651,6 +651,133 @@ echo
 echo
 
 echo
+
+echo
+echo "Timeline: posting, moderation, and the module gate"
+
+# The first module-gated route on the platform, so this is also the first time
+# ModuleGateMiddleware decides anything for real.
+check "the community module is switched on for this Samaaj" 200 \
+  "$(status -X PUT "$GATEWAY/v1/identity/tenants/$TENANT_ID/modules" \
+     -H 'Content-Type: application/json' -H "Authorization: Bearer $ADMIN_TOKEN" \
+     -d '{"enabledModules":["community","pathshala"]}')"
+
+# The gateway caches what a Samaaj runs for 60 seconds, so a module change is
+# not instant. Waiting is the honest way to test it.
+sleep 62
+
+check "a member reads the timeline" 200 \
+  "$(status -H "Authorization: Bearer $MEMBER_TOKEN" "$GATEWAY/v1/timeline/posts")"
+
+POST=$(curl -s -X POST "$GATEWAY/v1/timeline/posts" -H 'Content-Type: application/json' \
+  -H "Authorization: Bearer $MEMBER_TOKEN" \
+  -d '{"title":"Community blood donation drive","body":"Volunteers are welcome to participate.","asAnnouncement":false}')
+
+POST_ID=$(printf '%s' "$POST" | json_field id)
+POST_STATUS=$(printf '%s' "$POST" | json_field status)
+
+if [ -n "$POST_ID" ] && [ "$POST_STATUS" = "PendingReview" ]; then
+  echo "  ok    a member's post is created awaiting review"
+  pass=$((pass + 1))
+else
+  echo "  FAIL  a member's post is created awaiting review (got '$POST_STATUS')"
+  fail=$((fail + 1))
+fi
+
+check "a member cannot publish a Samaaj announcement" 403 \
+  "$(status -X POST "$GATEWAY/v1/timeline/posts" -H 'Content-Type: application/json' \
+     -H "Authorization: Bearer $MEMBER_TOKEN" \
+     -d '{"title":"Announcement","body":"Straight to the timeline.","asAnnouncement":true}')"
+
+check "nor moderate" 403 \
+  "$(status -X POST "$GATEWAY/v1/timeline/posts/$POST_ID/moderate" -H 'Content-Type: application/json' \
+     -H "Authorization: Bearer $MEMBER_TOKEN" -d '{"decision":"Approve"}')"
+
+check "nor read the moderation queue" 403 \
+  "$(status -H "Authorization: Bearer $MEMBER_TOKEN" \
+     "$GATEWAY/v1/timeline/posts/moderation-queue")"
+
+# The post is invisible to everyone but its author until it is approved.
+if curl -s -H "Authorization: Bearer $ADMIN_TOKEN" -H "$ADMIN_TENANT_HEADER" \
+   "$GATEWAY/v1/timeline/posts" | grep -q "blood donation"; then
+  echo "  FAIL  an unapproved post is on the timeline"
+  fail=$((fail + 1))
+else
+  echo "  ok    an unapproved post is not on the timeline"
+  pass=$((pass + 1))
+fi
+
+if curl -s -H "Authorization: Bearer $ADMIN_TOKEN" -H "$ADMIN_TENANT_HEADER" \
+   "$GATEWAY/v1/timeline/posts/moderation-queue" | grep -q "blood donation"; then
+  echo "  ok    but it is in the moderation queue"
+  pass=$((pass + 1))
+else
+  echo "  FAIL  the post did not reach the moderation queue"
+  fail=$((fail + 1))
+fi
+
+check "rejecting without saying why is refused" 400 \
+  "$(status -X POST "$GATEWAY/v1/timeline/posts/$POST_ID/moderate" -H 'Content-Type: application/json' \
+     -H "Authorization: Bearer $ADMIN_TOKEN" -H "$ADMIN_TENANT_HEADER" \
+     -d '{"decision":"Reject"}')"
+
+check "a moderator approves it" 200 \
+  "$(status -X POST "$GATEWAY/v1/timeline/posts/$POST_ID/moderate" -H 'Content-Type: application/json' \
+     -H "Authorization: Bearer $ADMIN_TOKEN" -H "$ADMIN_TENANT_HEADER" \
+     -d '{"decision":"Approve"}')"
+
+if curl -s -H "Authorization: Bearer $ADMIN_TOKEN" -H "$ADMIN_TENANT_HEADER" \
+   "$GATEWAY/v1/timeline/posts" | grep -q "blood donation"; then
+  echo "  ok    and it reaches the Samaaj's timeline"
+  pass=$((pass + 1))
+else
+  echo "  FAIL  the approved post is not on the timeline"
+  fail=$((fail + 1))
+fi
+
+check "commenting on an approved post" 201 \
+  "$(status -X POST "$GATEWAY/v1/timeline/posts/$POST_ID/comments" -H 'Content-Type: application/json' \
+     -H "Authorization: Bearer $MEMBER_TOKEN" -d '{"body":"Happy to help."}')"
+
+check "reacting to it" 200 \
+  "$(status -X PUT "$GATEWAY/v1/timeline/posts/$POST_ID/reaction" -H 'Content-Type: application/json' \
+     -H "Authorization: Bearer $MEMBER_TOKEN" -d '{"reaction":"Appreciate"}')"
+
+check "reporting it" 200 \
+  "$(status -X POST "$GATEWAY/v1/timeline/posts/$POST_ID/report" \
+     -H "Authorization: Bearer $MEMBER_TOKEN")"
+
+# 404, not the handler's 403: a Super Admin with no Samaaj selected has no
+# resolved tenant, and the module gate refuses a module route it cannot check
+# before the request ever reaches the service. The handler check behind it is
+# defence in depth for a caller who bypasses the gateway.
+check "a post with no Samaaj selected never reaches the service" 404 \
+  "$(status -X POST "$GATEWAY/v1/timeline/posts" -H 'Content-Type: application/json' \
+     -H "Authorization: Bearer $ADMIN_TOKEN" \
+     -d '{"title":"Nowhere","body":"No Samaaj selected.","asAnnouncement":false}')"
+
+# Switching the module off must take the whole area away, not merely refuse it:
+# a Samaaj that does not run a module should be indistinguishable from a
+# platform that has no such feature (ARCHITECTURE.md section 6).
+check "switching the community module off" 200 \
+  "$(status -X PUT "$GATEWAY/v1/identity/tenants/$TENANT_ID/modules" \
+     -H 'Content-Type: application/json' -H "Authorization: Bearer $ADMIN_TOKEN" \
+     -d '{"enabledModules":["pathshala"]}')"
+
+sleep 62
+
+check "the timeline then answers 404, not 403" 404 \
+  "$(status -H "Authorization: Bearer $MEMBER_TOKEN" "$GATEWAY/v1/timeline/posts")"
+
+check "while an ungated route is unaffected" 200 \
+  "$(status -H "Authorization: Bearer $MEMBER_TOKEN" "$GATEWAY/v1/identity/me")"
+
+check "switching it back on" 200 \
+  "$(status -X PUT "$GATEWAY/v1/identity/tenants/$TENANT_ID/modules" \
+     -H 'Content-Type: application/json' -H "Authorization: Bearer $ADMIN_TOKEN" \
+     -d '{"enabledModules":["community","pathshala"]}')"
+
+echo
 echo "Sessions: rotation, reuse detection and sign-out"
 
 SESSION_LOGIN=$(curl -s -X POST "$GATEWAY/v1/identity/login" -H 'Content-Type: application/json' \

@@ -47,6 +47,28 @@ enforced by `TenantAuthorizationBehavior`, not just UI hiding.
 > taking a whole role list makes two admins editing at once silently overwrite
 > each other.
 
+## timeline-service — `/v1/timeline`
+
+> Module-gated on `community`. A Samaaj that has switched it off gets 404 on
+> every path here, not 403 — a Samaaj that does not run a module should be
+> indistinguishable from a platform that has no such feature.
+
+| Method | Path | Roles | Purpose |
+|---|---|---|---|
+| GET | `/posts` | `Timeline.Post` | The Samaaj's timeline, plus this member's own posts whatever their status |
+| POST | `/posts` | `Timeline.Post` | Write a post. A member's goes to the queue; `asAnnouncement` needs `Timeline.Moderate` |
+| GET | `/posts/moderation-queue` | `Timeline.Moderate` | Posts awaiting review, and approved posts members have reported |
+| GET | `/posts/{id}` | `Timeline.Post` | One post with its comments |
+| POST | `/posts/{id}/moderate` | `Timeline.Moderate` | `{decision, reason}` — Approve, Reject, Hide or Restore. Reject and Hide need a reason |
+| POST | `/posts/{id}/comments` | `Timeline.Post` | Comment on an approved post |
+| PUT | `/posts/{id}/reaction` | `Timeline.Post` | Set, change or clear. Sending the same one removes it |
+| POST | `/posts/{id}/report` | `Timeline.Post` | Flag for the moderators. Removes nothing by itself |
+
+> The original draft named these `/feed` and `/moderation-queue` at the top
+> level, and gated them by role. They shipped under `/posts` because both are
+> views of the same collection, and gated by permission rather than role — see
+> "Authorization" in `services/timeline-service/CLAUDE.md` for why.
+
 ## member-family-service — `/v1/members`, `/v1/families`
 
 | Method | Path | Roles | Purpose |
@@ -64,16 +86,6 @@ enforced by `TenantAuthorizationBehavior`, not just UI hiding.
 | POST | `/children/{id}/conversion` | FamilyHead | Start adult-child conversion |
 | GET | `/children/conversion-requests` | SamaajAdmin | Requests awaiting a decision |
 | POST | `/children/conversion-requests/{id}/decide` | SamaajAdmin | Approve or reject (admin-approved, decided 2026-08-28) |
-
-## timeline-service — `/v1/timeline`
-
-| Method | Path | Roles | Purpose |
-|---|---|---|---|
-| GET | `/feed` | Member | Tenant feed (announcements + approved posts) |
-| POST | `/posts` | Member | Create post (enters moderation) |
-| GET | `/moderation-queue` | ContentModerator, SamaajAdmin | Pending posts |
-| POST | `/posts/{id}/moderate` | ContentModerator, SamaajAdmin | Approve/reject/hide/restore |
-| POST | `/posts/{id}/comments` | Member | Comment |
 
 ## volunteer-groups-service — `/v1/volunteer-groups`
 

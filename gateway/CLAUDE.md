@@ -47,6 +47,13 @@ The module key lives in route metadata rather than in a table in this project,
 so `ModuleGateMiddleware` needs no change when a service is added. Keep the path
 prefix identical to the one in `docs/product/SERVICES.md`.
 
+**Never put a `"//"` comment key inside `Routes` or `Clusters`.** The
+convention works at the top level of `appsettings.json`, where nothing binds
+the value. Inside those two objects every key is a route or cluster name, and
+YARP refuses to start on a route with no `Path` - so the gateway crash-loops
+with `Route '//x' requires Hosts or Path specified`. Put the explanation in
+this file instead.
+
 **The key must be one of the keys in `ModuleCatalog`** in
 identity-tenant-service's domain. That is the closed list a Samaaj's enabled
 modules are validated against, so a route whose metadata names a key no Samaaj

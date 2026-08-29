@@ -35,6 +35,8 @@ jobs:
             solution: services/audit-notification-service/Sangam.AuditNotification.sln
           - name: member-family-service
             solution: services/member-family-service/Sangam.MemberFamily.sln
+          - name: timeline-service
+            solution: services/timeline-service/Sangam.Timeline.sln
           - name: gateway
             solution: gateway/Sangam.Gateway.sln
 
@@ -137,6 +139,12 @@ jobs:
           dotnet dotnet-ef migrations has-pending-model-changes \
             --project services/member-family-service/src/Sangam.MemberFamily.Infrastructure \
             --startup-project services/member-family-service/src/Sangam.MemberFamily.Api
+
+      - name: Check timeline-service
+        run: |
+          dotnet dotnet-ef migrations has-pending-model-changes \
+            --project services/timeline-service/src/Sangam.Timeline.Infrastructure \
+            --startup-project services/timeline-service/src/Sangam.Timeline.Api
 
   smoke:
     name: Through the gateway

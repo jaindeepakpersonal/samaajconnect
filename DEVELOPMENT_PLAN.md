@@ -7,18 +7,14 @@ version of the plan; the reasoning behind the ordering lives in
 
 ## Current Status
 
-- **Stage:** Stage 0 complete; Phase 1 - Platform Foundation nearly done
-- **Last updated:** 2026-08-29 - session revocation: rotating single-use refresh
-  tokens, reuse detection, real sign-out, and 15-minute access tokens. 555 tests
-  green (490 backend, 65 frontend) plus 92 smoke checks against a stack built
-  from empty volumes.
-- **Blocking item:** none. Four Phase 1 items remain, none blocking: step-up
-  auth on deactivating a Samaaj, a member-portal surface for the DPDP rights, an
-  editable role matrix, and the two DPDP obligations that need a notification
-  channel first. `SECURITY-CHECKLIST.md` is now 14 ticked and 4 open, and all
-  four open ones are deployment concerns or wait on file storage. The five
-  questions in `docs/product/DPDP-COMPLIANCE.md` need counsel before this ships
-  to real users. Next: Phase 2, starting with the timeline and volunteer groups.
+- **Stage:** Phase 1 complete bar four tracked items; Phase 2 started
+- **Last updated:** 2026-08-29 - timeline-service, the platform's fourth service
+  and the first behind a module gate. 599 tests green (534 backend, 65 frontend)
+  plus 111 smoke checks against a stack built from empty volumes.
+- **Blocking item:** none. Next in Phase 2: `volunteer-groups-service`, then
+  events. The four Phase 1 leftovers are tracked above and none of them blocks
+  Phase 2. The five questions in `docs/product/DPDP-COMPLIANCE.md` still need
+  counsel before any of this ships to real users.
 
 *(Update these three lines at the start/end of every work session —
 they're what a coding agent or a teammate should read first to know
@@ -139,7 +135,7 @@ unit tested.
 
 ## Phase 2 — Social & Community Engagement
 
-- [ ] `timeline-service` (feed + moderation queue)
+- [x] `timeline-service` (feed + moderation queue) — posting with the member/announcement split, the moderation queue that reported posts rejoin, comments, reactions and reporting. The platform's first module-gated route: switching `community` off makes the whole area answer 404
 - [ ] `volunteer-groups-service`
 - [ ] `events-service` (with capacity/waitlist)
 - [ ] `social-issues-service` (full Draft → Published workflow)
