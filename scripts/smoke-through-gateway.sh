@@ -73,6 +73,27 @@ echo
 echo "Gateway itself"
 check "health" 200 "$(status "$GATEWAY/health")"
 
+# The member portal is served by the gateway at the root, so that the app and
+# its API share an origin - which is what its production ApiConfig
+# (`gatewayUrl: ''`) assumes. Two things have to stay true at once, and both
+# have already broken once:
+#
+#   - the catch-all must match `/`. Written as `{**catch-all}` rather than
+#     `/{**catch-all}` it matches nothing and the site is a 404.
+#   - the catch-all must NOT swallow `/health` or `/v1/**`.
+check "the member portal is served at the root" 200 "$(status "$GATEWAY/")"
+
+# A client-side route. Reloading one has to reach the app, not 404 at the edge.
+check "and a deep link reaches the app rather than a 404" 200 "$(status "$GATEWAY/groups")"
+
+if curl -s "$GATEWAY/" | grep -q "<app-root"; then
+  echo "  ok    and what it serves is the Angular app"
+  pass=$((pass + 1))
+else
+  echo "  FAIL  the root did not serve the Angular app"
+  fail=$((fail + 1))
+fi
+
 echo
 echo "Anonymous surface"
 check "unauthenticated /me is refused" 401 "$(status "$GATEWAY/v1/identity/me")"

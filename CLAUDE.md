@@ -40,8 +40,8 @@ samaajconnect/
 │       │   └── Sangam.{PascalName}.Infrastructure/
 │       └── tests/
 ├── apps/
-│   ├── member-portal/            (Angular, SSR)
-│   └── admin-portal/             (Angular, SPA)
+│   ├── member-portal/            (Angular, SSR; Dockerfile; served by the gateway)
+│   └── admin-portal/             (Angular, SPA; Dockerfile + nginx.conf; own origin)
 ├── libs/                         (shared Angular components, HTTP interceptors)
 └── .claude/
     └── skills/
@@ -212,6 +212,23 @@ session.
   own `CLAUDE.md` — one route block per service, matching
   `/v1/{resource-prefix}/**`, plus the tenant module-flag key that
   route requires.
+
+**The two Angular apps are containers too**, and they are not symmetrical.
+
+- **member-portal** is server-side rendered (Node) and is reached
+  *through the gateway* at `http://localhost:8080/`, not on a port of
+  its own. Its production `ApiConfig` says `gatewayUrl: ''` — same
+  origin — so whatever serves the app must also serve `/v1`, and the
+  gateway is what does. The route is a catch-all with `Order: 1000`, so
+  every `/v1/**` route and the gateway's own `/health` win over it.
+- **admin-portal** is a static SPA served by nginx, which proxies
+  `/v1` to the gateway. It is on its own origin
+  (`http://localhost:4300`) **deliberately**: both apps use the same
+  `TokenStore`, whose `sessionStorage` keys are
+  `samaajconnect.token` and `samaajconnect.refresh`. Share an origin and
+  an admin signing in overwrites a member's session in the same tab.
+
+Neither uses `*service-defaults` — they need no database and no broker.
 
 ## 9. Testing conventions
 

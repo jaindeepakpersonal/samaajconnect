@@ -1,7 +1,13 @@
 # gateway
 
-YARP reverse proxy. Single public entry point for both Angular apps and for
-anything else talking to the platform.
+YARP reverse proxy. The platform's public entry point: every `/v1` API route,
+and the member portal itself.
+
+The **admin panel is not behind it** - it has its own nginx on its own origin,
+which proxies `/v1` here. That is deliberate, not an omission: both Angular apps
+use the same `TokenStore`, whose sessionStorage keys are `samaajconnect.token`
+and `samaajconnect.refresh`, and sessionStorage is scoped to an origin. On one
+origin an admin signing in would overwrite a member's session in the same tab.
 
 Read the root `CLAUDE.md` §6 and `docs/product/ARCHITECTURE.md` §6 first — this
 file covers how the gateway is built, not why the platform is shaped this way.
@@ -42,6 +48,32 @@ Two blocks in `src/Sangam.Gateway/appsettings.json`, and nothing else:
   }
 }
 ```
+
+## Serving the member portal
+
+One route, and two things about it that have both broken once:
+
+```jsonc
+"member-portal": {
+  "ClusterId": "member-portal",
+  // Every /v1 route and the gateway's own /health must win over this one.
+  "Order": 1000,
+  // The leading slash is load-bearing. `{**catch-all}` on its own matches
+  // nothing, and the whole site is a 404 with no error anywhere.
+  "Match": { "Path": "/{**catch-all}" }
+}
+```
+
+It carries no `module` metadata, so it is never gated - a Samaaj cannot switch
+off the site it signs in on.
+
+The portal is served here rather than on a port of its own because its
+production `ApiConfig` says `gatewayUrl: ''` - same origin. Whatever serves the
+app has to serve `/v1` too, and this is what does. `scripts/smoke-through-gateway.sh`
+asserts all three: the root serves the app, a deep link reaches it rather than
+404ing at the edge, and `/health` is still the gateway's own.
+
+## Adding a service, continued
 
 The module key lives in route metadata rather than in a table in this project,
 so `ModuleGateMiddleware` needs no change when a service is added. Keep the path

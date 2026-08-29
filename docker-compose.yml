@@ -244,6 +244,8 @@ services:
         condition: service_started
       pathshala-service:
         condition: service_started
+      member-portal:
+        condition: service_started
     environment:
       ASPNETCORE_ENVIRONMENT: Development
       Redis__ConnectionString: redis:6379
@@ -251,6 +253,55 @@ services:
       Gateway__IdentityServiceUrl: "http://identity-tenant-service:8080"
     ports:
       - "8080:8080"
+
+  # ---- The two Angular apps ------------------------------------------------
+  #
+  # Neither is a backend service, so neither uses *service-defaults: they need
+  # no database and no broker.
+
+  # Server-side rendered, and reached *through the gateway* at
+  # http://localhost:8080 rather than on a port of its own. Its production
+  # ApiConfig says `gatewayUrl: ''` - same origin - so whatever serves the app
+  # must also serve /v1, and the gateway is what does.
+  member-portal:
+    build:
+      context: .
+      dockerfile: apps/member-portal/Dockerfile
+    container_name: samaajconnect-member-portal
+    restart: unless-stopped
+    environment:
+      NODE_ENV: production
+      PORT: "4000"
+    healthcheck:
+      test: ["CMD-SHELL", "wget -q --spider http://127.0.0.1:4000/ || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+      start_period: 15s
+
+  # The admin panel, on its own origin. Not behind the gateway: both apps share
+  # the sessionStorage keys in libs/shared's TokenStore, so one origin would
+  # mean an admin signing in overwrites a member's session in the same tab.
+  # Its nginx proxies /v1 to the gateway, so it is same-origin with its own API.
+  admin-portal:
+    build:
+      context: .
+      dockerfile: apps/admin-portal/Dockerfile
+    container_name: samaajconnect-admin-portal
+    restart: unless-stopped
+    depends_on:
+      gateway:
+        condition: service_started
+    ports:
+      - "4300:8080"
+    # 127.0.0.1, not localhost: nginx listens on IPv4 only and busybox wget
+    # tries ::1 first, so `localhost` here is a connection refused on a
+    # container that is serving perfectly well.
+    healthcheck:
+      test: ["CMD-SHELL", "wget -q --spider http://127.0.0.1:8080/ || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
 
 volumes:
   postgres-data:

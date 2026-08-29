@@ -7,11 +7,12 @@ version of the plan; the reasoning behind the ordering lives in
 
 ## Current Status
 
-- **Stage:** Phase 4 built; the member portal is catching up on the backend
-- **Last updated:** 2026-08-29 - the member portal's Volunteer Groups screens,
-  including the president's review queue no wireframe covers. 923 tests green
-  (776 backend, 147 frontend) plus 237 smoke checks against a stack built from
-  empty volumes, re-runnable against a dirty one.
+- **Stage:** Phase 4 built; the whole platform now runs in Docker
+- **Last updated:** 2026-08-29 - both Angular apps containerised. Neither had a
+  Dockerfile, so neither could be deployed; the member portal is now served by
+  the gateway at the root and the admin panel by nginx on its own origin. 923
+  tests green (776 backend, 147 frontend) plus 240 smoke checks against a stack
+  built from empty volumes, re-runnable against a dirty one.
 - **Blocking item:** none. The **frontend gap keeps closing**: the whole
   `community` module — Timeline, Events and Volunteer Groups — now has member
   screens. Social Issues is the last service with a Home tile still saying
@@ -174,6 +175,15 @@ unit tested.
       group says the reader leads it, because the endpoint answers 404 to
       anyone else. Verified against the stack: applied as a member, accepted
       with a position as the president
+- [x] **Both Angular apps are containerised.** Neither had a Dockerfile, so
+      neither could be deployed - the portals only ever ran from `ng serve` on
+      a developer's machine. member-portal is an SSR Node image served *by the
+      gateway* at the root, which is what makes its production
+      `gatewayUrl: ''` (same origin) true. admin-portal is a static build behind
+      nginx on its own origin, proxying `/v1` to the gateway - deliberately not
+      sharing an origin, because both apps use the same sessionStorage token
+      keys and one origin would mean one session. Smoke checks cover the root,
+      a deep link and `/health` not being swallowed
 - [ ] **Member portal: the rest.** Social Issues has a service and no screen.
       Its Home tile says "Coming soon", as do Members and Family
 

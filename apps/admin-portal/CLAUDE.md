@@ -41,7 +41,25 @@ apps/admin-portal/src/app/
 
 ## Running it
 
-The panel talks to the gateway, so bring the stack up first:
+**In Docker, with everything else.** The panel is a container now: a static
+build served by nginx, which also proxies `/v1` to the gateway so the app is
+same-origin with its own API.
+
+```bash
+docker compose up -d --build
+```
+
+Then open <http://localhost:4300>.
+
+**Its own origin is deliberate.** It is not behind the gateway like the member
+portal, because both apps share `libs/shared`'s `TokenStore` and its
+sessionStorage keys `samaajconnect.token` / `samaajconnect.refresh`.
+sessionStorage is scoped to an origin, so on one origin an admin signing in
+would overwrite a member's session in the same tab - and the panel would then
+call every endpoint with a member's token and 403 on all of them. Two origins,
+two sessions. See `apps/admin-portal/nginx.conf`.
+
+**For frontend work**, the dev server is still the fast path:
 
 ```bash
 docker compose up -d --build
@@ -51,7 +69,17 @@ docker compose up -d --build
 npm run start:admin
 ```
 
-It serves on port 4300, so it and the member portal can run together.
+The dev server also uses 4300, so it and the container cannot both hold it.
+Stop the container first:
+
+```bash
+docker compose stop admin-portal
+```
+
+The rest of the stack keeps running, and the dev server's `proxy.conf.json`
+sends `/v1` to the gateway on 8080 — the same same-origin arrangement nginx
+provides in the container.
+
 `npm test` runs all three suites: `test:libs`, `test:app` (member-portal) and
 `test:admin`.
 

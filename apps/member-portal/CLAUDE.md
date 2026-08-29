@@ -41,7 +41,21 @@ interceptor to itself.
 
 ## Running it
 
-The portal talks to the gateway, so bring the stack up first:
+**In Docker, with everything else.** The portal is a container now, and it is
+served *by the gateway* rather than on a port of its own - so the app and its
+API share an origin, which is what its production `ApiConfig`
+(`gatewayUrl: ''`) assumes.
+
+```bash
+docker compose up -d --build
+```
+
+Then open <http://localhost:8080>. There is no port 4200 in the compose stack;
+the SSR container listens on 4000 on the compose network and nothing publishes
+it, because an app reachable without its API is not much use.
+
+**For frontend work**, the dev server is still the fast path - rebuilds are
+instant and the container is a full `ng build`:
 
 ```bash
 docker compose up -d --build
@@ -50,6 +64,9 @@ docker compose up -d --build
 ```bash
 npm start
 ```
+
+That serves on 4200 and `proxy.conf.json` sends `/v1` to the gateway on 8080,
+which is the same same-origin arrangement by a different route.
 
 `npm test` runs both suites: `test:libs` (Vitest, for `libs/shared`) and
 `test:app` (the Angular unit-test builder, also Vitest). They are separate
