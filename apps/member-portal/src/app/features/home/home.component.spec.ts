@@ -2,7 +2,8 @@ import { provideHttpClient } from '@angular/common/http';
 import { HttpTestingController, provideHttpClientTesting } from '@angular/common/http/testing';
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { provideRouter } from '@angular/router';
-import { API_CONFIG, CurrentUser, TenantSummary } from '@samaajconnect/shared';
+import { API_CONFIG, AllModuleKeys, CurrentUser, TenantSummary } from '@samaajconnect/shared';
+import { routes } from '../../app.routes';
 import { HomeComponent } from './home.component';
 
 describe('HomeComponent', () => {
@@ -92,6 +93,51 @@ describe('HomeComponent', () => {
     expect(tileTitles()).toContain('Pathshala');
     expect(tileTitles()).not.toContain('Boli');
     expect(tileTitles()).not.toContain('Events');
+  });
+
+  it('shows the community tiles for a Samaaj that runs community', () => {
+    // The regression test for a bug that was invisible by construction. These
+    // three tiles were filtered on `Events` and `VolunteerGroups`, neither of
+    // which is a module key the platform has ever had - all three are behind
+    // `community`. The filter did not fail, it never matched, so the tiles were
+    // missing for every Samaaj with nothing logged anywhere.
+    load({ modules: ['community'] });
+
+    expect(tileTitles()).toContain('Timeline');
+    expect(tileTitles()).toContain('Events');
+    expect(tileTitles()).toContain('Volunteer');
+  });
+
+  it('offers every module the platform has, to a Samaaj that runs them all', () => {
+    load({ modules: [...AllModuleKeys] });
+
+    // A tile the catalogue can enable but Home never lists is a feature no
+    // member can reach from the portal.
+    expect(tileTitles()).toEqual(
+      expect.arrayContaining([
+        'Timeline',
+        'Events',
+        'Volunteer',
+        'Social Issues',
+        'Celebrities of Samaaj',
+        'Pathshala',
+        'Boli',
+      ]),
+    );
+  });
+
+  it('never offers a tile whose route the app does not register', () => {
+    // A tile linking to a path with no route sends the member to the wildcard
+    // and straight back to Home, which reads as the button being broken.
+    load({ modules: [...AllModuleKeys] });
+
+    const registered = routes.map((route) => `/${route.path}`);
+
+    for (const tile of component.tiles()) {
+      if (tile.route !== null) {
+        expect(registered).toContain(tile.route);
+      }
+    }
   });
 
   it('always shows the core tiles that are not behind a module flag', () => {

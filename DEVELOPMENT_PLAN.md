@@ -7,22 +7,23 @@ version of the plan; the reasoning behind the ordering lives in
 
 ## Current Status
 
-- **Stage:** Phase 4 service built; Phase 1 has three tracked leftovers
-- **Last updated:** 2026-08-29 - pathshala-service, the platform's ninth service
-  and the Phase 4 context. 847 tests green (776 backend, 71 frontend) plus 237
-  smoke checks against a stack built from empty volumes, re-runnable against a
-  dirty one.
-- **Blocking item:** none, but the **frontend gap is now the largest thing in
-  this plan**. Every service since timeline-service has shipped backend-only,
-  and the member portal still has login, register and home. Nine services have
-  no member-facing screen. Next is either that, the Phase 5 `boli-service`, or
-  the three remaining Phase 1 leftovers, which are smaller: a member-portal
-  surface for the DPDP rights, an editable role matrix, and the two DPDP
-  obligations that need a notification channel first. The vote endpoint's
-  throughput load test is carried to Phase 5, since it needs a deployed
-  environment; its correctness half is done. The five questions in
-  `docs/product/DPDP-COMPLIANCE.md` still need counsel before any of this ships
-  to real users.
+- **Stage:** Phase 4 built; the member portal has its first real screen
+- **Last updated:** 2026-08-29 - the member portal's Timeline, and a fix to Home
+  that had hidden three module tiles from every Samaaj. 869 tests green (776
+  backend, 93 frontend) plus 237 smoke checks against a stack built from empty
+  volumes, re-runnable against a dirty one.
+- **Blocking item:** none. The **frontend gap is still the largest thing in this
+  plan**, but it is no longer untouched: Timeline is built and establishes the
+  pattern the other screens follow. Eight services still have no member-facing
+  screen — Events, Volunteer Groups and Social Issues are the obvious next
+  three, since their services are complete and their Home tiles already say
+  "Coming soon". After that: the Phase 5 `boli-service`, or the three remaining
+  Phase 1 leftovers (a member-portal surface for the DPDP rights, an editable
+  role matrix, and the two DPDP obligations that need a notification channel
+  first). The vote endpoint's throughput load test is carried to Phase 5, since
+  it needs a deployed environment; its correctness half is done. The five
+  questions in `docs/product/DPDP-COMPLIANCE.md` still need counsel before any
+  of this ships to real users.
 
 *(Update these three lines at the start/end of every work session —
 they're what a coding agent or a teammate should read first to know
@@ -153,6 +154,14 @@ unit tested.
 - [x] `volunteer-groups-service` — groups, the join-application flow, and the president's review queue. Introduced `VolunteerGroups.Lead`, a permission every member holds, because gating a president's own group on an admin permission made those endpoints unreachable
 - [x] `events-service` (with capacity/waitlist) — draft/publish/cancel, RSVP and a waitlist that actually moves: giving up a place promotes whoever waited longest, and a promoted member keeps their queue position
 - [x] `social-issues-service` (full Draft → Published workflow) — eight states declared as a transition table, with publishing reachable only from Approved, and an append-only history that answers "why was mine rejected?". The first service on its own module key
+- [x] **Member portal: Timeline** (wireframe `#timeline`) — the feed with its
+      three real states, composing, reactions, comments and reporting. The
+      first member-facing screen for any service beyond sign-in, and the one
+      that establishes the pattern the rest follow: a feature folder with its
+      own `*.api.ts` and `*.models.ts`, wire types mirroring the service's
+      responses, and per-item errors kept off the page-level error
+- [ ] **Member portal: the rest.** Events, Volunteer Groups and Social Issues
+      have services and no screens. Their Home tiles say "Coming soon"
 
 ## Phase 3 — Celebrity Voting
 
@@ -177,10 +186,7 @@ unit tested.
       Progress is computed rather than stored, so a corrected mark
       cannot leave it quietly wrong
 - [ ] The Angular screens for both, from the wireframes' `#myclass`,
-      `#attendance`, `#exams` and `#progress`. The member portal still
-      has only login, register and home, and every service since
-      timeline-service has shipped backend-only — this is the largest
-      accumulated gap in the plan
+      `#attendance`, `#exams` and `#progress`
 
 ## Phase 5 — Boli + Hardening
 

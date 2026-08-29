@@ -1,11 +1,28 @@
 import { HttpClient } from '@angular/common/http';
 import { Component, OnInit, computed, inject, signal } from '@angular/core';
 import { Router } from '@angular/router';
-import { AuthService, CurrentUser, TenantSummary, describeError } from '@samaajconnect/shared';
+import {
+  AuthService,
+  CurrentUser,
+  ModuleKey,
+  ModuleKeys,
+  TenantSummary,
+  describeError,
+  hasModule,
+} from '@samaajconnect/shared';
 
-/** A module tile on Home. `route` stays null until that feature ships. */
+/**
+ * A module tile on Home. `route` stays null until that feature ships.
+ *
+ * `moduleKey` is a `ModuleKey`, not a string, and that is load-bearing. These
+ * were free-text before, and two of them - `Events` and `VolunteerGroups` -
+ * were not keys the platform has ever had: both are behind `community`. The
+ * filter did not fail, it simply never matched, so those tiles were invisible
+ * to every Samaaj with nothing logged anywhere. The type now makes that
+ * mistake a compile error.
+ */
 interface ModuleTile {
-  readonly moduleKey: string | null;
+  readonly moduleKey: ModuleKey | null;
   readonly title: string;
   readonly description: string;
   readonly action: string;
@@ -128,28 +145,49 @@ export class HomeComponent implements OnInit {
       route: null,
     },
     {
-      moduleKey: 'Events',
+      moduleKey: ModuleKeys.Community,
+      title: 'Timeline',
+      description: 'Samaaj announcements and approved member posts.',
+      action: 'Open',
+      route: '/timeline',
+    },
+    {
+      moduleKey: ModuleKeys.Community,
       title: 'Events',
       description: 'Upcoming community events.',
       action: 'View',
       route: null,
     },
     {
-      moduleKey: 'Pathshala',
-      title: 'Pathshala',
-      description: "Manage your child's enrollment and education.",
-      action: 'Open',
-      route: null,
-    },
-    {
-      moduleKey: 'VolunteerGroups',
+      moduleKey: ModuleKeys.Community,
       title: 'Volunteer',
       description: 'Find groups and apply to join.',
       action: 'Explore',
       route: null,
     },
     {
-      moduleKey: 'Boli',
+      moduleKey: ModuleKeys.SocialIssues,
+      title: 'Social Issues',
+      description: 'Raise an issue, and follow the ones your Samaaj published.',
+      action: 'Open',
+      route: null,
+    },
+    {
+      moduleKey: ModuleKeys.CelebrityVoting,
+      title: 'Celebrities of Samaaj',
+      description: 'Nominate, vote, and see the published result.',
+      action: 'Open',
+      route: null,
+    },
+    {
+      moduleKey: ModuleKeys.Pathshala,
+      title: 'Pathshala',
+      description: "Manage your child's enrollment and education.",
+      action: 'Open',
+      route: null,
+    },
+    {
+      moduleKey: ModuleKeys.Boli,
       title: 'Boli',
       description: 'View active and published Boli results.',
       action: 'Open',
@@ -161,9 +199,7 @@ export class HomeComponent implements OnInit {
     const enabled = this.samaaj()?.enabledModules ?? [];
 
     return HomeComponent.AllTiles.filter(
-      (tile) =>
-        tile.moduleKey === null ||
-        enabled.some((module) => module.toLowerCase() === tile.moduleKey!.toLowerCase()),
+      (tile) => tile.moduleKey === null || hasModule(enabled, tile.moduleKey),
     );
   });
 

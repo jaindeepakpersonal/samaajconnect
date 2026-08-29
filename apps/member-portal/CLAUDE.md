@@ -11,8 +11,9 @@ before translating another screen.
 | Login | `/login` | `#login` | built |
 | Register | `/register` | `#register` | built |
 | Home | `/home` | `#home` | built |
+| Timeline | `/timeline` | `#timeline` | built |
 | Forgot password / OTP | — | `#forgot`, `#otp` | not built — no endpoint exists |
-| Profile, Members, Family, Timeline, … | — | various | not built |
+| Profile, Members, Family, Events, Groups, Issues, Celebrity, Pathshala, Boli, Notifications | — | various | not built — the services exist, the screens do not |
 
 ## Where things live
 
@@ -75,6 +76,24 @@ only once something can supply one.
 The "no modules enabled" notice is keyed off whether any *optional* module is
 on, not off an empty tile list, because Members and Family are not module-gated
 and are always present.
+
+**A module key is `ModuleKeys.X`, never a string literal.** Home filtered its
+Events and Volunteer tiles on `Events` and `VolunteerGroups`, neither of which
+is a key the platform has ever had - both features are behind `community`. The
+filter did not fail; it simply never matched, so both tiles were invisible to
+every Samaaj, forever, with nothing logged anywhere. `libs/shared`'s
+`ModuleKeys` now mirrors `ModuleCatalog` and `ModuleTile.moduleKey` is typed to
+it, which makes the same mistake a compile error.
+
+**Three bugs in this app have had one shape: the portal inventing a value the
+platform does not have.** The module keys above; a post status of `Pending`
+where the service serialises `PendingReview`; and reactions called `Like` and
+`Pray` where `ReactionType` is a closed enum of `Appreciate`, `Support` and
+`Celebrate`. None of the three is a type error - they are strings compared
+against strings on the wire - so none failed loudly. The module keys were caught
+by reading the catalogue, and the other two only by opening the screen against a
+running stack. **When a screen compares against a name the backend produced,
+check the enum, and open the page.**
 
 **Screens with no endpoint are disabled and say why.** The OTP tab and the
 forgot-password link are both present, because they are in the signed-off
