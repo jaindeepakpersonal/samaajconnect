@@ -16,8 +16,10 @@ before translating another screen.
 | Event detail | `/events/:id` | `#eventdetail` | built |
 | Volunteer Groups | `/groups` | `#groups` | built |
 | Group detail | `/groups/:id` | `#groupdetail` | built, plus the president's review queue the wireframe has no screen for |
+| Social Issues | `/issues` | `#issues` | built |
+| Issue detail | `/issues/:id` | — | built; no wireframe covers it, and the workflow is unusable without one |
 | Forgot password / OTP | — | `#forgot`, `#otp` | not built — no endpoint exists |
-| Profile, Members, Family, Issues, Celebrity, Pathshala, Boli, Notifications | — | various | not built — the services exist, the screens do not |
+| Profile, Members, Family, Celebrity, Pathshala, Boli, Notifications | — | various | not built — the services exist, the screens do not |
 
 ## Where things live
 
@@ -132,6 +134,15 @@ before the event". There is no notification channel yet, so the shipped screen
 does not say it - a disabled control can explain itself, but a sentence of prose
 cannot, and printing it would simply be a lie. There is a test asserting the
 words are absent.
+
+**A workflow screen renders its buttons from the server, never from the
+status.** Social issues have eight states and a transition table the aggregate
+enforces; the service returns `availableTransitions` computed from that same
+table, so a button that appears is a move the server will accept. Deriving the
+buttons here would put a second copy of the table in the portal, and the first
+time somebody added a state the screen would be confidently wrong. It also
+means one screen serves a member and a reviewer without knowing which it is
+talking to.
 
 **A screen never asks for something it has been told it may not have.** The
 group detail screen fetches the president's review queue only when the group

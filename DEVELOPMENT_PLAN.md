@@ -7,24 +7,23 @@ version of the plan; the reasoning behind the ordering lives in
 
 ## Current Status
 
-- **Stage:** Phase 4 built; the whole platform now runs in Docker
-- **Last updated:** 2026-08-29 - both Angular apps containerised. Neither had a
-  Dockerfile, so neither could be deployed; the member portal now runs on 4200
-  and is also served by the gateway at the root, and the admin panel by nginx on
-  its own origin. 923 tests green (776 backend, 147 frontend) plus 240 smoke
-  checks against a stack built from empty volumes, re-runnable against a dirty
-  one.
-- **Blocking item:** none. The **frontend gap keeps closing**: the whole
-  `community` module — Timeline, Events and Volunteer Groups — now has member
-  screens. Social Issues is the last service with a Home tile still saying
-  "Coming soon"; Members and Family need one too. After that: the Phase 5
-  `boli-service`, or the three remaining Phase 1 leftovers (a member-portal
-  surface for the DPDP rights, an editable role matrix, and the two DPDP
-  obligations that need a notification channel first). The vote endpoint's
-  throughput load test is carried to Phase 5, since it needs a deployed
-  environment; its correctness half is done. The five questions in
-  `docs/product/DPDP-COMPLIANCE.md` still need counsel before any of this ships
-  to real users.
+- **Stage:** Phase 4 built; four member modules have screens
+- **Last updated:** 2026-08-29 - the member portal's Social Issues screens,
+  including a detail view no wireframe covers and the eight-state workflow
+  driven entirely by the service's own `availableTransitions`. 951 tests green
+  (776 backend, 175 frontend) plus 240 smoke checks against a stack built from
+  empty volumes, re-runnable against a dirty one.
+- **Blocking item:** none. The **frontend gap keeps closing**: Timeline, Events,
+  Volunteer Groups and Social Issues all have member screens. What is left is
+  Members and Family (member-family-service exists), and the three modules whose
+  tiles still say "Coming soon" — Celebrity Voting, Pathshala and Boli, the last
+  of which has no service either. After that: the Phase 5 `boli-service`, or the
+  three remaining Phase 1 leftovers (a member-portal surface for the DPDP
+  rights, an editable role matrix, and the two DPDP obligations that need a
+  notification channel first). The vote endpoint's throughput load test is
+  carried to Phase 5, since it needs a deployed environment; its correctness
+  half is done. The five questions in `docs/product/DPDP-COMPLIANCE.md` still
+  need counsel before any of this ships to real users.
 
 *(Update these three lines at the start/end of every work session —
 they're what a coding agent or a teammate should read first to know
@@ -186,8 +185,19 @@ unit tested.
       sharing an origin, because both apps use the same sessionStorage token
       keys and one origin would mean one session. Smoke checks cover the root,
       a deep link and `/health` not being swallowed
-- [ ] **Member portal: the rest.** Social Issues has a service and no screen.
-      Its Home tile says "Coming soon", as do Members and Family
+- [x] **Member portal: Social Issues** (wireframe `#issues`, plus a detail
+      screen no wireframe covers) - the submission form, the published list,
+      and "My Submissions" with the wireframe's progress strip. The strip is
+      drawn only for the four states on the happy path; Rejected,
+      ChangesRequested and Closed are where an issue leaves it, so those say so
+      in words rather than showing an issue as partway to a publication it is
+      not heading for. Every workflow button comes from the service's
+      `availableTransitions`, so the portal holds no copy of the eight-state
+      table. The detail screen surfaces the reviewer's reason at the top, which
+      is what the append-only history was built to answer
+- [ ] **Member portal: the rest.** Members and Family have a service
+      (member-family-service) and no screens; Celebrity Voting, Pathshala and
+      Boli tiles say "Coming soon" too
 
 ## Phase 3 — Celebrity Voting
 

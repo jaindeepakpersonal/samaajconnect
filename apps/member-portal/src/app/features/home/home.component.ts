@@ -170,7 +170,7 @@ export class HomeComponent implements OnInit {
       title: 'Social Issues',
       description: 'Raise an issue, and follow the ones your Samaaj published.',
       action: 'Open',
-      route: null,
+      route: '/issues',
     },
     {
       moduleKey: ModuleKeys.CelebrityVoting,
