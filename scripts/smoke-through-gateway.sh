@@ -905,6 +905,144 @@ check "deactivating the group" 200 \
      -H 'Content-Type: application/json' -H "Authorization: Bearer $ADMIN_TOKEN" \
      -H "$ADMIN_TENANT_HEADER" -d '{"status":"Inactive"}')"
 
+
+echo
+echo "Events: publishing, capacity and the waitlist"
+
+# Runs while the community module is on; the groups section above leaves it on
+# and waits the gateway's cache out.
+EVENT_START=$(date -u -d "+30 days" +%Y-%m-%dT%H:%M:%SZ 2>/dev/null \
+  || date -u -v+30d +%Y-%m-%dT%H:%M:%SZ)
+
+# A fresh title per run, like the post and group above: the visibility
+# checks grep the list for it, and a fixed title matches whatever an
+# earlier run left published.
+EVENT_TITLE="Paryushan Lecture $(date +%s)"
+
+EVENT=$(curl -s -X POST "$GATEWAY/v1/events" -H 'Content-Type: application/json' \
+  -H "Authorization: Bearer $ADMIN_TOKEN" -H "$ADMIN_TENANT_HEADER" \
+  -d "{\"title\":\"$EVENT_TITLE\",\"description\":\"An evening lecture.\",\"startAt\":\"$EVENT_START\",\"endAt\":null,\"venue\":\"Community Hall\",\"organizerType\":\"Samaaj\",\"organizerId\":null,\"registrationEnabled\":true,\"capacity\":1}")
+
+EVENT_ID=$(printf '%s' "$EVENT" | json_field id)
+EVENT_STATUS=$(printf '%s' "$EVENT" | json_field status)
+
+if [ "$EVENT_STATUS" = "Draft" ]; then
+  echo "  ok    an event is created as a draft"
+  pass=$((pass + 1))
+else
+  echo "  FAIL  an event is created as a draft (got '$EVENT_STATUS')"
+  fail=$((fail + 1))
+fi
+
+check "a member cannot create one" 403 \
+  "$(status -X POST "$GATEWAY/v1/events" -H 'Content-Type: application/json' \
+     -H "Authorization: Bearer $MEMBER_TOKEN" \
+     -d "{\"title\":\"Unauthorised\",\"description\":null,\"startAt\":\"$EVENT_START\",\"endAt\":null,\"venue\":null,\"organizerType\":\"Samaaj\",\"organizerId\":null,\"registrationEnabled\":true,\"capacity\":null}")"
+
+# A draft is not an event anybody has been told about.
+if curl -s -H "Authorization: Bearer $MEMBER_TOKEN" "$GATEWAY/v1/events" \
+   | grep -q "$EVENT_TITLE"; then
+  echo "  FAIL  an unpublished event is visible to members"
+  fail=$((fail + 1))
+else
+  echo "  ok    an unpublished event is not visible to members"
+  pass=$((pass + 1))
+fi
+
+check "a member cannot register for a draft" 404 \
+  "$(status -X POST "$GATEWAY/v1/events/$EVENT_ID/registration" \
+     -H "Authorization: Bearer $MEMBER_TOKEN")"
+
+check "the organiser publishes it" 200 \
+  "$(status -X POST "$GATEWAY/v1/events/$EVENT_ID/publish" \
+     -H "Authorization: Bearer $ADMIN_TOKEN" -H "$ADMIN_TENANT_HEADER")"
+
+if curl -s -H "Authorization: Bearer $MEMBER_TOKEN" "$GATEWAY/v1/events" \
+   | grep -q "$EVENT_TITLE"; then
+  echo "  ok    and it reaches the Samaaj"
+  pass=$((pass + 1))
+else
+  echo "  FAIL  the published event did not reach the Samaaj"
+  fail=$((fail + 1))
+fi
+
+RSVP=$(curl -s -X POST "$GATEWAY/v1/events/$EVENT_ID/registration" \
+  -H "Authorization: Bearer $MEMBER_TOKEN")
+
+if printf '%s' "$RSVP" | grep -q '"status":"Registered"'; then
+  echo "  ok    the first member takes the only place"
+  pass=$((pass + 1))
+else
+  echo "  FAIL  the first member takes the only place ($RSVP)"
+  fail=$((fail + 1))
+fi
+
+# The wireframe's "Full - Waitlist" state, as a real outcome rather than a pill.
+WAITLIST=$(curl -s -X POST "$GATEWAY/v1/events/$EVENT_ID/registration" \
+  -H "Authorization: Bearer $CHILD_TOKEN")
+
+if printf '%s' "$WAITLIST" | grep -q '"status":"Waitlisted"'; then
+  echo "  ok    the second is waitlisted rather than refused"
+  pass=$((pass + 1))
+else
+  echo "  FAIL  the second is waitlisted rather than refused ($WAITLIST)"
+  fail=$((fail + 1))
+fi
+
+if curl -s -H "Authorization: Bearer $CHILD_TOKEN" "$GATEWAY/v1/events/$EVENT_ID" \
+   | grep -q '"isFull":true'; then
+  echo "  ok    and the event reports itself full"
+  pass=$((pass + 1))
+else
+  echo "  FAIL  the event does not report itself full"
+  fail=$((fail + 1))
+fi
+
+check "the attendee list is refused to a member" 403 \
+  "$(status -H "Authorization: Bearer $MEMBER_TOKEN" "$GATEWAY/v1/events/$EVENT_ID/attendees")"
+
+check "and served to the organiser" 200 \
+  "$(status -H "Authorization: Bearer $ADMIN_TOKEN" -H "$ADMIN_TENANT_HEADER" \
+     "$GATEWAY/v1/events/$EVENT_ID/attendees")"
+
+# Giving up the place has to move the queue, or the waitlist is a list nobody
+# comes off.
+GAVE_UP=$(curl -s -X DELETE "$GATEWAY/v1/events/$EVENT_ID/registration" \
+  -H "Authorization: Bearer $MEMBER_TOKEN")
+
+if printf '%s' "$GAVE_UP" | grep -q '"promotedMemberId":"'; then
+  echo "  ok    giving up the place promotes the member who was waiting"
+  pass=$((pass + 1))
+else
+  echo "  FAIL  giving up the place promoted nobody ($GAVE_UP)"
+  fail=$((fail + 1))
+fi
+
+if curl -s -H "Authorization: Bearer $CHILD_TOKEN" "$GATEWAY/v1/events/$EVENT_ID" \
+   | grep -q '"myRegistrationStatus":"Registered"'; then
+  echo "  ok    and they now hold a confirmed place"
+  pass=$((pass + 1))
+else
+  echo "  FAIL  the promoted member does not hold a place"
+  fail=$((fail + 1))
+fi
+
+check "cancelling an event without saying why is refused" 400 \
+  "$(status -X POST "$GATEWAY/v1/events/$EVENT_ID/cancel" -H 'Content-Type: application/json' \
+     -H "Authorization: Bearer $ADMIN_TOKEN" -H "$ADMIN_TENANT_HEADER" \
+     -d '{"reason":null}')"
+
+check "the organiser cancels it, with a reason" 200 \
+  "$(status -X POST "$GATEWAY/v1/events/$EVENT_ID/cancel" -H 'Content-Type: application/json' \
+     -H "Authorization: Bearer $ADMIN_TOKEN" -H "$ADMIN_TENANT_HEADER" \
+     -d '{"reason":"The hall is unavailable."}')"
+
+check "a cancelled event takes no more registrations" 409 \
+  "$(status -X POST "$GATEWAY/v1/events/$EVENT_ID/registration" \
+     -H "Authorization: Bearer $MEMBER_TOKEN")"
+
+echo
+
 # Volunteer groups sit behind the same community module as the timeline, so
 # switching it off has to take both away.
 check "switching the community module off" 200 \
@@ -916,6 +1054,9 @@ sleep 62
 
 check "the groups route then answers 404 as well" 404 \
   "$(status -H "Authorization: Bearer $MEMBER_TOKEN" "$GATEWAY/v1/volunteer-groups/groups")"
+
+check "and so does the events route" 404 \
+  "$(status -H "Authorization: Bearer $MEMBER_TOKEN" "$GATEWAY/v1/events")"
 
 check "switching it back on" 200 \
   "$(status -X PUT "$GATEWAY/v1/identity/tenants/$TENANT_ID/modules" \

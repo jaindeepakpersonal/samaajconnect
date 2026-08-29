@@ -110,13 +110,19 @@ enforced by `TenantAuthorizationBehavior`, not just UI hiding.
 
 ## events-service — `/v1/events`
 
+> Module-gated on `community`, the same key as the timeline and volunteer
+> groups.
+
 | Method | Path | Roles | Purpose |
 |---|---|---|---|
-| GET | `/events` | Member | Upcoming/past tenant events |
-| POST | `/events` | SamaajAdmin, VolunteerGroupPresident | Create event |
-| POST | `/events/{id}/publish` | SamaajAdmin | Publish |
-| POST | `/events/{id}/register` | Member | RSVP (or waitlist if at capacity) |
-| GET | `/events/{id}/attendees` | SamaajAdmin, organizer | Attendee list |
+| GET | `/` | `Members.Read` | The Samaaj's events, each with the asking member's own standing. `?includeDrafts` needs `Events.Publish`; a member asking gets the published list |
+| POST | `/` | `Events.Publish` | Write an event down. It stays a draft |
+| GET | `/{id}` | `Members.Read` | One event. A draft answers 404 to a member |
+| POST | `/{id}/publish` | `Events.Publish` | Tell the Samaaj about it |
+| POST | `/{id}/cancel` | `Events.Publish` | `{reason}`, required — members who were going are told it |
+| GET | `/{id}/attendees` | `Events.Publish` | Who is coming and who is waiting |
+| POST | `/{id}/registration` | `Members.Read` | RSVP, or join the waitlist when full. One call for both; the response says which and, for the waitlist, the position |
+| DELETE | `/{id}/registration` | `Members.Read` | Give up a place or leave the queue. Promotes whoever waited longest |
 
 ## social-issues-service — `/v1/social-issues`
 

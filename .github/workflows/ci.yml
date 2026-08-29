@@ -39,6 +39,8 @@ jobs:
             solution: services/timeline-service/Sangam.Timeline.sln
           - name: volunteer-groups-service
             solution: services/volunteer-groups-service/Sangam.VolunteerGroups.sln
+          - name: events-service
+            solution: services/events-service/Sangam.Events.sln
           - name: gateway
             solution: gateway/Sangam.Gateway.sln
 
@@ -153,6 +155,12 @@ jobs:
           dotnet dotnet-ef migrations has-pending-model-changes \
             --project services/volunteer-groups-service/src/Sangam.VolunteerGroups.Infrastructure \
             --startup-project services/volunteer-groups-service/src/Sangam.VolunteerGroups.Api
+
+      - name: Check events-service
+        run: |
+          dotnet dotnet-ef migrations has-pending-model-changes \
+            --project services/events-service/src/Sangam.Events.Infrastructure \
+            --startup-project services/events-service/src/Sangam.Events.Api
 
   smoke:
     name: Through the gateway
