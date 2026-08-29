@@ -156,7 +156,7 @@ export class HomeComponent implements OnInit {
       title: 'Events',
       description: 'Upcoming community events.',
       action: 'View',
-      route: null,
+      route: '/events',
     },
     {
       moduleKey: ModuleKeys.Community,

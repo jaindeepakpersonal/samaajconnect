@@ -12,8 +12,10 @@ before translating another screen.
 | Register | `/register` | `#register` | built |
 | Home | `/home` | `#home` | built |
 | Timeline | `/timeline` | `#timeline` | built |
+| Events | `/events` | `#events` | built |
+| Event detail | `/events/:id` | `#eventdetail` | built |
 | Forgot password / OTP | — | `#forgot`, `#otp` | not built — no endpoint exists |
-| Profile, Members, Family, Events, Groups, Issues, Celebrity, Pathshala, Boli, Notifications | — | various | not built — the services exist, the screens do not |
+| Profile, Members, Family, Groups, Issues, Celebrity, Pathshala, Boli, Notifications | — | various | not built — the services exist, the screens do not |
 
 ## Where things live
 
@@ -99,6 +101,21 @@ check the enum, and open the page.**
 forgot-password link are both present, because they are in the signed-off
 wireframe, and both explain that the feature is not available yet. Neither
 calls anything. When the backend lands, wire them; do not fake them sooner.
+
+**A wireframe promise the platform cannot keep is dropped, not printed.** The
+event detail wireframe says "You'll receive a notification reminder 24 hours
+before the event". There is no notification channel yet, so the shipped screen
+does not say it - a disabled control can explain itself, but a sentence of prose
+cannot, and printing it would simply be a lie. There is a test asserting the
+words are absent.
+
+**Shared page primitives live in `src/styles.css`, not in a feature
+stylesheet.** The pill colours (`.ok`, `.warn`, `.danger`), the two-column
+`.grid2`, the `.progress` bar, `.back` and the table rules are all used by more
+than one screen. Timeline shipped marking a pill `.warn` with nothing defining
+it: the pill rendered in the wrong colour, which is exactly the kind of thing
+nobody notices. Every one of those pill variants sets a text colour as well as a
+background, so a state is never carried by hue alone.
 
 **After signing in the portal simply navigates to Home.** The wireframe sent a
 member to their Samaaj's subdomain; there is no subdomain now, so there is

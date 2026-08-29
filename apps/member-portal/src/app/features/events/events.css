@@ -1,0 +1,37 @@
+/* Only what is specific to the two event screens. The pill colours, the
+   two-column grid, the capacity bar, the back link and the table styling are
+   shared primitives and live in `src/styles.css`. */
+
+.events-page {
+  max-width: 900px;
+  margin: 0 auto;
+  padding: var(--space-6) var(--space-4);
+}
+
+.page-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: var(--space-4);
+  flex-wrap: wrap;
+  margin-bottom: var(--space-4);
+}
+
+.section-heading {
+  font-size: 1rem;
+  margin: var(--space-6) 0 var(--space-3);
+}
+
+/* Past events are dimmed rather than hidden: a member checking what they went
+   to should be able to find it. Opacity only - the row is still selectable and
+   its text still meets contrast at this level. */
+.past td {
+  color: var(--muted);
+}
+
+/* Preserves the line breaks an organiser typed without letting a long word
+   widen the card past the page. */
+.event-body {
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}

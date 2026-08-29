@@ -26,6 +26,20 @@ export const routes: Routes = [
     loadComponent: () =>
       import('./features/timeline/timeline.component').then((m) => m.TimelineComponent),
   },
+  {
+    path: 'events',
+    title: 'Events - samaajconnect',
+    canActivate: [authGuard],
+    loadComponent: () =>
+      import('./features/events/events-list.component').then((m) => m.EventsListComponent),
+  },
+  {
+    path: 'events/:id',
+    title: 'Event - samaajconnect',
+    canActivate: [authGuard],
+    loadComponent: () =>
+      import('./features/events/event-detail.component').then((m) => m.EventDetailComponent),
+  },
   { path: '', pathMatch: 'full', redirectTo: 'home' },
 
   // Anything unrecognised goes to Home, which sends signed-out visitors to

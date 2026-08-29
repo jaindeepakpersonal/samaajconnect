@@ -206,6 +206,108 @@ label {
   font-size: 12px;
 }
 
+/* The three states the wireframes colour a pill for. They live here rather than
+   in a feature stylesheet because Timeline and Events both need them, and
+   Timeline shipped marking a pill `.warn` with nothing defining it - the pill
+   rendered, in the wrong colour, which is exactly the sort of thing that never
+   gets noticed.
+
+   Every one of them changes the text colour as well as the background, so the
+   state is not carried by hue alone. */
+.pill.ok {
+  background: #e3f5e8;
+  color: #1f6b36;
+}
+
+.pill.warn {
+  background: var(--warn-soft);
+  color: var(--warn-ink);
+}
+
+.pill.danger {
+  background: var(--danger-soft);
+  color: var(--danger);
+}
+
+/* Two equal columns that collapse on a narrow screen. The wireframes use this
+   for a details/status pair. */
+.grid2 {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+  gap: var(--space-4);
+}
+
+.btn.small {
+  padding: 6px 10px;
+  font-size: 13px;
+}
+
+/* An anchor styled as a button still needs to look like one. */
+a.btn {
+  display: inline-block;
+  text-decoration: none;
+}
+
+.back {
+  display: inline-block;
+  background: none;
+  border: 0;
+  padding: 0;
+  margin-bottom: var(--space-3);
+  color: var(--accent);
+  cursor: pointer;
+  font-size: 14px;
+  font-family: inherit;
+  text-decoration: none;
+}
+
+/* A capacity bar. `i` rather than a nested div, matching the wireframe markup. */
+.progress {
+  background: #eef0f4;
+  border-radius: var(--radius-pill);
+  height: 8px;
+  overflow: hidden;
+  margin: var(--space-2) 0;
+}
+
+.progress i {
+  display: block;
+  height: 100%;
+  background: var(--accent);
+}
+
+/* Wide tables scroll inside their own box rather than widening the page.
+   Required by the artifact and accessibility conventions alike: a page that
+   scrolls sideways is unusable on a phone. */
+.table-scroll {
+  overflow-x: auto;
+}
+
+table {
+  width: 100%;
+  border-collapse: collapse;
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-md);
+}
+
+th,
+td {
+  text-align: left;
+  padding: var(--space-3);
+  border-bottom: 1px solid var(--line);
+  font-size: 14px;
+}
+
+th {
+  font-weight: 600;
+  color: var(--muted);
+}
+
+tr:last-child td {
+  border-bottom: 0;
+}
+
 /* Visually hidden but still announced. Used for live regions that report
    loading and error states to screen readers. */
 .sr-only {

@@ -7,23 +7,21 @@ version of the plan; the reasoning behind the ordering lives in
 
 ## Current Status
 
-- **Stage:** Phase 4 built; the member portal has its first real screen
-- **Last updated:** 2026-08-29 - the member portal's Timeline, and a fix to Home
-  that had hidden three module tiles from every Samaaj. 869 tests green (776
-  backend, 93 frontend) plus 237 smoke checks against a stack built from empty
-  volumes, re-runnable against a dirty one.
-- **Blocking item:** none. The **frontend gap is still the largest thing in this
-  plan**, but it is no longer untouched: Timeline is built and establishes the
-  pattern the other screens follow. Eight services still have no member-facing
-  screen — Events, Volunteer Groups and Social Issues are the obvious next
-  three, since their services are complete and their Home tiles already say
-  "Coming soon". After that: the Phase 5 `boli-service`, or the three remaining
-  Phase 1 leftovers (a member-portal surface for the DPDP rights, an editable
-  role matrix, and the two DPDP obligations that need a notification channel
-  first). The vote endpoint's throughput load test is carried to Phase 5, since
-  it needs a deployed environment; its correctness half is done. The five
-  questions in `docs/product/DPDP-COMPLIANCE.md` still need counsel before any
-  of this ships to real users.
+- **Stage:** Phase 4 built; the member portal is catching up on the backend
+- **Last updated:** 2026-08-29 - the member portal's Events screens, list and
+  detail, with the capacity bar and the waitlist. 898 tests green (776 backend,
+  122 frontend) plus 237 smoke checks against a stack built from empty volumes,
+  re-runnable against a dirty one.
+- **Blocking item:** none. The **frontend gap is still the biggest item**, but
+  it is closing: Timeline and Events are built and the pattern is established.
+  Volunteer Groups and Social Issues are next — services complete, Home tiles
+  already saying "Coming soon". After that: the Phase 5 `boli-service`, or the
+  three remaining Phase 1 leftovers (a member-portal surface for the DPDP
+  rights, an editable role matrix, and the two DPDP obligations that need a
+  notification channel first). The vote endpoint's throughput load test is
+  carried to Phase 5, since it needs a deployed environment; its correctness
+  half is done. The five questions in `docs/product/DPDP-COMPLIANCE.md` still
+  need counsel before any of this ships to real users.
 
 *(Update these three lines at the start/end of every work session —
 they're what a coding agent or a teammate should read first to know
@@ -160,8 +158,15 @@ unit tested.
       that establishes the pattern the rest follow: a feature folder with its
       own `*.api.ts` and `*.models.ts`, wire types mirroring the service's
       responses, and per-item errors kept off the page-level error
-- [ ] **Member portal: the rest.** Events, Volunteer Groups and Social Issues
-      have services and no screens. Their Home tiles say "Coming soon"
+- [x] **Member portal: Events** (wireframes `#events` and `#eventdetail`) - the
+      list with the two states the wireframe drew and four it did not
+      (cancelled, already going, already waiting, no capacity limit), and the
+      detail screen with the real capacity bar. RSVP and joining the waitlist
+      are one button and one call, because which of the two a member gets
+      depends on a count the portal cannot see the current value of. Verified
+      against the stack: RSVP, join a queue, and watch a place move down it
+- [ ] **Member portal: the rest.** Volunteer Groups and Social Issues have
+      services and no screens. Their Home tiles say "Coming soon"
 
 ## Phase 3 — Celebrity Voting
 
