@@ -1,0 +1,22 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <ItemGroup>
+    <PackageReference Include="MediatR" />
+    <PackageReference Include="FluentValidation" />
+    <PackageReference Include="FluentValidation.DependencyInjectionExtensions" />
+    <PackageReference Include="Microsoft.Extensions.DependencyInjection.Abstractions" />
+    <PackageReference Include="Microsoft.Extensions.Logging.Abstractions" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\Sangam.VolunteerGroups.Domain\Sangam.VolunteerGroups.Domain.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <!-- The privacy mapping is internal but is the security-relevant code in
+         this service, so it is tested directly rather than only through an
+         endpoint. -->
+    <InternalsVisibleTo Include="Sangam.VolunteerGroups.UnitTests" />
+  </ItemGroup>
+
+</Project>

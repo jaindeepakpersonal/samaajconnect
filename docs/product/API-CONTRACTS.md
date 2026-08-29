@@ -89,13 +89,24 @@ enforced by `TenantAuthorizationBehavior`, not just UI hiding.
 
 ## volunteer-groups-service — `/v1/volunteer-groups`
 
+> Module-gated on `community`, the same key as the timeline.
+
 | Method | Path | Roles | Purpose |
 |---|---|---|---|
-| GET | `/groups` | Member | List tenant groups |
-| POST | `/groups` | SamaajAdmin | Create group |
-| POST | `/groups/{id}/applications` | Member | Apply to join |
-| GET | `/groups/{id}/applications` | VolunteerGroupPresident | Review queue |
-| POST | `/groups/{id}/applications/{appId}/decide` | VolunteerGroupPresident | Accept/reject + assign role |
+| GET | `/groups` | `Members.Read` | This Samaaj's groups, each with the asking member's standing |
+| POST | `/groups` | `VolunteerGroups.Manage` | Create a group and name its president |
+| GET | `/groups/{id}` | `Members.Read` | One group with its members |
+| PATCH | `/groups/{id}/status` | `VolunteerGroups.Manage` | Activate or deactivate. A deactivated group keeps its members |
+| POST | `/groups/{id}/applications` | `Members.Read` | Ask to join |
+| GET | `/groups/{id}/applications` | `VolunteerGroups.Lead` + this group's president | The president's review queue |
+| POST | `/groups/{id}/applications/{applicationId}/decide` | `VolunteerGroups.Lead` + president | `{accept, rolePosition}` |
+| PUT | `/groups/{id}/members/{memberId}/position` | `VolunteerGroups.Lead` + president | Give a position, or clear it |
+
+> The draft gated the president's operations on the `VolunteerGroupPresident`
+> role, which nothing grants. They ship on `VolunteerGroups.Lead`, which every
+> member holds and which grants nothing until they are actually a group's
+> president — see "Authorization" in
+> `services/volunteer-groups-service/CLAUDE.md`.
 
 ## events-service — `/v1/events`
 

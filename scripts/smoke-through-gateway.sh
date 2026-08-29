@@ -546,11 +546,17 @@ echo "DPDP section 12: erasure, across all three services"
 
 # A throwaway account, because everything below this point still needs the
 # member registered at the top to be able to sign in.
-ERASE_EMAIL="erasable-$(date +%s)@example.com"
+ERASE_STAMP="$(date +%s)"
+ERASE_EMAIL="erasable-$ERASE_STAMP@example.com"
+
+# The name is unique too, not just the address: the checks below search the
+# directory for it, and a fixed name matches a throwaway member some earlier
+# run left behind.
+ERASE_NAME="Erasable Member $ERASE_STAMP"
 
 check "a throwaway member registers" 201 \
   "$(status -X POST "$GATEWAY/v1/identity/register" -H 'Content-Type: application/json' \
-     -d "{\"tenantSlug\":\"$SLUG\",\"fullName\":\"Erasable Member\",\"mobileOrEmail\":\"$ERASE_EMAIL\",\"password\":\"$MEMBER_PASSWORD\",\"consentedPurposes\":[\"Membership\"],\"noticeVersion\":\"$NOTICE_VERSION\"}")"
+     -d "{\"tenantSlug\":\"$SLUG\",\"fullName\":\"$ERASE_NAME\",\"mobileOrEmail\":\"$ERASE_EMAIL\",\"password\":\"$MEMBER_PASSWORD\",\"consentedPurposes\":[\"Membership\"],\"noticeVersion\":\"$NOTICE_VERSION\"}")"
 
 ERASE_TOKEN=$(curl -s -X POST "$GATEWAY/v1/identity/login" -H 'Content-Type: application/json' \
   -d "{\"mobileOrEmail\":\"$ERASE_EMAIL\",\"password\":\"$MEMBER_PASSWORD\"}" | json_field accessToken)
@@ -562,7 +568,7 @@ ERASE_USER_ID=$(curl -s -H "Authorization: Bearer $ERASE_TOKEN" "$GATEWAY/v1/ide
 erasable_profile=0
 for attempt in $(seq 1 30); do
   if curl -s -H "Authorization: Bearer $ERASE_TOKEN" "$GATEWAY/v1/members/me" \
-     | grep -q "Erasable Member"; then
+     | grep -q "$ERASE_NAME"; then
     erasable_profile=1
     break
   fi
@@ -575,8 +581,8 @@ check "the throwaway profile arrives over Kafka" 1 "$erasable_profile"
 # for the wrong reason.
 listed_before=0
 for attempt in $(seq 1 30); do
-  if curl -s -H "Authorization: Bearer $MEMBER_TOKEN" "$GATEWAY/v1/members?search=Erasable" \
-     | grep -q "Erasable Member"; then
+  if curl -s -H "Authorization: Bearer $MEMBER_TOKEN" "$GATEWAY/v1/members?search=Erasable+Member+$ERASE_STAMP" \
+     | grep -q "$ERASE_NAME"; then
     listed_before=1
     break
   fi
@@ -613,8 +619,8 @@ check "an erased member cannot sign in" 401 \
 # member-family-service consumes identity.user.erased.v1.
 profile_erased=0
 for attempt in $(seq 1 30); do
-  if ! curl -s -H "Authorization: Bearer $MEMBER_TOKEN" "$GATEWAY/v1/members?search=Erasable" \
-     | grep -q "Erasable Member"; then
+  if ! curl -s -H "Authorization: Bearer $MEMBER_TOKEN" "$GATEWAY/v1/members?search=Erasable+Member+$ERASE_STAMP" \
+     | grep -q "$ERASE_NAME"; then
     profile_erased=1
     break
   fi
@@ -669,9 +675,13 @@ sleep 62
 check "a member reads the timeline" 200 \
   "$(status -H "Authorization: Bearer $MEMBER_TOKEN" "$GATEWAY/v1/timeline/posts")"
 
+# A fresh title per run: the visibility checks below grep the feed for it,
+# and a fixed title matches the post a previous run left approved.
+POST_TITLE="Community blood donation drive $(date +%s)"
+
 POST=$(curl -s -X POST "$GATEWAY/v1/timeline/posts" -H 'Content-Type: application/json' \
   -H "Authorization: Bearer $MEMBER_TOKEN" \
-  -d '{"title":"Community blood donation drive","body":"Volunteers are welcome to participate.","asAnnouncement":false}')
+  -d "{\"title\":\"$POST_TITLE\",\"body\":\"Volunteers are welcome to participate.\",\"asAnnouncement\":false}")
 
 POST_ID=$(printf '%s' "$POST" | json_field id)
 POST_STATUS=$(printf '%s' "$POST" | json_field status)
@@ -699,7 +709,7 @@ check "nor read the moderation queue" 403 \
 
 # The post is invisible to everyone but its author until it is approved.
 if curl -s -H "Authorization: Bearer $ADMIN_TOKEN" -H "$ADMIN_TENANT_HEADER" \
-   "$GATEWAY/v1/timeline/posts" | grep -q "blood donation"; then
+   "$GATEWAY/v1/timeline/posts" | grep -q "$POST_TITLE"; then
   echo "  FAIL  an unapproved post is on the timeline"
   fail=$((fail + 1))
 else
@@ -708,7 +718,7 @@ else
 fi
 
 if curl -s -H "Authorization: Bearer $ADMIN_TOKEN" -H "$ADMIN_TENANT_HEADER" \
-   "$GATEWAY/v1/timeline/posts/moderation-queue" | grep -q "blood donation"; then
+   "$GATEWAY/v1/timeline/posts/moderation-queue" | grep -q "$POST_TITLE"; then
   echo "  ok    but it is in the moderation queue"
   pass=$((pass + 1))
 else
@@ -727,7 +737,7 @@ check "a moderator approves it" 200 \
      -d '{"decision":"Approve"}')"
 
 if curl -s -H "Authorization: Bearer $ADMIN_TOKEN" -H "$ADMIN_TENANT_HEADER" \
-   "$GATEWAY/v1/timeline/posts" | grep -q "blood donation"; then
+   "$GATEWAY/v1/timeline/posts" | grep -q "$POST_TITLE"; then
   echo "  ok    and it reaches the Samaaj's timeline"
   pass=$((pass + 1))
 else
@@ -776,6 +786,143 @@ check "switching it back on" 200 \
   "$(status -X PUT "$GATEWAY/v1/identity/tenants/$TENANT_ID/modules" \
      -H 'Content-Type: application/json' -H "Authorization: Bearer $ADMIN_TOKEN" \
      -d '{"enabledModules":["community","pathshala"]}')"
+
+# Wait the gateway's module cache out before the next section runs. Without
+# this every module-gated check after here fails with a 404 that looks like a
+# routing bug and is not one - the module really was off a moment ago.
+sleep 62
+
+echo
+echo "Volunteer groups: applying, and the president's queue"
+
+# Runs while the community module is on - the timeline section above switches it
+# back on before finishing.
+MEMBER_ID=$(curl -s -H "Authorization: Bearer $MEMBER_TOKEN" "$GATEWAY/v1/identity/me"   | json_field userId)
+
+# The converted child from the conversion section: a second real member, so the
+# applicant and the president are genuinely different people.
+CHILD_TOKEN=$(curl -s -X POST "$GATEWAY/v1/identity/login" -H 'Content-Type: application/json'   -d "{\"mobileOrEmail\":\"$CHILD_EMAIL\",\"password\":\"$CHILD_PASSWORD\"}"   | json_field accessToken)
+
+CHILD_USER_ID=$(curl -s -H "Authorization: Bearer $CHILD_TOKEN" "$GATEWAY/v1/identity/me"   | json_field userId)
+
+# A fresh name per run: a group name is unique per Samaaj, so a fixed one
+# turns every re-run into a 409 and every check after it into a cascade.
+GROUP_NAME="Seva Group $(date +%s)"
+
+GROUP=$(curl -s -X POST "$GATEWAY/v1/volunteer-groups/groups" -H 'Content-Type: application/json' \
+  -H "Authorization: Bearer $ADMIN_TOKEN" -H "$ADMIN_TENANT_HEADER" \
+  -d "{\"name\":\"$GROUP_NAME\",\"description\":\"Food drives and blood donation camps.\",\"focusArea\":\"Social Service\",\"presidentMemberId\":\"$MEMBER_ID\"}")
+
+GROUP_ID=$(printf '%s' "$GROUP" | json_field id)
+
+if [ -n "$GROUP_ID" ]; then
+  echo "  ok    a Samaaj admin creates a group and names its president"
+  pass=$((pass + 1))
+else
+  echo "  FAIL  a Samaaj admin creates a group ($GROUP)"
+  fail=$((fail + 1))
+fi
+
+check "a second group cannot take the same name" 409 \
+  "$(status -X POST "$GATEWAY/v1/volunteer-groups/groups" -H 'Content-Type: application/json' \
+     -H "Authorization: Bearer $ADMIN_TOKEN" -H "$ADMIN_TENANT_HEADER" \
+     -d "{\"name\":\"$GROUP_NAME\",\"description\":null,\"focusArea\":null,\"presidentMemberId\":\"$MEMBER_ID\"}")"
+
+check "a member reads the group list" 200 \
+  "$(status -H "Authorization: Bearer $MEMBER_TOKEN" "$GATEWAY/v1/volunteer-groups/groups")"
+
+check "but cannot create one" 403 \
+  "$(status -X POST "$GATEWAY/v1/volunteer-groups/groups" -H 'Content-Type: application/json' \
+     -H "Authorization: Bearer $MEMBER_TOKEN" \
+     -d "{\"name\":\"Unauthorised\",\"description\":null,\"focusArea\":null,\"presidentMemberId\":\"$MEMBER_ID\"}")"
+
+check "another member applies to join" 200 \
+  "$(status -X POST "$GATEWAY/v1/volunteer-groups/groups/$GROUP_ID/applications" \
+     -H 'Content-Type: application/json' -H "Authorization: Bearer $CHILD_TOKEN" \
+     -d '{"note":"Happy to help at weekends."}')"
+
+check "the applicant cannot read the review queue" 404 \
+  "$(status -H "Authorization: Bearer $CHILD_TOKEN" \
+     "$GATEWAY/v1/volunteer-groups/groups/$GROUP_ID/applications")"
+
+APPLICATIONS=$(curl -s -H "Authorization: Bearer $MEMBER_TOKEN" \
+  "$GATEWAY/v1/volunteer-groups/groups/$GROUP_ID/applications")
+
+APPLICATION_ID=$(printf '%s' "$APPLICATIONS" | json_field id)
+
+if [ -n "$APPLICATION_ID" ]; then
+  echo "  ok    the president sees it in their queue"
+  pass=$((pass + 1))
+else
+  echo "  FAIL  the president sees it in their queue ($APPLICATIONS)"
+  fail=$((fail + 1))
+fi
+
+# The note is the applicant's own words, for the president. It must not have
+# travelled to the service that stores payloads verbatim.
+if printf '%s' "$APPLICATIONS" | grep -q "weekends"; then
+  echo "  ok    and can read what the applicant wrote"
+  pass=$((pass + 1))
+else
+  echo "  FAIL  the application note did not reach the president"
+  fail=$((fail + 1))
+fi
+
+# 404, not 403: everyone holds VolunteerGroups.Lead, so everyone passes the
+# outer gate and is stopped by the presidency check - which answers "not
+# found", because whose applications are waiting is the president's business.
+check "a Samaaj admin who is not this president cannot decide it" 404 \
+  "$(status -X POST "$GATEWAY/v1/volunteer-groups/groups/$GROUP_ID/applications/$APPLICATION_ID/decide" \
+     -H 'Content-Type: application/json' -H "Authorization: Bearer $ADMIN_TOKEN" \
+     -H "$ADMIN_TENANT_HEADER" -d '{"accept":true,"rolePosition":null}')"
+
+check "the president accepts it" 200 \
+  "$(status -X POST "$GATEWAY/v1/volunteer-groups/groups/$GROUP_ID/applications/$APPLICATION_ID/decide" \
+     -H 'Content-Type: application/json' -H "Authorization: Bearer $MEMBER_TOKEN" \
+     -d '{"accept":true,"rolePosition":"Coordinator"}')"
+
+if curl -s -H "Authorization: Bearer $CHILD_TOKEN" \
+   "$GATEWAY/v1/volunteer-groups/groups/$GROUP_ID" | grep -q '"iAmAMember":true'; then
+  echo "  ok    and the applicant is now a member"
+  pass=$((pass + 1))
+else
+  echo "  FAIL  the accepted applicant is not a member"
+  fail=$((fail + 1))
+fi
+
+check "deciding the same application twice is refused" 404 \
+  "$(status -X POST "$GATEWAY/v1/volunteer-groups/groups/$GROUP_ID/applications/$APPLICATION_ID/decide" \
+     -H 'Content-Type: application/json' -H "Authorization: Bearer $MEMBER_TOKEN" \
+     -d '{"accept":false,"rolePosition":null}')"
+
+check "the president assigns a position" 200 \
+  "$(status -X PUT "$GATEWAY/v1/volunteer-groups/groups/$GROUP_ID/members/$CHILD_USER_ID/position" \
+     -H 'Content-Type: application/json' -H "Authorization: Bearer $MEMBER_TOKEN" \
+     -d '{"rolePosition":"Secretary"}')"
+
+check "deactivating the group" 200 \
+  "$(status -X PATCH "$GATEWAY/v1/volunteer-groups/groups/$GROUP_ID/status" \
+     -H 'Content-Type: application/json' -H "Authorization: Bearer $ADMIN_TOKEN" \
+     -H "$ADMIN_TENANT_HEADER" -d '{"status":"Inactive"}')"
+
+# Volunteer groups sit behind the same community module as the timeline, so
+# switching it off has to take both away.
+check "switching the community module off" 200 \
+  "$(status -X PUT "$GATEWAY/v1/identity/tenants/$TENANT_ID/modules" \
+     -H 'Content-Type: application/json' -H "Authorization: Bearer $ADMIN_TOKEN" \
+     -d '{"enabledModules":["pathshala"]}')"
+
+sleep 62
+
+check "the groups route then answers 404 as well" 404 \
+  "$(status -H "Authorization: Bearer $MEMBER_TOKEN" "$GATEWAY/v1/volunteer-groups/groups")"
+
+check "switching it back on" 200 \
+  "$(status -X PUT "$GATEWAY/v1/identity/tenants/$TENANT_ID/modules" \
+     -H 'Content-Type: application/json' -H "Authorization: Bearer $ADMIN_TOKEN" \
+     -d '{"enabledModules":["community","pathshala"]}')"
+
+sleep 62
 
 echo
 echo "Sessions: rotation, reuse detection and sign-out"

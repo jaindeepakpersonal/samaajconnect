@@ -84,6 +84,27 @@ this table, with stable hand-assigned ids so a grant means the same thing in
 every environment. `GET /v1/identity/roles` serves it, so the admin panel shows
 what is actually enforced rather than a second copy that can drift.
 
+### A permission held only by an ungranted role is a permission nobody has
+
+Three capabilities have now shipped unreachable because their permission was
+carried only by a role that nothing grants:
+
+- `Family.Write` sat on `FamilyHead` — no member could add a child.
+- `VolunteerGroups.Manage` sat on `VolunteerGroupPresident` — no president
+  could decide their own group's applications.
+
+Both were found by a smoke test through the gateway, and neither could have been
+found by a unit test: those build principals by hand and hand them whatever
+permission the test needs. `Member`, `SamaajAdmin` and `SuperAdmin` are the
+only roles anything currently grants, so when adding a permission, ask which of
+*those* carries it.
+
+Where the answer is "the person doing this is an ordinary member who happens to
+hold a position", the pattern is a permission every member holds plus a data
+check in the handler — `Family.Write` with "are you this family's head?", and
+`VolunteerGroups.Lead` with "are you this group's president?". The permission
+is the outer gate and grants nothing on its own.
+
 ## Audit logging
 
 - [x] Every state-changing command that matches an item in the "Audit

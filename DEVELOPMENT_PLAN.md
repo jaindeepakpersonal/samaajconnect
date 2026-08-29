@@ -7,14 +7,15 @@ version of the plan; the reasoning behind the ordering lives in
 
 ## Current Status
 
-- **Stage:** Phase 1 complete bar four tracked items; Phase 2 started
-- **Last updated:** 2026-08-29 - timeline-service, the platform's fourth service
-  and the first behind a module gate. 599 tests green (534 backend, 65 frontend)
-  plus 111 smoke checks against a stack built from empty volumes.
-- **Blocking item:** none. Next in Phase 2: `volunteer-groups-service`, then
-  events. The four Phase 1 leftovers are tracked above and none of them blocks
-  Phase 2. The five questions in `docs/product/DPDP-COMPLIANCE.md` still need
-  counsel before any of this ships to real users.
+- **Stage:** Phase 1 complete bar four tracked items; Phase 2 in progress
+- **Last updated:** 2026-08-29 - volunteer-groups-service, the platform's fifth
+  service. 641 tests green (576 backend, 65 frontend) plus 128 smoke checks
+  against a stack built from empty volumes, and the smoke script now survives a
+  re-run against a dirty database.
+- **Blocking item:** none. Next in Phase 2: `events-service`, then social
+  issues. The four Phase 1 leftovers are tracked above and none blocks Phase 2.
+  The five questions in `docs/product/DPDP-COMPLIANCE.md` still need counsel
+  before any of this ships to real users.
 
 *(Update these three lines at the start/end of every work session —
 they're what a coding agent or a teammate should read first to know
@@ -136,7 +137,7 @@ unit tested.
 ## Phase 2 — Social & Community Engagement
 
 - [x] `timeline-service` (feed + moderation queue) — posting with the member/announcement split, the moderation queue that reported posts rejoin, comments, reactions and reporting. The platform's first module-gated route: switching `community` off makes the whole area answer 404
-- [ ] `volunteer-groups-service`
+- [x] `volunteer-groups-service` — groups, the join-application flow, and the president's review queue. Introduced `VolunteerGroups.Lead`, a permission every member holds, because gating a president's own group on an admin permission made those endpoints unreachable
 - [ ] `events-service` (with capacity/waitlist)
 - [ ] `social-issues-service` (full Draft → Published workflow)
 

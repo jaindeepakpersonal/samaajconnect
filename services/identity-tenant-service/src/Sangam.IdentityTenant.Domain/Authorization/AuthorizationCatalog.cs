@@ -45,6 +45,7 @@ public static class AuthorizationCatalog
         public static readonly Guid BoliManage = new("b0000000-0000-0000-0000-000000000010");
         public static readonly Guid BoliPublishResults = new("b0000000-0000-0000-0000-000000000011");
         public static readonly Guid AuditRead = new("b0000000-0000-0000-0000-000000000012");
+        public static readonly Guid VolunteerGroupsLead = new("b0000000-0000-0000-0000-000000000013");
     }
 
     public static IReadOnlyList<Role> Roles { get; } =
@@ -80,6 +81,7 @@ public static class AuthorizationCatalog
         new(PermissionIds.BoliManage, "Boli.Manage"),
         new(PermissionIds.BoliPublishResults, "Boli.PublishResults"),
         new(PermissionIds.AuditRead, "Audit.Read"),
+        new(PermissionIds.VolunteerGroupsLead, "VolunteerGroups.Lead"),
     ];
 
     /// <summary>
@@ -99,6 +101,7 @@ public static class AuthorizationCatalog
         new(RoleIds.SamaajAdmin, PermissionIds.TimelinePost),
         new(RoleIds.SamaajAdmin, PermissionIds.TimelineModerate),
         new(RoleIds.SamaajAdmin, PermissionIds.VolunteerGroupsManage),
+        new(RoleIds.SamaajAdmin, PermissionIds.VolunteerGroupsLead),
         new(RoleIds.SamaajAdmin, PermissionIds.EventsPublish),
         new(RoleIds.SamaajAdmin, PermissionIds.SocialIssuesApprove),
         new(RoleIds.SamaajAdmin, PermissionIds.CelebrityVotingConfigure),
@@ -117,6 +120,20 @@ public static class AuthorizationCatalog
         // member could ever satisfy Family.Write.
         new(RoleIds.Member, PermissionIds.FamilyWrite),
 
+        // And for the same reason, every member may lead a volunteer group.
+        // A Samaaj admin creates the group and names its president, so a member
+        // cannot make themselves one - but the president they name is usually an
+        // ordinary member, and without this they could not decide their own
+        // group's applications. Which group they may lead is checked against the
+        // data in volunteer-groups-service ("are you this group's president?"),
+        // which is a stronger check than a role claim.
+        //
+        // This is the third time this shape has bitten: nothing grants
+        // FamilyHead, nothing grants VolunteerGroupPresident, and a permission
+        // held only by an ungranted role is a permission nobody has. When adding
+        // a permission, ask which *granted* role carries it.
+        new(RoleIds.Member, PermissionIds.VolunteerGroupsLead),
+
         new(RoleIds.FamilyHead, PermissionIds.MembersRead),
         new(RoleIds.FamilyHead, PermissionIds.TimelinePost),
         new(RoleIds.FamilyHead, PermissionIds.FamilyWrite),
@@ -124,6 +141,7 @@ public static class AuthorizationCatalog
         new(RoleIds.VolunteerGroupPresident, PermissionIds.MembersRead),
         new(RoleIds.VolunteerGroupPresident, PermissionIds.TimelinePost),
         new(RoleIds.VolunteerGroupPresident, PermissionIds.VolunteerGroupsManage),
+        new(RoleIds.VolunteerGroupPresident, PermissionIds.VolunteerGroupsLead),
         new(RoleIds.VolunteerGroupPresident, PermissionIds.EventsPublish),
 
         new(RoleIds.PathshalaTeacher, PermissionIds.MembersRead),

@@ -134,6 +134,11 @@ namespace Sangam.IdentityTenant.Infrastructure.Persistence.Migrations
                         {
                             Id = new Guid("b0000000-0000-0000-0000-000000000012"),
                             Key = "Audit.Read"
+                        },
+                        new
+                        {
+                            Id = new Guid("b0000000-0000-0000-0000-000000000013"),
+                            Key = "VolunteerGroups.Lead"
                         });
                 });
 
@@ -318,6 +323,11 @@ namespace Sangam.IdentityTenant.Infrastructure.Persistence.Migrations
                         },
                         new
                         {
+                            RoleId = new Guid("a0000000-0000-0000-0000-000000000001"),
+                            PermissionId = new Guid("b0000000-0000-0000-0000-000000000013")
+                        },
+                        new
+                        {
                             RoleId = new Guid("a0000000-0000-0000-0000-000000000002"),
                             PermissionId = new Guid("b0000000-0000-0000-0000-000000000002")
                         },
@@ -355,6 +365,11 @@ namespace Sangam.IdentityTenant.Infrastructure.Persistence.Migrations
                         {
                             RoleId = new Guid("a0000000-0000-0000-0000-000000000002"),
                             PermissionId = new Guid("b0000000-0000-0000-0000-000000000009")
+                        },
+                        new
+                        {
+                            RoleId = new Guid("a0000000-0000-0000-0000-000000000002"),
+                            PermissionId = new Guid("b0000000-0000-0000-0000-000000000013")
                         },
                         new
                         {
@@ -403,6 +418,11 @@ namespace Sangam.IdentityTenant.Infrastructure.Persistence.Migrations
                         },
                         new
                         {
+                            RoleId = new Guid("a0000000-0000-0000-0000-000000000003"),
+                            PermissionId = new Guid("b0000000-0000-0000-0000-000000000013")
+                        },
+                        new
+                        {
                             RoleId = new Guid("a0000000-0000-0000-0000-000000000004"),
                             PermissionId = new Guid("b0000000-0000-0000-0000-000000000003")
                         },
@@ -430,6 +450,11 @@ namespace Sangam.IdentityTenant.Infrastructure.Persistence.Migrations
                         {
                             RoleId = new Guid("a0000000-0000-0000-0000-000000000005"),
                             PermissionId = new Guid("b0000000-0000-0000-0000-000000000009")
+                        },
+                        new
+                        {
+                            RoleId = new Guid("a0000000-0000-0000-0000-000000000005"),
+                            PermissionId = new Guid("b0000000-0000-0000-0000-000000000013")
                         },
                         new
                         {
