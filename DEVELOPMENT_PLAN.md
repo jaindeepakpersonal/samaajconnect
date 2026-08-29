@@ -8,20 +8,21 @@ version of the plan; the reasoning behind the ordering lives in
 ## Current Status
 
 - **Stage:** Phase 4 built; the member portal is catching up on the backend
-- **Last updated:** 2026-08-29 - the member portal's Events screens, list and
-  detail, with the capacity bar and the waitlist. 898 tests green (776 backend,
-  122 frontend) plus 237 smoke checks against a stack built from empty volumes,
-  re-runnable against a dirty one.
-- **Blocking item:** none. The **frontend gap is still the biggest item**, but
-  it is closing: Timeline and Events are built and the pattern is established.
-  Volunteer Groups and Social Issues are next — services complete, Home tiles
-  already saying "Coming soon". After that: the Phase 5 `boli-service`, or the
-  three remaining Phase 1 leftovers (a member-portal surface for the DPDP
-  rights, an editable role matrix, and the two DPDP obligations that need a
-  notification channel first). The vote endpoint's throughput load test is
-  carried to Phase 5, since it needs a deployed environment; its correctness
-  half is done. The five questions in `docs/product/DPDP-COMPLIANCE.md` still
-  need counsel before any of this ships to real users.
+- **Last updated:** 2026-08-29 - the member portal's Volunteer Groups screens,
+  including the president's review queue no wireframe covers. 923 tests green
+  (776 backend, 147 frontend) plus 237 smoke checks against a stack built from
+  empty volumes, re-runnable against a dirty one.
+- **Blocking item:** none. The **frontend gap keeps closing**: the whole
+  `community` module — Timeline, Events and Volunteer Groups — now has member
+  screens. Social Issues is the last service with a Home tile still saying
+  "Coming soon"; Members and Family need one too. After that: the Phase 5
+  `boli-service`, or the three remaining Phase 1 leftovers (a member-portal
+  surface for the DPDP rights, an editable role matrix, and the two DPDP
+  obligations that need a notification channel first). The vote endpoint's
+  throughput load test is carried to Phase 5, since it needs a deployed
+  environment; its correctness half is done. The five questions in
+  `docs/product/DPDP-COMPLIANCE.md` still need counsel before any of this ships
+  to real users.
 
 *(Update these three lines at the start/end of every work session —
 they're what a coding agent or a teammate should read first to know
@@ -165,8 +166,16 @@ unit tested.
       are one button and one call, because which of the two a member gets
       depends on a count the portal cannot see the current value of. Verified
       against the stack: RSVP, join a queue, and watch a place move down it
-- [ ] **Member portal: the rest.** Volunteer Groups and Social Issues have
-      services and no screens. Their Home tiles say "Coming soon"
+- [x] **Member portal: Volunteer Groups** (wireframes `#groups` and
+      `#groupdetail`) - the directory with the reader's standing on each card,
+      the detail screen with the apply flow, and **the president's review
+      queue**, which no wireframe covers but without which every application a
+      member sends sits unanswered forever. The queue is fetched only when the
+      group says the reader leads it, because the endpoint answers 404 to
+      anyone else. Verified against the stack: applied as a member, accepted
+      with a position as the president
+- [ ] **Member portal: the rest.** Social Issues has a service and no screen.
+      Its Home tile says "Coming soon", as do Members and Family
 
 ## Phase 3 — Celebrity Voting
 

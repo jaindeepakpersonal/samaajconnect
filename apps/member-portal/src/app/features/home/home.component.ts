@@ -163,7 +163,7 @@ export class HomeComponent implements OnInit {
       title: 'Volunteer',
       description: 'Find groups and apply to join.',
       action: 'Explore',
-      route: null,
+      route: '/groups',
     },
     {
       moduleKey: ModuleKeys.SocialIssues,

@@ -1,0 +1,67 @@
+/* Only what is specific to the two group screens. The pill colours, the
+   two-column grid, the back link and the table rules are shared primitives and
+   live in `src/styles.css`. */
+
+.groups-page {
+  max-width: 900px;
+  margin: 0 auto;
+  padding: var(--space-6) var(--space-4);
+}
+
+.page-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: var(--space-4);
+  flex-wrap: wrap;
+  margin-bottom: var(--space-4);
+}
+
+.section-heading {
+  font-size: 1rem;
+  margin: var(--space-6) 0 var(--space-3);
+}
+
+/* The standing pill and any warnings beside it. Wrapping rather than
+   truncating: "Your application is with the president" is the longest of them
+   and is worth the second line. */
+.badges {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+  margin: var(--space-2) 0;
+}
+
+/* Preserves the line breaks somebody typed - a description or an application
+   note - without letting a long word widen the card past the page. */
+.group-body {
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+.apply {
+  margin-top: var(--space-3);
+  padding-top: var(--space-3);
+  border-top: 1px solid var(--line);
+}
+
+.queue {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+
+/* The position editor inside a table cell. Wraps rather than forcing the table
+   wider, which would push the whole row into horizontal scroll. */
+.inline-form {
+  display: flex;
+  gap: var(--space-2);
+  align-items: center;
+  flex-wrap: wrap;
+}
+
+.inline-form .input {
+  margin-bottom: 0;
+  width: auto;
+  min-width: 120px;
+}

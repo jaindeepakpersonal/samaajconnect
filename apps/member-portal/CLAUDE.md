@@ -14,8 +14,10 @@ before translating another screen.
 | Timeline | `/timeline` | `#timeline` | built |
 | Events | `/events` | `#events` | built |
 | Event detail | `/events/:id` | `#eventdetail` | built |
+| Volunteer Groups | `/groups` | `#groups` | built |
+| Group detail | `/groups/:id` | `#groupdetail` | built, plus the president's review queue the wireframe has no screen for |
 | Forgot password / OTP | — | `#forgot`, `#otp` | not built — no endpoint exists |
-| Profile, Members, Family, Groups, Issues, Celebrity, Pathshala, Boli, Notifications | — | various | not built — the services exist, the screens do not |
+| Profile, Members, Family, Issues, Celebrity, Pathshala, Boli, Notifications | — | various | not built — the services exist, the screens do not |
 
 ## Where things live
 
@@ -108,6 +110,21 @@ before the event". There is no notification channel yet, so the shipped screen
 does not say it - a disabled control can explain itself, but a sentence of prose
 cannot, and printing it would simply be a lie. There is a test asserting the
 words are absent.
+
+**A screen never asks for something it has been told it may not have.** The
+group detail screen fetches the president's review queue only when the group
+says `iAmThePresident`. That endpoint answers 404 to anyone else - deliberately,
+so a 403 cannot confirm a group has applications pending - so asking
+speculatively would mean a 404 on every ordinary member's visit, and a console
+full of them is how a real 404 stops being noticed.
+
+**Names the portal cannot resolve are not invented.** Timeline, Events and
+Groups all carry member ids and no names: names live in member-family-service
+and resolving them would be a call per row. Each screen says the thing it *can*
+know and that actually matters to the reader - "Your post", "You", "The
+president", "A member", "A volunteer group" - rather than printing an id or a
+placeholder. The wireframes' "President: Rajesh Jain" is prototype data, not a
+field the API has.
 
 **Shared page primitives live in `src/styles.css`, not in a feature
 stylesheet.** The pill colours (`.ok`, `.warn`, `.danger`), the two-column

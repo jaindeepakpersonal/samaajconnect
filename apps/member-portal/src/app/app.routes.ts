@@ -40,6 +40,20 @@ export const routes: Routes = [
     loadComponent: () =>
       import('./features/events/event-detail.component').then((m) => m.EventDetailComponent),
   },
+  {
+    path: 'groups',
+    title: 'Volunteer Groups - samaajconnect',
+    canActivate: [authGuard],
+    loadComponent: () =>
+      import('./features/groups/groups-list.component').then((m) => m.GroupsListComponent),
+  },
+  {
+    path: 'groups/:id',
+    title: 'Volunteer Group - samaajconnect',
+    canActivate: [authGuard],
+    loadComponent: () =>
+      import('./features/groups/group-detail.component').then((m) => m.GroupDetailComponent),
+  },
   { path: '', pathMatch: 'full', redirectTo: 'home' },
 
   // Anything unrecognised goes to Home, which sends signed-out visitors to
