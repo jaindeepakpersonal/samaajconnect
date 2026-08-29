@@ -103,6 +103,22 @@ export const routes: Routes = [
     loadComponent: () =>
       import('./features/voting/campaign-detail.component').then((m) => m.CampaignDetailComponent),
   },
+  {
+    path: 'pathshala',
+    title: 'Jain Pathshala - samaajconnect',
+    canActivate: [authGuard],
+    loadComponent: () =>
+      import('./features/pathshala/pathshala-list.component').then(
+        (m) => m.PathshalaListComponent,
+      ),
+  },
+  {
+    path: 'pathshala/:id',
+    title: 'Pathshala enrolment - samaajconnect',
+    canActivate: [authGuard],
+    loadComponent: () =>
+      import('./features/pathshala/enrolment.component').then((m) => m.EnrolmentComponent),
+  },
   { path: '', pathMatch: 'full', redirectTo: 'home' },
 
   // Anything unrecognised goes to Home, which sends signed-out visitors to

@@ -1,0 +1,68 @@
+/* Only what is specific to the Pathshala screens. Pill colours, the grids, the
+   progress bar, the back link and the table rules are shared primitives in
+   `src/styles.css`. */
+
+.pathshala-page {
+  max-width: 900px;
+  margin: 0 auto;
+  padding: var(--space-6) var(--space-4);
+}
+
+.page-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: var(--space-4);
+  flex-wrap: wrap;
+  margin-bottom: var(--space-4);
+}
+
+.section-heading {
+  font-size: 1rem;
+  margin: var(--space-6) 0 var(--space-3);
+}
+
+.badges {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+  margin: var(--space-2) 0;
+}
+
+/* The attendance and progress tiles. Tabular figures so the three sit level. */
+.pathshala-page .stat {
+  font-variant-numeric: tabular-nums;
+  margin-bottom: 0;
+}
+
+/* A percentage nothing can be computed for yet. Not a zero, and it should not
+   look like one: lighter, and set in the body face rather than the tile face. */
+.stat.unknown {
+  font-size: 1rem;
+  font-weight: 400;
+  color: var(--muted);
+}
+
+/* The timetable. Days read as a list rather than a table because a class has
+   one or two slots, not a week of them. */
+.slots {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.slots li {
+  display: flex;
+  gap: var(--space-3);
+  padding: var(--space-1) 0;
+}
+
+.slots .day {
+  min-width: 6.5rem;
+  font-weight: 600;
+}
+
+.slots .time {
+  font-variant-numeric: tabular-nums;
+  color: var(--muted);
+}

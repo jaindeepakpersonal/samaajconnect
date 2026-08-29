@@ -163,7 +163,9 @@ describe('HomeComponent', () => {
   });
 
   it('marks tiles whose screens do not exist yet instead of linking nowhere', () => {
-    load();
+    // Boli is the last module with a tile and no screen; Pathshala was the
+    // example here until its screens shipped.
+    load({ modules: ['Boli'] });
 
     const disabled = (fixture.nativeElement as HTMLElement).querySelectorAll('.card button[disabled]');
 

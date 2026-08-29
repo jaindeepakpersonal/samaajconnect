@@ -184,7 +184,7 @@ export class HomeComponent implements OnInit {
       title: 'Pathshala',
       description: "Manage your child's enrollment and education.",
       action: 'Open',
-      route: null,
+      route: '/pathshala',
     },
     {
       moduleKey: ModuleKeys.Boli,

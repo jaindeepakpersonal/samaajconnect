@@ -23,8 +23,11 @@ before translating another screen.
 | My Family | `/family` | `#family` + `#children` | built as one screen |
 | Celebrities of Samaaj | `/voting` | `#celebrity` | built |
 | Campaign detail | `/voting/:id` | `#celebrity` + `#celebrityresults` | built as one screen |
+| Jain Pathshala | `/pathshala` | `#pathshala` | built |
+| Pathshala enrolment | `/pathshala/:id` | `#myclass` + `#attendance` + `#exams` + `#progress` | built as one screen |
+| Pathshala events | — | `#pathevents` | not built — no endpoint exists |
 | Forgot password / OTP | — | `#forgot`, `#otp` | not built — no endpoint exists |
-| Profile, Pathshala, Boli, Notifications | — | various | not built |
+| Profile, Boli, Notifications | — | various | not built |
 
 ## Where things live
 
@@ -183,6 +186,36 @@ know and that actually matters to the reader - "Your post", "You", "The
 president", "A member", "A volunteer group" - rather than printing an id or a
 placeholder. The wireframes' "President: Rajesh Jain" is prototype data, not a
 field the API has.
+
+**A parent's own children are the one place this app does resolve names.** The
+rule below — that names the portal cannot resolve are not invented — is about
+ids belonging to people the reader has no particular claim on, where resolving
+them would be a call per row. A parent's children are one call to
+`/v1/children`, a list they already hold, and "Waiting for a place" against an
+opaque id would be useless to the only person the Pathshala screens are for. The
+teachers on the same screen stay a count, because those are exactly the ids the
+rule is about.
+
+**Waiting for a place is a state, not a failure.** An unplaced enrolment has no
+class, so `my-class` answers 409 by design and the exam list comes back empty.
+The enrolment screen reads `classId` off the enrolment it already has and asks
+for neither until there is one — the same discipline as the group president's
+review queue. A parent needs "the Pathshala has not placed them yet" told
+plainly; it is the state they will sit in longest, and it is not "declined".
+
+**Two numbers on one screen must be able to be reconciled.** An excused absence
+is marked but deliberately not counted against the attendance percentage. The
+progress tile first printed "2 of 4 marked" beside a 67% that is 2 of 3, which
+reads as an arithmetic error rather than as the policy it is. It now lists the
+three counts instead. The same care applies to the exam column: a mark is shown
+out of the exam's own maximum, never rebased to 100 without saying so.
+
+**A `<select>` bound to an uninitialised model shows nothing at all.** An
+`undefined` matches no option — not even the one whose `value` is the empty
+string — so the control renders with `selectedIndex: -1` and reads as an empty
+dropdown rather than as its placeholder. The Pathshala child picker seeds each
+card's model to `''` when the list loads. Tests that set the model directly
+never see this; only opening the page does.
 
 **A window that is open is a fact about the clock, not about the status.** The
 voting screens read `acceptsNominations` and `acceptsVotes` for every button,

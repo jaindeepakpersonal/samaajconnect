@@ -8,18 +8,19 @@ version of the plan; the reasoning behind the ordering lives in
 ## Current Status
 
 - **Stage:** Phase 4 built; six member modules have screens
-- **Last updated:** 2026-08-29 - the member portal's Celebrities of Samaaj
-  screens. Driving them against the running stack found a gateway bug that had
-  been breaking every module-gated screen in the app: a gated route answered
-  404 rather than 401 when the caller's access token had expired, so the
-  portals' silent renew-and-retry never fired and the screen printed "No such
-  endpoint." from fifteen minutes after sign-in onwards. 1,011 tests green (780
-  backend, 231 frontend) plus 240 smoke checks against a stack built from empty
-  volumes, re-runnable against a dirty one.
-- **Blocking item:** none. The **frontend gap is nearly closed**: Timeline,
-  Events, Volunteer Groups, Social Issues, Members, Family and Celebrity Voting
-  all have member screens. What is left is Pathshala, whose service exists, and
-  Boli, which has neither. After that: the Phase 5 `boli-service`, or the
+- **Last updated:** 2026-08-29 - the member portal's Jain Pathshala screens,
+  after the Celebrities of Samaaj ones. Driving Celebrity Voting against the
+  running stack found a gateway bug that had been breaking every module-gated
+  screen in the app: a gated route answered 404 rather than 401 when the
+  caller's access token had expired, so the portals' silent renew-and-retry
+  never fired and the screen printed "No such endpoint." from fifteen minutes
+  after sign-in onwards. 1,034 tests green (780 backend, 254 frontend) plus 240
+  smoke checks against a stack built from empty volumes, re-runnable against a
+  dirty one.
+- **Blocking item:** none. **Every member module with a service now has
+  screens**: Timeline, Events, Volunteer Groups, Social Issues, Members, Family,
+  Celebrity Voting and Pathshala. Only Boli is left, and it has neither a
+  service nor screens. After that: the Phase 5 `boli-service`, or the
   three remaining Phase 1 leftovers (a member-portal surface for the DPDP
   rights, an editable role matrix, and the two DPDP obligations that need a
   notification channel first). The vote endpoint's throughput load test is
@@ -215,8 +216,17 @@ unit tested.
       module-gated route answered 404 to a caller whose access token had merely
       expired, so the portals' renew-and-retry never fired and every gated
       screen said "No such endpoint." fifteen minutes after sign-in, for good
-- [ ] **Member portal: the rest.** Pathshala has a service and no screens;
-      Boli has neither
+- [x] **Member portal: Jain Pathshala.** The directory with a parent's enrol
+      request, and one enrolment screen carrying the wireframe's `#myclass`,
+      `#attendance`, `#exams` and `#progress` — four views of one enrolment,
+      whose own `#progress` already reprints the attendance percentage from
+      `#attendance`. Waiting for a place is a first-class state: the screen
+      reads `classId` and asks for neither the class nor the exams until there
+      is one, because `my-class` answers 409 by design while a child is
+      unplaced. The wireframe's "Events: 7 participated" tile is dropped —
+      nothing records Pathshala event participation, so it would be a number
+      the app made up
+- [ ] **Member portal: the rest.** Boli has neither a service nor screens
 
 ## Phase 3 — Celebrity Voting
 
