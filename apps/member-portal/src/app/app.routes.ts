@@ -89,6 +89,20 @@ export const routes: Routes = [
     loadComponent: () =>
       import('./features/members/family.component').then((m) => m.FamilyComponent),
   },
+  {
+    path: 'voting',
+    title: 'Celebrities of Samaaj - samaajconnect',
+    canActivate: [authGuard],
+    loadComponent: () =>
+      import('./features/voting/campaigns-list.component').then((m) => m.CampaignsListComponent),
+  },
+  {
+    path: 'voting/:id',
+    title: 'Campaign - samaajconnect',
+    canActivate: [authGuard],
+    loadComponent: () =>
+      import('./features/voting/campaign-detail.component').then((m) => m.CampaignDetailComponent),
+  },
   { path: '', pathMatch: 'full', redirectTo: 'home' },
 
   // Anything unrecognised goes to Home, which sends signed-out visitors to

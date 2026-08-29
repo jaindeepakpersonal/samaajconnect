@@ -177,7 +177,7 @@ export class HomeComponent implements OnInit {
       title: 'Celebrities of Samaaj',
       description: 'Nominate, vote, and see the published result.',
       action: 'Open',
-      route: null,
+      route: '/voting',
     },
     {
       moduleKey: ModuleKeys.Pathshala,

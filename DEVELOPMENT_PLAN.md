@@ -8,15 +8,18 @@ version of the plan; the reasoning behind the ordering lives in
 ## Current Status
 
 - **Stage:** Phase 4 built; six member modules have screens
-- **Last updated:** 2026-08-29 - the member portal's Members directory, member
-  detail and My Family. Building them found `GET /v1/members/{id}` had been in
-  the contract since it was written and never implemented, so that shipped too.
-  983 tests green (778 backend, 205 frontend) plus 240 smoke checks against a
-  stack built from empty volumes, re-runnable against a dirty one.
+- **Last updated:** 2026-08-29 - the member portal's Celebrities of Samaaj
+  screens. Driving them against the running stack found a gateway bug that had
+  been breaking every module-gated screen in the app: a gated route answered
+  404 rather than 401 when the caller's access token had expired, so the
+  portals' silent renew-and-retry never fired and the screen printed "No such
+  endpoint." from fifteen minutes after sign-in onwards. 1,011 tests green (780
+  backend, 231 frontend) plus 240 smoke checks against a stack built from empty
+  volumes, re-runnable against a dirty one.
 - **Blocking item:** none. The **frontend gap is nearly closed**: Timeline,
-  Events, Volunteer Groups, Social Issues, Members and Family all have member
-  screens. What is left is Celebrity Voting and Pathshala, whose services exist,
-  and Boli, which has neither. After that: the Phase 5 `boli-service`, or the
+  Events, Volunteer Groups, Social Issues, Members, Family and Celebrity Voting
+  all have member screens. What is left is Pathshala, whose service exists, and
+  Boli, which has neither. After that: the Phase 5 `boli-service`, or the
   three remaining Phase 1 leftovers (a member-portal surface for the DPDP
   rights, an editable role matrix, and the two DPDP obligations that need a
   notification channel first). The vote endpoint's throughput load test is
@@ -202,8 +205,18 @@ unit tested.
       that shipped too, through the same per-field privacy mapper the directory
       uses. Adding a child shows the DPDP notice before the form and sends its
       version with the consent
-- [ ] **Member portal: the rest.** Celebrity Voting and Pathshala have services
-      and no screens; Boli has neither
+- [x] **Member portal: Celebrities of Samaaj.** The campaign list and one
+      detail screen carrying the wireframe's ballot and its results table,
+      because they are the same campaign at two points in its life and a member
+      arriving after publication wants the result where the ballot was. Every
+      control reads `acceptsNominations`/`acceptsVotes` rather than the status,
+      so a window that has closed cannot still offer a button. Driving it
+      against the running stack found a **gateway** bug, not a portal one: a
+      module-gated route answered 404 to a caller whose access token had merely
+      expired, so the portals' renew-and-retry never fired and every gated
+      screen said "No such endpoint." fifteen minutes after sign-in, for good
+- [ ] **Member portal: the rest.** Pathshala has a service and no screens;
+      Boli has neither
 
 ## Phase 3 — Celebrity Voting
 

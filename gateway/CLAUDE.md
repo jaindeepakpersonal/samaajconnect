@@ -131,6 +131,19 @@ distinguishable from a deletion.
 no Pathshala should be indistinguishable from a platform with no Pathshala
 feature.
 
+**But an unauthenticated caller on a gated route gets 401, not that 404.** The
+404 is an answer about a Samaaj, and a request with no usable token has no
+Samaaj to answer about. Conflating the two broke both portals: their
+interceptors renew an expired access token on a 401 and retry, and a 404 goes
+straight through to the screen. Every module-gated screen in the member portal
+showed "No such endpoint." from fifteen minutes after sign-in and never
+recovered, because nothing on those screens could produce the 401 that would
+have renewed the token — the only screens that still worked were the ungated
+ones. It hides nothing extra: with no Samaaj resolved the 401 is identical for
+every gated route, and a signed-in member still cannot tell a switched-off
+module from a feature that does not exist. A Super Admin who is authenticated
+but has named no Samaaj still gets the 404.
+
 **"We could not check" is a 502, never a 403.** If `identity-tenant-service` is
 unreachable, reporting "your Samaaj is unavailable" would turn one service being
 down into every member on the platform being locked out.

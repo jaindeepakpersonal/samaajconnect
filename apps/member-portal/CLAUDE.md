@@ -21,8 +21,10 @@ before translating another screen.
 | Members | `/members` | `#members` | built |
 | Member detail | `/members/:id` | `#memberdetail` | built |
 | My Family | `/family` | `#family` + `#children` | built as one screen |
+| Celebrities of Samaaj | `/voting` | `#celebrity` | built |
+| Campaign detail | `/voting/:id` | `#celebrity` + `#celebrityresults` | built as one screen |
 | Forgot password / OTP | — | `#forgot`, `#otp` | not built — no endpoint exists |
-| Profile, Celebrity, Pathshala, Boli, Notifications | — | various | not built |
+| Profile, Pathshala, Boli, Notifications | — | various | not built |
 
 ## Where things live
 
@@ -181,6 +183,32 @@ know and that actually matters to the reader - "Your post", "You", "The
 president", "A member", "A volunteer group" - rather than printing an id or a
 placeholder. The wireframes' "President: Rajesh Jain" is prototype data, not a
 field the API has.
+
+**A window that is open is a fact about the clock, not about the status.** The
+voting screens read `acceptsNominations` and `acceptsVotes` for every button,
+every sentence and the state pill, and the status only as a fallback for naming
+a state that has no window. A campaign sitting at `NominationsOpen` past its
+closing date is not taking nominations, and only the server knows the time it is
+deciding against. Labelling the pill from the status while everything else read
+the clock shipped a card whose pill said "Nominations open" directly above a
+line saying "Nominations have closed" — worse than either sentence alone,
+because a reader has to work out which half to believe. `stageLabel()` in
+`voting.models.ts` is shared by both screens so they cannot drift apart again.
+
+**A null count is not zero, and the flag that says which is not the null.**
+A campaign set to `HiddenUntilClose` returns candidates with `votes: null`, and
+`tallyVisible: false` beside them. Printing 0 would tell a member nobody had
+voted for someone, which is a claim, and the wrong one. The screen needs the
+flag rather than inferring from the null because an empty campaign with the
+tally visible has genuine zeroes — the two look identical from the null alone.
+
+**Doing something twice is not an error, and the screen should not dress it up
+as one.** Nominating an already-nominated member and voting a second time both
+come back 200, with `nominated: false` / `accepted: false` and the candidacy or
+vote actually held. The unique indexes are what enforce one each; the response
+just reports which happened. Both screens say so plainly — "They had already
+been put forward" — rather than showing an error for a button someone pressed
+twice.
 
 **Shared page primitives live in `src/styles.css`, not in a feature
 stylesheet.** The pill colours (`.ok`, `.warn`, `.danger`), the two-column

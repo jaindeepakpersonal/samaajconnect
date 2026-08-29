@@ -1,0 +1,42 @@
+/* Only what is specific to the two voting screens. Pill colours, the grids, the
+   back link and the table rules are shared primitives in `src/styles.css`. */
+
+.voting-page {
+  max-width: 900px;
+  margin: 0 auto;
+  padding: var(--space-6) var(--space-4);
+}
+
+.page-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: var(--space-4);
+  flex-wrap: wrap;
+  margin-bottom: var(--space-4);
+}
+
+.section-heading {
+  font-size: 1rem;
+  margin: var(--space-6) 0 var(--space-3);
+}
+
+.badges {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+  margin: var(--space-2) 0;
+}
+
+/* The candidate this member voted for. An outline as well as a tint, so the
+   distinction does not rest on colour alone. */
+.card.mine {
+  box-shadow: inset 0 0 0 2px var(--accent);
+}
+
+/* The vote count. Tabular figures so a column of them does not jitter as the
+   numbers change. */
+.voting-page .stat {
+  font-variant-numeric: tabular-nums;
+  margin-bottom: 0;
+}
