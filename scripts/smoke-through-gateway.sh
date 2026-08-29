@@ -1066,6 +1066,152 @@ check "switching it back on" 200 \
 sleep 62
 
 echo
+
+echo
+echo "Social issues: the approval workflow, and a second module key"
+
+# Social issues sit behind their own module, not `community`. Turning this one
+# on must not disturb the timeline, and turning it off later must not take the
+# timeline with it - which is the first time two module keys are exercised
+# independently.
+check "switching the social-issues module on alongside community" 200 \
+  "$(status -X PUT "$GATEWAY/v1/identity/tenants/$TENANT_ID/modules" \
+     -H 'Content-Type: application/json' -H "Authorization: Bearer $ADMIN_TOKEN" \
+     -d '{"enabledModules":["community","pathshala","social-issues"]}')"
+
+sleep 62
+
+ISSUE_TITLE="Road safety near the community school $(date +%s)"
+
+ISSUE=$(curl -s -X POST "$GATEWAY/v1/social-issues" -H 'Content-Type: application/json' \
+  -H "Authorization: Bearer $MEMBER_TOKEN" \
+  -d "{\"title\":\"$ISSUE_TITLE\",\"description\":\"Cars come through too fast at closing time.\",\"category\":\"Safety\",\"locality\":\"Hiran Magri\",\"submitNow\":true}")
+
+ISSUE_ID=$(printf '%s' "$ISSUE" | json_field id)
+ISSUE_STATUS=$(printf '%s' "$ISSUE" | json_field status)
+
+if [ "$ISSUE_STATUS" = "Submitted" ]; then
+  echo "  ok    a member raises an issue and it awaits review"
+  pass=$((pass + 1))
+else
+  echo "  FAIL  a member raises an issue (got '$ISSUE_STATUS')"
+  fail=$((fail + 1))
+fi
+
+check "a category outside the list is refused" 400 \
+  "$(status -X POST "$GATEWAY/v1/social-issues" -H 'Content-Type: application/json' \
+     -H "Authorization: Bearer $MEMBER_TOKEN" \
+     -d '{"title":"Anything","description":"Anything.","category":"Whatever I like","locality":null,"submitNow":true}')"
+
+# Unpublished issues belong to their author and the reviewers.
+if curl -s -H "Authorization: Bearer $CHILD_TOKEN" "$GATEWAY/v1/social-issues" \
+   | grep -q "$ISSUE_TITLE"; then
+  echo "  FAIL  an unpublished issue is visible to other members"
+  fail=$((fail + 1))
+else
+  echo "  ok    an unpublished issue is not visible to other members"
+  pass=$((pass + 1))
+fi
+
+if curl -s -H "Authorization: Bearer $MEMBER_TOKEN" "$GATEWAY/v1/social-issues" \
+   | grep -q "$ISSUE_TITLE"; then
+  echo "  ok    but its author sees it in their own list"
+  pass=$((pass + 1))
+else
+  echo "  FAIL  the author cannot see their own submission"
+  fail=$((fail + 1))
+fi
+
+check "the approval queue is refused to a member" 403 \
+  "$(status -H "Authorization: Bearer $MEMBER_TOKEN" "$GATEWAY/v1/social-issues/approval-queue")"
+
+if curl -s -H "Authorization: Bearer $ADMIN_TOKEN" -H "$ADMIN_TENANT_HEADER" \
+   "$GATEWAY/v1/social-issues/approval-queue" | grep -q "$ISSUE_TITLE"; then
+  echo "  ok    and served to a reviewer, with the issue in it"
+  pass=$((pass + 1))
+else
+  echo "  FAIL  the issue did not reach the approval queue"
+  fail=$((fail + 1))
+fi
+
+check "a member cannot decide about their own issue" 403 \
+  "$(status -X POST "$GATEWAY/v1/social-issues/$ISSUE_ID/status" -H 'Content-Type: application/json' \
+     -H "Authorization: Bearer $MEMBER_TOKEN" -d '{"status":"Approved","reason":null}')"
+
+# The one promise this service makes.
+check "publishing without approval is refused" 409 \
+  "$(status -X POST "$GATEWAY/v1/social-issues/$ISSUE_ID/status" -H 'Content-Type: application/json' \
+     -H "Authorization: Bearer $ADMIN_TOKEN" -H "$ADMIN_TENANT_HEADER" \
+     -d '{"status":"Published","reason":null}')"
+
+check "rejecting without saying why is refused" 400 \
+  "$(status -X POST "$GATEWAY/v1/social-issues/$ISSUE_ID/status" -H 'Content-Type: application/json' \
+     -H "Authorization: Bearer $ADMIN_TOKEN" -H "$ADMIN_TENANT_HEADER" \
+     -d '{"status":"Rejected","reason":null}')"
+
+check "a reviewer sends it back for changes" 200 \
+  "$(status -X POST "$GATEWAY/v1/social-issues/$ISSUE_ID/status" -H 'Content-Type: application/json' \
+     -H "Authorization: Bearer $ADMIN_TOKEN" -H "$ADMIN_TENANT_HEADER" \
+     -d '{"status":"ChangesRequested","reason":"Please add the road name."}')"
+
+check "the author revises it" 200 \
+  "$(status -X PUT "$GATEWAY/v1/social-issues/$ISSUE_ID" -H 'Content-Type: application/json' \
+     -H "Authorization: Bearer $MEMBER_TOKEN" \
+     -d "{\"title\":\"$ISSUE_TITLE\",\"description\":\"Cars come through too fast on the main road at closing time.\",\"category\":\"Safety\",\"locality\":\"Hiran Magri\"}")"
+
+check "and resubmits it" 200 \
+  "$(status -X POST "$GATEWAY/v1/social-issues/$ISSUE_ID/status" -H 'Content-Type: application/json' \
+     -H "Authorization: Bearer $MEMBER_TOKEN" -d '{"status":"Submitted","reason":null}')"
+
+check "the reviewer approves it" 200 \
+  "$(status -X POST "$GATEWAY/v1/social-issues/$ISSUE_ID/status" -H 'Content-Type: application/json' \
+     -H "Authorization: Bearer $ADMIN_TOKEN" -H "$ADMIN_TENANT_HEADER" \
+     -d '{"status":"Approved","reason":null}')"
+
+check "and publishes it" 200 \
+  "$(status -X POST "$GATEWAY/v1/social-issues/$ISSUE_ID/status" -H 'Content-Type: application/json' \
+     -H "Authorization: Bearer $ADMIN_TOKEN" -H "$ADMIN_TENANT_HEADER" \
+     -d '{"status":"Published","reason":null}')"
+
+if curl -s -H "Authorization: Bearer $CHILD_TOKEN" "$GATEWAY/v1/social-issues" \
+   | grep -q "$ISSUE_TITLE"; then
+  echo "  ok    the published issue reaches the whole Samaaj"
+  pass=$((pass + 1))
+else
+  echo "  FAIL  the published issue did not reach the Samaaj"
+  fail=$((fail + 1))
+fi
+
+# The history is what answers "why was mine sent back?".
+if curl -s -H "Authorization: Bearer $MEMBER_TOKEN" "$GATEWAY/v1/social-issues/$ISSUE_ID" \
+   | grep -q "Please add the road name."; then
+  echo "  ok    and its author can still read why it was sent back"
+  pass=$((pass + 1))
+else
+  echo "  FAIL  the issue history lost the reviewer's reason"
+  fail=$((fail + 1))
+fi
+
+check "a published issue can no longer be edited" 409 \
+  "$(status -X PUT "$GATEWAY/v1/social-issues/$ISSUE_ID" -H 'Content-Type: application/json' \
+     -H "Authorization: Bearer $MEMBER_TOKEN" \
+     -d '{"title":"Something else entirely","description":"Rewritten after approval.","category":"Community","locality":null}')"
+
+# Two module keys, gated independently.
+check "switching the social-issues module off alone" 200 \
+  "$(status -X PUT "$GATEWAY/v1/identity/tenants/$TENANT_ID/modules" \
+     -H 'Content-Type: application/json' -H "Authorization: Bearer $ADMIN_TOKEN" \
+     -d '{"enabledModules":["community","pathshala"]}')"
+
+sleep 62
+
+check "the social-issues route answers 404" 404 \
+  "$(status -H "Authorization: Bearer $MEMBER_TOKEN" "$GATEWAY/v1/social-issues")"
+
+check "while the timeline, on a different module, is untouched" 200 \
+  "$(status -H "Authorization: Bearer $MEMBER_TOKEN" "$GATEWAY/v1/timeline/posts")"
+
+echo
 echo "Sessions: rotation, reuse detection and sign-out"
 
 SESSION_LOGIN=$(curl -s -X POST "$GATEWAY/v1/identity/login" -H 'Content-Type: application/json' \

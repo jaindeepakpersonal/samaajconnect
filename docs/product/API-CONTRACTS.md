@@ -126,14 +126,24 @@ enforced by `TenantAuthorizationBehavior`, not just UI hiding.
 
 ## social-issues-service — `/v1/social-issues`
 
+> Module-gated on `social-issues` — its own key, not `community`. Switching it
+> off leaves the timeline and volunteer groups untouched.
+
 | Method | Path | Roles | Purpose |
 |---|---|---|---|
-| POST | `/issues` | Member | Submit issue |
-| GET | `/issues/approval-queue` | SamaajAdmin, ContentModerator | Pending review |
-| POST | `/issues/{id}/decide` | SamaajAdmin, ContentModerator | Approve/reject/request changes |
-| POST | `/issues/{id}/publish` | SamaajAdmin | Publish approved issue |
-| GET | `/issues/published` | Member | Public list |
-| GET | `/issues/{id}/history` | SamaajAdmin | Status/audit history |
+| GET | `/` | `Members.Read` | Published issues, plus this member's own whatever their status. `?category=` filters |
+| POST | `/` | `Members.Read` | Raise one. `submitNow=false` saves a draft only the author sees |
+| GET | `/approval-queue` | `SocialIssues.Approve` | Submitted and under review, oldest first |
+| GET | `/{id}` | `Members.Read` | One issue with its full status history |
+| PUT | `/{id}` | `Members.Read` + author | Correct one that has not been decided |
+| POST | `/{id}/status` | `Members.Read`, then per transition | `{status, reason}` — one endpoint for every move. Reject and ChangesRequested need a reason; the legal moves for this caller are on the issue as `availableTransitions` |
+
+> The draft named `SubmitIssueCommand`, `DecideIssueCommand`,
+> `PublishIssueCommand` and `CloseIssueCommand` as four separate operations.
+> They ship as one `POST /{id}/status`, because the transition table decides
+> legality and four handlers would be four copies of the same tenant, author and
+> permission checks — see "The workflow" in
+> `services/social-issues-service/CLAUDE.md`.
 
 ## celebrity-voting-service — `/v1/celebrity-voting`
 

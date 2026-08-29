@@ -7,15 +7,18 @@ version of the plan; the reasoning behind the ordering lives in
 
 ## Current Status
 
-- **Stage:** Phase 1 complete bar four tracked items; Phase 2 in progress
-- **Last updated:** 2026-08-29 - events-service, the platform's sixth service
-  and the third Phase 2 context. 686 tests green (621 backend, 65 frontend) plus
-  145 smoke checks against a stack built from empty volumes, re-runnable against
-  a dirty one.
-- **Blocking item:** none. Next in Phase 2: `social-issues-service`, the last
-  one before Phase 3. The four Phase 1 leftovers are tracked above and none
-  blocks Phase 2. The five questions in `docs/product/DPDP-COMPLIANCE.md` still
-  need counsel before any of this ships to real users.
+- **Stage:** Phase 2 complete; Phase 1 has four tracked leftovers
+- **Last updated:** 2026-08-29 - social-issues-service, the platform's seventh
+  service and the last Phase 2 context. 746 tests green (681 backend, 65
+  frontend) plus 166 smoke checks against a stack built from empty volumes,
+  re-runnable against a dirty one.
+- **Blocking item:** none. Phase 2's four services are done. Next is Phase 3
+  (`celebrity-voting-service`), or the four Phase 1 leftovers, which are
+  smaller: step-up auth on deactivating a Samaaj, a member-portal surface for
+  the DPDP rights, an editable role matrix, and the two DPDP obligations that
+  need a notification channel first. The five questions in
+  `docs/product/DPDP-COMPLIANCE.md` still need counsel before any of this ships
+  to real users.
 
 *(Update these three lines at the start/end of every work session —
 they're what a coding agent or a teammate should read first to know
@@ -139,7 +142,7 @@ unit tested.
 - [x] `timeline-service` (feed + moderation queue) — posting with the member/announcement split, the moderation queue that reported posts rejoin, comments, reactions and reporting. The platform's first module-gated route: switching `community` off makes the whole area answer 404
 - [x] `volunteer-groups-service` — groups, the join-application flow, and the president's review queue. Introduced `VolunteerGroups.Lead`, a permission every member holds, because gating a president's own group on an admin permission made those endpoints unreachable
 - [x] `events-service` (with capacity/waitlist) — draft/publish/cancel, RSVP and a waitlist that actually moves: giving up a place promotes whoever waited longest, and a promoted member keeps their queue position
-- [ ] `social-issues-service` (full Draft → Published workflow)
+- [x] `social-issues-service` (full Draft → Published workflow) — eight states declared as a transition table, with publishing reachable only from Approved, and an append-only history that answers "why was mine rejected?". The first service on its own module key
 
 ## Phase 3 — Celebrity Voting
 

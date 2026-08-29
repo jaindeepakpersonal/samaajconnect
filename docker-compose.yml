@@ -175,6 +175,19 @@ services:
       Outbox__PollIntervalSeconds: "5"
     ports:
       - "5106:8080"
+  social-issues-service:
+    <<: *service-defaults
+    build:
+      context: .
+      dockerfile: services/social-issues-service/Dockerfile
+    container_name: samaajconnect-issues
+    environment:
+      <<: *service-environment
+      ConnectionStrings__Default: "Host=postgres;Port=5432;Database=samaajconnect_social_issues;Username=samaajconnect;Password=samaajconnect"
+      Jwt__SigningKey: "${JWT_SIGNING_KEY:-local-development-signing-key-do-not-use-in-production}"
+      Outbox__PollIntervalSeconds: "5"
+    ports:
+      - "5107:8080"
   gateway:
     build:
       context: .
@@ -195,6 +208,8 @@ services:
       volunteer-groups-service:
         condition: service_started
       events-service:
+        condition: service_started
+      social-issues-service:
         condition: service_started
     environment:
       ASPNETCORE_ENVIRONMENT: Development
