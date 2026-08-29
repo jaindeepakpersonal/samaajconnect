@@ -147,15 +147,35 @@ enforced by `TenantAuthorizationBehavior`, not just UI hiding.
 
 ## celebrity-voting-service — `/v1/celebrity-voting`
 
-| Method | Path | Roles | Purpose |
+| Method | Path | Permission | Purpose |
 |---|---|---|---|
-| POST | `/campaigns` | SamaajAdmin | Create campaign |
-| POST | `/campaigns/{id}/candidates` | Member, SamaajAdmin | Nominate |
-| GET | `/campaigns/{id}/candidates` | Member | List candidates |
-| POST | `/campaigns/{id}/votes` | Member | Cast vote (idempotent per voter) |
-| POST | `/campaigns/{id}/close` | SamaajAdmin | Close voting |
-| POST | `/campaigns/{id}/publish` | SamaajAdmin | Generate + publish Top 10 |
-| GET | `/campaigns/{id}/results` | Member | View published results |
+| GET | `/campaigns` | `Members.Read` | This Samaaj's campaigns, with the caller's own vote on each |
+| POST | `/campaigns` | `CelebrityVoting.Configure` | Create a campaign (starts as a draft) |
+| GET | `/campaigns/{id}` | `Members.Read` | One campaign with its ballot, and the tally if the caller may see it |
+| POST | `/campaigns/{id}/status` | `CelebrityVoting.Configure` | Open nominations, open voting, or close |
+| POST | `/campaigns/{id}/candidates` | `Members.Read` | Nominate a member |
+| POST | `/campaigns/{id}/candidates/{candidateId}/decide` | `CelebrityVoting.Configure` | Put a nomination on the ballot, or remove it |
+| POST | `/campaigns/{id}/votes` | `Members.Read` | Cast this member's one vote (idempotent per voter) |
+| POST | `/campaigns/{id}/results` | `CelebrityVoting.Configure` | Compute the ranking and freeze it |
+| GET | `/campaigns/{id}/results` | `Members.Read` | The published ranking, as frozen |
+
+> **Shipped shape vs. the draft.** Four differences, each deliberate.
+>
+> `/close` and `/publish` are not two more verbs. Closing is a status move like
+> the others, so it ships as `POST /{id}/status`; publishing is separate because
+> it is the one transition that also computes and stores something.
+>
+> There is no `GET /campaigns/{id}/candidates`. The ballot is part of the
+> campaign, and a separate call would let a client render candidates without the
+> window, the status, or the visibility setting that decide what those candidates
+> mean.
+>
+> Nominations are approved before they reach the ballot. Anyone may put anyone
+> forward, and a Samaaj should not be made to hold a public vote about a person
+> because one member typed their name.
+>
+> The draft said "Top 10"; the campaign carries a `topN` instead. Ten is a
+> reasonable default, not a property of every Samaaj.
 
 ## pathshala-service — `/v1/pathshala`
 

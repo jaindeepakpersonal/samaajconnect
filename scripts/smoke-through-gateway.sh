@@ -1212,6 +1212,236 @@ check "while the timeline, on a different module, is untouched" 200 \
   "$(status -H "Authorization: Bearer $MEMBER_TOKEN" "$GATEWAY/v1/timeline/posts")"
 
 echo
+echo "Celebrities of Samaaj: nominations, one vote each, a frozen result"
+
+check "switching the celebrity-voting module on" 200 \
+  "$(status -X PUT "$GATEWAY/v1/identity/tenants/$TENANT_ID/modules" \
+     -H 'Content-Type: application/json' -H "Authorization: Bearer $ADMIN_TOKEN" \
+     -d '{"enabledModules":["community","pathshala","celebrity-voting"]}')"
+
+sleep 62
+
+# A campaign runs over time, and nominations and voting are deliberately never
+# open at once - members who vote early must see the same ballot as members who
+# vote late. So this section has a real window to wait out. Forty-five seconds
+# is the smallest one that leaves room for the calls in between.
+CAMPAIGN_TITLE="Celebrities of Samaaj $(date +%s)"
+NOMINATIONS_CLOSE=$(date -u -d '+45 seconds' +%Y-%m-%dT%H:%M:%SZ)
+VOTING_CLOSES=$(date -u -d '+7 days' +%Y-%m-%dT%H:%M:%SZ)
+NOMINATIONS_OPENED=$(date -u -d '-1 minute' +%Y-%m-%dT%H:%M:%SZ)
+
+# Nominated so that a member cannot vote for themselves later.
+OTHER_MEMBER="dddddddd-0000-4000-8000-00000000d001"
+
+CAMPAIGN=$(curl -s -X POST "$GATEWAY/v1/celebrity-voting/campaigns" \
+  -H 'Content-Type: application/json' \
+  -H "Authorization: Bearer $ADMIN_TOKEN" -H "$ADMIN_TENANT_HEADER" \
+  -d "{\"title\":\"$CAMPAIGN_TITLE\",\"description\":null,\"nominationStartAt\":\"$NOMINATIONS_OPENED\",\"nominationEndAt\":\"$NOMINATIONS_CLOSE\",\"votingStartAt\":\"$NOMINATIONS_CLOSE\",\"votingEndAt\":\"$VOTING_CLOSES\",\"topN\":3,\"resultsVisibility\":\"Live\"}")
+
+CAMPAIGN_ID=$(printf '%s' "$CAMPAIGN" | json_field id)
+
+if [ -n "$CAMPAIGN_ID" ]; then
+  echo "  ok    an administrator sets a campaign up"
+  pass=$((pass + 1))
+else
+  echo "  FAIL  an administrator sets a campaign up"
+  fail=$((fail + 1))
+fi
+
+check "a voting window that opens before nominations close is refused" 400 \
+  "$(status -X POST "$GATEWAY/v1/celebrity-voting/campaigns" -H 'Content-Type: application/json' \
+     -H "Authorization: Bearer $ADMIN_TOKEN" -H "$ADMIN_TENANT_HEADER" \
+     -d "{\"title\":\"Overlapping\",\"description\":null,\"nominationStartAt\":\"$NOMINATIONS_OPENED\",\"nominationEndAt\":\"$VOTING_CLOSES\",\"votingStartAt\":\"$NOMINATIONS_CLOSE\",\"votingEndAt\":\"$VOTING_CLOSES\",\"topN\":3,\"resultsVisibility\":\"Live\"}")"
+
+check "a member cannot set one up" 403 \
+  "$(status -X POST "$GATEWAY/v1/celebrity-voting/campaigns" -H 'Content-Type: application/json' \
+     -H "Authorization: Bearer $MEMBER_TOKEN" \
+     -d "{\"title\":\"Mine\",\"description\":null,\"nominationStartAt\":\"$NOMINATIONS_OPENED\",\"nominationEndAt\":\"$NOMINATIONS_CLOSE\",\"votingStartAt\":\"$NOMINATIONS_CLOSE\",\"votingEndAt\":\"$VOTING_CLOSES\",\"topN\":3,\"resultsVisibility\":\"Live\"}")"
+
+check "voting cannot open before the ballot has anyone on it" 409 \
+  "$(status -X POST "$GATEWAY/v1/celebrity-voting/campaigns/$CAMPAIGN_ID/status" \
+     -H 'Content-Type: application/json' \
+     -H "Authorization: Bearer $ADMIN_TOKEN" -H "$ADMIN_TENANT_HEADER" \
+     -d '{"status":"VotingOpen"}')"
+
+check "opening nominations is accepted" 200 \
+  "$(status -X POST "$GATEWAY/v1/celebrity-voting/campaigns/$CAMPAIGN_ID/status" \
+     -H 'Content-Type: application/json' \
+     -H "Authorization: Bearer $ADMIN_TOKEN" -H "$ADMIN_TENANT_HEADER" \
+     -d '{"status":"NominationsOpen"}')"
+
+NOMINATION=$(curl -s -X POST "$GATEWAY/v1/celebrity-voting/campaigns/$CAMPAIGN_ID/candidates" \
+  -H 'Content-Type: application/json' -H "Authorization: Bearer $MEMBER_TOKEN" \
+  -d "{\"memberId\":\"$OTHER_MEMBER\",\"category\":\"Community service\"}")
+
+CANDIDATE_ID=$(printf '%s' "$NOMINATION" | json_field candidateId)
+
+if [ -n "$CANDIDATE_ID" ]; then
+  echo "  ok    a member puts somebody forward"
+  pass=$((pass + 1))
+else
+  echo "  FAIL  a member puts somebody forward"
+  fail=$((fail + 1))
+fi
+
+# Nominating themselves, so the self-vote refusal below has something to refuse.
+SELF_NOMINATION=$(curl -s -X POST "$GATEWAY/v1/celebrity-voting/campaigns/$CAMPAIGN_ID/candidates" \
+  -H 'Content-Type: application/json' -H "Authorization: Bearer $CHILD_TOKEN" \
+  -d "{\"memberId\":\"$MEMBER_ID\",\"category\":\"Community service\"}")
+
+SELF_CANDIDATE_ID=$(printf '%s' "$SELF_NOMINATION" | json_field candidateId)
+
+# A second nomination of the same person is a no-op, not an error: two entries
+# for one person split their vote, and the second nominator did nothing wrong.
+REPEAT=$(curl -s -X POST "$GATEWAY/v1/celebrity-voting/campaigns/$CAMPAIGN_ID/candidates" \
+  -H 'Content-Type: application/json' -H "Authorization: Bearer $CHILD_TOKEN" \
+  -d "{\"memberId\":\"$OTHER_MEMBER\",\"category\":\"Community service\"}")
+
+if printf '%s' "$REPEAT" | grep -q "$CANDIDATE_ID"; then
+  echo "  ok    nominating the same person twice returns the one candidacy"
+  pass=$((pass + 1))
+else
+  echo "  FAIL  a second nomination created a second candidacy"
+  fail=$((fail + 1))
+fi
+
+check "a member cannot approve a nomination" 403 \
+  "$(status -X POST "$GATEWAY/v1/celebrity-voting/campaigns/$CAMPAIGN_ID/candidates/$CANDIDATE_ID/decide" \
+     -H 'Content-Type: application/json' -H "Authorization: Bearer $MEMBER_TOKEN" \
+     -d '{"approve":true}')"
+
+check "a reviewer puts them on the ballot" 200 \
+  "$(status -X POST "$GATEWAY/v1/celebrity-voting/campaigns/$CAMPAIGN_ID/candidates/$CANDIDATE_ID/decide" \
+     -H 'Content-Type: application/json' \
+     -H "Authorization: Bearer $ADMIN_TOKEN" -H "$ADMIN_TENANT_HEADER" \
+     -d '{"approve":true}')"
+
+check "and the second one too" 200 \
+  "$(status -X POST "$GATEWAY/v1/celebrity-voting/campaigns/$CAMPAIGN_ID/candidates/$SELF_CANDIDATE_ID/decide" \
+     -H 'Content-Type: application/json' \
+     -H "Authorization: Bearer $ADMIN_TOKEN" -H "$ADMIN_TENANT_HEADER" \
+     -d '{"approve":true}')"
+
+check "voting is not open while nominations still are" 409 \
+  "$(status -X POST "$GATEWAY/v1/celebrity-voting/campaigns/$CAMPAIGN_ID/votes" \
+     -H 'Content-Type: application/json' -H "Authorization: Bearer $MEMBER_TOKEN" \
+     -d "{\"candidateId\":\"$CANDIDATE_ID\"}")"
+
+echo "  ..    waiting for nominations to close"
+while [ "$(date -u +%s)" -lt "$(date -u -d "$NOMINATIONS_CLOSE" +%s)" ]; do
+  sleep 2
+done
+
+check "opening voting is accepted" 200 \
+  "$(status -X POST "$GATEWAY/v1/celebrity-voting/campaigns/$CAMPAIGN_ID/status" \
+     -H 'Content-Type: application/json' \
+     -H "Authorization: Bearer $ADMIN_TOKEN" -H "$ADMIN_TENANT_HEADER" \
+     -d '{"status":"VotingOpen"}')"
+
+FIRST_VOTE=$(curl -s -X POST "$GATEWAY/v1/celebrity-voting/campaigns/$CAMPAIGN_ID/votes" \
+  -H 'Content-Type: application/json' -H "Authorization: Bearer $MEMBER_TOKEN" \
+  -d "{\"candidateId\":\"$CANDIDATE_ID\"}")
+
+if printf '%s' "$FIRST_VOTE" | grep -q '"accepted":true'; then
+  echo "  ok    a member casts their vote"
+  pass=$((pass + 1))
+else
+  echo "  FAIL  a member casts their vote (got '$FIRST_VOTE')"
+  fail=$((fail + 1))
+fi
+
+# The second press is success with accepted=false: they have done nothing
+# wrong, and the response tells them what they hold. The unique index on
+# (CampaignId, VoterMemberId) is what actually refuses it.
+SECOND_VOTE=$(curl -s -X POST "$GATEWAY/v1/celebrity-voting/campaigns/$CAMPAIGN_ID/votes" \
+  -H 'Content-Type: application/json' -H "Authorization: Bearer $MEMBER_TOKEN" \
+  -d "{\"candidateId\":\"$SELF_CANDIDATE_ID\"}")
+
+if printf '%s' "$SECOND_VOTE" | grep -q '"accepted":false'; then
+  echo "  ok    voting a second time changes nothing and is not an error"
+  pass=$((pass + 1))
+else
+  echo "  FAIL  a second vote was accepted (got '$SECOND_VOTE')"
+  fail=$((fail + 1))
+fi
+
+check "and nobody may vote for themselves" 409 \
+  "$(status -X POST "$GATEWAY/v1/celebrity-voting/campaigns/$CAMPAIGN_ID/votes" \
+     -H 'Content-Type: application/json' -H "Authorization: Bearer $CHILD_TOKEN" \
+     -d "{\"candidateId\":\"$SELF_CANDIDATE_ID\"}")"
+
+check "a candidate who is not on this ballot is not found" 404 \
+  "$(status -X POST "$GATEWAY/v1/celebrity-voting/campaigns/$CAMPAIGN_ID/votes" \
+     -H 'Content-Type: application/json' -H "Authorization: Bearer $CHILD_TOKEN" \
+     -d '{"candidateId":"11111111-2222-4333-8444-555555555555"}')"
+
+check "a candidate cannot be removed once voting has opened" 409 \
+  "$(status -X POST "$GATEWAY/v1/celebrity-voting/campaigns/$CAMPAIGN_ID/candidates/$CANDIDATE_ID/decide" \
+     -H 'Content-Type: application/json' \
+     -H "Authorization: Bearer $ADMIN_TOKEN" -H "$ADMIN_TENANT_HEADER" \
+     -d '{"approve":false}')"
+
+if curl -s -H "Authorization: Bearer $MEMBER_TOKEN" \
+   "$GATEWAY/v1/celebrity-voting/campaigns/$CAMPAIGN_ID" | grep -q '"votes":1'; then
+  echo "  ok    the tally counts exactly one vote"
+  pass=$((pass + 1))
+else
+  echo "  FAIL  the tally does not show one vote"
+  fail=$((fail + 1))
+fi
+
+check "results cannot be published while voting is open" 409 \
+  "$(status -X POST "$GATEWAY/v1/celebrity-voting/campaigns/$CAMPAIGN_ID/results" \
+     -H "Authorization: Bearer $ADMIN_TOKEN" -H "$ADMIN_TENANT_HEADER")"
+
+check "closing the campaign is accepted" 200 \
+  "$(status -X POST "$GATEWAY/v1/celebrity-voting/campaigns/$CAMPAIGN_ID/status" \
+     -H 'Content-Type: application/json' \
+     -H "Authorization: Bearer $ADMIN_TOKEN" -H "$ADMIN_TENANT_HEADER" \
+     -d '{"status":"Closed"}')"
+
+check "and a closed campaign takes no more votes" 409 \
+  "$(status -X POST "$GATEWAY/v1/celebrity-voting/campaigns/$CAMPAIGN_ID/votes" \
+     -H 'Content-Type: application/json' -H "Authorization: Bearer $CHILD_TOKEN" \
+     -d "{\"candidateId\":\"$CANDIDATE_ID\"}")"
+
+check "an unpublished result is not found" 404 \
+  "$(status -H "Authorization: Bearer $MEMBER_TOKEN" \
+     "$GATEWAY/v1/celebrity-voting/campaigns/$CAMPAIGN_ID/results")"
+
+check "publishing the result is accepted" 200 \
+  "$(status -X POST "$GATEWAY/v1/celebrity-voting/campaigns/$CAMPAIGN_ID/results" \
+     -H "Authorization: Bearer $ADMIN_TOKEN" -H "$ADMIN_TENANT_HEADER")"
+
+# The frozen order. Published twice would leave "the result" with no referent,
+# which is why the second attempt is refused rather than recomputed.
+check "publishing twice is refused" 409 \
+  "$(status -X POST "$GATEWAY/v1/celebrity-voting/campaigns/$CAMPAIGN_ID/results" \
+     -H "Authorization: Bearer $ADMIN_TOKEN" -H "$ADMIN_TENANT_HEADER")"
+
+if curl -s -H "Authorization: Bearer $MEMBER_TOKEN" \
+   "$GATEWAY/v1/celebrity-voting/campaigns/$CAMPAIGN_ID/results" | grep -q "$CANDIDATE_ID"; then
+  echo "  ok    and the Samaaj can read the published ranking"
+  pass=$((pass + 1))
+else
+  echo "  FAIL  the published ranking is not readable"
+  fail=$((fail + 1))
+fi
+
+check "switching the celebrity-voting module off again" 200 \
+  "$(status -X PUT "$GATEWAY/v1/identity/tenants/$TENANT_ID/modules" \
+     -H 'Content-Type: application/json' -H "Authorization: Bearer $ADMIN_TOKEN" \
+     -d '{"enabledModules":["community","pathshala"]}')"
+
+sleep 62
+
+check "the celebrity-voting route answers 404" 404 \
+  "$(status -H "Authorization: Bearer $MEMBER_TOKEN" "$GATEWAY/v1/celebrity-voting/campaigns")"
+
+check "while the timeline, on a different module, is untouched" 200 \
+  "$(status -H "Authorization: Bearer $MEMBER_TOKEN" "$GATEWAY/v1/timeline/posts")"
+
+echo
 echo "Sessions: rotation, reuse detection and sign-out"
 
 SESSION_LOGIN=$(curl -s -X POST "$GATEWAY/v1/identity/login" -H 'Content-Type: application/json' \

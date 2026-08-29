@@ -7,16 +7,17 @@ version of the plan; the reasoning behind the ordering lives in
 
 ## Current Status
 
-- **Stage:** Phase 2 complete; Phase 1 has four tracked leftovers
-- **Last updated:** 2026-08-29 - social-issues-service, the platform's seventh
-  service and the last Phase 2 context. 746 tests green (681 backend, 65
-  frontend) plus 166 smoke checks against a stack built from empty volumes,
+- **Stage:** Phase 3 service built; Phase 1 has four tracked leftovers
+- **Last updated:** 2026-08-29 - celebrity-voting-service, the platform's eighth
+  service and the first Phase 3 context. 770 tests green (705 backend, 65
+  frontend) plus 195 smoke checks against a stack built from empty volumes,
   re-runnable against a dirty one.
-- **Blocking item:** none. Phase 2's four services are done. Next is Phase 3
-  (`celebrity-voting-service`), or the four Phase 1 leftovers, which are
-  smaller: step-up auth on deactivating a Samaaj, a member-portal surface for
-  the DPDP rights, an editable role matrix, and the two DPDP obligations that
-  need a notification channel first. The five questions in
+- **Blocking item:** none. Next is the Phase 4 `pathshala-service`, or the four
+  Phase 1 leftovers, which are smaller: step-up auth on deactivating a Samaaj, a
+  member-portal surface for the DPDP rights, an editable role matrix, and the
+  two DPDP obligations that need a notification channel first. The vote
+  endpoint's throughput load test is carried to Phase 5, since it needs a
+  deployed environment; its correctness half is done. The five questions in
   `docs/product/DPDP-COMPLIANCE.md` still need counsel before any of this ships
   to real users.
 
@@ -146,10 +147,15 @@ unit tested.
 
 ## Phase 3 — Celebrity Voting
 
-- [ ] `celebrity-voting-service`
+- [x] `celebrity-voting-service` — nominations with an approval step, one vote per member, and a result that is frozen when announced. The double-voting guarantee is a unique index on `(CampaignId, VoterMemberId)`, not the handler's check and not a Redis lock; the vote is written on its own scope so voters are not serialised by the request's transaction
 - [ ] Load-test the vote-cast endpoint specifically (highest
       concurrency write path on the platform — see
-      `docs/product/ROADMAP.md`)
+      `docs/product/ROADMAP.md`). The **correctness** half is done:
+      `ConcurrentVotingTests` proves twenty racing requests from one
+      member leave exactly one vote, and `VoteIndexTests` proves the
+      index is what refuses the second. What remains is throughput
+      under sustained load, which needs a deployed environment rather
+      than a Testcontainer — carried to Phase 5 hardening
 
 ## Phase 4 — Jain Pathshala
 
