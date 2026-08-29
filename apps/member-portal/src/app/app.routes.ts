@@ -68,6 +68,27 @@ export const routes: Routes = [
     loadComponent: () =>
       import('./features/issues/issue-detail.component').then((m) => m.IssueDetailComponent),
   },
+  {
+    path: 'members',
+    title: 'Members - samaajconnect',
+    canActivate: [authGuard],
+    loadComponent: () =>
+      import('./features/members/members-list.component').then((m) => m.MembersListComponent),
+  },
+  {
+    path: 'members/:id',
+    title: 'Member - samaajconnect',
+    canActivate: [authGuard],
+    loadComponent: () =>
+      import('./features/members/member-detail.component').then((m) => m.MemberDetailComponent),
+  },
+  {
+    path: 'family',
+    title: 'My Family - samaajconnect',
+    canActivate: [authGuard],
+    loadComponent: () =>
+      import('./features/members/family.component').then((m) => m.FamilyComponent),
+  },
   { path: '', pathMatch: 'full', redirectTo: 'home' },
 
   // Anything unrecognised goes to Home, which sends signed-out visitors to

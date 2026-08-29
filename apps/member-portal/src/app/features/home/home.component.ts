@@ -135,14 +135,14 @@ export class HomeComponent implements OnInit {
       title: 'Members',
       description: 'Explore the Samaaj member directory.',
       action: 'Open',
-      route: null,
+      route: '/members',
     },
     {
       moduleKey: null,
       title: 'Family',
       description: 'Family members linked to your profile.',
       action: 'Manage',
-      route: null,
+      route: '/family',
     },
     {
       moduleKey: ModuleKeys.Community,

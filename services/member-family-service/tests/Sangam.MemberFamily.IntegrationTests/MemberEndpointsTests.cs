@@ -163,6 +163,50 @@ public sealed class MemberEndpointsTests(MemberFamilyApiFactory factory)
     }
 
     [Fact]
+    public async Task One_member_can_be_read_by_id()
+    {
+        // API-CONTRACTS.md promised this route from the start and nothing
+        // implemented it; the portal's directory screen is what noticed. A
+        // directory whose rows cannot be opened is a list.
+        var meera = await MemberClient(_ravi, TenantA)
+            .GetFromJsonAsync<JsonElement>($"/v1/members/{_meera}");
+
+        meera.GetProperty("fullName").GetString().Should().Be(Named("Meera Shah"));
+    }
+
+    [Fact]
+    public async Task Reading_one_by_id_applies_the_same_privacy_rules_as_the_directory()
+    {
+        // The detail view is exactly where a second copy of the per-field
+        // rules would drift into showing more than the list does, so it goes
+        // through the same mapper.
+        var directory = await MemberClient(_ravi, TenantA)
+            .GetFromJsonAsync<JsonElement>("/v1/members");
+
+        var fromList = directory.EnumerateArray()
+            .Single(m => m.GetProperty("id").GetGuid() == _meera);
+
+        var direct = await MemberClient(_ravi, TenantA)
+            .GetFromJsonAsync<JsonElement>($"/v1/members/{_meera}");
+
+        foreach (var field in new[] { "mobile", "email", "address", "profession" })
+        {
+            direct.GetProperty(field).ToString().Should().Be(
+                fromList.GetProperty(field).ToString(),
+                $"the detail view must not reveal more {field} than the directory");
+        }
+    }
+
+    [Fact]
+    public async Task A_member_of_another_Samaaj_is_not_found_rather_than_forbidden()
+    {
+        var response = await MemberClient(_ravi, TenantA)
+            .GetAsync($"/v1/members/{Guid.NewGuid()}");
+
+        response.StatusCode.Should().Be(HttpStatusCode.NotFound);
+    }
+
+    [Fact]
     public async Task A_member_reads_their_own_profile_in_full()
     {
         var me = await MemberClient(_ravi, TenantA).GetFromJsonAsync<JsonElement>("/v1/members/me");

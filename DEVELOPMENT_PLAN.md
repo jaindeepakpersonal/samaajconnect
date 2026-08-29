@@ -7,17 +7,16 @@ version of the plan; the reasoning behind the ordering lives in
 
 ## Current Status
 
-- **Stage:** Phase 4 built; four member modules have screens
-- **Last updated:** 2026-08-29 - the member portal's Social Issues screens,
-  including a detail view no wireframe covers and the eight-state workflow
-  driven entirely by the service's own `availableTransitions`. 951 tests green
-  (776 backend, 175 frontend) plus 240 smoke checks against a stack built from
-  empty volumes, re-runnable against a dirty one.
-- **Blocking item:** none. The **frontend gap keeps closing**: Timeline, Events,
-  Volunteer Groups and Social Issues all have member screens. What is left is
-  Members and Family (member-family-service exists), and the three modules whose
-  tiles still say "Coming soon" — Celebrity Voting, Pathshala and Boli, the last
-  of which has no service either. After that: the Phase 5 `boli-service`, or the
+- **Stage:** Phase 4 built; six member modules have screens
+- **Last updated:** 2026-08-29 - the member portal's Members directory, member
+  detail and My Family. Building them found `GET /v1/members/{id}` had been in
+  the contract since it was written and never implemented, so that shipped too.
+  983 tests green (778 backend, 205 frontend) plus 240 smoke checks against a
+  stack built from empty volumes, re-runnable against a dirty one.
+- **Blocking item:** none. The **frontend gap is nearly closed**: Timeline,
+  Events, Volunteer Groups, Social Issues, Members and Family all have member
+  screens. What is left is Celebrity Voting and Pathshala, whose services exist,
+  and Boli, which has neither. After that: the Phase 5 `boli-service`, or the
   three remaining Phase 1 leftovers (a member-portal surface for the DPDP
   rights, an editable role matrix, and the two DPDP obligations that need a
   notification channel first). The vote endpoint's throughput load test is
@@ -195,9 +194,16 @@ unit tested.
       `availableTransitions`, so the portal holds no copy of the eight-state
       table. The detail screen surfaces the reviewer's reason at the top, which
       is what the append-only history was built to answer
-- [ ] **Member portal: the rest.** Members and Family have a service
-      (member-family-service) and no screens; Celebrity Voting, Pathshala and
-      Boli tiles say "Coming soon" too
+- [x] **Member portal: Members and Family** (wireframes `#members`,
+      `#memberdetail`, `#family`, `#children`) - the directory, one member's
+      privacy-filtered profile, and the household with its children as one
+      screen. Building it found that `GET /v1/members/{id}` had been in
+      API-CONTRACTS.md since the contract was written and never implemented, so
+      that shipped too, through the same per-field privacy mapper the directory
+      uses. Adding a child shows the DPDP notice before the form and sends its
+      version with the consent
+- [ ] **Member portal: the rest.** Celebrity Voting and Pathshala have services
+      and no screens; Boli has neither
 
 ## Phase 3 — Celebrity Voting
 

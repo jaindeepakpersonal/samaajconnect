@@ -18,8 +18,11 @@ before translating another screen.
 | Group detail | `/groups/:id` | `#groupdetail` | built, plus the president's review queue the wireframe has no screen for |
 | Social Issues | `/issues` | `#issues` | built |
 | Issue detail | `/issues/:id` | — | built; no wireframe covers it, and the workflow is unusable without one |
+| Members | `/members` | `#members` | built |
+| Member detail | `/members/:id` | `#memberdetail` | built |
+| My Family | `/family` | `#family` + `#children` | built as one screen |
 | Forgot password / OTP | — | `#forgot`, `#otp` | not built — no endpoint exists |
-| Profile, Members, Family, Celebrity, Pathshala, Boli, Notifications | — | various | not built — the services exist, the screens do not |
+| Profile, Celebrity, Pathshala, Boli, Notifications | — | various | not built |
 
 ## Where things live
 
@@ -134,6 +137,26 @@ before the event". There is no notification channel yet, so the shipped screen
 does not say it - a disabled control can explain itself, but a sentence of prose
 cannot, and printing it would simply be a lie. There is a test asserting the
 words are absent.
+
+**A null field means "not shared", never "not set", and the screen must not
+claim otherwise.** member-family-service returns null for a field the viewer
+may not see rather than masking it, because a mask like "+91 98xxxxxx10" still
+leaks length and shape. From the client the two cases are indistinguishable, so
+the only honest label is "Not shared" - never "None" and never a bare dash.
+
+**The directory has no profession filter, and that is a privacy decision.**
+Profession carries a per-field privacy level. A server-side filter on it would
+let anybody confirm a private value one query at a time - ask for "CA", see who
+comes back - which is the same reasoning that already stops the service matching
+a search term against a private mobile number. The column stays, because a
+member who shared it should be findable by eye.
+
+**Adding a child fetches the DPDP notice before it offers the form.** Section 9
+makes parental consent the basis for holding a child's data and section 6(7)
+means a consent that cannot say what was shown is worth little - so the notice
+arrives first, its version travels back with the consent, and the tick is never
+pre-filled. A tick beside a notice that has not loaded is a tick against
+nothing.
 
 **A workflow screen renders its buttons from the server, never from the
 status.** Social issues have eight states and a transition table the aggregate

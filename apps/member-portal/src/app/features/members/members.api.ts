@@ -1,0 +1,142 @@
+import { HttpClient, HttpParams } from '@angular/common/http';
+import { Injectable, inject } from '@angular/core';
+import { Observable } from 'rxjs';
+import {
+  Child,
+  ChildDataNotice,
+  Family,
+  Member,
+  MyProfile,
+  Relationship,
+} from './members.models';
+
+/**
+ * Every call this app makes to member-family-service.
+ *
+ * Not module-gated: a Samaaj cannot switch off its own member directory, so
+ * these routes carry no module key at the gateway and answer whatever the
+ * permission check says.
+ *
+ * The admin-only calls - the conversion-request queue and its decide endpoint -
+ * are absent. Approving a conversion is a Samaaj admin's job and the admin
+ * panel already has that screen.
+ */
+@Injectable({ providedIn: 'root' })
+export class MembersApi {
+  private readonly http = inject(HttpClient);
+
+  /**
+   * The Samaaj directory, each row already filtered to what this viewer may
+   * see.
+   *
+   * The service takes a name/locality term and a locality; it does **not**
+   * filter on profession, because profession carries a privacy level and a
+   * server-side filter on it would let a caller confirm a private value one
+   * query at a time. See the list screen for what that costs the wireframe.
+   */
+  search(term?: string | null, locality?: string | null): Observable<Member[]> {
+    let params = new HttpParams();
+
+    if (term && term.length > 0) {
+      params = params.set('term', term);
+    }
+
+    if (locality && locality.length > 0) {
+      params = params.set('locality', locality);
+    }
+
+    return this.http.get<Member[]>('/v1/members', { params });
+  }
+
+  /** One member, through the same per-field privacy mapper the directory uses. */
+  get(id: string): Observable<Member> {
+    return this.http.get<Member>(`/v1/members/${id}`);
+  }
+
+  /** The caller's own profile, complete regardless of their privacy settings. */
+  me(): Observable<MyProfile> {
+    return this.http.get<MyProfile>('/v1/members/me');
+  }
+
+  updateMe(profile: MyProfile): Observable<MyProfile> {
+    return this.http.patch<MyProfile>(`/v1/members/${profile.id}`, {
+      fullName: profile.fullName,
+      photoUrl: profile.photoUrl,
+      dateOfBirth: profile.dateOfBirth,
+      gender: profile.gender,
+      mobile: profile.mobile,
+      email: profile.email,
+      address: profile.address,
+      locality: profile.locality,
+      profession: profile.profession,
+      privacy: profile.privacy,
+    });
+  }
+
+  // ---- The household ------------------------------------------------------
+
+  /** This member's household, or 404 when they are in none. */
+  myFamily(): Observable<Family> {
+    return this.http.get<Family>('/v1/families/mine');
+  }
+
+  /** Creates one, and makes the caller its head. */
+  createFamily(): Observable<Family> {
+    return this.http.post<Family>('/v1/families', {});
+  }
+
+  /** Asks to join, using the code the head has. */
+  requestToJoin(familyCode: string, relationship: Relationship): Observable<Family> {
+    return this.http.post<Family>('/v1/families/join-requests', { familyCode, relationship });
+  }
+
+  /** The head accepts or turns down a request. */
+  decideJoinRequest(
+    familyId: string,
+    requestId: string,
+    accept: boolean,
+  ): Observable<Family> {
+    return this.http.post<Family>(
+      `/v1/families/${familyId}/join-requests/${requestId}/decide`,
+      { accept },
+    );
+  }
+
+  // ---- Children -----------------------------------------------------------
+
+  children(): Observable<Child[]> {
+    return this.http.get<Child[]>('/v1/children');
+  }
+
+  /**
+   * The notice a parent has to be shown before a child profile exists.
+   *
+   * Fetched before the form is offered, not after: DPDP section 9 makes
+   * parental consent the basis on which a child's data may be held, and consent
+   * to something nobody has read is not consent.
+   */
+  childDataNotice(): Observable<ChildDataNotice> {
+    return this.http.get<ChildDataNotice>('/v1/children/data-notice');
+  }
+
+  addChild(
+    fullName: string,
+    dateOfBirth: string,
+    gender: string,
+    noticeVersion: string,
+  ): Observable<Child> {
+    return this.http.post<Child>('/v1/children', {
+      fullName,
+      dateOfBirth,
+      gender,
+      photoUrl: null,
+      parentalConsentGiven: true,
+      noticeVersion,
+    });
+  }
+
+  /** Starts the adult-child conversion. A Samaaj admin decides it. */
+  startConversion(childId: string, mobileOrEmail: string): Observable<unknown> {
+    return this.http.post(`/v1/children/${childId}/conversion`, { mobileOrEmail });
+  }
+}

@@ -74,7 +74,7 @@ enforced by `TenantAuthorizationBehavior`, not just UI hiding.
 | Method | Path | Roles | Purpose |
 |---|---|---|---|
 | GET | `/members` | Member, SamaajAdmin | Search/filter tenant directory |
-| GET | `/members/{id}` | Member, SamaajAdmin | Member profile (privacy-filtered) |
+| GET | `/members/{id}` | `Members.Read` | One member, through the same per-field privacy mapper the directory uses |
 | PATCH | `/members/{id}` | Member (self), SamaajAdmin | Update profile |
 | POST | `/families` | Member | Create family, become head |
 | POST | `/families/join-requests` | Member | Request to join via family code |
