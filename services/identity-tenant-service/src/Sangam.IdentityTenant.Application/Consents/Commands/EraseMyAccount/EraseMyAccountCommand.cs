@@ -22,6 +22,13 @@ namespace Sangam.IdentityTenant.Application.Consents.Commands.EraseMyAccount;
 /// the account holder, which is the identity verification a Fiduciary needs
 /// before acting on an irreversible request, and it makes the action
 /// deliberate rather than a mis-click.
+///
+/// The check goes through <see cref="IStepUpAuthentication"/>, shared with
+/// deactivating a Samaaj. That is also what changed a wrong password here from
+/// 401 to 403: a 401 tells the portals' interceptor the access token expired,
+/// so it renews the token and retries the original request - which on this
+/// endpoint means an erasure is submitted a second time because somebody
+/// mistyped.
 /// </remarks>
 [RequiresRoles(
     Roles.Member,
@@ -54,7 +61,7 @@ public sealed class EraseMyAccountCommandValidator : AbstractValidator<EraseMyAc
 
 public sealed class EraseMyAccountCommandHandler(
     IUserRepository users,
-    IPasswordHasher passwordHasher,
+    IStepUpAuthentication stepUp,
     ISessionService sessions,
     IUnitOfWork unitOfWork,
     ICurrentUser currentUser,
@@ -80,12 +87,12 @@ public sealed class EraseMyAccountCommandHandler(
                 Error.NotFound("User.NotFound", "This account no longer exists."));
         }
 
-        if (!passwordHasher.Verify(command.Password, user.PasswordHash))
+        var confirmed = await stepUp.ConfirmAsync(
+            command.Password, "Erasing an account", cancellationToken);
+
+        if (confirmed.IsFailure)
         {
-            return Result.Failure<EraseMyAccountResponse>(Error.Unauthorized(
-                "Auth.InvalidCredentials",
-                "That password is not correct. Erasing an account cannot be undone, so we ask "
-                + "for it first."));
+            return Result.Failure<EraseMyAccountResponse>(confirmed.Error);
         }
 
         // A Super Admin erasing themselves would leave a platform nobody can

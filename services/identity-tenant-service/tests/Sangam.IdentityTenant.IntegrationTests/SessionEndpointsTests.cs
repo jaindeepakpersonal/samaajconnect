@@ -323,10 +323,13 @@ public sealed class SessionEndpointsTests(IdentityTenantApiFactory factory)
         var signed = await SignInAsync();
         var tenantId = await TenantIdAsync();
 
-        var platformAdmin = factory.CreateClientWith(Application.Security.PermissionKeys.TenantManage);
+        // The real Super Admin account, because deactivating re-asks for its
+        // password.
+        var platformAdmin = await factory.CreateSuperAdminClientAsync();
 
         (await platformAdmin.PatchAsJsonAsync(
-                $"/v1/identity/tenants/{tenantId}/status", new { status = "Inactive" }))
+                $"/v1/identity/tenants/{tenantId}/status",
+                new { status = "Inactive", password = IdentityTenantApiFactory.BootstrapPassword }))
             .StatusCode.Should().Be(HttpStatusCode.OK);
 
         (await RefreshAsync(signed.RefreshToken)).StatusCode

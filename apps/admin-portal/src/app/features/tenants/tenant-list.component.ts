@@ -125,7 +125,7 @@ import { ModuleDescriptor, Tenant, TenantStatus } from '../../core/admin.models'
                         class="btn alt small"
                         type="button"
                         [disabled]="busyId() === tenant.id"
-                        (click)="setStatus(tenant, 'Inactive')"
+                        (click)="askToConfirm(tenant)"
                       >
                         Deactivate
                       </button>
@@ -148,6 +148,36 @@ import { ModuleDescriptor, Tenant, TenantStatus } from '../../core/admin.models'
                       </button>
                     }
                   </div>
+
+                  @if (confirming() === tenant.id) {
+                    <form class="confirm" (ngSubmit)="confirmDeactivate(tenant)">
+                      <p class="small">
+                        Deactivating {{ tenant.name }} signs out every one of its members and
+                        stops the whole Samaaj serving. Enter your own password to confirm.
+                      </p>
+                      <label [for]="tenant.id + 'pwd'">Your password</label>
+                      <input
+                        class="input"
+                        type="password"
+                        autocomplete="current-password"
+                        [id]="tenant.id + 'pwd'"
+                        [(ngModel)]="password"
+                        name="password"
+                        required
+                      />
+                      @if (confirmError()) {
+                        <p class="small error" role="alert">{{ confirmError() }}</p>
+                      }
+                      <div class="actions">
+                        <button class="btn small" type="submit" [disabled]="busyId() === tenant.id">
+                          Deactivate
+                        </button>
+                        <button class="btn alt small" type="button" (click)="cancelConfirm()">
+                          Cancel
+                        </button>
+                      </div>
+                    </form>
+                  }
 
                   @if (editing() === tenant.id) {
                     <div class="modules">
@@ -226,6 +256,13 @@ import { ModuleDescriptor, Tenant, TenantStatus } from '../../core/admin.models'
       min-width: 260px;
     }
 
+    .confirm {
+      margin-top: var(--space-3);
+      padding-top: var(--space-2);
+      border-top: 1px solid var(--line-soft);
+      min-width: 260px;
+    }
+
     .pills {
       display: flex;
       flex-wrap: wrap;
@@ -249,6 +286,19 @@ export class TenantListComponent implements OnInit {
   readonly draft = signal<readonly string[]>([]);
 
   readonly busyId = signal<string | null>(null);
+
+  /**
+   * The Samaaj whose deactivation is waiting on a password, if any.
+   * Deactivating signs out every member of that Samaaj, so the server re-asks
+   * for the administrator's own password and this is the panel that collects
+   * it.
+   */
+  readonly confirming = signal<string | null>(null);
+
+  /** Kept apart from `error` so a wrong password lands next to the field. */
+  readonly confirmError = signal<string | null>(null);
+
+  password = '';
 
   search = '';
   status: TenantStatus | '' = '';
@@ -329,6 +379,37 @@ export class TenantListComponent implements OnInit {
       next: (updated) => this.replace(updated),
       error: (failure: unknown) => {
         this.error.set(describeError(failure));
+        this.busyId.set(null);
+      },
+    });
+  }
+
+  /** Deactivating asks before it acts, rather than acting on one click. */
+  askToConfirm(tenant: Tenant): void {
+    this.password = '';
+    this.confirmError.set(null);
+    this.confirming.set(this.confirming() === tenant.id ? null : tenant.id);
+  }
+
+  cancelConfirm(): void {
+    this.password = '';
+    this.confirmError.set(null);
+    this.confirming.set(null);
+  }
+
+  confirmDeactivate(tenant: Tenant): void {
+    this.busyId.set(tenant.id);
+    this.confirmError.set(null);
+
+    this.api.changeTenantStatus(tenant.id, 'Inactive', this.password).subscribe({
+      next: (updated) => {
+        this.cancelConfirm();
+        this.replace(updated);
+      },
+      error: (failure: unknown) => {
+        // Left open, with the message beside the field. Closing the panel on a
+        // wrong password would make the admin start again to correct a typo.
+        this.confirmError.set(describeError(failure));
         this.busyId.set(null);
       },
     });

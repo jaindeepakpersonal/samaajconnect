@@ -2,6 +2,7 @@ using System.Reflection;
 using FluentValidation;
 using Microsoft.Extensions.DependencyInjection;
 using Sangam.IdentityTenant.Application.Behaviors;
+using Sangam.IdentityTenant.Application.Security;
 
 namespace Sangam.IdentityTenant.Application;
 
@@ -29,6 +30,11 @@ public static class DependencyInjection
         });
 
         services.AddValidatorsFromAssembly(assembly, includeInternalTypes: true);
+
+        // Re-asking for the password before an irreversible action. Shared
+        // rather than repeated per handler, because both halves of it are easy
+        // to get quietly wrong - see StepUpAuthentication.
+        services.AddScoped<IStepUpAuthentication, StepUpAuthentication>();
 
         return services;
     }

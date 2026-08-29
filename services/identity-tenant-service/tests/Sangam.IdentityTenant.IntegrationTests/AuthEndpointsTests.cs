@@ -237,8 +237,16 @@ public sealed class AuthEndpointsTests(IdentityTenantApiFactory factory)
         var tenant = await factory.SeedActiveTenantAsync();
         await RegisterAsync(tenant.Slug);
 
-        var admin = factory.CreateClientWith(PermissionKeys.TenantManage);
-        await admin.PatchAsJsonAsync($"/v1/identity/tenants/{tenant.Id}/status", new { status = "Inactive" });
+        // Deactivating re-asks for the caller's own password, so this needs the
+        // real Super Admin account rather than a synthetic token. Asserted
+        // rather than fired and forgotten: a deactivation that quietly failed
+        // used to surface as a confusing login success three lines later.
+        var admin = await factory.CreateSuperAdminClientAsync();
+
+        (await admin.PatchAsJsonAsync(
+                $"/v1/identity/tenants/{tenant.Id}/status",
+                new { status = "Inactive", password = IdentityTenantApiFactory.BootstrapPassword }))
+            .StatusCode.Should().Be(HttpStatusCode.OK);
 
         (await LoginAsync("ravi@example.com", Password))
             .StatusCode.Should().Be(HttpStatusCode.Forbidden);

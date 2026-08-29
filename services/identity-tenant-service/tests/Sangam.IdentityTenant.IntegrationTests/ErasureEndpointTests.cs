@@ -163,7 +163,11 @@ public sealed class ErasureEndpointTests(IdentityTenantApiFactory factory)
         var response = await client.PostAsJsonAsync(
             "/v1/identity/me/erase", new { password = "not-the-password" });
 
-        response.StatusCode.Should().Be(HttpStatusCode.Unauthorized);
+        // Forbidden, not Unauthorized, and the difference matters. The portals'
+        // interceptor reads a 401 as an expired access token: it renews the
+        // token and retries the original request - which here would submit the
+        // erasure a second time because somebody mistyped their password.
+        response.StatusCode.Should().Be(HttpStatusCode.Forbidden);
 
         var stillThere = await factory.WithDbContextAsync(db =>
             db.Users.IgnoreQueryFilters().AsNoTracking()

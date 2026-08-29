@@ -241,7 +241,16 @@ public sealed class TenantEndpointsTests(IdentityTenantApiFactory factory)
         var active = await factory.CreateClient().GetFromJsonAsync<JsonElement>($"{TenantsUrl}/by-id/{id}");
         active.GetProperty("status").GetString().Should().Be("Active");
 
-        await admin.PatchAsJsonAsync($"{TenantsUrl}/{id}/status", new { status = "Inactive" });
+        // Deactivating re-asks for the password, so this step needs the real
+        // Super Admin account. Asserted rather than fired and forgotten: a
+        // deactivation that quietly failed used to surface as a baffling
+        // "expected Inactive, got Active" two lines below.
+        var stepUpAdmin = await factory.CreateSuperAdminClientAsync();
+
+        (await stepUpAdmin.PatchAsJsonAsync(
+                $"{TenantsUrl}/{id}/status",
+                new { status = "Inactive", password = IdentityTenantApiFactory.BootstrapPassword }))
+            .StatusCode.Should().Be(HttpStatusCode.OK);
 
         var inactive = await factory.CreateClient().GetFromJsonAsync<JsonElement>($"{TenantsUrl}/by-id/{id}");
         inactive.GetProperty("status").GetString().Should().Be("Inactive");

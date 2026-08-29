@@ -50,8 +50,17 @@ export class AdminApi {
     return this.http.post<Tenant>('/v1/identity/tenants', request);
   }
 
-  changeTenantStatus(id: string, status: TenantStatus): Observable<Tenant> {
-    return this.http.patch<Tenant>(`/v1/identity/tenants/${id}/status`, { status });
+  /**
+   * Deactivating and archiving re-ask for the caller’s own password; activating
+   * does not. The server decides which, so `password` is always sent and is
+   * simply ignored where it is not needed.
+   */
+  changeTenantStatus(
+    id: string,
+    status: TenantStatus,
+    password?: string,
+  ): Observable<Tenant> {
+    return this.http.patch<Tenant>(`/v1/identity/tenants/${id}/status`, { status, password });
   }
 
   /** Replaces the whole set. The screen is a row of toggles saved together. */

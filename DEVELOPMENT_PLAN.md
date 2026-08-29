@@ -7,19 +7,18 @@ version of the plan; the reasoning behind the ordering lives in
 
 ## Current Status
 
-- **Stage:** Phase 3 service built; Phase 1 has four tracked leftovers
-- **Last updated:** 2026-08-29 - celebrity-voting-service, the platform's eighth
-  service and the first Phase 3 context. 770 tests green (705 backend, 65
-  frontend) plus 195 smoke checks against a stack built from empty volumes,
+- **Stage:** Phase 3 service built; Phase 1 has three tracked leftovers
+- **Last updated:** 2026-08-29 - step-up authentication on deactivating and
+  archiving a Samaaj, shared with erasure. 797 tests green (726 backend, 71
+  frontend) plus 205 smoke checks against a stack built from empty volumes,
   re-runnable against a dirty one.
-- **Blocking item:** none. Next is the Phase 4 `pathshala-service`, or the four
-  Phase 1 leftovers, which are smaller: step-up auth on deactivating a Samaaj, a
-  member-portal surface for the DPDP rights, an editable role matrix, and the
-  two DPDP obligations that need a notification channel first. The vote
-  endpoint's throughput load test is carried to Phase 5, since it needs a
-  deployed environment; its correctness half is done. The five questions in
-  `docs/product/DPDP-COMPLIANCE.md` still need counsel before any of this ships
-  to real users.
+- **Blocking item:** none. Next is the Phase 4 `pathshala-service`, or the three
+  remaining Phase 1 leftovers, which are smaller: a member-portal surface for
+  the DPDP rights, an editable role matrix, and the two DPDP obligations that
+  need a notification channel first. The vote endpoint's throughput load test is
+  carried to Phase 5, since it needs a deployed environment; its correctness
+  half is done. The five questions in `docs/product/DPDP-COMPLIANCE.md` still
+  need counsel before any of this ships to real users.
 
 *(Update these three lines at the start/end of every work session —
 they're what a coding agent or a teammate should read first to know
@@ -134,9 +133,15 @@ unit tested.
       Refreshing re-reads the account, its Samaaj and its roles, so a
       suspension or a revoked role bites within one token lifetime. Both
       portals renew silently rather than sending members to the login screen
-- [ ] Step-up authentication on deactivating a Samaaj. Erasing an account
-      already re-asks for the password; deactivating a whole Samaaj is at least
-      as consequential and does not
+- [x] Step-up authentication on deactivating a Samaaj — and on archiving one,
+      which is the only status change that cannot be undone. Shared with
+      erasure through `IStepUpAuthentication`. Two things came out of doing it:
+      a failed step-up must answer 403 rather than 401, because the portals'
+      interceptor renews the token on a 401 and *retries the original request*,
+      which on these endpoints would resubmit the destructive command after a
+      typo — erasure had this defect and now does not; and the step-up has to
+      read the account past the tenant query filter, since a Super Admin's own
+      account sits at `PlatformTenantId` while they act on a Samaaj
 
 ## Phase 2 — Social & Community Engagement
 

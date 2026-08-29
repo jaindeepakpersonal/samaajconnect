@@ -601,7 +601,10 @@ for attempt in $(seq 1 30); do
 done
 check "their actions are on the audit record first" 1 "$actor_recorded"
 
-check "a wrong password erases nothing" 401 \
+# 403, not 401. The portals' interceptor reads a 401 as an expired access
+# token: it renews the token and retries the original request, which here would
+# resubmit the erasure because somebody mistyped.
+check "a wrong password erases nothing" 403 \
   "$(status -X POST "$GATEWAY/v1/identity/me/erase" -H 'Content-Type: application/json' \
      -H "Authorization: Bearer $ERASE_TOKEN" -d '{"password":"not-the-password"}')"
 
@@ -1502,6 +1505,87 @@ check "signing out with an unknown token is not an error" 200 \
 check "a refresh token nobody issued is refused" 401 \
   "$(status -X POST "$GATEWAY/v1/identity/token/refresh" -H 'Content-Type: application/json' \
      -d '{"refreshToken":"not-a-real-token"}')"
+
+echo
+echo "Step-up: taking a Samaaj out of service re-asks for the password"
+
+# On a throwaway Samaaj, not the one the rest of this script is standing on.
+# Deactivating that would sign out every member and make every check after this
+# point fail for the wrong reason.
+DOOMED_SLUG="smoke-doomed-$(date +%s)"
+
+DOOMED_ID=$(curl -s -X POST "$GATEWAY/v1/identity/tenants" \
+  -H 'Content-Type: application/json' -H "Authorization: Bearer $ADMIN_TOKEN" \
+  -d "{\"name\":\"Doomed Samaaj\",\"slug\":\"$DOOMED_SLUG\",\"enabledModules\":[]}" \
+  | json_field id)
+
+if [ -n "$DOOMED_ID" ]; then
+  echo "  ok    a throwaway Samaaj to deactivate"
+  pass=$((pass + 1))
+else
+  echo "  FAIL  could not create the throwaway Samaaj"
+  fail=$((fail + 1))
+fi
+
+check "activating it needs no password" 200 \
+  "$(status -X PATCH "$GATEWAY/v1/identity/tenants/$DOOMED_ID/status" \
+     -H 'Content-Type: application/json' -H "Authorization: Bearer $ADMIN_TOKEN" \
+     -d '{"status":"Active"}')"
+
+check "deactivating it without one is refused" 403 \
+  "$(status -X PATCH "$GATEWAY/v1/identity/tenants/$DOOMED_ID/status" \
+     -H 'Content-Type: application/json' -H "Authorization: Bearer $ADMIN_TOKEN" \
+     -d '{"status":"Inactive"}')"
+
+# Not 401, and this is the point of the whole check. The portals' interceptor
+# treats a 401 as an expired access token: it renews the token and retries the
+# original request, so a mistyped password would resubmit the deactivation.
+WRONG_PASSWORD=$(status -X PATCH "$GATEWAY/v1/identity/tenants/$DOOMED_ID/status" \
+  -H 'Content-Type: application/json' -H "Authorization: Bearer $ADMIN_TOKEN" \
+  -d '{"status":"Inactive","password":"not-the-password"}')
+
+check "a wrong password is refused" 403 "$WRONG_PASSWORD"
+
+if [ "$WRONG_PASSWORD" != "401" ]; then
+  echo "  ok    and never with a 401, which the portals would retry"
+  pass=$((pass + 1))
+else
+  echo "  FAIL  a wrong step-up password answered 401"
+  fail=$((fail + 1))
+fi
+
+# Refused, so nothing moved.
+DOOMED_STATUS=$(curl -s "$GATEWAY/v1/identity/tenants/by-id/$DOOMED_ID" | json_field status)
+
+if [ "$DOOMED_STATUS" = "Active" ]; then
+  echo "  ok    and the Samaaj is still serving"
+  pass=$((pass + 1))
+else
+  echo "  FAIL  the Samaaj moved despite the refusal (got '$DOOMED_STATUS')"
+  fail=$((fail + 1))
+fi
+
+check "the right password goes through" 200 \
+  "$(status -X PATCH "$GATEWAY/v1/identity/tenants/$DOOMED_ID/status" \
+     -H 'Content-Type: application/json' -H "Authorization: Bearer $ADMIN_TOKEN" \
+     -d "{\"status\":\"Inactive\",\"password\":\"$SUPERADMIN_PASSWORD\"}")"
+
+check "archiving asks as well" 403 \
+  "$(status -X PATCH "$GATEWAY/v1/identity/tenants/$DOOMED_ID/status" \
+     -H 'Content-Type: application/json' -H "Authorization: Bearer $ADMIN_TOKEN" \
+     -d '{"status":"Archived"}')"
+
+check "and archives with it" 200 \
+  "$(status -X PATCH "$GATEWAY/v1/identity/tenants/$DOOMED_ID/status" \
+     -H 'Content-Type: application/json' -H "Authorization: Bearer $ADMIN_TOKEN" \
+     -d "{\"status\":\"Archived\",\"password\":\"$SUPERADMIN_PASSWORD\"}")"
+
+# One-way. Checked before the password is asked for, so a request that cannot
+# succeed says so rather than first demanding a credential.
+check "an archived Samaaj cannot be brought back" 409 \
+  "$(status -X PATCH "$GATEWAY/v1/identity/tenants/$DOOMED_ID/status" \
+     -H 'Content-Type: application/json' -H "Authorization: Bearer $ADMIN_TOKEN" \
+     -d "{\"status\":\"Active\",\"password\":\"$SUPERADMIN_PASSWORD\"}")"
 
 echo
 echo "Header forgery"

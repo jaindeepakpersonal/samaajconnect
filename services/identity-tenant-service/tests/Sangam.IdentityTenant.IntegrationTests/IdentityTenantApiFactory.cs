@@ -164,6 +164,31 @@ public sealed class IdentityTenantApiFactory : WebApplicationFactory<Program>, I
     public HttpClient CreateClientWith(params string[] permissions) =>
         CreateClientAs(Guid.NewGuid(), ["SuperAdmin"], permissions);
 
+    /// <summary>
+    /// A client whose token names the real bootstrapped Super Admin account,
+    /// and that account's password.
+    /// </summary>
+    /// <remarks>
+    /// <see cref="CreateClientWith"/> mints a token for an id with no row
+    /// behind it, which is enough for anything decided by claims alone. It is
+    /// not enough for a step-up: re-asking for the password means reading the
+    /// account and verifying its hash, so the account has to exist. Anything
+    /// that deactivates or archives a Samaaj needs this client.
+    /// </remarks>
+    public async Task<HttpClient> CreateSuperAdminClientAsync()
+    {
+        await BootstrapSuperAdminAsync();
+
+        var id = await WithDbContextAsync(db => db.Users
+            .IgnoreQueryFilters()
+            .Where(u => u.MobileOrEmail == BootstrapIdentifier)
+            .Select(u => u.Id)
+            .FirstAsync());
+
+        return CreateClientAs(
+            id, ["SuperAdmin"], [Application.Security.PermissionKeys.TenantManage]);
+    }
+
     public HttpClient CreateClientAs(Guid userId, string[] roles, string[] permissions) =>
         CreateClientAs(userId, tenantId: null, roles, permissions);
 

@@ -57,13 +57,16 @@ public static class TenantEndpoints
                 CancellationToken cancellationToken) =>
             {
                 var result = await sender.Send(
-                    new ChangeTenantStatusCommand(id, request.Status), cancellationToken);
+                    new ChangeTenantStatusCommand(id, request.Status, request.Password),
+                    cancellationToken);
 
                 return result.ToApiResult();
             })
             .RequireAuthorization()
             .WithName("ChangeTenantStatus")
-            .WithSummary("Activate, deactivate or archive a Samaaj (Super Admin only).")
+            .WithSummary(
+                "Activate, deactivate or archive a Samaaj (Super Admin only). Deactivating "
+                + "and archiving re-ask for the caller's own password.")
             .Produces<TenantResponse>()
             .ProducesValidationProblem()
             .ProducesProblem(StatusCodes.Status403Forbidden)
@@ -188,10 +191,16 @@ public static class TenantEndpoints
     }
 
     /// <summary>
-    /// Wire format for tenant creation. Separate from the command so the public
+    /// Wire format for a status change. Separate from the command so the public
     /// contract can evolve independently of the internal one.
     /// </summary>
-    public sealed record ChangeStatusRequest(string Status);
+    /// <remarks>
+    /// <paramref name="Password"/> is the calling Super Admin's own, and is
+    /// required when the target status takes the Samaaj out of service. See
+    /// <c>ChangeTenantStatusCommand</c> for why the requirement is decided by
+    /// the target status rather than by what would actually change.
+    /// </remarks>
+    public sealed record ChangeStatusRequest(string Status, string? Password = null);
 
     public sealed record GrievanceContactRequest(string? Name, string? Email, string? Phone);
 

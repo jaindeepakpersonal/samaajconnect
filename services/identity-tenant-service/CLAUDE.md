@@ -318,6 +318,33 @@ approves it - unlike adult-child conversion, where an admin decides whether to
 account holder, which is the identity check needed before something with no
 undo, and it stops a mis-click being enough.
 
+**Step-up is shared, and a failed one is 403.** `IStepUpAuthentication` is the
+one place that re-asks for a password, used by erasure and by deactivating or
+archiving a Samaaj. Two things about it are load-bearing.
+
+It reads the account with `GetSelfAsync`, past the tenant query filter, because
+a Super Admin's own account lives at `PlatformTenantId` while they act on a
+Samaaj — a tenant-filtered read finds nothing and fails the step-up for the one
+role that most needs it. This is the same trap that made `/me` answer 404 for an
+overriding Super Admin.
+
+And it fails with `ErrorType.Forbidden`, never `Unauthorized`. Both portals'
+HTTP interceptor treats a 401 as an expired access token: it renews the token
+and *retries the original request*. On a step-up endpoint that means the
+destructive command is submitted a second time because somebody mistyped. 403 is
+also the truer answer — the caller is authenticated, they simply have not proven
+enough — and carries no `WWW-Authenticate` obligation, which a 401 does and this
+never had. Erasure returned 401 until this was noticed.
+
+**Activating a Samaaj deliberately does not ask.** The requirement is decided by
+the target status: `Inactive` and `Archived` need the password, `Active` does
+not. Deactivating signs out every member at their next refresh and archiving
+cannot be undone at all; activating restores service and is undone by the very
+call that undid it. A step-up on the harmless direction only teaches people to
+type their password without reading the screen. The rule reads the target status
+alone rather than whether the change would actually do anything, so the same call
+never sometimes needs a password and sometimes not.
+
 **A Super Admin cannot erase through this route.** Nothing but the bootstrap on
 an empty database can recreate one, and there is no second Super Admin to
 notice the platform has become unadministrable.

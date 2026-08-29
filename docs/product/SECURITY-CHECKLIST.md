@@ -167,12 +167,31 @@ is the outer gate and grants nothing on its own.
       concern, not a code one, and nothing here enforces it.** Compose serves
       plain HTTP for local work. Needs TLS termination, HSTS, and secure-cookie
       policy decided with the hosting; tracked in `DEVELOPMENT_PLAN.md` Phase 5.
-- [ ] Sensitive admin actions (publish Boli result, publish voting
+- [x] Sensitive admin actions (publish Boli result, publish voting
       results, deactivate a tenant) are candidates for step-up
-      authentication (re-enter password / OTP). **One exists**: erasing an
-      account requires the password again, which is the most irreversible
-      action on the platform today. The others named here belong to services
-      that do not exist yet. Deactivating a Samaaj does not ask, and should.
+      authentication (re-enter password / OTP). **Erasing an account,
+      deactivating a Samaaj and archiving one all re-ask for the caller's own
+      password**, through the shared `IStepUpAuthentication` in
+      identity-tenant-service. Activating a Samaaj deliberately does not: a
+      step-up on a harmless, reversible direction only teaches people to type
+      their password without reading the screen. Publishing a voting result is
+      reversible in the sense that matters — it refuses to publish twice, so a
+      mis-click cannot change an announced result — and publishing a Boli
+      result belongs to a service that does not exist yet.
+
+      **A failed step-up answers 403, never 401**, and this is a rule rather
+      than a preference. The portals' HTTP interceptor treats a 401 as an
+      expired access token: it renews the token and *retries the original
+      request*. On a step-up endpoint that means a destructive command is
+      submitted a second time because somebody mistyped their password. 403 is
+      also the truer answer, since the caller is authenticated and simply has
+      not proven enough. Any future step-up must follow the same rule; there
+      are tests asserting the status code specifically.
+
+      The step-up reads the account with `GetSelfAsync`, past the tenant query
+      filter. A Super Admin's own account lives at `PlatformTenantId` while
+      they act on a Samaaj, so a tenant-filtered read finds nothing and the
+      step-up fails for the one role that most needs it.
 
 ## File handling
 

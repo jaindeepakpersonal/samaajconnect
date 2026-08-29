@@ -122,8 +122,18 @@ public sealed class EraseMyAccountCommandHandlerTests
         _hasher.Verify("correct-horse", "hash").Returns(true);
         _users.GetByIdAsync(_user.Id, Arg.Any<CancellationToken>()).Returns(_user);
 
+        // GetSelfAsync, because that is what the step-up reads - it has to see
+        // past the tenant filter to find a Super Admin doing this to their own
+        // account.
+        _users.GetSelfAsync(_user.Id, Arg.Any<CancellationToken>()).Returns(_user);
+
+        // The real step-up rather than a substitute: the thing most worth
+        // asserting here is that a wrong password is refused the way the
+        // shared implementation refuses it, and a stub would assert nothing.
         _handler = new EraseMyAccountCommandHandler(
-            _users, _hasher, _sessions, _unitOfWork, _currentUser, _clock,
+            _users,
+            new StepUpAuthentication(_users, _hasher, _currentUser),
+            _sessions, _unitOfWork, _currentUser, _clock,
             NullLogger<EraseMyAccountCommandHandler>.Instance);
     }
 
@@ -146,7 +156,11 @@ public sealed class EraseMyAccountCommandHandlerTests
         var result = await Handle("guess");
 
         result.IsFailure.Should().BeTrue();
-        result.Error.Code.Should().Be("Auth.InvalidCredentials");
+        result.Error.Code.Should().Be(IStepUpAuthentication.StepUpFailedCode);
+
+        // Forbidden, not Unauthorized. A 401 makes the portals renew the token
+        // and retry the request - which here would submit the erasure again.
+        result.Error.Type.Should().Be(Application.Common.ErrorType.Forbidden);
         _user.Status.Should().Be(UserStatus.Active);
         await _unitOfWork.DidNotReceive().SaveChangesAsync(Arg.Any<CancellationToken>());
     }

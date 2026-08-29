@@ -15,7 +15,7 @@ enforced by `TenantAuthorizationBehavior`, not just UI hiding.
 | Method | Path | Roles | Purpose |
 |---|---|---|---|
 | POST | `/tenants` | SuperAdmin | Create a Samaaj tenant |
-| PATCH | `/tenants/{id}/status` | SuperAdmin | Activate/deactivate/archive |
+| PATCH | `/tenants/{id}/status` | SuperAdmin | Activate/deactivate/archive. Deactivating and archiving also require the caller's own `password` in the body, and answer **403** (`Auth.StepUpFailed`) without it |
 | GET | `/tenants` | SuperAdmin | List all tenants |
 | GET | `/tenants/{slug}` | Anonymous | Resolve slug → tenant (registration picker) |
 | GET | `/tenants/by-id/{id}` | Anonymous | Resolve id → tenant (used by the gateway on every request) |
@@ -30,7 +30,7 @@ enforced by `TenantAuthorizationBehavior`, not just UI hiding.
 | GET | `/consent-notice` | Anonymous | The consent notice and its version (DPDP s.5) |
 | POST | `/me/consents/{purpose}/withdraw` | Authenticated | Withdraw one consent (DPDP s.6(4)) |
 | GET | `/me/data-export` | Authenticated | What this service holds about you (DPDP s.11) |
-| POST | `/me/erase` | Authenticated | Erase this account and, by event, everything the platform holds (DPDP s.12) |
+| POST | `/me/erase` | Authenticated | Erase this account and, by event, everything the platform holds (DPDP s.12). Requires the caller's `password`; a wrong one answers **403** (`Auth.StepUpFailed`) |
 | GET | `/tenants` | `SuperAdmin` + `Tenant.Manage` | Every Samaaj, any status; `?status=` and `?search=` narrow it |
 | GET | `/tenants/modules` | Anonymous | The closed list of module keys, with labels, for the toggles |
 | PUT | `/tenants/{id}/modules` | `SuperAdmin` + `Tenant.Manage` | Replace the whole set of modules a Samaaj runs |
