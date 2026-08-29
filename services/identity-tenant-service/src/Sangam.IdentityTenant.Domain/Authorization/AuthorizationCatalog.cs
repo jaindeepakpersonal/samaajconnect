@@ -105,6 +105,14 @@ public static class AuthorizationCatalog
         new(RoleIds.SamaajAdmin, PermissionIds.EventsPublish),
         new(RoleIds.SamaajAdmin, PermissionIds.SocialIssuesApprove),
         new(RoleIds.SamaajAdmin, PermissionIds.CelebrityVotingConfigure),
+
+        // Running a Pathshala - sessions, classes, teacher assignments, placing
+        // students - is the Samaaj's job. Only *creating* the master record is
+        // reserved to a Super Admin (DATA-MODEL.md section 9), and that is
+        // enforced by a role check on the one command rather than by withholding
+        // this permission, which would have left every other Pathshala operation
+        // reachable by nobody but the platform operator.
+        new(RoleIds.SamaajAdmin, PermissionIds.PathshalaManage),
         new(RoleIds.SamaajAdmin, PermissionIds.BoliManage),
         new(RoleIds.SamaajAdmin, PermissionIds.BoliPublishResults),
         new(RoleIds.SamaajAdmin, PermissionIds.AuditRead),
@@ -173,7 +181,15 @@ public static class AuthorizationCatalog
     /// registering, and by creating a household. Handing someone Member from
     /// this screen would write a grant with no account behind it.
     ///
-    /// <b>PathshalaStudent</b> is created by enrolment for the same reason.
+    /// <b>PathshalaStudent</b> was described here as "created by enrolment",
+    /// and nothing creates it: enrolment happens in pathshala-service, which
+    /// cannot write role grants here. It is a label on the matrix, not a
+    /// working grant, and nothing gates on it - pathshala-service decides who
+    /// may read a child's records against its own enrolment rows instead
+    /// (whose child is this, who teaches the class), which is a stronger check
+    /// than a role claim and needs no cross-service write. Leave it unassignable
+    /// and ungranted; do not gate anything new on it without first giving
+    /// something the ability to grant it.
     ///
     /// This list is what both the role matrix and the assign-role command read,
     /// so a role can never be assignable in one and not the other.

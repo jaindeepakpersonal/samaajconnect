@@ -179,17 +179,51 @@ enforced by `TenantAuthorizationBehavior`, not just UI hiding.
 
 ## pathshala-service — `/v1/pathshala`
 
-| Method | Path | Roles | Purpose |
+| Method | Path | Permission | Purpose |
 |---|---|---|---|
-| POST | `/pathshalas` | SuperAdmin | Create Pathshala master record |
-| GET | `/pathshalas` | FamilyHead, SamaajAdmin | List available Pathshalas |
-| POST | `/pathshalas/{id}/enrollments` | FamilyHead | Enroll eligible child |
-| GET | `/enrollments/{id}/my-class` | PathshalaStudent | My Class view |
-| GET | `/enrollments/{id}/attendance` | PathshalaStudent | My Attendance |
-| POST | `/classes/{id}/attendance` | PathshalaTeacher | Mark attendance |
-| GET | `/enrollments/{id}/exams` | PathshalaStudent | My Exams |
-| POST | `/exams/{id}/results` | PathshalaTeacher | Record exam result |
-| GET | `/enrollments/{id}/progress` | PathshalaStudent, FamilyHead | My Progress |
+| GET | `/pathshalas` | `Members.Read` | This Samaaj's Pathshalas, with class and teacher counts |
+| POST | `/pathshalas` | SuperAdmin **role** + `Pathshala.Manage` | Create the master record |
+| GET | `/pathshalas/{id}` | `Members.Read` | Sessions and classes |
+| POST | `/pathshalas/{id}/sessions` | `Pathshala.Manage` | Open an academic session; it becomes current |
+| DELETE | `/pathshalas/{id}` | `Pathshala.Manage` | Stop the Pathshala operating |
+| POST | `/pathshalas/{id}/classes` | `Pathshala.Manage` | Add a class to a session |
+| POST | `/classes/{id}/schedule` | `Pathshala.Manage` | Add a weekly slot; overlaps refused |
+| POST | `/classes/{id}/teachers` | `Pathshala.Manage` | Assign or remove a teacher |
+| GET | `/classes/{id}/roll` | `Members.Read` + teaches this class | Who is on the roll |
+| POST | `/classes/{id}/attendance` | `Pathshala.Attendance.Write` + teaches this class | Mark the whole register for one date |
+| POST | `/classes/{id}/exams` | `Pathshala.Exams.Write` + teaches this class | Set an exam |
+| POST | `/exams/{id}/results` | `Pathshala.Exams.Write` + teaches this class | Record or correct one mark |
+| POST | `/pathshalas/{id}/enrollments` | `Members.Read` | Ask for a place for a child |
+| GET | `/pathshalas/{id}/enrollments/requests` | `Pathshala.Manage` | The placement queue |
+| POST | `/enrollments/{id}/placement` | `Pathshala.Manage` | Place in a class, or decline |
+| DELETE | `/enrollments/{id}` | `Pathshala.Manage` | Withdraw; records are kept |
+| GET | `/enrollments` | `Members.Read` | This member's own enrolments |
+| GET | `/enrollments/{id}/my-class` | `Members.Read` + owns this enrolment | My Class |
+| GET | `/enrollments/{id}/attendance` | `Members.Read` + owns this enrolment | My Attendance |
+| GET | `/enrollments/{id}/exams` | `Members.Read` + owns this enrolment | My Exams |
+| GET | `/enrollments/{id}/progress` | `Members.Read` + owns this enrolment | My Progress |
+
+> **Shipped shape vs. the draft.** Four differences.
+>
+> **Enrolment is two calls, not one.** A parent asks; somebody at the Pathshala
+> places the child in a class. The endpoint was always at the Pathshala rather
+> than at a class, so a placement step was implied — and it is also the only
+> check this service can make that the child is the caller's, which is
+> member-family-service's fact and not ours.
+>
+> **Nothing is gated on the `PathshalaStudent` role.** Nothing grants it —
+> enrolment happens in pathshala-service, which cannot write role grants in
+> identity-tenant-service. "Owns this enrolment" above means the parent who
+> asked, the student once conversion gives them an account, a teacher of their
+> class, or a Pathshala administrator, decided against the data.
+>
+> **A teacher permission is necessary and not sufficient.**
+> `Pathshala.Attendance.Write` says somebody is a teacher; the per-class check
+> beside it says whose register they may mark.
+>
+> **`SamaajAdmin` now holds `Pathshala.Manage`**, which nothing held before.
+> Creating the master record stays Super-Admin-only through a role check on that
+> one command.
 
 ## boli-service — `/v1/boli`
 

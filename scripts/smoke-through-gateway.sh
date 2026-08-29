@@ -1507,6 +1507,280 @@ check "a refresh token nobody issued is refused" 401 \
      -d '{"refreshToken":"not-a-real-token"}')"
 
 echo
+echo "Jain Pathshala: enrolment in two steps, a register, an exam"
+
+check "switching the pathshala module on" 200 \
+  "$(status -X PUT "$GATEWAY/v1/identity/tenants/$TENANT_ID/modules" \
+     -H 'Content-Type: application/json' -H "Authorization: Bearer $ADMIN_TOKEN" \
+     -d '{"enabledModules":["community","pathshala"]}')"
+
+sleep 62
+
+# Only a Super Admin creates the master record (DATA-MODEL.md section 9); the
+# Samaaj runs it afterwards. ADMIN_TOKEN is the platform account, so it can do
+# both - the refusals below use the Samaaj Admin token instead.
+PATHSHALA=$(curl -s -X POST "$GATEWAY/v1/pathshala/pathshalas" \
+  -H 'Content-Type: application/json' \
+  -H "Authorization: Bearer $ADMIN_TOKEN" -H "$ADMIN_TENANT_HEADER" \
+  -d '{"name":"Shri Mahavir Jain Pathshala","address":"Hiran Magri","contactPerson":"Smt. Kavita Jain"}')
+
+PATHSHALA_ID=$(printf '%s' "$PATHSHALA" | json_field id)
+
+if [ -n "$PATHSHALA_ID" ]; then
+  echo "  ok    a Super Admin creates the Pathshala"
+  pass=$((pass + 1))
+else
+  echo "  FAIL  a Super Admin creates the Pathshala"
+  fail=$((fail + 1))
+fi
+
+check "a Samaaj Admin cannot create one" 403 \
+  "$(status -X POST "$GATEWAY/v1/pathshala/pathshalas" -H 'Content-Type: application/json' \
+     -H "Authorization: Bearer $SAMAAJ_ADMIN_TOKEN" \
+     -d '{"name":"Ours","address":null,"contactPerson":null}')"
+
+check "a member cannot either" 403 \
+  "$(status -X POST "$GATEWAY/v1/pathshala/pathshalas" -H 'Content-Type: application/json' \
+     -H "Authorization: Bearer $MEMBER_TOKEN" \
+     -d '{"name":"Mine","address":null,"contactPerson":null}')"
+
+# A Pathshala with no current session has nowhere to put a child.
+check "it takes no enrolments before a session is open" 409 \
+  "$(status -X POST "$GATEWAY/v1/pathshala/pathshalas/$PATHSHALA_ID/enrollments" \
+     -H 'Content-Type: application/json' -H "Authorization: Bearer $MEMBER_TOKEN" \
+     -d "{\"childProfileId\":\"$CHILD_ID\"}")"
+
+# Running it is the Samaaj's job, and this is the half that would have been
+# unreachable if Pathshala.Manage had been withheld to reserve creation.
+SESSION=$(curl -s -X POST "$GATEWAY/v1/pathshala/pathshalas/$PATHSHALA_ID/sessions" \
+  -H 'Content-Type: application/json' -H "Authorization: Bearer $SAMAAJ_ADMIN_TOKEN" \
+  -d '{"label":"2026-27","startDate":"2026-03-01","endDate":"2027-02-28"}')
+
+if printf '%s' "$SESSION" | grep -q '"isCurrent":true'; then
+  echo "  ok    a Samaaj Admin opens the academic session"
+  pass=$((pass + 1))
+else
+  echo "  FAIL  a Samaaj Admin opens the academic session"
+  fail=$((fail + 1))
+fi
+
+SESSION_ID=$(printf '%s' "$SESSION" | json_field id)
+
+CLASS=$(curl -s -X POST "$GATEWAY/v1/pathshala/pathshalas/$PATHSHALA_ID/classes" \
+  -H 'Content-Type: application/json' -H "Authorization: Bearer $SAMAAJ_ADMIN_TOKEN" \
+  -d "{\"sessionId\":\"$SESSION_ID\",\"name\":\"Class 8 - Jain Studies\",\"roomLabel\":\"Room 2\"}")
+
+CLASS_ID=$(printf '%s' "$CLASS" | json_field id)
+
+if [ -n "$CLASS_ID" ]; then
+  echo "  ok    and creates a class in it"
+  pass=$((pass + 1))
+else
+  echo "  FAIL  and creates a class in it"
+  fail=$((fail + 1))
+fi
+
+check "assigning the member as its teacher" 200 \
+  "$(status -X POST "$GATEWAY/v1/pathshala/classes/$CLASS_ID/teachers" \
+     -H 'Content-Type: application/json' -H "Authorization: Bearer $SAMAAJ_ADMIN_TOKEN" \
+     -d "{\"teacherMemberId\":\"$MEMBER_ID\",\"assign\":true}")"
+
+# Teaching a class is not enough on its own: marking a register needs the
+# Pathshala.Attendance.Write permission, which arrives with the
+# PathshalaTeacher role. Granting it and signing in again is what proves the
+# role actually carries the permission - the check that has caught an
+# unreachable permission three times in this repo.
+check "granting the member the PathshalaTeacher role" 200 \
+  "$(status -X PUT "$GATEWAY/v1/identity/admins/$MEMBER_ID/roles/PathshalaTeacher" \
+     -H 'Content-Type: application/json' -H "Authorization: Bearer $ADMIN_TOKEN" \
+     -H "$ADMIN_TENANT_HEADER" -d '{"granted":true}')"
+
+TEACHER_TOKEN=$(curl -s -X POST "$GATEWAY/v1/identity/login" -H 'Content-Type: application/json' \
+  -d "{\"mobileOrEmail\":\"$MEMBER\",\"password\":\"$MEMBER_PASSWORD\"}" | json_field accessToken)
+
+if [ -n "$TEACHER_TOKEN" ]; then
+  echo "  ok    and a fresh token carries the teacher permission"
+  pass=$((pass + 1))
+else
+  echo "  FAIL  could not sign in again after the role grant"
+  fail=$((fail + 1))
+fi
+
+check "an overlapping timetable slot is refused" 200 \
+  "$(status -X POST "$GATEWAY/v1/pathshala/classes/$CLASS_ID/schedule" \
+     -H 'Content-Type: application/json' -H "Authorization: Bearer $SAMAAJ_ADMIN_TOKEN" \
+     -d '{"dayOfWeek":"Sunday","startTime":"10:00:00","endTime":"12:00:00"}')"
+
+check "and the overlap itself is a conflict" 409 \
+  "$(status -X POST "$GATEWAY/v1/pathshala/classes/$CLASS_ID/schedule" \
+     -H 'Content-Type: application/json' -H "Authorization: Bearer $SAMAAJ_ADMIN_TOKEN" \
+     -d '{"dayOfWeek":"Sunday","startTime":"11:00:00","endTime":"13:00:00"}')"
+
+# ---- Enrolment is two steps ------------------------------------------------
+
+ENROLMENT=$(curl -s -X POST "$GATEWAY/v1/pathshala/pathshalas/$PATHSHALA_ID/enrollments" \
+  -H 'Content-Type: application/json' -H "Authorization: Bearer $MEMBER_TOKEN" \
+  -d "{\"childProfileId\":\"$CHILD_ID\"}")
+
+ENROLMENT_ID=$(printf '%s' "$ENROLMENT" | json_field id)
+
+if printf '%s' "$ENROLMENT" | grep -q '"status":"Requested"'; then
+  echo "  ok    a parent asks for a place, and it is not yet a place"
+  pass=$((pass + 1))
+else
+  echo "  FAIL  a parent asks for a place (got '$ENROLMENT')"
+  fail=$((fail + 1))
+fi
+
+# A parent picking their own child's class is the thing the second step exists
+# to prevent - and it is also the only check this service can make that the
+# child is theirs.
+check "a parent cannot place their own child" 403 \
+  "$(status -X POST "$GATEWAY/v1/pathshala/enrollments/$ENROLMENT_ID/placement" \
+     -H 'Content-Type: application/json' -H "Authorization: Bearer $MEMBER_TOKEN" \
+     -d "{\"classId\":\"$CLASS_ID\",\"place\":true}")"
+
+if curl -s -H "Authorization: Bearer $SAMAAJ_ADMIN_TOKEN" \
+   "$GATEWAY/v1/pathshala/pathshalas/$PATHSHALA_ID/enrollments/requests" \
+   | grep -q "$ENROLMENT_ID"; then
+  echo "  ok    and it reaches the placement queue"
+  pass=$((pass + 1))
+else
+  echo "  FAIL  the request did not reach the placement queue"
+  fail=$((fail + 1))
+fi
+
+check "the Pathshala places the child in a class" 200 \
+  "$(status -X POST "$GATEWAY/v1/pathshala/enrollments/$ENROLMENT_ID/placement" \
+     -H 'Content-Type: application/json' -H "Authorization: Bearer $SAMAAJ_ADMIN_TOKEN" \
+     -d "{\"classId\":\"$CLASS_ID\",\"place\":true}")"
+
+check "placing an already-placed child is refused" 409 \
+  "$(status -X POST "$GATEWAY/v1/pathshala/enrollments/$ENROLMENT_ID/placement" \
+     -H 'Content-Type: application/json' -H "Authorization: Bearer $SAMAAJ_ADMIN_TOKEN" \
+     -d "{\"classId\":\"$CLASS_ID\",\"place\":true}")"
+
+# ---- The register ----------------------------------------------------------
+
+# The class meets on Sundays, so the register is marked for one that has
+# already passed.
+CLASS_DATE=$(date -u -d 'last Sunday' +%Y-%m-%d 2>/dev/null || date -u +%Y-%m-%d)
+
+REGISTER="{\"classDate\":\"$CLASS_DATE\",\"marks\":[{\"enrolmentId\":\"$ENROLMENT_ID\",\"status\":\"Present\"}]}"
+
+MARKED=$(curl -s -X POST "$GATEWAY/v1/pathshala/classes/$CLASS_ID/attendance" \
+  -H 'Content-Type: application/json' -H "Authorization: Bearer $TEACHER_TOKEN" -d "$REGISTER")
+
+if printf '%s' "$MARKED" | grep -q '"recorded":1'; then
+  echo "  ok    the class teacher marks the register"
+  pass=$((pass + 1))
+else
+  echo "  FAIL  the class teacher marks the register (got '$MARKED')"
+  fail=$((fail + 1))
+fi
+
+# Submitting twice is the ordinary case on a bad connection. The unique index
+# on (enrolment, date) is what makes the second one a correction rather than a
+# second row.
+AGAIN=$(curl -s -X POST "$GATEWAY/v1/pathshala/classes/$CLASS_ID/attendance" \
+  -H 'Content-Type: application/json' -H "Authorization: Bearer $TEACHER_TOKEN" \
+  -d "{\"classDate\":\"$CLASS_DATE\",\"marks\":[{\"enrolmentId\":\"$ENROLMENT_ID\",\"status\":\"Excused\"}]}")
+
+if printf '%s' "$AGAIN" | grep -q '"amended":1'; then
+  echo "  ok    and re-marking corrects rather than duplicating"
+  pass=$((pass + 1))
+else
+  echo "  FAIL  re-marking did not amend (got '$AGAIN')"
+  fail=$((fail + 1))
+fi
+
+# The permission gate, before any per-class check: this member is not a
+# teacher anywhere.
+check "a member with no teacher permission cannot mark it" 403 \
+  "$(status -X POST "$GATEWAY/v1/pathshala/classes/$CLASS_ID/attendance" \
+     -H 'Content-Type: application/json' -H "Authorization: Bearer $CHILD_TOKEN" -d "$REGISTER")"
+
+check "and a register cannot be marked before the class has met" 409 \
+  "$(status -X POST "$GATEWAY/v1/pathshala/classes/$CLASS_ID/attendance" \
+     -H 'Content-Type: application/json' -H "Authorization: Bearer $TEACHER_TOKEN" \
+     -d "{\"classDate\":\"$(date -u -d '+30 days' +%Y-%m-%d)\",\"marks\":[{\"enrolmentId\":\"$ENROLMENT_ID\",\"status\":\"Present\"}]}")"
+
+# ---- Exams -----------------------------------------------------------------
+
+EXAM=$(curl -s -X POST "$GATEWAY/v1/pathshala/classes/$CLASS_ID/exams" \
+  -H 'Content-Type: application/json' -H "Authorization: Bearer $TEACHER_TOKEN" \
+  -d "{\"title\":\"Jain History\",\"examDate\":\"$CLASS_DATE\",\"maxScore\":50}")
+
+EXAM_ID=$(printf '%s' "$EXAM" | json_field id)
+
+if [ -n "$EXAM_ID" ]; then
+  echo "  ok    the teacher sets an exam"
+  pass=$((pass + 1))
+else
+  echo "  FAIL  the teacher sets an exam"
+  fail=$((fail + 1))
+fi
+
+check "a score above the paper is refused" 409 \
+  "$(status -X POST "$GATEWAY/v1/pathshala/exams/$EXAM_ID/results" \
+     -H 'Content-Type: application/json' -H "Authorization: Bearer $TEACHER_TOKEN" \
+     -d "{\"enrolmentId\":\"$ENROLMENT_ID\",\"score\":51,\"grade\":null}")"
+
+check "and a mark within it is recorded" 200 \
+  "$(status -X POST "$GATEWAY/v1/pathshala/exams/$EXAM_ID/results" \
+     -H 'Content-Type: application/json' -H "Authorization: Bearer $TEACHER_TOKEN" \
+     -d "{\"enrolmentId\":\"$ENROLMENT_ID\",\"score\":44,\"grade\":\"A\"}")"
+
+# ---- What the parent sees --------------------------------------------------
+
+if curl -s -H "Authorization: Bearer $MEMBER_TOKEN" \
+   "$GATEWAY/v1/pathshala/enrollments/$ENROLMENT_ID/my-class" | grep -q "Class 8"; then
+  echo "  ok    the parent sees the class their child is in"
+  pass=$((pass + 1))
+else
+  echo "  FAIL  the parent cannot see their child's class"
+  fail=$((fail + 1))
+fi
+
+if curl -s -H "Authorization: Bearer $MEMBER_TOKEN" \
+   "$GATEWAY/v1/pathshala/enrollments/$ENROLMENT_ID/progress" | grep -q '"examsSat":1'; then
+  echo "  ok    and their progress, computed rather than stored"
+  pass=$((pass + 1))
+else
+  echo "  FAIL  the progress view did not count the exam"
+  fail=$((fail + 1))
+fi
+
+# Records about somebody's child. Not found rather than forbidden: a 403 would
+# confirm which enrolment ids are real.
+check "another member cannot read this child's records" 404 \
+  "$(status -H "Authorization: Bearer $CHILD_TOKEN" \
+     "$GATEWAY/v1/pathshala/enrollments/$ENROLMENT_ID/attendance")"
+
+check "and a class roll is not readable by them either" 404 \
+  "$(status -H "Authorization: Bearer $CHILD_TOKEN" \
+     "$GATEWAY/v1/pathshala/classes/$CLASS_ID/roll")"
+
+check "while the class teacher may read it" 200 \
+  "$(status -H "Authorization: Bearer $TEACHER_TOKEN" \
+     "$GATEWAY/v1/pathshala/classes/$CLASS_ID/roll")"
+
+# ---- The module gate -------------------------------------------------------
+
+check "switching the pathshala module off" 200 \
+  "$(status -X PUT "$GATEWAY/v1/identity/tenants/$TENANT_ID/modules" \
+     -H 'Content-Type: application/json' -H "Authorization: Bearer $ADMIN_TOKEN" \
+     -d '{"enabledModules":["community"]}')"
+
+sleep 62
+
+check "the pathshala route answers 404" 404 \
+  "$(status -H "Authorization: Bearer $MEMBER_TOKEN" "$GATEWAY/v1/pathshala/pathshalas")"
+
+check "while the timeline, on a different module, is untouched" 200 \
+  "$(status -H "Authorization: Bearer $MEMBER_TOKEN" "$GATEWAY/v1/timeline/posts")"
+
+echo
 echo "Step-up: taking a Samaaj out of service re-asks for the password"
 
 # On a throwaway Samaaj, not the one the rest of this script is standing on.

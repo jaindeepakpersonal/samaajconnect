@@ -389,6 +389,11 @@ namespace Sangam.IdentityTenant.Infrastructure.Persistence.Migrations
                         new
                         {
                             RoleId = new Guid("a0000000-0000-0000-0000-000000000002"),
+                            PermissionId = new Guid("b0000000-0000-0000-0000-00000000000d")
+                        },
+                        new
+                        {
+                            RoleId = new Guid("a0000000-0000-0000-0000-000000000002"),
                             PermissionId = new Guid("b0000000-0000-0000-0000-000000000010")
                         },
                         new

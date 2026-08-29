@@ -7,18 +7,22 @@ version of the plan; the reasoning behind the ordering lives in
 
 ## Current Status
 
-- **Stage:** Phase 3 service built; Phase 1 has three tracked leftovers
-- **Last updated:** 2026-08-29 - step-up authentication on deactivating and
-  archiving a Samaaj, shared with erasure. 797 tests green (726 backend, 71
-  frontend) plus 205 smoke checks against a stack built from empty volumes,
-  re-runnable against a dirty one.
-- **Blocking item:** none. Next is the Phase 4 `pathshala-service`, or the three
-  remaining Phase 1 leftovers, which are smaller: a member-portal surface for
-  the DPDP rights, an editable role matrix, and the two DPDP obligations that
-  need a notification channel first. The vote endpoint's throughput load test is
-  carried to Phase 5, since it needs a deployed environment; its correctness
-  half is done. The five questions in `docs/product/DPDP-COMPLIANCE.md` still
-  need counsel before any of this ships to real users.
+- **Stage:** Phase 4 service built; Phase 1 has three tracked leftovers
+- **Last updated:** 2026-08-29 - pathshala-service, the platform's ninth service
+  and the Phase 4 context. 847 tests green (776 backend, 71 frontend) plus 237
+  smoke checks against a stack built from empty volumes, re-runnable against a
+  dirty one.
+- **Blocking item:** none, but the **frontend gap is now the largest thing in
+  this plan**. Every service since timeline-service has shipped backend-only,
+  and the member portal still has login, register and home. Nine services have
+  no member-facing screen. Next is either that, the Phase 5 `boli-service`, or
+  the three remaining Phase 1 leftovers, which are smaller: a member-portal
+  surface for the DPDP rights, an editable role matrix, and the two DPDP
+  obligations that need a notification channel first. The vote endpoint's
+  throughput load test is carried to Phase 5, since it needs a deployed
+  environment; its correctness half is done. The five questions in
+  `docs/product/DPDP-COMPLIANCE.md` still need counsel before any of this ships
+  to real users.
 
 *(Update these three lines at the start/end of every work session —
 they're what a coding agent or a teammate should read first to know
@@ -164,9 +168,19 @@ unit tested.
 
 ## Phase 4 — Jain Pathshala
 
-- [ ] `pathshala-service`
-- [ ] Teacher and Student "My…" views built in parallel (shared
-      underlying data)
+- [x] `pathshala-service` — the school, its sessions and classes, a two-step enrolment, the register and exams. Enrolment is a parent's request and a Pathshala's placement, because the Pathshala picks the class and because placing is the only check this service can make that a child is the caller's. Attendance is held to one mark per child per class day by a unique index; the register is written on one connection outside the request transaction, after two mistakes documented in the service's own `CLAUDE.md`
+- [x] Teacher and Student "My…" views built in parallel (shared
+      underlying data) — the backend for both. My Class, My Attendance,
+      My Exams and My Progress are one set of queries over the same
+      tables, gated on `Members.Read` and decided against the enrolment
+      rather than on the `PathshalaStudent` role, which nothing grants.
+      Progress is computed rather than stored, so a corrected mark
+      cannot leave it quietly wrong
+- [ ] The Angular screens for both, from the wireframes' `#myclass`,
+      `#attendance`, `#exams` and `#progress`. The member portal still
+      has only login, register and home, and every service since
+      timeline-service has shipped backend-only — this is the largest
+      accumulated gap in the plan
 
 ## Phase 5 — Boli + Hardening
 

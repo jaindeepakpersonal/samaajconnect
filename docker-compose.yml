@@ -203,6 +203,20 @@ services:
     ports:
       - "5108:8080"
 
+  pathshala-service:
+    <<: *service-defaults
+    build:
+      context: .
+      dockerfile: services/pathshala-service/Dockerfile
+    container_name: samaajconnect-pathshala
+    environment:
+      <<: *service-environment
+      ConnectionStrings__Default: "Host=postgres;Port=5432;Database=samaajconnect_pathshala;Username=samaajconnect;Password=samaajconnect"
+      Jwt__SigningKey: "${JWT_SIGNING_KEY:-local-development-signing-key-do-not-use-in-production}"
+      Outbox__PollIntervalSeconds: "5"
+    ports:
+      - "5109:8080"
+
   gateway:
     build:
       context: .
@@ -227,6 +241,8 @@ services:
       social-issues-service:
         condition: service_started
       celebrity-voting-service:
+        condition: service_started
+      pathshala-service:
         condition: service_started
     environment:
       ASPNETCORE_ENVIRONMENT: Development

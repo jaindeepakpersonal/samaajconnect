@@ -241,6 +241,7 @@ session.
 | Admin panel conventions | `apps/admin-portal/CLAUDE.md` |
 | Module-gated service, worked example | `services/timeline-service/CLAUDE.md` |
 | A correctness guarantee that is a database index | `services/celebrity-voting-service/CLAUDE.md` |
+| A permission that is necessary but not sufficient | `services/pathshala-service/CLAUDE.md` |
 | Permission that needs a data check beside it | `services/volunteer-groups-service/CLAUDE.md` |
 | Capacity and a waitlist that moves | `services/events-service/CLAUDE.md` |
 | A multi-state workflow as a transition table | `services/social-issues-service/CLAUDE.md` |

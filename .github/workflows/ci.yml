@@ -45,6 +45,8 @@ jobs:
             solution: services/social-issues-service/Sangam.SocialIssues.sln
           - name: celebrity-voting-service
             solution: services/celebrity-voting-service/Sangam.CelebrityVoting.sln
+          - name: pathshala-service
+            solution: services/pathshala-service/Sangam.Pathshala.sln
           - name: gateway
             solution: gateway/Sangam.Gateway.sln
 
@@ -177,6 +179,12 @@ jobs:
           dotnet dotnet-ef migrations has-pending-model-changes \
             --project services/celebrity-voting-service/src/Sangam.CelebrityVoting.Infrastructure \
             --startup-project services/celebrity-voting-service/src/Sangam.CelebrityVoting.Api
+
+      - name: Check pathshala-service
+        run: |
+          dotnet dotnet-ef migrations has-pending-model-changes \
+            --project services/pathshala-service/src/Sangam.Pathshala.Infrastructure \
+            --startup-project services/pathshala-service/src/Sangam.Pathshala.Api
 
   smoke:
     name: Through the gateway
