@@ -5,11 +5,10 @@
 # directory and `npm ci` needs all of them to resolve the same tree the host
 # resolves.
 #
-# The app is reached through the gateway, not on a port of its own - see the
-# `member-portal` route in gateway/src/Sangam.Gateway/appsettings.json. Its
-# production ApiConfig has an empty gatewayUrl, meaning "same origin", so `/v1`
-# has to be served by whatever serves the app. Putting it behind the gateway is
-# what makes that true.
+# The production ApiConfig has an empty gatewayUrl, meaning "same origin", so
+# `/v1` has to be served by whatever serves the app. Two things do: the gateway,
+# which serves this portal at its root, and this container itself, whose SSR
+# server proxies `/v1` onward when GATEWAY_URL is set (see src/server.ts).
 
 FROM node:22-alpine AS build
 WORKDIR /src

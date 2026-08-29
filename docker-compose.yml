@@ -244,8 +244,6 @@ services:
         condition: service_started
       pathshala-service:
         condition: service_started
-      member-portal:
-        condition: service_started
     environment:
       ASPNETCORE_ENVIRONMENT: Development
       Redis__ConnectionString: redis:6379
@@ -259,19 +257,34 @@ services:
   # Neither is a backend service, so neither uses *service-defaults: they need
   # no database and no broker.
 
-  # Server-side rendered, and reached *through the gateway* at
-  # http://localhost:8080 rather than on a port of its own. Its production
-  # ApiConfig says `gatewayUrl: ''` - same origin - so whatever serves the app
-  # must also serve /v1, and the gateway is what does.
+  # Server-side rendered. Reachable two ways, and both are same-origin, which
+  # is what its production ApiConfig (`gatewayUrl: ''`) needs:
+  #
+  #   - http://localhost:4200 - the container itself. Its SSR server proxies
+  #     /v1 to the gateway (see GATEWAY_URL below and src/server.ts).
+  #   - http://localhost:8080 - the gateway, which serves the portal at the
+  #     root as the platform's public front door.
+  #
+  # The port is published because a container with no port looks unreachable,
+  # whatever the docs say - which is exactly how this was first reported.
   member-portal:
     build:
       context: .
       dockerfile: apps/member-portal/Dockerfile
     container_name: samaajconnect-member-portal
     restart: unless-stopped
+    depends_on:
+      gateway:
+        condition: service_started
     environment:
       NODE_ENV: production
       PORT: "4000"
+      # Makes the SSR server proxy /v1 to the gateway, so the app is
+      # same-origin with its own API on 4200 as well as through the gateway.
+      # Unset outside the container, where ng serve proxies /v1 itself.
+      GATEWAY_URL: "http://gateway:8080"
+    ports:
+      - "4200:4000"
     healthcheck:
       test: ["CMD-SHELL", "wget -q --spider http://127.0.0.1:4000/ || exit 1"]
       interval: 10s

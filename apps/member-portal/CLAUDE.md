@@ -41,18 +41,23 @@ interceptor to itself.
 
 ## Running it
 
-**In Docker, with everything else.** The portal is a container now, and it is
-served *by the gateway* rather than on a port of its own - so the app and its
-API share an origin, which is what its production `ApiConfig`
-(`gatewayUrl: ''`) assumes.
+**In Docker, with everything else.**
 
 ```bash
 docker compose up -d --build
 ```
 
-Then open <http://localhost:8080>. There is no port 4200 in the compose stack;
-the SSR container listens on 4000 on the compose network and nothing publishes
-it, because an app reachable without its API is not much use.
+Open either <http://localhost:4200> - the container - or
+<http://localhost:8080> - the gateway, which serves the portal at the root as
+the platform's public front door. Both are same-origin with `/v1`, which is
+what the production `ApiConfig` (`gatewayUrl: ''`) needs: on 8080 the gateway
+serves both, and on 4200 the SSR server proxies `/v1` to the gateway itself
+(`GATEWAY_URL` in docker-compose.yml, mounted in `src/server.ts`).
+
+The first version of this published no port at all, on the reasoning that the
+gateway was the only front door that mattered. That was wrong: every other
+container in the stack publishes one, so a portal showing a bare `4000/tcp`
+reads as broken no matter what the documentation says.
 
 **For frontend work**, the dev server is still the fast path - rebuilds are
 instant and the container is a full `ng build`:

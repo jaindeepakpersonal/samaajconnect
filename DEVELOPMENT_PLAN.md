@@ -9,10 +9,11 @@ version of the plan; the reasoning behind the ordering lives in
 
 - **Stage:** Phase 4 built; the whole platform now runs in Docker
 - **Last updated:** 2026-08-29 - both Angular apps containerised. Neither had a
-  Dockerfile, so neither could be deployed; the member portal is now served by
-  the gateway at the root and the admin panel by nginx on its own origin. 923
-  tests green (776 backend, 147 frontend) plus 240 smoke checks against a stack
-  built from empty volumes, re-runnable against a dirty one.
+  Dockerfile, so neither could be deployed; the member portal now runs on 4200
+  and is also served by the gateway at the root, and the admin panel by nginx on
+  its own origin. 923 tests green (776 backend, 147 frontend) plus 240 smoke
+  checks against a stack built from empty volumes, re-runnable against a dirty
+  one.
 - **Blocking item:** none. The **frontend gap keeps closing**: the whole
   `community` module — Timeline, Events and Volunteer Groups — now has member
   screens. Social Issues is the last service with a Home tile still saying
@@ -177,9 +178,10 @@ unit tested.
       with a position as the president
 - [x] **Both Angular apps are containerised.** Neither had a Dockerfile, so
       neither could be deployed - the portals only ever ran from `ng serve` on
-      a developer's machine. member-portal is an SSR Node image served *by the
-      gateway* at the root, which is what makes its production
-      `gatewayUrl: ''` (same origin) true. admin-portal is a static build behind
+      a developer's machine. member-portal is an SSR Node image on 4200 whose
+      server proxies `/v1` to the gateway, and the gateway also serves it at
+      the root as the public front door; both are same-origin, which is what
+      its production `gatewayUrl: ''` needs. admin-portal is a static build behind
       nginx on its own origin, proxying `/v1` to the gateway - deliberately not
       sharing an origin, because both apps use the same sessionStorage token
       keys and one origin would mean one session. Smoke checks cover the root,

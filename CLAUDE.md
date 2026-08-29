@@ -215,12 +215,13 @@ session.
 
 **The two Angular apps are containers too**, and they are not symmetrical.
 
-- **member-portal** is server-side rendered (Node) and is reached
-  *through the gateway* at `http://localhost:8080/`, not on a port of
-  its own. Its production `ApiConfig` says `gatewayUrl: ''` — same
-  origin — so whatever serves the app must also serve `/v1`, and the
-  gateway is what does. The route is a catch-all with `Order: 1000`, so
-  every `/v1/**` route and the gateway's own `/health` win over it.
+- **member-portal** is server-side rendered (Node) and reachable two
+  ways, both same-origin — which is what its production `ApiConfig`
+  (`gatewayUrl: ''`) needs. On `http://localhost:4200` the SSR server
+  proxies `/v1` to the gateway itself; on `http://localhost:8080` the
+  gateway serves the portal at the root, as the public front door. That
+  route is a catch-all with `Order: 1000`, so every `/v1/**` route and
+  the gateway's own `/health` win over it.
 - **admin-portal** is a static SPA served by nginx, which proxies
   `/v1` to the gateway. It is on its own origin
   (`http://localhost:4300`) **deliberately**: both apps use the same

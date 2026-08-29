@@ -67,11 +67,14 @@ One route, and two things about it that have both broken once:
 It carries no `module` metadata, so it is never gated - a Samaaj cannot switch
 off the site it signs in on.
 
-The portal is served here rather than on a port of its own because its
-production `ApiConfig` says `gatewayUrl: ''` - same origin. Whatever serves the
-app has to serve `/v1` too, and this is what does. `scripts/smoke-through-gateway.sh`
-asserts all three: the root serves the app, a deep link reaches it rather than
-404ing at the edge, and `/health` is still the gateway's own.
+This is the platform's public front door, and not the only way in: the portal
+container also publishes 4200 and proxies `/v1` here itself. Both are
+same-origin, which is what its production `ApiConfig` (`gatewayUrl: ''`)
+needs.
+
+`scripts/smoke-through-gateway.sh` asserts all three things this route has to
+get right: the root serves the app, a deep link reaches it rather than 404ing
+at the edge, and `/health` is still the gateway's own.
 
 ## Adding a service, continued
 
