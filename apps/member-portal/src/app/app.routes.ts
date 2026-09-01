@@ -119,6 +119,13 @@ export const routes: Routes = [
     loadComponent: () =>
       import('./features/pathshala/enrolment.component').then((m) => m.EnrolmentComponent),
   },
+  {
+    path: 'privacy',
+    title: 'Your data and privacy - samaajconnect',
+    canActivate: [authGuard],
+    loadComponent: () =>
+      import('./features/privacy/privacy.component').then((m) => m.PrivacyComponent),
+  },
   { path: '', pathMatch: 'full', redirectTo: 'home' },
 
   // Anything unrecognised goes to Home, which sends signed-out visitors to

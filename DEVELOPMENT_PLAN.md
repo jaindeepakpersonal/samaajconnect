@@ -8,21 +8,24 @@ version of the plan; the reasoning behind the ordering lives in
 ## Current Status
 
 - **Stage:** Phase 4 built; six member modules have screens
-- **Last updated:** 2026-08-29 - the member portal's Jain Pathshala screens,
-  after the Celebrities of Samaaj ones. Driving Celebrity Voting against the
-  running stack found a gateway bug that had been breaking every module-gated
-  screen in the app: a gated route answered 404 rather than 401 when the
-  caller's access token had expired, so the portals' silent renew-and-retry
-  never fired and the screen printed "No such endpoint." from fifteen minutes
-  after sign-in onwards. 1,034 tests green (780 backend, 254 frontend) plus 240
-  smoke checks against a stack built from empty volumes, re-runnable against a
-  dirty one.
+- **Last updated:** 2026-09-01 - the member portal's DPDP rights screen
+  (`/privacy`), after the Jain Pathshala and Celebrities of Samaaj ones. The
+  erasure, export and consent-withdrawal endpoints had existed and been tested
+  for weeks, but a right reachable only with curl is not one a member has; that
+  gap is now closed and driven end to end, real erasure included. Driving
+  Celebrity Voting against the running stack earlier in the same run found a
+  gateway bug that had been breaking every module-gated screen in the app: a
+  gated route answered 404 rather than 401 when the caller's access token had
+  expired, so the portals' silent renew-and-retry never fired and the screen
+  printed "No such endpoint." from fifteen minutes after sign-in onwards. 1,047
+  tests green (780 backend, 267 frontend) plus 240 smoke checks against a stack
+  built from empty volumes, re-runnable against a dirty one.
 - **Blocking item:** none. **Every member module with a service now has
   screens**: Timeline, Events, Volunteer Groups, Social Issues, Members, Family,
   Celebrity Voting and Pathshala. Only Boli is left, and it has neither a
-  service nor screens. After that: the Phase 5 `boli-service`, or the
-  three remaining Phase 1 leftovers (a member-portal surface for the DPDP
-  rights, an editable role matrix, and the two DPDP obligations that need a
+  service nor screens. After that: the Phase 5 `boli-service`, or the two
+  remaining Phase 1 leftovers (an editable role matrix, and the two DPDP
+  obligations — breach notification and the right to nominate — that need a
   notification channel first). The vote endpoint's throughput load test is
   carried to Phase 5, since it needs a deployed environment; its correctness
   half is done. The five questions in `docs/product/DPDP-COMPLIANCE.md` still
@@ -108,10 +111,17 @@ unit tested.
       notifications, and de-identify rather than delete their audit rows
 - [ ] DPDP Act, remaining: breach notification (s.8(6)) and the right to
       nominate (s.14), both of which need a notification channel first
-- [ ] DPDP Act: a member-portal surface for consent withdrawal, data export and
-      erasure. The endpoints exist and are exercised end to end, but a right
-      only reachable with curl is not one a member has. No wireframe covers an
-      account/privacy screen, so this needs one first
+- [x] DPDP Act: a member-portal surface for consent withdrawal, data export and
+      erasure, at `/privacy`. No wireframe covers it — the prototype's
+      `#profile` screen is per-field directory privacy, which is a different
+      thing — so the screen was designed against the Act rather than translated.
+      Withdrawing is one click with no confirmation, because s.6(4) requires it
+      to be as easy as giving and giving was a tick; erasing asks for the
+      password, because it cannot be undone. What erasure keeps is printed
+      beside what it erased. The copy is assembled in the browser from the three
+      services that hold it, since the platform deliberately has no single
+      export endpoint. Driven end to end against the running stack, including a
+      real erasure of a throwaway account
 - [x] Admin backend: Super Admin tenant list (`GET /v1/identity/tenants`), a
       closed `ModuleCatalog` with runtime toggles, the read-only role and
       permission matrix, listing administrators, inviting one with a one-time

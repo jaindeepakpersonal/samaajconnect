@@ -143,6 +143,14 @@ h3 {
   text-decoration: underline;
 }
 
+/* An action that cannot be undone - erasing an account, so far. Its own colour
+   rather than the accent, so that "Erase my account permanently" does not look
+   like every other button on the page. */
+.btn.danger {
+  background: var(--danger);
+  color: #fff;
+}
+
 .actions {
   display: flex;
   gap: var(--space-2);

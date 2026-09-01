@@ -23,6 +23,7 @@ before translating another screen.
 | My Family | `/family` | `#family` + `#children` | built as one screen |
 | Celebrities of Samaaj | `/voting` | `#celebrity` | built |
 | Campaign detail | `/voting/:id` | `#celebrity` + `#celebrityresults` | built as one screen |
+| Your data and privacy | `/privacy` | — | built; no wireframe covers the DPDP rights, and endpoints reachable only with curl are not rights a member has |
 | Jain Pathshala | `/pathshala` | `#pathshala` | built |
 | Pathshala enrolment | `/pathshala/:id` | `#myclass` + `#attendance` + `#exams` + `#progress` | built as one screen |
 | Pathshala events | — | `#pathevents` | not built — no endpoint exists |
@@ -186,6 +187,32 @@ know and that actually matters to the reader - "Your post", "You", "The
 president", "A member", "A volunteer group" - rather than printing an id or a
 placeholder. The wireframes' "President: Rajesh Jain" is prototype data, not a
 field the API has.
+
+**Withdrawing a consent has no confirmation step, and erasing has two.** DPDP
+section 6(4) requires withdrawing to be as easy as giving, and giving was a tick
+during registration — so an "are you sure?" in front of it would be the app
+making a right harder to exercise than the Act allows. Erasure is the opposite:
+it cannot be undone, so it asks for the password, which is also the identity
+check a Fiduciary needs before acting irreversibly. The required consent is not
+a disabled button but a sentence: withdrawing membership is not temporarily
+unavailable, it *means* erasing the account, and saying so is more use than a
+control that answers 409.
+
+**What erasure keeps is shown beside what it erased.** A member told only "done"
+has no way to know a de-identified audit row survives. Section 8(7) permits
+retention required by other law, so printing both lists is part of honouring the
+right rather than a caveat on it.
+
+**The data export is assembled in the browser, from three services.** The
+platform has no single export endpoint on purpose: a member's data sits in
+identity, member-family and audit, and having one service reach synchronously
+into the others would undo the service boundaries for something used a handful
+of times a year. The client is the only party already authenticated to all
+three. A service with nothing for that member contributes a note rather than
+failing the export — a partial copy delivered beats a complete one refused —
+and gathering the data is reported separately from the browser refusing to save
+it, because those are different problems and only one of them is the member's to
+fix.
 
 **A parent's own children are the one place this app does resolve names.** The
 rule below — that names the portal cannot resolve are not invented — is about

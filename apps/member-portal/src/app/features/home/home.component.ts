@@ -145,6 +145,15 @@ export class HomeComponent implements OnInit {
       route: '/family',
     },
     {
+      // Core, and deliberately not behind a module key: a right under the DPDP
+      // Act does not depend on which modules a Samaaj has switched on.
+      moduleKey: null,
+      title: 'Your data and privacy',
+      description: 'What you agreed to, a copy of your data, and erasing your account.',
+      action: 'Open',
+      route: '/privacy',
+    },
+    {
       moduleKey: ModuleKeys.Community,
       title: 'Timeline',
       description: 'Samaaj announcements and approved member posts.',
