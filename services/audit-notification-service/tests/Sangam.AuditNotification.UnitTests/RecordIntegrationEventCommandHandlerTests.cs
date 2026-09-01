@@ -46,6 +46,16 @@ public sealed class RecordIntegrationEventCommandHandlerTests
             payload ?? $$"""{"userId":"{{UserId}}","tenantId":"{{TenantId}}","fullName":"Ravi Shah"}""",
             Now.AddMinutes(-1));
 
+    /// <summary>
+    /// A registration payload carrying the identifier the member signed up with,
+    /// which is what decides whether the welcome can also leave the platform.
+    /// </summary>
+    private static string PayloadWith(string mobileOrEmail) =>
+        $$"""
+          {"userId":"{{UserId}}","tenantId":"{{TenantId}}","fullName":"Ravi Shah",
+           "mobileOrEmail":"{{mobileOrEmail}}"}
+          """;
+
     private Task<Application.Common.Result<RecordIntegrationEventResult>> Handle(
         IntegrationEventEnvelope envelope) =>
         _handler.Handle(new RecordIntegrationEventCommand(envelope), CancellationToken.None);
@@ -130,12 +140,65 @@ public sealed class RecordIntegrationEventCommandHandlerTests
     [Fact]
     public async Task A_notification_already_raised_for_this_message_is_not_raised_again()
     {
-        _notifications.AlreadyRaisedAsync(Arg.Any<Guid>(), Arg.Any<CancellationToken>()).Returns(true);
+        _notifications
+            .AlreadyRaisedAsync(Arg.Any<Guid>(), Arg.Any<NotificationChannel>(), Arg.Any<CancellationToken>())
+            .Returns(true);
 
         var result = await Handle(Envelope());
 
         result.Value.NotificationRaised.Should().BeFalse();
         _notifications.DidNotReceive().Add(Arg.Any<Notification>());
+    }
+
+    [Fact]
+    public async Task Registration_with_an_email_identifier_also_queues_an_emailed_copy()
+    {
+        await Handle(Envelope(payload: PayloadWith("ravi.shah@example.com")));
+
+        _notifications.Received(1).Add(Arg.Is<Notification>(n =>
+            n.Channel == NotificationChannel.InApp));
+
+        _notifications.Received(1).Add(Arg.Is<Notification>(n =>
+            n.Channel == NotificationChannel.Email
+            && n.Destination == "ravi.shah@example.com"
+            && n.Status == NotificationStatus.Pending));
+    }
+
+    [Fact]
+    public async Task Registration_with_a_mobile_identifier_queues_it_as_a_text_message()
+    {
+        await Handle(Envelope(payload: PayloadWith("+919876543210")));
+
+        _notifications.Received(1).Add(Arg.Is<Notification>(n =>
+            n.Channel == NotificationChannel.Sms && n.Destination == "+919876543210"));
+    }
+
+    [Fact]
+    public async Task An_identifier_that_is_neither_raises_the_in_app_notification_only()
+    {
+        // Refusing the event would stall the partition behind one member whose
+        // identifier the platform cannot send to. They still get told in-app.
+        await Handle(Envelope(payload: PayloadWith("ravi-shah")));
+
+        _notifications.Received(1).Add(Arg.Any<Notification>());
+        _notifications.Received(1).Add(Arg.Is<Notification>(n =>
+            n.Channel == NotificationChannel.InApp));
+    }
+
+    [Fact]
+    public async Task An_emailed_copy_already_raised_for_this_message_is_not_raised_again()
+    {
+        // The dedupe is per channel: the in-app row is new, the emailed one is
+        // a redelivery, and only the first should be written.
+        _notifications
+            .AlreadyRaisedAsync(Arg.Any<Guid>(), NotificationChannel.Email, Arg.Any<CancellationToken>())
+            .Returns(true);
+
+        await Handle(Envelope(payload: PayloadWith("ravi.shah@example.com")));
+
+        _notifications.Received(1).Add(Arg.Any<Notification>());
+        _notifications.DidNotReceive().Add(Arg.Is<Notification>(n =>
+            n.Channel == NotificationChannel.Email));
     }
 
     [Fact]

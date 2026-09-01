@@ -25,7 +25,23 @@ public sealed record EventDescriptor(
     Func<JsonElement, NotificationSpec?>? Notification = null,
     IReadOnlyList<string>? BeforeProperties = null);
 
-public sealed record NotificationSpec(Guid? RecipientUserId, string Title, string Body);
+/// <param name="Destination">
+/// A contact address to also send this message to, when the event happens to
+/// carry one. Null means in-app only, which is the case for almost every event:
+/// most of them identify a member by id and nothing else, deliberately, because
+/// a payload with a mobile number in it is a payload that later has to be
+/// redacted.
+///
+/// The channel is worked out from the address by
+/// <see cref="Sangam.AuditNotification.Domain.Notifications.ContactAddress"/>,
+/// since the platform stores one MobileOrEmail per login rather than separate
+/// fields. An address it cannot classify raises no outbound copy.
+/// </param>
+public sealed record NotificationSpec(
+    Guid? RecipientUserId,
+    string Title,
+    string Body,
+    string? Destination = null);
 
 /// <summary>
 /// The topics this service understands specifically.
@@ -73,7 +89,18 @@ public static class KnownEvents
                     "Welcome to your Samaaj",
                     string.IsNullOrWhiteSpace(name)
                         ? "Your membership is active. Complete your profile to appear in the member directory."
-                        : $"Welcome, {name}. Complete your profile to appear in the member directory.");
+                        : $"Welcome, {name}. Complete your profile to appear in the member directory.",
+                    // The identifier the member registered with, so the welcome
+                    // also reaches them rather than only waiting in the portal
+                    // for a first sign-in that may never come.
+                    //
+                    // This is not contact verification. Nothing here checks that
+                    // the message arrived, or that whoever reads it is the person
+                    // who registered - User.IsContactVerified stays false until
+                    // something does. See the service CLAUDE.md.
+                    Destination: payload.TryGetProperty("mobileOrEmail", out var contact)
+                        ? contact.GetString()
+                        : null);
             }),
 
         ["identity.user.logged-in.v1"] = new(

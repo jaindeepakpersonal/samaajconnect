@@ -1377,9 +1377,14 @@ fi
 # The second press is success with accepted=false: they have done nothing
 # wrong, and the response tells them what they hold. The unique index on
 # (CampaignId, VoterMemberId) is what actually refuses it.
+# The same candidate again, deliberately. Pressing it a second time with a
+# *different* candidate would hit whichever rule that candidate happens to
+# break first - and it did: this used SELF_CANDIDATE_ID, so the second press was
+# refused for being a self-vote and this check never once exercised the
+# already-voted path it is named after.
 SECOND_VOTE=$(curl -s -X POST "$GATEWAY/v1/celebrity-voting/campaigns/$CAMPAIGN_ID/votes" \
   -H 'Content-Type: application/json' -H "Authorization: Bearer $MEMBER_TOKEN" \
-  -d "{\"candidateId\":\"$SELF_CANDIDATE_ID\"}")
+  -d "{\"candidateId\":\"$CANDIDATE_ID\"}")
 
 if printf '%s' "$SECOND_VOTE" | grep -q '"accepted":false'; then
   echo "  ok    voting a second time changes nothing and is not an error"
@@ -1389,9 +1394,14 @@ else
   fail=$((fail + 1))
 fi
 
+# SELF_CANDIDATE_ID is MEMBER nominated as a candidate, so it is MEMBER's own
+# token that makes this a self-vote. With CHILD_TOKEN - which this used - it is
+# simply somebody voting for a candidate who is not them, and the 200 that came
+# back was correct. The check was wrong, and it was also quietly casting a
+# second vote in a campaign the next checks then tally.
 check "and nobody may vote for themselves" 409 \
   "$(status -X POST "$GATEWAY/v1/celebrity-voting/campaigns/$CAMPAIGN_ID/votes" \
-     -H 'Content-Type: application/json' -H "Authorization: Bearer $CHILD_TOKEN" \
+     -H 'Content-Type: application/json' -H "Authorization: Bearer $MEMBER_TOKEN" \
      -d "{\"candidateId\":\"$SELF_CANDIDATE_ID\"}")"
 
 check "a candidate who is not on this ballot is not found" 404 \
@@ -1433,15 +1443,46 @@ check "an unpublished result is not found" 404 \
   "$(status -H "Authorization: Bearer $MEMBER_TOKEN" \
      "$GATEWAY/v1/celebrity-voting/campaigns/$CAMPAIGN_ID/results")"
 
-check "publishing the result is accepted" 200 \
-  "$(status -X POST "$GATEWAY/v1/celebrity-voting/campaigns/$CAMPAIGN_ID/results" \
-     -H "Authorization: Bearer $ADMIN_TOKEN" -H "$ADMIN_TENANT_HEADER")"
+FIRST_PUBLISH=$(curl -s -X POST "$GATEWAY/v1/celebrity-voting/campaigns/$CAMPAIGN_ID/results" \
+  -H "Authorization: Bearer $ADMIN_TOKEN" -H "$ADMIN_TENANT_HEADER")
 
-# The frozen order. Published twice would leave "the result" with no referent,
-# which is why the second attempt is refused rather than recomputed.
-check "publishing twice is refused" 409 \
-  "$(status -X POST "$GATEWAY/v1/celebrity-voting/campaigns/$CAMPAIGN_ID/results" \
-     -H "Authorization: Bearer $ADMIN_TOKEN" -H "$ADMIN_TENANT_HEADER")"
+if printf '%s' "$FIRST_PUBLISH" | grep -q '"publishedAt"'; then
+  echo "  ok    publishing the result is accepted"
+  pass=$((pass + 1))
+else
+  echo "  FAIL  publishing the result is accepted (got '$FIRST_PUBLISH')"
+  fail=$((fail + 1))
+fi
+
+# What matters is that the announced order cannot move, not that the second
+# press errors. PublishResultsCommandHandler returns the stored result rather
+# than recomputing one - the same shape as pressing Vote twice, where doing the
+# thing again is not a mistake to report. This check asked for a 409 and so
+# asserted the opposite of what the service deliberately does; it now asserts
+# the property the comment was actually about.
+SECOND_PUBLISH=$(curl -s -X POST "$GATEWAY/v1/celebrity-voting/campaigns/$CAMPAIGN_ID/results" \
+  -H "Authorization: Bearer $ADMIN_TOKEN" -H "$ADMIN_TENANT_HEADER")
+
+# The ranking and who published it, not the whole body. The two responses
+# legitimately differ in `publishedAt`: the first is the in-memory timestamp,
+# which .NET keeps to 100ns, and the second is read back from Postgres, which
+# stores microseconds - so the last digit disappears in the round trip. That is
+# cosmetic, and comparing the bodies verbatim failed on it while the result
+# itself had not moved an inch.
+ranking_of() { printf '%s' "$1" | sed 's/.*"ranking":\[//; s/\],"publishedBy".*//'; }
+
+if [ -n "$FIRST_PUBLISH" ] \
+   && [ "$(ranking_of "$SECOND_PUBLISH")" = "$(ranking_of "$FIRST_PUBLISH")" ] \
+   && [ "$(printf '%s' "$SECOND_PUBLISH" | json_field publishedBy)" \
+      = "$(printf '%s' "$FIRST_PUBLISH" | json_field publishedBy)" ]; then
+  echo "  ok    publishing twice returns the frozen result, unchanged"
+  pass=$((pass + 1))
+else
+  echo "  FAIL  a second publish changed the result"
+  echo "        first:  $FIRST_PUBLISH"
+  echo "        second: $SECOND_PUBLISH"
+  fail=$((fail + 1))
+fi
 
 if curl -s -H "Authorization: Bearer $MEMBER_TOKEN" \
    "$GATEWAY/v1/celebrity-voting/campaigns/$CAMPAIGN_ID/results" | grep -q "$CANDIDATE_ID"; then
@@ -1585,7 +1626,28 @@ else
   fail=$((fail + 1))
 fi
 
-SESSION_ID=$(printf '%s' "$SESSION" | json_field id)
+# Opening a session answers with the whole Pathshala, so the *first* "id" in the
+# response is the Pathshala's and not the session's. `json_field id` takes the
+# first match, so this used to hand the Pathshala's own id back as SESSION_ID -
+# and every Pathshala check after it failed with Session.NotFound while the
+# check immediately above passed, because the session really had been opened.
+# Seventeen red lines, one wrong field, and nothing pointing at it.
+SESSION_ID=$(printf '%s' "$SESSION" \
+  | sed 's/.*"sessions":\[//; s/\],"classes".*//' \
+  | tr '}' '\n' \
+  | grep '"isCurrent":true' \
+  | json_field id)
+
+# Named separately rather than folded into the next check, because the failure
+# it guards against is not "no id" - it is "a plausible id belonging to
+# something else", which every downstream check reports as someone else's bug.
+if [ -n "$SESSION_ID" ] && [ "$SESSION_ID" != "$PATHSHALA_ID" ]; then
+  echo "  ok    and the session has an id of its own, not the Pathshala's"
+  pass=$((pass + 1))
+else
+  echo "  FAIL  could not read the current session's id (got '$SESSION_ID')"
+  fail=$((fail + 1))
+fi
 
 CLASS=$(curl -s -X POST "$GATEWAY/v1/pathshala/pathshalas/$PATHSHALA_ID/classes" \
   -H 'Content-Type: application/json' -H "Authorization: Bearer $SAMAAJ_ADMIN_TOKEN" \

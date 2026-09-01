@@ -76,7 +76,62 @@ public sealed class RecordIntegrationEventCommandHandler(
             return false;
         }
 
-        if (await notifications.AlreadyRaisedAsync(envelope.MessageId, cancellationToken))
+        var raised = false;
+
+        if (!await notifications.AlreadyRaisedAsync(
+                envelope.MessageId, NotificationChannel.InApp, cancellationToken))
+        {
+            notifications.Add(Notification.Create(
+                envelope.TenantId,
+                spec.RecipientUserId,
+                spec.Title,
+                spec.Body,
+                NotificationChannel.InApp,
+                envelope.MessageId,
+                clock.UtcNow));
+
+            raised = true;
+        }
+
+        return await TryRaiseOutboundCopyAsync(envelope, spec, cancellationToken) || raised;
+    }
+
+    /// <summary>
+    /// Queues the same message for delivery off the platform, when the event
+    /// carried an address that a configured channel can reach.
+    /// </summary>
+    /// <remarks>
+    /// A second row rather than a flag on the first, because the two are
+    /// genuinely different messages: the in-app one is delivered by being
+    /// written, and this one has attempts, failures and a destination. The
+    /// unique index on (source_message_id, channel) keeps a redelivery from
+    /// producing a second copy of either.
+    ///
+    /// Deliberately silent when the address cannot be classified. An unreachable
+    /// contact is not a reason to refuse the event - the member still gets the
+    /// in-app notification, and refusing here would stall the whole partition
+    /// behind one member with a malformed identifier.
+    /// </remarks>
+    private async Task<bool> TryRaiseOutboundCopyAsync(
+        IntegrationEventEnvelope envelope,
+        NotificationSpec spec,
+        CancellationToken cancellationToken)
+    {
+        if (ContactAddress.ChannelFor(spec.Destination) is not { } channel)
+        {
+            if (!string.IsNullOrWhiteSpace(spec.Destination))
+            {
+                logger.LogWarning(
+                    "Event {MessageId} from {Topic} carried a contact address that is neither an "
+                    + "email nor a mobile number; sending in-app only",
+                    envelope.MessageId,
+                    envelope.Topic);
+            }
+
+            return false;
+        }
+
+        if (await notifications.AlreadyRaisedAsync(envelope.MessageId, channel, cancellationToken))
         {
             return false;
         }
@@ -86,9 +141,10 @@ public sealed class RecordIntegrationEventCommandHandler(
             spec.RecipientUserId,
             spec.Title,
             spec.Body,
-            NotificationChannel.InApp,
+            channel,
             envelope.MessageId,
-            clock.UtcNow));
+            clock.UtcNow,
+            spec.Destination));
 
         return true;
     }

@@ -45,3 +45,10 @@ Desktop.ini
 # place on this platform to remove it from, and would defeat the erasure the
 # platform goes to some trouble to honour.
 .backup-drill/
+
+# Smoke-suite output. Written by scripts/smoke-through-gateway.sh when its output
+# is redirected; it names real members and tokens from the run.
+.smoke.log
+
+# Backend test-suite output from a full run across every solution.
+.backend-tests.log

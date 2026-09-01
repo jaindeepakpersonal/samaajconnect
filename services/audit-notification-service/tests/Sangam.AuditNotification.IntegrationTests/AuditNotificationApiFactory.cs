@@ -106,6 +106,16 @@ public sealed class AuditNotificationApiFactory : WebApplicationFactory<Program>
                 // beginning instead of inheriting another run's offsets.
                 ["Consumer:GroupId"] = $"audit-tests-{Guid.NewGuid():n}",
                 ["Consumer:MetadataRefreshIntervalMilliseconds"] = "1000",
+                // The notification dispatcher does not run on its own here.
+                // Tests call NotificationDispatcher.DispatchBatchAsync when they
+                // want a pass, which is both more deterministic than waiting on
+                // a poll interval and the only way to assert on a row's state
+                // between passes - a background loop would claim a seeded
+                // Pending row out from under the assertion about it.
+                ["NotificationDelivery:Enabled"] = "false",
+                // Short enough that a test can make a claim look abandoned
+                // without sleeping for minutes.
+                ["NotificationDelivery:StalledAfterMinutes"] = "1",
             });
         });
     }

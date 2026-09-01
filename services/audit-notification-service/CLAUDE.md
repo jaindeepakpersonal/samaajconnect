@@ -15,8 +15,8 @@ services exist means revisiting all five (`docs/product/ROADMAP.md`).
 | Entity | Status | Notes |
 |---|---|---|
 | `AuditLog` | built | Append-only. No mutating method, no update or delete endpoint. One de-identifying exception - see below. |
-| `Notification` | built | `RecipientUserId == null` is a Samaaj-wide broadcast. |
-| `NotificationTemplate` | not built | Needed when a real email/SMS channel lands. |
+| `Notification` | built | `RecipientUserId == null` is a Samaaj-wide broadcast. Also the delivery record for anything leaving the platform - see "Outbound delivery". |
+| `NotificationTemplate` | not built | Titles and bodies are still written inline in `KnownEvents`. Needed once there is more than one message and somebody wants to change the wording without a deploy. |
 
 ## Commands
 
@@ -42,9 +42,10 @@ genuinely externally-reachable unauthenticated surface greppable on its own.
 
 ## Events published
 
-None yet. `NotificationSent` belongs here once a delivery channel exists. The
-Outbox tables and dispatcher are already wired so the first event raised cannot
-be lost.
+None yet. A delivery channel now exists, and `NotificationSent` still is not
+raised on it - nothing on the platform would consume one today, and an event
+with no consumer is a topic to keep in step for no reason. The Outbox tables and
+dispatcher are wired, so the first event raised cannot be lost.
 
 ## Events consumed
 
@@ -60,9 +61,11 @@ has described yet.
 simply records; see "Erasure" below.
 
 Topics with specific handling are listed in
-`Application/IntegrationEvents/KnownEvents.cs`. Today that is the four
-`identity.*` topics; `identity.user.registered.v1` is the only one that also
-raises a notification.
+`Application/IntegrationEvents/KnownEvents.cs`. `identity.user.registered.v1` is
+still the only one that raises a notification, and the only one that carries a
+contact address to send it to - most events name a member by id and nothing
+else, deliberately, because a payload holding a mobile number is a payload that
+later has to be redacted.
 
 ## API endpoints
 
@@ -72,6 +75,94 @@ raises a notification.
 | GET | `/v1/notifications` | any authenticated role |
 | GET | `/v1/audit/me/data-export` | any authenticated role |
 | GET | `/health` | anonymous |
+
+## Outbound delivery
+
+In-app notifications are delivered by being written: the row *is* the message.
+Anything else has to leave the platform, and that is what this part does.
+
+```
+event → RecordIntegrationEventCommandHandler → Notification(Pending, destination)
+      → NotificationDispatcher (polls, claims)
+      → INotificationChannel adapter
+      → Sent / Pending again / Failed
+```
+
+**There is no provider. `LoggingNotificationChannel` writes the message to the
+log and reports success.** Everything above the transport is real — deciding a
+message is due, addressing it, queueing, retrying, giving up — and the last step
+is a log line. Replacing it is one class implementing `INotificationChannel` and
+one registration in `Infrastructure/DependencyInjection.cs`.
+
+The cost of that stand-in is stated where it matters: a notification marked
+`Sent` today means "handed to the channel", not "reached a person". The
+dispatcher says so at Warning on every start, naming the channels involved.
+
+**A message that leaves the platform is a second row, not a flag.** One event
+raises an in-app notification and, if it carried a contact address, an outbound
+copy. They are genuinely different — one is delivered by existing, the other has
+a destination, attempts and failures — and the unique index on
+`(source_message_id, channel)` is what keeps a redelivery from duplicating
+either. That index replaced one on `source_message_id` alone, which is why the
+dedupe check now takes a channel.
+
+**`GET /v1/notifications` returns in-app rows only. The data export does not.**
+The notification list is the member's message list, and without the filter every
+message the platform also emailed would appear in the portal twice. The DPDP
+s.11 export is a different question — everything this service holds about them —
+so it uses `ListEveryChannelForRecipientAsync` and includes the destination.
+
+Two methods rather than one with a flag, because they were briefly one: adding
+the in-app filter to the shared method silently narrowed the export in the same
+edit, and nothing failed. `The_member_sees_one_message_and_the_export_sees_both_copies`
+is what would now catch it.
+
+**The claim is the one write that skips the aggregate, and atomicity is why.**
+`NotificationRepository.ClaimPendingAsync` marks a batch `Sending` in a single
+conditional `UPDATE`. Two dispatchers that each read a Pending row and then
+write it have both sent the message; a member gets two texts. Publishing a Kafka
+event twice is free because consumers are idempotent — there is no idempotency
+on the far side of a phone, which is why this dispatcher is stricter than
+`OutboxDispatcher` about the same-looking problem.
+
+That claim was verified by breaking it: replacing the statement with a select
+followed by an update fails
+`NotificationDeliveryTests.Two_dispatch_passes_at_once_never_send_the_same_message_twice`.
+Removing only `FOR UPDATE SKIP LOCKED` does **not** fail it — so that clause is
+throughput (a second dispatcher proceeds instead of blocking), and the atomicity
+of the one statement is the correctness.
+
+**The attempt is counted at claim time, not on failure.** A process that dies
+mid-send has already spent its attempt. Counting on failure would let a message
+that reliably kills the sender be retried forever, because a crash records
+nothing.
+
+**A row abandoned in `Sending` is returned to the queue after a timeout, and it
+may already have been sent.** That is the honest reading of a crash between the
+provider accepting a message and this recording it, and the requeue writes a
+failure reason saying so. Delivery is at-least-once, like everything else here.
+`StalledAfterMinutes` must stay comfortably longer than a real send, or a slow
+provider is asked to deliver the same message twice.
+
+**Which channel a message goes on is derived from the address.** The platform
+stores one `MobileOrEmail` per login rather than separate fields, so
+`ContactAddress.ChannelFor` decides from the shape of the string. It refuses
+anything ambiguous, and an unclassifiable address raises no outbound copy at all
+rather than a guess sent to the wrong place — the member still gets the in-app
+notification, and the event is not refused, because refusing it would stall the
+partition behind one malformed identifier.
+
+**The welcome message is not contact verification.** `identity.user.registered.v1`
+now sends a welcome to the identifier the member registered with. Nothing checks
+that it arrived or that whoever reads it is the person who registered, so
+`User.IsContactVerified` stays false. OTP is still unbuilt; this is a channel it
+could use, not the thing itself.
+
+**By default the log gets a redacted address and no body.** A notification is
+addressed to one person and written for them, so logging both puts personal data
+where erasure cannot reach. `NotificationDelivery:Logging:RevealContent` turns
+that off, is on in `docker-compose.yml` because that stack is local development,
+and announces itself at Warning on every start.
 
 ## Decisions worth knowing before you change this service
 
@@ -155,6 +246,9 @@ values - see `members.profile.updated.v1`.
 
 - **Postgres** `samaajconnect_audit_notification` — `ConnectionStrings__Default`
 - **Kafka** — `Kafka__BootstrapServers`, consumer *and* producer
+- **A notification provider** — none. `NotificationDelivery__*` configures the
+  dispatcher; the channels behind it are the logging stand-in. Local messages
+  come out of `docker compose logs -f audit-notification-service`.
 - **Jwt** — `Jwt__SigningKey`, validation only. This service never mints tokens.
 - No Redis dependency.
 
@@ -168,10 +262,23 @@ values - see `members.profile.updated.v1`.
   up in the audit log", and a fake broker would let that pass while the
   consumer loop, the header contract or the regex subscription were all broken.
 
+**The dispatcher does not run on its own in the integration tests**
+(`NotificationDelivery:Enabled` is false in the factory). Tests call
+`DispatchBatchAsync` when they want a pass — otherwise a background loop claims
+a seeded Pending row out from under the assertion about it, and the test that
+"fails" is the honest one. `NotificationDispatcher` is registered as a singleton
+and *then* handed to the host so a test can resolve the same instance.
+
+Delivery is deliberately split across the two projects, and the split is not
+arbitrary: the state machine (`MarkDelivered`, `RecordDeliveryFailure`,
+`ReleaseStalledClaim`) is unit-testable and unit-tested, while the attempt
+counter it reads is incremented by SQL — so the attempt limit, the claim and the
+stall timeout are only provable against a real Postgres.
+
 ```
 dotnet test services/audit-notification-service/Sangam.AuditNotification.sln
 ```
 
-Still missing: a test that curls this service **through the gateway**
-(CLAUDE.md §9). The gateway does not exist yet; add it in the same change that
-adds the YARP route.
+Through the gateway (CLAUDE.md §9): `scripts/smoke-through-gateway.sh` calls
+`GET /v1/notifications` on 8080 with a member token, so the YARP route is
+exercised rather than only the service.

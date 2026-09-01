@@ -8,25 +8,27 @@ version of the plan; the reasoning behind the ordering lives in
 ## Current Status
 
 - **Stage:** every module has a service and member screens; Phase 5 hardening under way
-- **Last updated:** 2026-09-01 - the member portal's Boli screens, closing the
-  last module. `boli-service` shipped in the same run as the tenth and final
-  service: its guarantee is one *highest* bid rather than one vote each, which
-  needs a row lock as well as a unique index, and fifteen simultaneous
-  identical bids through the gateway leave exactly one. Driving Celebrity
-  Voting against the running stack earlier in the run found a gateway bug that
-  had been breaking every module-gated screen in the app: a gated route
-  answered 404 rather than 401 when the caller's access token had expired, so
-  the portals' silent renew-and-retry never fired and the screen printed "No
-  such endpoint." from fifteen minutes after sign-in onwards. 1,087 tests green
-  (814 backend, 273 frontend) plus 240 smoke checks against a stack built from
-  empty volumes, re-runnable against a dirty one.
+- **Last updated:** 2026-09-01 - an outbound notification channel. Everything
+  above the transport is real - deciding a message is due, addressing it,
+  queueing, retrying, giving up - and the adapter behind it writes to the log
+  and delivers nothing, which the service says at Warning on every start.
+  Registration now sends a welcome to the identifier the member signed up with.
+  The claim is a single conditional UPDATE rather than a read-then-write,
+  because two dispatchers that both take a row send a member two text messages;
+  breaking it on purpose confirmed the test catches that, and confirmed that
+  `FOR UPDATE SKIP LOCKED` is throughput rather than correctness. Running the
+  smoke suite against a stack built from empty volumes found 20 red checks, all
+  four root causes in the script rather than in any service - one wrong id
+  extraction accounted for 17 of them. 1,222 tests green (913 backend across 21
+  suites, 309 frontend) plus 241 smoke checks against empty volumes.
 - **Blocking item:** none. **Every module the platform has now has both a
   service and member screens**, and the role matrix is editable per Samaaj. What
   is left needs things this repository cannot supply on its own: TLS and a
   backup drill need a deployed environment, platform-hosted images need storage,
   the two remaining DPDP obligations - breach notification and the right to
-  nominate - need a notification channel, and a screen-reader pass needs a
-  person. The vote endpoint's throughput load test is
+  nominate - are no longer blocked on a channel but still need a real provider
+  and, for s.8(6), a detection process and the Board form; and a screen-reader
+  pass needs a person. The vote endpoint's throughput load test is
   carried to Phase 5, since it needs a deployed environment; its correctness
   half is done. The five questions in `docs/product/DPDP-COMPLIANCE.md` still
   need counsel before any of this ships to real users.
@@ -94,10 +96,12 @@ unit tested.
         `members.child-conversion.approved.v1`; nothing consumes it yet, so
         the login is not created - see below.
 - [x] identity-tenant-service consumes `members.child-conversion.approved.v1`
-      and creates the login. With no notification channel, a Samaaj admin
-      issues a one-time activation code (shown once, stored as a hash) and
-      hands it over in person; redeeming it sets the first password and closes
-      the loop back to member-family-service
+      and creates the login. A Samaaj admin issues a one-time activation code
+      (shown once, stored as a hash) and hands it over in person; redeeming it
+      sets the first password and closes the loop back to member-family-service.
+      A channel now exists that could carry the code instead, but sending it
+      needs a real provider first - a code delivered to a log is a code handed
+      over in person with extra steps
 - [x] DPDP Act: the compliance mapping (`docs/product/DPDP-COMPLIANCE.md`),
       versioned consent notice, per-purpose append-only consent records
       captured at registration, withdrawal, and per-service data export
@@ -109,8 +113,20 @@ unit tested.
       `identity.user.erased.v1` to clear the profile, the children held on that
       member's parental consent and the household link, delete their
       notifications, and de-identify rather than delete their audit rows
+- [x] An outbound notification channel - `INotificationChannel`, a dispatcher
+      that claims, retries and gives up, and a delivery record per message.
+      The adapter behind it writes to the log and delivers nothing, so `Sent`
+      means "handed to the channel", which the service says at Warning on
+      every start. Registration now sends a welcome to the identifier the
+      member signed up with, proving the path end to end
+- [ ] A real email or SMS provider, so `Sent` means a person was reached.
+      One class implementing `INotificationChannel` and one registration; the
+      choice of provider is a hosting decision
 - [ ] DPDP Act, remaining: breach notification (s.8(6)) and the right to
-      nominate (s.14), both of which need a notification channel first
+      nominate (s.14). Neither is blocked on a channel any more. s.8(6) still
+      needs a provider, a way to address every affected member at once, the
+      Board form, and the detection that starts it; s.14 needs a nominee field
+      and counsel on what a nominee may do
 - [x] DPDP Act: a member-portal surface for consent withdrawal, data export and
       erasure, at `/privacy`. No wireframe covers it — the prototype's
       `#profile` screen is per-field directory privacy, which is a different
@@ -369,6 +385,30 @@ unit tested.
       and full dumps mean the recovery point is whenever the dump ran. A real
       deployment needs WAL archiving for point-in-time recovery, off-host
       storage, and a schedule. All three are hosting decisions
+- [x] Four wrong checks in `scripts/smoke-through-gateway.sh`, found by running
+      it against a stack built from empty volumes rather than trusting the
+      count. None was a service bug:
+      the Pathshala session id was read with `json_field id` off a response
+      whose first `id` is the *Pathshala's*, so classes were created in a
+      session that did not exist and **17 checks failed pointing at the wrong
+      service** while the check above them passed;
+      the second-vote check voted for a different candidate and so was refused
+      as a self-vote, never once exercising the already-voted path it is named
+      after; the self-vote check used the wrong member's token, asserting 409
+      on a vote that was correctly accepted — and quietly casting a second vote
+      into a campaign the next checks tally;
+      and the republish check asserted 409 against a handler that deliberately
+      returns the stored result, so it asserted the opposite of the documented
+      behaviour. It now compares the frozen ranking instead, which is what its
+      own comment was about, and ignores `publishedAt` — the first response
+      carries .NET's 100ns timestamp and the second Postgres's microseconds,
+      a round-trip artifact rather than a result that moved
+- [ ] A smoke run that fails loudly when an id extraction goes wrong. The
+      session-id bug was invisible for a reason worth fixing properly: every
+      downstream check reported someone else's service returning 404, and
+      nothing pointed at the empty variable. One guard was added where it bit;
+      the pattern (`json_field` returning a plausible id belonging to something
+      else) is everywhere in this script
 
 ---
 

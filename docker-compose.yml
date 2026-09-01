@@ -118,6 +118,17 @@ services:
       Jwt__SigningKey: "${JWT_SIGNING_KEY:-local-development-signing-key-do-not-use-in-production}"
       Outbox__PollIntervalSeconds: "5"
       Consumer__GroupId: "audit-notification-service"
+      # Email, SMS and WhatsApp are handled by the logging channel: no provider
+      # exists yet, so messages are written to this container's log and are not
+      # delivered. `docker compose logs -f audit-notification-service` is where
+      # they come out.
+      NotificationDelivery__PollIntervalSeconds: "5"
+      # On here, and only here. This stack is local development - the signing
+      # key above says so - and the whole use for the logging channel is reading
+      # a message off the console. Anywhere logs are retained or shipped it must
+      # be off: it writes contact addresses and message bodies, which is a copy
+      # of personal data that erasure cannot reach.
+      NotificationDelivery__Logging__RevealContent: "true"
     ports:
       - "5102:8080"
 

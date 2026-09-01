@@ -190,6 +190,12 @@ and expose its endpoints behind the gateway at the route prefix shown.
 - **Gateway route prefix:** `/v1/audit/**`, `/v1/notifications/**`
 - **Tenant role(s):** `SuperAdmin`/`SamaajAdmin` (read audit log), all
   authenticated roles (read own notifications)
+- **Outbound delivery:** in-app notifications are delivered by being
+  written; anything else is queued on the `Notification` row and sent by
+  `NotificationDispatcher` through an `INotificationChannel` adapter.
+  **There is no provider yet** — the registered adapter writes to the log,
+  so `Sent` means "handed to the channel", not "reached a person". See the
+  service's own `CLAUDE.md`, section "Outbound delivery".
 - **Notes:** This is a strong candidate for the "tenth module" the
   `new-microservice` skill refers to, if it hasn't been scaffolded yet —
   scaffold it early (Phase 1) rather than last, since every other

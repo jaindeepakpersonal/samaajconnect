@@ -71,6 +71,18 @@ copy, and compared. It never writes to the live databases:
 bash scripts/backup-restore-drill.sh
 ```
 
+**Notifications that leave the platform come out of the log**, not out of an
+inbox. There is no email or SMS provider yet, so the channel behind them is a
+stand-in that writes each message and reports success:
+
+```bash
+docker compose logs -f audit-notification-service
+```
+
+Register a member and the welcome message appears there, marked `NOT SENT`. In
+this stack the full address and body are logged (`RevealContent`), which is
+local-development-only — see `services/audit-notification-service/CLAUDE.md`.
+
 Then start the member portal against it:
 
 ```bash

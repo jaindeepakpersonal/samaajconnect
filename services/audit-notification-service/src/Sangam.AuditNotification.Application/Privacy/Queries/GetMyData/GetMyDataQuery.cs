@@ -65,7 +65,12 @@ public sealed class GetMyDataQueryHandler(
                 Error.Unauthorized("Auth.Required", "Authentication is required for this request."));
         }
 
-        var mine = await notifications.ListForRecipientAsync(userId, 500, cancellationToken);
+        // Every channel, not just in-app. The member notification list filters to
+        // in-app so an emailed copy does not read as a second message; an export
+        // of what this service holds about someone must not hide that a message
+        // was also sent to their address, or which address.
+        var mine = await notifications.ListEveryChannelForRecipientAsync(
+            userId, 500, cancellationToken);
         var actions = await auditLogs.ListForActorAsync(userId, 500, cancellationToken);
 
         return Result.Success(new MyAuditDataResponse(
@@ -76,6 +81,9 @@ public sealed class GetMyDataQueryHandler(
             [
                 "We keep a record of what you were notified about, so your Samaaj can show "
                 + "you your notifications.",
+                "Where we sent a message to your email address or mobile number, we keep "
+                + "that address alongside the message, and whether it reached the "
+                + "provider we sent it through.",
                 "We keep an audit record of actions taken on the platform, including yours. "
                 + "This is how a Samaaj can account for decisions made about its members, "
                 + "and is kept even if you later ask for your account to be erased.",
@@ -94,5 +102,6 @@ public sealed class GetMyDataQueryHandler(
         notification.Status.ToString(),
         notification.RecipientUserId is null,
         notification.CreatedAt,
-        notification.ReadAt);
+        notification.ReadAt,
+        notification.Destination);
 }

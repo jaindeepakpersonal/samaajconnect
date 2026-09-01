@@ -259,6 +259,7 @@ Neither uses `*service-defaults` — they need no database and no broker.
 | Admin panel conventions | `apps/admin-portal/CLAUDE.md` |
 | Module-gated service, worked example | `services/timeline-service/CLAUDE.md` |
 | A correctness guarantee that is a database index | `services/celebrity-voting-service/CLAUDE.md` |
+| An adapter seam with nothing real behind it yet | `services/audit-notification-service/CLAUDE.md` |
 | A permission that is necessary but not sufficient | `services/pathshala-service/CLAUDE.md` |
 | Permission that needs a data check beside it | `services/volunteer-groups-service/CLAUDE.md` |
 | Capacity and a waitlist that moves | `services/events-service/CLAUDE.md` |

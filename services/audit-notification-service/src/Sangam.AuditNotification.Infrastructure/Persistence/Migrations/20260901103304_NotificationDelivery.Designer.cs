@@ -2,6 +2,7 @@
 using System;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 using Sangam.AuditNotification.Infrastructure.Persistence;
@@ -11,9 +12,11 @@ using Sangam.AuditNotification.Infrastructure.Persistence;
 namespace Sangam.AuditNotification.Infrastructure.Persistence.Migrations
 {
     [DbContext(typeof(AuditNotificationDbContext))]
-    partial class AuditNotificationDbContextModelSnapshot : ModelSnapshot
+    [Migration("20260901103304_NotificationDelivery")]
+    partial class NotificationDelivery
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder

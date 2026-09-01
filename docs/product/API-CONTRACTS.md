@@ -262,6 +262,6 @@ somebody actually offered.
 |---|---|---|---|
 | GET | `/audit/logs` | SuperAdmin, SamaajAdmin | Query audit log (filterable) |
 | GET | `/audit/me/data-export` | Authenticated | My notifications and my actions (DPDP s.11) |
-| GET | `/notifications` | Authenticated | My notifications |
+| GET | `/notifications` | Authenticated | My notifications. In-app only: a message the platform also emailed is the same message, and returning both would show it twice |
 | POST | `/notifications/{id}/read` | Authenticated | Mark read |
 | POST | `/notifications/broadcast` | SamaajAdmin, SuperAdmin | Send tenant/platform announcement |

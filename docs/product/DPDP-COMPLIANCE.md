@@ -32,14 +32,14 @@ deferrable — it attaches the moment the first child record is created.
 | 6(7) | Consent records retained and producible | **built** | `ConsentRecord` is append-only |
 | 8(1) | Process only for the consented purpose | partial | Purpose is recorded; enforcement is by code review, not by a runtime check |
 | 8(4) | Reasonable security safeguards | partial | See "Security" below |
-| 8(6) | Breach notification to the Board and affected principals | **not built** | Needs a process and a notification channel |
+| 8(6) | Breach notification to the Board and affected principals | **not built** | A channel now exists to send on; the detection process, the Board form and the text do not. See "Breach notification" below |
 | 8(7) | Erase when consent is withdrawn or the purpose is served | **built** | `POST /v1/identity/me/erase`; see "Erasure vs. the audit log" |
 | 9 | **Verifiable parental consent for under-18s** | partial | `ParentalConsent` on `ChildProfile`, required to create one; "verifiable" needs counsel |
 | 9(3) | No tracking or behavioural monitoring of children | **built by absence** | The platform does none. Keep it that way. |
 | 11 | Right to access a summary of data and processing | **built** | A `/me/data-export` in each of the three services |
 | 12 | Right to correction and erasure | **built** | Correction is the profile edit; erasure is `POST /v1/identity/me/erase` |
 | 13 | Right to grievance redressal | **built** | `GrievanceContact` per Samaaj, published on the public summary |
-| 14 | Right to nominate | **not built** | |
+| 14 | Right to nominate | **not built** | No longer blocked on a channel; needs a nominee field, and counsel on what a nominee may do |
 
 ## What is built
 
@@ -264,6 +264,16 @@ Not in place: encryption at rest (a deployment concern, not yet specified),
 TLS termination policy, key rotation, a breach-detection process, and
 penetration testing — the last is already Phase 5 in `DEVELOPMENT_PLAN.md`.
 
+**Logs are a place personal data can escape to, and outbound notifications are
+where that risk starts.** A message to a member is addressed to them and written
+for them, so a log of both is a copy of personal data outside the database —
+somewhere erasure does not reach and retention policy usually does not cover.
+The logging channel therefore writes a redacted address (`r***@example.com`) and
+the message title, never the body, unless
+`NotificationDelivery:Logging:RevealContent` is turned on. It is off by default,
+on in `docker-compose.yml` because that stack is local development, and the
+service says so at Warning on every start so it cannot be left on unnoticed.
+
 **Availability is a safeguard too, and only half of it is done.** §8(4) asks for
 safeguards against loss as well as against breach. The drill proves a dump
 restores; it does not make a dump a backup. The dumps land beside the database
@@ -271,6 +281,31 @@ they came from, and being full dumps the recovery point is whenever one last
 ran. Off-host storage, WAL archiving for point-in-time recovery, and a schedule
 are hosting decisions, and until they are made the platform can restore from a
 backup it has but does not reliably have one to restore from.
+
+### Breach notification (§8(6)) — a channel, but not the duty
+
+There is now a way to send a member a message that is not "wait until they next
+open the portal": audit-notification-service queues outbound notifications and
+hands them to a channel adapter (`INotificationChannel`), with retries, an
+attempt limit and a delivery record per message.
+
+**The adapter behind it writes to a log and delivers nothing.** That is a real
+constraint on what can be claimed, not a detail. A notification marked `Sent`
+today means it reached the channel, not that it reached a person, so nothing
+here evidences that affected data principals were told. §8(6) also wants a
+Board notification and a description of the breach, neither of which is a
+message-sending problem.
+
+What is still needed, in order: a provider (email or SMS) so `Sent` means what
+it says; a way to address a message to every affected member rather than one at
+a time, which the current design does not have — an event raises a notification
+for the member it names; the wording, and the Board's prescribed form; and the
+detection that starts any of it, which is a monitoring question the platform has
+not answered.
+
+What the channel does discharge is the excuse: the reason §8(6) and §14 were
+both marked "needs a notification channel" no longer applies, and what is left
+in each is the obligation itself.
 
 ## What each Samaaj must decide, not the software
 
