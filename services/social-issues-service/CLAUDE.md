@@ -44,7 +44,33 @@ shown to work per-module rather than all-or-nothing.
 
 ## Events consumed
 
-None. A leaf service, like the other Phase 2 contexts.
+| Event | Topic | What it does |
+|---|---|---|
+| user erased | `identity.user.erased.v1` | Replaces what that member wrote — the issues they raised, and any reason they gave in a history entry |
+
+**This service shipped as a leaf and should not have stayed one.**
+`DPDP-COMPLIANCE.md` states that any service consuming platform events must
+subscribe to the erasure topic on the day it ships; six services did not, found
+by the 2026-09-01 security-checklist pass. Social issues was one of the two
+where it mattered: an issue carries free text its submitter wrote, which
+identifies them whatever happens to the member id beside it.
+
+What erasure does here is `SocialIssue.ErasePersonalDataOf`, and the rule is
+**the words go and the shape stays**. An issue is a container — a reviewer's
+decisions and reasons hang off it as history, and those are the reviewer's
+records rather than the submitter's — so it is emptied rather than deleted. The
+**status is not moved**: a published issue that vanished would leave a Samaaj
+wondering what happened to something it was told about. What it said is gone;
+that it existed is not the submitter's alone to erase.
+
+The submitter's own reasons go with it, because a submitter is an actor in their
+own workflow — resubmitting after changes were asked for — and those words are
+theirs like any other.
+
+`SubmittedByMemberId` is deliberately not cleared, for the reason given in
+timeline-service's own note: it is open counsel question 6 in
+`DPDP-COMPLIANCE.md` and should be answered once for every service holding a
+bare member id.
 
 ## API endpoints
 

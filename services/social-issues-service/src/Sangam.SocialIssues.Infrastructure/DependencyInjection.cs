@@ -43,9 +43,14 @@ public static class DependencyInjection
 
         services.Configure<KafkaOptions>(configuration.GetSection(KafkaOptions.SectionName));
         services.Configure<OutboxOptions>(configuration.GetSection(OutboxOptions.SectionName));
+        services.Configure<ConsumerOptions>(configuration.GetSection(ConsumerOptions.SectionName));
 
         services.AddSingleton<IEventPublisher, KafkaProducer>();
         services.AddHostedService<OutboxDispatcher>();
+
+        // Erasure reaches this service through the bus. It was missing until
+        // the 2026-09-01 security-checklist pass; see the consume command.
+        services.AddHostedService<IntegrationEventConsumer>();
 
         return services;
     }

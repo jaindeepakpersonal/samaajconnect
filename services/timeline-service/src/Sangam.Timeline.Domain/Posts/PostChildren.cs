@@ -23,6 +23,26 @@ public sealed class PostComment
         Body = body;
         CreatedAt = createdAt;
     }
+
+    /// <summary>
+    /// Replaces the text with a placeholder. Returns false when it already
+    /// reads that way, so a redelivered erasure changes nothing.
+    /// </summary>
+    /// <remarks>
+    /// Internal: only <see cref="TimelinePost.ErasePersonalDataOf"/> calls it,
+    /// so the reasoning about what erasure does here lives in one place.
+    /// </remarks>
+    internal bool EraseBody(string placeholder)
+    {
+        if (Body == placeholder)
+        {
+            return false;
+        }
+
+        Body = placeholder;
+
+        return true;
+    }
 }
 
 /// <summary>One member's reaction to a post. At most one per member per post.</summary>

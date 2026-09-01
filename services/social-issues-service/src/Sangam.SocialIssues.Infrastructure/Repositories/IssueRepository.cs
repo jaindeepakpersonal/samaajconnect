@@ -61,4 +61,22 @@ public sealed class IssueRepository(SocialIssuesDbContext dbContext) : IIssueRep
             .ToListAsync(cancellationToken);
 
     public void Add(SocialIssue issue) => dbContext.Issues.Add(issue);
+
+    public async Task<IReadOnlyList<SocialIssue>> ListTouchedByMemberAsync(
+        Guid tenantId, Guid memberId, CancellationToken cancellationToken = default) =>
+        await dbContext.Issues
+
+            // The erasure consumer runs on no request and so has no resolved
+            // tenant; a filtered read here compares every row against
+            // Guid.Empty and finds nothing, which would make the erasure a
+            // silent no-op. The tenant comes from the event instead. See
+            // IIssueRepository.
+            .IgnoreQueryFilters()
+            .Include(i => i.History)
+            .Where(i => i.TenantId == tenantId
+                && (i.SubmittedByMemberId == memberId
+                    || i.History.Any(h => h.ActorUserId == memberId)))
+
+            // Tracked: the consumer amends these.
+            .ToListAsync(cancellationToken);
 }

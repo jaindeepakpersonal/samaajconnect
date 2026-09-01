@@ -59,4 +59,22 @@ public sealed class PostRepository(TimelineDbContext dbContext) : IPostRepositor
             .ToListAsync(cancellationToken);
 
     public void Add(TimelinePost post) => dbContext.Posts.Add(post);
+
+    public async Task<IReadOnlyList<TimelinePost>> ListTouchedByMemberAsync(
+        Guid tenantId, Guid memberId, CancellationToken cancellationToken = default) =>
+        await dbContext.Posts
+
+            // The erasure consumer runs on no request and so has no resolved
+            // tenant; a filtered read here compares every row against
+            // Guid.Empty and finds nothing, which would make the erasure a
+            // silent no-op. The tenant comes from the event instead. See
+            // IPostRepository.
+            .IgnoreQueryFilters()
+            .Include(p => p.Comments)
+            .Where(p => p.TenantId == tenantId
+                && (p.AuthorMemberId == memberId
+                    || p.Comments.Any(c => c.AuthorMemberId == memberId)))
+
+            // Tracked: the consumer amends these.
+            .ToListAsync(cancellationToken);
 }

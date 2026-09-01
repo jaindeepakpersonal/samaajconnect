@@ -220,6 +220,59 @@ public sealed class TimelinePost : AggregateRoot, ITenantScopedEntity
         return true;
     }
 
+    /// <summary>
+    /// Removes what an erased member wrote, keeping the row.
+    /// </summary>
+    /// <remarks>
+    /// DPDP section 12, reaching this service through
+    /// <c>identity.user.erased.v1</c>. Returns true when this call changed
+    /// something, so the handler can count and stay idempotent — the event is
+    /// delivered at least once.
+    ///
+    /// <b>The words go and the shape stays.</b> A post is a container: other
+    /// members' comments and reactions hang off it, and deleting it would take
+    /// their records with it — the same reason erasure leaves a household
+    /// standing rather than deleting it out from under the people still in it.
+    /// So the title and body are replaced and the post is hidden, which stops
+    /// it being displayed to anyone.
+    ///
+    /// <b>Comments this member left on other people's posts go too</b>, because
+    /// they are equally their words and are not containers of anything.
+    /// Reactions carry no text and are left alone.
+    ///
+    /// <c>AuthorMemberId</c> is deliberately <b>not</b> cleared. Once
+    /// identity-tenant-service and member-family-service have erased, that id
+    /// resolves to nobody anywhere on the platform, which is the same position
+    /// the other services holding bare member ids are in; whether that is
+    /// sufficient is open counsel question 6 in DPDP-COMPLIANCE.md, and it
+    /// should be answered once for all of them rather than differently here.
+    /// </remarks>
+    public bool ErasePersonalDataOf(Guid memberId)
+    {
+        var changed = false;
+
+        if (AuthorMemberId == memberId && !IsErased)
+        {
+            Title = ErasedPlaceholder;
+            Body = ErasedPlaceholder;
+            Status = PostStatus.Hidden;
+
+            changed = true;
+        }
+
+        foreach (var comment in _comments.Where(c => c.AuthorMemberId == memberId))
+        {
+            changed |= comment.EraseBody(ErasedPlaceholder);
+        }
+
+        return changed;
+    }
+
+    /// <summary>What a post reads as once its author has been erased.</summary>
+    public const string ErasedPlaceholder = "[removed at the author's request]";
+
+    private bool IsErased => Body == ErasedPlaceholder && Status == PostStatus.Hidden;
+
     private static string? Normalize(string? value) =>
         string.IsNullOrWhiteSpace(value) ? null : value.Trim();
 }

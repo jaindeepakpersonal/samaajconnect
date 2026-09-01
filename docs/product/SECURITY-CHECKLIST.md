@@ -261,19 +261,26 @@ is the outer gate and grants nothing on its own.
       one is ever added it needs its own permission key, and this item should
       be re-read then.
 
-- [ ] Erasure reaches every service that holds member data. **Six do not
-      subscribe to `identity.user.erased.v1`** — `timeline`, `events`,
-      `volunteer-groups`, `social-issues`, `celebrity-voting` and `boli` —
-      although `DPDP-COMPLIANCE.md` states as a rule that any new consumer must
-      subscribe on the day it ships. Four of the six hold only a bare `MemberId`
-      that no longer resolves to a person once identity and member-family have
-      cleared, and two of *those* have a reason it must stay: the voter id is
-      the double-voting guarantee, and a bid is a financial record. The real gap
-      is `timeline` and `social-issues`, which hold free text an erased member
-      wrote and which identifies its author whatever happens to the id. Found by
-      the 2026-09-01 pass; written up in full under "Six services shipped
-      without doing that" in `DPDP-COMPLIANCE.md` and tracked in
-      `DEVELOPMENT_PLAN.md`.
+- [x] Erasure reaches every service that holds **free text** a member wrote.
+      Six services did not subscribe to `identity.user.erased.v1` although
+      `DPDP-COMPLIANCE.md` states that rule plainly. `timeline` and
+      `social-issues` were the two where it mattered — a post and an issue carry
+      words their author wrote, which identify them whatever happens to the id
+      beside them — and both now consume it, verified end to end through Kafka
+      against the running stack.
+
+      Building those two consumers found that **six services shared the Kafka
+      consumer group `timeline-service`**, scaffolded from it and never changed.
+      Nothing had broken only because one of them ran a consumer; adding a
+      second would have had erasure events delivered to a service that ignores
+      them and committed away, intermittently. The group id now lives only in
+      each service's `ConsumerOptions`.
+- [ ] Decide whether a bare `MemberId` left in a service that holds no name or
+      contact is still personal data after erasure. Four services are in that
+      position — `events`, `volunteer-groups`, `celebrity-voting`, `boli` —
+      and two of them cannot simply drop the id: the voter id **is** the
+      double-voting guarantee, and a bid is a financial record. Counsel question
+      6 in `DPDP-COMPLIANCE.md`.
 
 > **DPDP Act, 2023.** The obligations this platform carries under India's data
 > protection law, what is built for them, and what still needs counsel, are in

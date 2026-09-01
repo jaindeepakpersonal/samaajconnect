@@ -31,4 +31,22 @@ public interface IPostRepository
         int limit, CancellationToken cancellationToken = default);
 
     void Add(TimelinePost post);
+
+    /// <summary>
+    /// Every post this member wrote, or commented on, in the given Samaaj.
+    /// </summary>
+    /// <remarks>
+    /// For the erasure consumer, and the reason it takes an explicit tenant:
+    /// a consumer resolves no tenant, so the global query filter would compare
+    /// against <c>Guid.Empty</c> and match nothing. That failure is silent — an
+    /// erasure that quietly erases nothing — and it is the same one
+    /// pathshala-service hit on <c>ListForChildAsync</c>. The implementation
+    /// ignores the filter and applies the tenant from the event by hand.
+    ///
+    /// Comments are included because a member's words on somebody else's post
+    /// are theirs too, so the set of posts to touch is wider than the set they
+    /// authored.
+    /// </remarks>
+    Task<IReadOnlyList<TimelinePost>> ListTouchedByMemberAsync(
+        Guid tenantId, Guid memberId, CancellationToken cancellationToken = default);
 }

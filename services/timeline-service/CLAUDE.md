@@ -47,8 +47,29 @@ off gets 404 on every path here — see "The module gate" below.
 
 ## Events consumed
 
-None. This service is a leaf: it publishes and reacts to nothing, which is why
-there is no consumer here and no Kafka in its integration tests.
+| Event | Topic | What it does |
+|---|---|---|
+| user erased | `identity.user.erased.v1` | Replaces what that member wrote — their posts, and their comments on anyone's post |
+
+**This service shipped as a leaf and should not have stayed one.**
+`DPDP-COMPLIANCE.md` states that any service consuming platform events must
+subscribe to the erasure topic on the day it ships; six services did not, found
+by the 2026-09-01 security-checklist pass. Timeline was one of the two where it
+mattered: a post carries free text its author wrote, which identifies them
+whatever happens to the member id beside it.
+
+What erasure does here is `TimelinePost.ErasePersonalDataOf`, and the rule is
+**the words go and the shape stays**. A post is a container — other members'
+comments and reactions hang off it — so it is emptied and hidden rather than
+deleted, for the same reason erasure leaves a household standing rather than
+deleting it out from under the people still in it. Comments the erased member
+left on *other people's* posts go too. Reactions carry no words and are left.
+
+`AuthorMemberId` is deliberately not cleared: once identity and member-family
+have erased, it resolves to nobody anywhere on the platform, which is the same
+position every other service holding a bare member id is in. Whether that is
+enough is open counsel question 6 in `DPDP-COMPLIANCE.md`, and it should be
+answered once for all of them.
 
 ## API endpoints
 

@@ -47,4 +47,28 @@ public sealed class IssueStatusHistory
         Reason = reason;
         CreatedAt = createdAt;
     }
+
+    /// <summary>
+    /// Drops the reason this actor wrote. Returns false when there was none, so
+    /// a redelivered erasure changes nothing.
+    /// </summary>
+    /// <remarks>
+    /// Nulled rather than replaced with a placeholder: a reason is already
+    /// optional here, so null is a shape every reader of this row already
+    /// handles. The transition itself — from what, to what, by whom, when — is
+    /// the workflow record and stays.
+    ///
+    /// Internal: only <see cref="SocialIssue.ErasePersonalDataOf"/> calls it.
+    /// </remarks>
+    internal bool EraseReason()
+    {
+        if (Reason is null)
+        {
+            return false;
+        }
+
+        Reason = null;
+
+        return true;
+    }
 }

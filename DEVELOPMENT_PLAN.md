@@ -293,15 +293,23 @@ unit tested.
       permanent credential compromise. `StepUpAuthentication` now shares the
       login lockout, and both paths carry the gateway's `credential-attempts`
       policy
-- [ ] **Erasure does not reach six services.** `timeline`, `events`,
-      `volunteer-groups`, `social-issues`, `celebrity-voting` and `boli` hold
-      member ids and none consumes `identity.user.erased.v1`, though
-      `DPDP-COMPLIANCE.md` states as a rule that a new consumer must subscribe
-      the day it ships. `timeline` and `social-issues` are the real gap: they
-      hold free text an erased member wrote. The other four hold a bare id that
-      resolves to nobody once identity and member-family clear — probably
-      sufficient, but that is counsel question 6, and for votes and bids the id
-      cannot simply be removed anyway
+- [x] **Fixed: erasure now reaches the two services holding free text.**
+      `timeline` and `social-issues` consume `identity.user.erased.v1`, emptying
+      the posts, comments, issues and reasons an erased member wrote while
+      leaving other people's records — comments, reactions, reviewer decisions —
+      standing. Verified through Kafka against the running stack
+- [x] **Fixed: six services shared one Kafka consumer group.** All carried
+      `"GroupId": "timeline-service"` from being scaffolded off it. Only one ran
+      a consumer, so nothing had broken; adding the two above would have had
+      erasure events delivered to a service that ignores them and committed
+      away, intermittently by partition assignment. The group id now lives only
+      in each service's `ConsumerOptions`, where a copied `appsettings.json`
+      cannot reach it
+- [ ] **Counsel: is a bare `MemberId` still personal data after erasure?**
+      `events`, `volunteer-groups`, `celebrity-voting` and `boli` hold one and
+      no name or contact. Two of them cannot drop it regardless — the voter id
+      is the double-voting guarantee, and a bid is a financial record. Question
+      6 in `DPDP-COMPLIANCE.md`
 - [ ] Full `SECURITY-CHECKLIST.md` re-pass once the erasure gap is closed
 - [ ] HTTPS-only in production: TLS termination, HSTS, secure-cookie policy,
       and `ForwardedHeaders` so the gateway rate limiter partitions on the real

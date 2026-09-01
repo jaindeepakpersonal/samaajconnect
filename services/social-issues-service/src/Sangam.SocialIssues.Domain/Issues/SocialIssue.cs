@@ -227,6 +227,61 @@ public sealed class SocialIssue : AggregateRoot, ITenantScopedEntity
         return true;
     }
 
+    /// <summary>
+    /// Removes what an erased member wrote, keeping the row.
+    /// </summary>
+    /// <remarks>
+    /// DPDP section 12, reaching this service through
+    /// <c>identity.user.erased.v1</c>. Returns true when this call changed
+    /// something, so the handler can count and stay idempotent — the event is
+    /// delivered at least once.
+    ///
+    /// <b>The words go and the shape stays.</b> An issue is a container: a
+    /// reviewer's decisions and the reasons they gave hang off it as history,
+    /// and those are the reviewers' records, not the submitter's. Deleting the
+    /// issue would take them with it — the same reason erasure leaves a
+    /// household standing rather than deleting it out from under the people
+    /// still in it. So the title, description and locality are replaced and the
+    /// history is left alone.
+    ///
+    /// <b>Except the reasons this member wrote themselves.</b> A submitter is
+    /// an actor in their own workflow — resubmitting after changes were asked
+    /// for, for instance — and those reasons are their words like any other.
+    ///
+    /// The status is <b>not</b> moved. A published issue that vanishes from the
+    /// list leaves a Samaaj wondering what happened to something it was told
+    /// about, and the workflow record is the reviewers'. What it says is gone;
+    /// that it existed is not the submitter's alone to erase.
+    ///
+    /// <c>SubmittedByMemberId</c> is deliberately not cleared, for the reason
+    /// given in <c>TimelinePost.ErasePersonalDataOf</c> — it is counsel
+    /// question 6, and should be answered once for every service holding a bare
+    /// member id rather than differently here.
+    /// </remarks>
+    public bool ErasePersonalDataOf(Guid memberId)
+    {
+        var changed = false;
+
+        if (SubmittedByMemberId == memberId && Description != ErasedPlaceholder)
+        {
+            Title = ErasedPlaceholder;
+            Description = ErasedPlaceholder;
+            Locality = null;
+
+            changed = true;
+        }
+
+        foreach (var entry in _history.Where(h => h.ActorUserId == memberId))
+        {
+            changed |= entry.EraseReason();
+        }
+
+        return changed;
+    }
+
+    /// <summary>What an issue reads as once its submitter has been erased.</summary>
+    public const string ErasedPlaceholder = "[removed at the submitter's request]";
+
     private static string? Normalize(string? value) =>
         string.IsNullOrWhiteSpace(value) ? null : value.Trim();
 }

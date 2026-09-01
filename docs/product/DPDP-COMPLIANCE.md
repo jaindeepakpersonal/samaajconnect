@@ -209,18 +209,38 @@ randomising the voter id would not de-identify a vote so much as re-enable
 voting twice. A Boli bid is a financial record the Samaaj collects against, and
 retention of those is the kind of thing §8(7) contemplates other law requiring.
 
-**For two of them it is not a bare id, and that is the real gap.**
-`timeline` holds `Post.Body` and `social-issues` holds `Issue.Title` and
-`Issue.Description` — free text an erased member wrote, which can identify its
-author whatever happens to the id beside it. No amount of reasoning about GUIDs
-touches that. Both need to consume the erasure event and decide, per the
-platform's usual rule about other people's records, whether the content is
-removed or tombstoned: a published social issue may have replies and a decision
-history hanging off it, and deleting it restructures other people's records
-because one person exercised their own right.
+**For two of them it was not a bare id, and that was the real gap — now
+closed.** `timeline` holds `Post.Body` and `social-issues` holds `Issue.Title`
+and `Issue.Description`: free text an erased member wrote, which can identify
+its author whatever happens to the id beside it. No amount of reasoning about
+GUIDs touches that. Both now consume `identity.user.erased.v1`.
 
-Tracked in `DEVELOPMENT_PLAN.md`. Until it is done, this section is what the
-platform can honestly say it does.
+| Service | What it does on that event |
+|---|---|
+| timeline-service | Empties and hides the posts that member wrote, and empties their comments on anyone's post. Other members' comments and reactions survive |
+| social-issues-service | Empties the issues they submitted and drops the locality, and drops any reason they wrote in a history entry. Reviewers' decisions and reasons survive, and the status is not moved |
+
+The rule both follow is **the words go and the shape stays**. A post and an
+issue are containers — other people's comments, and a reviewer's decisions,
+hang off them — so they are emptied rather than deleted, for the same reason
+erasure leaves a household standing rather than deleting it out from under the
+people still in it. A social issue's status is deliberately not moved either: a
+published issue that vanished would leave a Samaaj wondering what happened to
+something it was told about. What it said is gone; that it existed is not the
+submitter's alone to erase.
+
+Building those two consumers exposed a second thing. **Six services carried
+`"GroupId": "timeline-service"` in their Kafka config**, having been scaffolded
+from it, and nothing had broken only because just one of them actually ran a
+consumer. Kafka gives each message in a group to exactly one member, so adding
+these two would have had erasure events delivered to a service that ignores
+them, committed, and lost — intermittently, by partition assignment, which is
+the worst way for an erasure to fail. The group id now lives only in each
+service's `ConsumerOptions`, beside its topic list, where a copied
+`appsettings.json` cannot reach it.
+
+The four services holding bare ids remain as described above, and are counsel
+question 6.
 
 ## Security safeguards (§8(4))
 
