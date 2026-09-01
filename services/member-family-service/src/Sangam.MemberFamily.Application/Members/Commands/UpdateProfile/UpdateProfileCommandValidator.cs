@@ -33,13 +33,31 @@ public sealed class UpdateProfileCommandValidator : AbstractValidator<UpdateProf
             .WithMessage("Date of birth cannot be in the future.")
             .When(x => x.DateOfBirth.HasValue);
 
-        RuleFor(x => x.Privacy).NotNull();
+        // Required, because this command replaces the whole profile including
+        // its privacy levels. A request that omits them is malformed rather
+        // than partial, and defaulting them would silently reopen fields a
+        // member had closed.
+        RuleFor(x => x.Privacy)
+            .NotNull()
+            .WithMessage("Privacy levels are required. Send the whole set, not a partial update.");
 
-        RuleFor(x => x.Privacy.Mobile).Must(BeALevel).WithMessage(LevelMessage);
-        RuleFor(x => x.Privacy.Email).Must(BeALevel).WithMessage(LevelMessage);
-        RuleFor(x => x.Privacy.Address).Must(BeALevel).WithMessage(LevelMessage);
-        RuleFor(x => x.Privacy.Profession).Must(BeALevel).WithMessage(LevelMessage);
-        RuleFor(x => x.Privacy.DateOfBirth).Must(BeALevel).WithMessage(LevelMessage);
+        // **The When is load-bearing, and it was missing.** `Privacy` is a
+        // non-nullable reference type on the command, which is a compile-time
+        // claim and nothing more: the JSON deserialiser leaves it null when the
+        // body omits it. FluentValidation then evaluates these five rules
+        // anyway - NotNull above does not stop the ones after it - and
+        // dereferencing null threw, so **every request without a `privacy`
+        // object answered 500**, including a member editing their own profile.
+        // Found by the tenant-isolation probe, which was aiming at something
+        // else entirely.
+        When(x => x.Privacy is not null, () =>
+        {
+            RuleFor(x => x.Privacy.Mobile).Must(BeALevel).WithMessage(LevelMessage);
+            RuleFor(x => x.Privacy.Email).Must(BeALevel).WithMessage(LevelMessage);
+            RuleFor(x => x.Privacy.Address).Must(BeALevel).WithMessage(LevelMessage);
+            RuleFor(x => x.Privacy.Profession).Must(BeALevel).WithMessage(LevelMessage);
+            RuleFor(x => x.Privacy.DateOfBirth).Must(BeALevel).WithMessage(LevelMessage);
+        });
     }
 
     private static bool BeALevel(string value) => Enum.TryParse<PrivacyLevel>(value, ignoreCase: true, out _);

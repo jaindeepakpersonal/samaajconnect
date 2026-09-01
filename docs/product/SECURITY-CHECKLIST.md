@@ -34,6 +34,23 @@ endpoint, not just a one-time setup task.
       one that does not need it, so the rule is enforced where it cannot be
       skipped. The guard is deliberately silent when no tenant is resolved,
       because consumers legitimately have none.
+
+      **Probed, not assumed.** `scripts/tenant-isolation-probe.sh` builds two
+      real Samaaj and has Samaaj B's member *and* Samaaj B's administrator
+      attempt 36 reads and writes against Samaaj A's ids, through the gateway,
+      across all ten services. Every one is refused with **404** — not 403,
+      which would confirm the id is real. The administrator half is the one
+      that matters most: a Super Admin whose override scopes them to B is
+      exactly the caller the query filter would let through if a handler
+      forgot its own check.
+
+      The script asserts its own validity before it believes a pass. A probe
+      against a path that does not exist answers 404 and is indistinguishable
+      from a refusal; the first run scored three of those, because the
+      volunteer-groups routes are under `/v1/volunteer-groups/groups`. So each
+      entity is now proven reachable by its *own* Samaaj first, and a missing
+      fixture id aborts the run rather than being probed — an empty id turns
+      `/groups/{id}` into the list endpoint, which answers 200 to anybody.
 - [x] `TenantId` is never read from a client-supplied field in a
       request body. It comes only from the resolved gateway context. The one
       apparent exception is registration, which takes a **slug** and resolves

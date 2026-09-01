@@ -7,7 +7,7 @@ version of the plan; the reasoning behind the ordering lives in
 
 ## Current Status
 
-- **Stage:** every module has a service and member screens; Phase 5 hardening next
+- **Stage:** every module has a service and member screens; Phase 5 hardening under way
 - **Last updated:** 2026-09-01 - the member portal's Boli screens, closing the
   last module. `boli-service` shipped in the same run as the tenth and final
   service: its guarantee is one *highest* bid rather than one vote each, which
@@ -322,8 +322,20 @@ unit tested.
       the file-handling half of `SECURITY-CHECKLIST.md` live: size and type
       limits, virus scanning, and per-request authorization rather than an
       unguessable URL
-- [ ] Tenant-isolation penetration testing (attempt cross-tenant IDOR
-      on every write endpoint)
+- [x] Tenant-isolation penetration testing (attempt cross-tenant IDOR
+      on every write endpoint) — `scripts/tenant-isolation-probe.sh`. Two real
+      Samaaj; B's member and B's administrator attempt 36 reads and writes
+      against A's ids through the gateway, across all ten services. All 36
+      refused with 404, none with 403. The script proves its own paths first,
+      after a first run scored three false passes against endpoints that did
+      not exist at the path it used
+- [x] **Fixed: `PATCH /v1/members/{id}` answered 500 when `privacy` was
+      omitted.** `PrivacySettings Privacy` is a non-nullable reference type,
+      which is a compile-time claim only — the JSON deserialiser leaves it null,
+      and the validator's sub-rules dereferenced it. A `NotNull` rule above them
+      does not stop the rules after it; they needed a `When`. It hit any caller,
+      including a member editing their own profile, and was found incidentally
+      by the isolation probe
 - [ ] Accessibility pass (WCAG 2.1 AA) on both Angular apps
 - [ ] Backup/restore drill
 

@@ -272,4 +272,40 @@ public sealed class MemberEndpointsTests(MemberFamilyApiFactory factory)
 
         response.StatusCode.Should().Be(HttpStatusCode.BadRequest);
     }
+
+    [Fact]
+    public async Task Omitting_the_privacy_object_is_refused_rather_than_crashing()
+    {
+        // This answered 500 for every caller, including a member editing their
+        // own profile. `Privacy` is a non-nullable reference type on the
+        // command, which is a compile-time claim and nothing more - the JSON
+        // deserialiser leaves it null when the body omits it, and the
+        // validator's five sub-rules dereferenced it anyway, because a NotNull
+        // rule above them does not stop the ones after it.
+        //
+        // Found by scripts/tenant-isolation-probe.sh, which was probing for
+        // something else entirely.
+        var response = await MemberClient(_ravi, TenantA).PatchAsJsonAsync(
+            "/v1/members/" + _ravi,
+            new { fullName = Named("Ravi No Privacy"), locality = "Jaipur" });
+
+        response.StatusCode.Should().Be(HttpStatusCode.BadRequest);
+
+        var problem = await response.Content.ReadAsStringAsync();
+
+        problem.Should().Contain("Privacy levels are required");
+    }
+
+    [Fact]
+    public async Task Omitting_privacy_on_somebody_else_profile_is_still_not_a_500()
+    {
+        // The same body aimed at another member. Whatever the answer is, it is
+        // a decision rather than a crash - a 500 here would be the service
+        // telling an attacker it had reached code it did not expect to.
+        var response = await MemberClient(_ravi, TenantA).PatchAsJsonAsync(
+            "/v1/members/" + _meera,
+            new { fullName = Named("Not Mine"), locality = "Jaipur" });
+
+        response.StatusCode.Should().NotBe(HttpStatusCode.InternalServerError);
+    }
 }
