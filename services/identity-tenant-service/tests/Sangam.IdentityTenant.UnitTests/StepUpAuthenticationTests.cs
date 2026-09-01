@@ -23,6 +23,8 @@ public sealed class StepUpAuthenticationTests
     private readonly IUserRepository _users = Substitute.For<IUserRepository>();
     private readonly IPasswordHasher _hasher = Substitute.For<IPasswordHasher>();
     private readonly ICurrentUser _currentUser = Substitute.For<ICurrentUser>();
+    private readonly IFailedLoginRecorder _failedLogins = Substitute.For<IFailedLoginRecorder>();
+    private readonly IDateTimeProvider _stepUpClock = Substitute.For<IDateTimeProvider>();
     private readonly StepUpAuthentication _stepUp;
     private readonly User _superAdmin;
 
@@ -37,7 +39,10 @@ public sealed class StepUpAuthenticationTests
         _hasher.Verify("correct-horse", "hash").Returns(true);
         _users.GetSelfAsync(_superAdmin.Id, Arg.Any<CancellationToken>()).Returns(_superAdmin);
 
-        _stepUp = new StepUpAuthentication(_users, _hasher, _currentUser);
+        _stepUpClock.UtcNow.Returns(Now);
+
+        _stepUp = new StepUpAuthentication(
+            _users, _hasher, _currentUser, _failedLogins, _stepUpClock);
     }
 
     [Fact]
@@ -132,7 +137,9 @@ public sealed class ChangeTenantStatusStepUpTests
 
         _handler = new ChangeTenantStatusCommandHandler(
             _tenants,
-            new StepUpAuthentication(_users, _hasher, _currentUser),
+            new StepUpAuthentication(
+                _users, _hasher, _currentUser,
+                Substitute.For<IFailedLoginRecorder>(), _clock),
             _unitOfWork,
             _clock,
             _currentUser,

@@ -140,8 +140,14 @@ public sealed class StudentEnrolment : AggregateRoot, ITenantScopedEntity
     /// <remarks>
     /// Withdrawing is not erasure. A child who leaves in March still attended
     /// from June, and a Pathshala asked what its attendance was that year has to
-    /// be able to answer. Erasure is a different act, driven by
-    /// <c>identity.user.erased.v1</c> and DPDP section 12.
+    /// be able to answer.
+    ///
+    /// Erasure is a different act, under DPDP section 12. <b>This service does
+    /// not consume <c>identity.user.erased.v1</c></b> — an earlier version of
+    /// this comment said it did, which was worse than saying nothing. What
+    /// survives an erasure here is a bare <c>ChildProfileId</c> with no name or
+    /// contact behind it anywhere on the platform; whether that is sufficient is
+    /// one of the open questions in <c>docs/product/DPDP-COMPLIANCE.md</c>.
     /// </remarks>
     public bool Withdraw(DateTimeOffset now)
     {

@@ -35,6 +35,21 @@ namespace Sangam.IdentityTenant.Application.Security;
 /// also the truer answer - the caller is authenticated, they simply have not
 /// proven enough for this - and it carries no <c>WWW-Authenticate</c>
 /// obligation, which a 401 does and this never had.
+///
+/// <b>A failed step-up counts toward the same lockout as a failed login.</b>
+/// It shipped without this, and the gap was real: SECURITY-CHECKLIST.md asks
+/// for brute-force protection on "/login and any OTP endpoint", and a step-up
+/// is the same class of thing - a password check - reached by a different path.
+/// Without a counter it was an unthrottled password oracle. Anyone holding a
+/// borrowed access token could guess at full speed and never trip the login
+/// lockout, which turns the fifteen-minute window the stateless-token design
+/// knowingly accepts into a permanent credential compromise. On the shared and
+/// family devices this platform is built for, that is somebody walking up to an
+/// unlocked tab.
+///
+/// The recorder is the login one, and for the same reason it exists: this
+/// method's callers return a failure, and <c>TransactionBehavior</c> would roll
+/// the increment back along with it.
 /// </remarks>
 public interface IStepUpAuthentication
 {
@@ -59,7 +74,9 @@ public interface IStepUpAuthentication
 public sealed class StepUpAuthentication(
     IUserRepository users,
     IPasswordHasher passwordHasher,
-    ICurrentUser currentUser)
+    ICurrentUser currentUser,
+    IFailedLoginRecorder failedLoginRecorder,
+    IDateTimeProvider clock)
     : IStepUpAuthentication
 {
     public async Task<Result> ConfirmAsync(
@@ -71,20 +88,33 @@ public sealed class StepUpAuthentication(
                 Error.Unauthorized("Auth.Required", "Authentication is required for this request."));
         }
 
-        // Deliberately the same failure as a wrong password. Telling an
-        // unauthenticated-looking caller that they simply forgot the field is
-        // harmless; telling them the field was accepted and the password was
-        // wrong is not.
-        if (string.IsNullOrEmpty(password))
+        // GetSelfAsync, not GetByIdAsync. See the remarks on the interface.
+        var user = await users.GetSelfAsync(userId, cancellationToken);
+
+        if (user is null)
         {
             return Failed(action);
         }
 
-        // GetSelfAsync, not GetByIdAsync. See the remarks on the interface.
-        var user = await users.GetSelfAsync(userId, cancellationToken);
-
-        if (user is null || !passwordHasher.Verify(password, user.PasswordHash))
+        if (user.IsLockedOut(clock.UtcNow))
         {
+            // Said plainly rather than as another wrong-password message. The
+            // caller is already authenticated as this account, so the existence
+            // of the account is not a secret from them, and a member who is told
+            // nothing keeps guessing and extends their own lockout.
+            return Result.Failure(Error.Forbidden(
+                "Auth.LockedOut",
+                "Too many failed attempts. Try again in a few minutes."));
+        }
+
+        // An empty password is deliberately the same failure as a wrong one -
+        // telling a caller the field was accepted and the password was wrong is
+        // more than they need - and it counts the same, so an attacker cannot
+        // probe the lockout state for free by sending nothing.
+        if (string.IsNullOrEmpty(password) || !passwordHasher.Verify(password, user.PasswordHash))
+        {
+            await failedLoginRecorder.RecordAsync(user.Id, cancellationToken);
+
             return Failed(action);
         }
 

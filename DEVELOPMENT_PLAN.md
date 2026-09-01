@@ -279,7 +279,30 @@ unit tested.
       field, not a red error; and "You are leading" is only said while bidding
       is open, because on a closed-but-unpublished Boli it would announce the
       winner before the Samaaj did
-- [ ] Full `SECURITY-CHECKLIST.md` pass across every service
+- [x] Full `SECURITY-CHECKLIST.md` pass across every service. The previous pass
+      covered three; six of the seven that shipped after it had never been
+      re-checked. The mechanical properties held everywhere — all ten apply the
+      tenant query filter by reflection, call `TenantWriteGuard` at
+      `SaveChanges`, register the five behaviors in order, and fail closed on an
+      unannotated request. Two findings, one fixed and one tracked below
+- [x] **Fixed: the step-up was an unthrottled password oracle.** `/me/erase`
+      and the tenant-status endpoint check a password and counted nothing, so
+      anyone holding a borrowed access token could brute-force the account
+      password at full speed without ever tripping the login lockout — turning
+      the fifteen-minute window the stateless-token design accepts into a
+      permanent credential compromise. `StepUpAuthentication` now shares the
+      login lockout, and both paths carry the gateway's `credential-attempts`
+      policy
+- [ ] **Erasure does not reach six services.** `timeline`, `events`,
+      `volunteer-groups`, `social-issues`, `celebrity-voting` and `boli` hold
+      member ids and none consumes `identity.user.erased.v1`, though
+      `DPDP-COMPLIANCE.md` states as a rule that a new consumer must subscribe
+      the day it ships. `timeline` and `social-issues` are the real gap: they
+      hold free text an erased member wrote. The other four hold a bare id that
+      resolves to nobody once identity and member-family clear — probably
+      sufficient, but that is counsel question 6, and for votes and bids the id
+      cannot simply be removed anyway
+- [ ] Full `SECURITY-CHECKLIST.md` re-pass once the erasure gap is closed
 - [ ] HTTPS-only in production: TLS termination, HSTS, secure-cookie policy,
       and `ForwardedHeaders` so the gateway rate limiter partitions on the real
       caller rather than on the proxy

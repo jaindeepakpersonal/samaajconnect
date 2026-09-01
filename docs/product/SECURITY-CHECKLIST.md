@@ -4,12 +4,21 @@ Derived from the cross-cutting requirements in both requirement docs.
 Treat this as a PR review checklist for anything touching a new
 endpoint, not just a one-time setup task.
 
-> **Status as of 2026-08-29.** Every box below has been walked against the code
-> in the three services and the gateway. A ticked box is something a test or a
-> smoke check actually asserts, not something believed to be true; an unticked
-> one says plainly what is missing and where it is tracked. Items that cannot
-> apply yet — file uploads, for instance — say so rather than being ticked by
-> default.
+> **Status as of 2026-09-01.** Every box below has been walked against **all ten
+> services and the gateway** — the previous pass covered three, and six of the
+> seven that shipped after it were never re-checked. A ticked box is something a
+> test or a smoke check actually asserts, not something believed to be true; an
+> unticked one says plainly what is missing and where it is tracked. Items that
+> cannot apply yet — file uploads, for instance — say so rather than being
+> ticked by default.
+>
+> **What that pass found.** Two things, both recorded rather than glossed:
+> a step-up password check that no lockout counted (fixed, below), and six
+> services holding member ids that never subscribed to the erasure event
+> (tracked, see "Data privacy"). The mechanical properties held everywhere:
+> all ten apply the tenant query filter by reflection, call `TenantWriteGuard`
+> at `SaveChanges`, register the five behaviors in the required order, and
+> fail closed on a request carrying no authorization attribute.
 
 ## Tenant isolation
 
@@ -158,11 +167,25 @@ is the outer gate and grants nothing on its own.
 - [x] Rate limiting and brute-force lockout on `/login` and any OTP
       endpoint. Both halves. Per-account lockout after five wrong passwords,
       and five wrong activation guesses kill the code; per-source rate limits
-      at the gateway on `/login`, `/activations/redeem` and `/register`. The
-      limits are deliberately loose because Indian mobile carriers put many
-      subscribers behind one address — see `gateway/.../RateLimiting.cs`. There
-      is no OTP endpoint yet; when one lands it belongs on the credential
-      policy.
+      at the gateway on `/login`, `/activations/redeem`, `/register`,
+      `/me/erase` and `/tenants/{id}/status`. The limits are deliberately loose
+      because Indian mobile carriers put many subscribers behind one address —
+      see `gateway/.../RateLimiting.cs`. There is no OTP endpoint yet; when one
+      lands it belongs on the credential policy.
+
+      **Read "any OTP endpoint" as "any endpoint that checks a credential".**
+      The step-up endpoints shipped outside both halves: they verify a password
+      and recorded nothing, so `/me/erase` was an unthrottled password oracle.
+      Anyone holding a borrowed access token — the fifteen-minute window the
+      stateless-token design knowingly accepts — could guess at full speed and
+      never trip the login lockout, turning a session compromise into a
+      permanent credential one. On the shared and family devices this platform
+      is built for, that is somebody walking up to an unlocked tab. Found by
+      the 2026-09-01 pass and fixed: `StepUpAuthentication` now refuses when
+      the account is locked out and records each failure through the same
+      `IFailedLoginRecorder` login uses, so the two share one budget rather
+      than offering two oracles. `ErasureEndpointTests` proves the lockout
+      engages and that it also blocks the *correct* password afterwards.
 - [ ] All production traffic is HTTPS-only; no mixed content. **A deployment
       concern, not a code one, and nothing here enforces it.** Compose serves
       plain HTTP for local work. Needs TLS termination, HSTS, and secure-cookie
@@ -176,8 +199,17 @@ is the outer gate and grants nothing on its own.
       step-up on a harmless, reversible direction only teaches people to type
       their password without reading the screen. Publishing a voting result is
       reversible in the sense that matters — it refuses to publish twice, so a
-      mis-click cannot change an announced result — and publishing a Boli
-      result belongs to a service that does not exist yet.
+      mis-click cannot change an announced result.
+
+      **Publishing a Boli result deliberately does not step up either**, on the
+      same reasoning, now that boli-service exists. `PublishResultCommand` is
+      idempotent and a published result cannot be changed through the API at
+      all, so a mis-click cannot announce the wrong winner — it can only
+      announce the right one slightly early. What it does carry is its own
+      permission, `Boli.PublishResults`, separate from `Boli.Manage`: the
+      control on "this cannot be taken back" is who may do it, not how many
+      times they are asked. A Samaaj that wants a second pair of eyes grants one
+      without the other.
 
       **A failed step-up answers 403, never 401**, and this is a rule rather
       than a preference. The portals' HTTP interceptor treats a 401 as an
@@ -228,6 +260,20 @@ is the outer gate and grants nothing on its own.
       exporting *other people's* data in bulk, and no such endpoint exists. If
       one is ever added it needs its own permission key, and this item should
       be re-read then.
+
+- [ ] Erasure reaches every service that holds member data. **Six do not
+      subscribe to `identity.user.erased.v1`** — `timeline`, `events`,
+      `volunteer-groups`, `social-issues`, `celebrity-voting` and `boli` —
+      although `DPDP-COMPLIANCE.md` states as a rule that any new consumer must
+      subscribe on the day it ships. Four of the six hold only a bare `MemberId`
+      that no longer resolves to a person once identity and member-family have
+      cleared, and two of *those* have a reason it must stay: the voter id is
+      the double-voting guarantee, and a bid is a financial record. The real gap
+      is `timeline` and `social-issues`, which hold free text an erased member
+      wrote and which identifies its author whatever happens to the id. Found by
+      the 2026-09-01 pass; written up in full under "Six services shipped
+      without doing that" in `DPDP-COMPLIANCE.md` and tracked in
+      `DEVELOPMENT_PLAN.md`.
 
 > **DPDP Act, 2023.** The obligations this platform carries under India's data
 > protection law, what is built for them, and what still needs counsel, are in

@@ -183,6 +183,45 @@ at-least-once and one-way, so a service that consumes platform events and is
 built later will not see the erasures that happened before it existed. Any new
 consumer needs to subscribe to `identity.user.erased.v1` on the day it ships,
 the way member-family-service and audit-notification-service do.
+
+### Six services shipped without doing that
+
+Found by the security-checklist pass on 2026-09-01, and recorded here rather
+than quietly fixed, because what the right fix is differs per service and two of
+them need counsel.
+
+`timeline`, `events`, `volunteer-groups`, `social-issues`, `celebrity-voting`
+and `boli` all hold member ids and none subscribes to the erasure event. The
+table above lists three services; there are ten.
+
+**For four of them the residual data is a bare id.** Events registrations,
+volunteer-group memberships, votes and bids carry a `MemberId` and nothing else
+about the person — no service outside identity and member-family stores a name
+or a contact, and both of those clear on erasure. So what survives is a GUID
+that resolves to nobody. That is the same de-identification the audit log does
+deliberately, arrived at by construction rather than by design, and it is
+probably sufficient — but "probably" is not a compliance position, and it is
+question 5 below.
+
+Two of those four also have a reason the id must stay. The double-voting
+guarantee **is** the unique index on `(CampaignId, VoterMemberId)`; removing or
+randomising the voter id would not de-identify a vote so much as re-enable
+voting twice. A Boli bid is a financial record the Samaaj collects against, and
+retention of those is the kind of thing §8(7) contemplates other law requiring.
+
+**For two of them it is not a bare id, and that is the real gap.**
+`timeline` holds `Post.Body` and `social-issues` holds `Issue.Title` and
+`Issue.Description` — free text an erased member wrote, which can identify its
+author whatever happens to the id beside it. No amount of reasoning about GUIDs
+touches that. Both need to consume the erasure event and decide, per the
+platform's usual rule about other people's records, whether the content is
+removed or tombstoned: a published social issue may have replies and a decision
+history hanging off it, and deleting it restructures other people's records
+because one person exercised their own right.
+
+Tracked in `DEVELOPMENT_PLAN.md`. Until it is done, this section is what the
+platform can honestly say it does.
+
 ## Security safeguards (§8(4))
 
 In place: passwords hashed with PBKDF2-HMAC-SHA256 at 210,000 iterations with
@@ -222,5 +261,12 @@ These are Data Fiduciary obligations that no amount of code discharges:
    "necessary for the specified purpose" of running a membership organisation?
 5. Are the Samaaj and the platform operator joint fiduciaries, or is the
    operator a Data Processor? This changes who notifies the Board on a breach.
+6. After erasure, is a bare `MemberId` left behind in a service that holds no
+   name or contact — a registration, a group membership, a vote, a bid —
+   still personal data? Every service that could resolve it to a person has
+   cleared, so nothing on the platform can. If the answer is yes, two of those
+   ids cannot simply be removed: the voter id **is** the double-voting
+   guarantee, and a bid is a financial record. See "Six services shipped
+   without doing that" above.
 
 Nothing in this repository should be taken as an answer to any of these.

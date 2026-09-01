@@ -132,7 +132,9 @@ public sealed class EraseMyAccountCommandHandlerTests
         // shared implementation refuses it, and a stub would assert nothing.
         _handler = new EraseMyAccountCommandHandler(
             _users,
-            new StepUpAuthentication(_users, _hasher, _currentUser),
+            new StepUpAuthentication(
+                _users, _hasher, _currentUser,
+                Substitute.For<IFailedLoginRecorder>(), _clock),
             _sessions, _unitOfWork, _currentUser, _clock,
             NullLogger<EraseMyAccountCommandHandler>.Instance);
     }

@@ -280,4 +280,93 @@ public sealed class ErasureEndpointTests(IdentityTenantApiFactory factory)
 
         response.StatusCode.Should().Be(HttpStatusCode.Unauthorized);
     }
+
+    [Fact]
+    public async Task Guessing_the_password_at_the_erase_endpoint_locks_the_account()
+    {
+        // The step-up shipped without a counter, which made this endpoint an
+        // unthrottled password oracle: SECURITY-CHECKLIST.md asks for
+        // brute-force protection on "/login and any OTP endpoint", and a
+        // step-up is the same class of thing reached by a different path.
+        // Anyone holding a borrowed access token could guess at full speed and
+        // never trip the login lockout.
+        var client = await SignedInMemberAsync();
+
+        for (var attempt = 0; attempt < 5; attempt++)
+        {
+            var wrong = await client.PostAsJsonAsync(
+                "/v1/identity/me/erase", new { password = $"wrong-password-{attempt}" });
+
+            wrong.StatusCode.Should().Be(HttpStatusCode.Forbidden);
+        }
+
+        // The sixth attempt is refused for being locked out rather than for
+        // being wrong - and crucially, so is the *right* password.
+        var afterLockout = await client.PostAsJsonAsync(
+            "/v1/identity/me/erase", new { password = Password });
+
+        afterLockout.StatusCode.Should().Be(HttpStatusCode.Forbidden);
+
+        var problem = await afterLockout.Content.ReadFromJsonAsync<JsonElement>();
+
+        problem.GetProperty("title").GetString().Should().Be("Auth.LockedOut");
+
+        // And nothing was erased along the way.
+        var stillThere = await factory.WithDbContextAsync(db =>
+            db.Users.IgnoreQueryFilters().AsNoTracking()
+                .CountAsync(u => u.Status == UserStatus.Erased));
+
+        stillThere.Should().Be(0);
+    }
+
+    [Fact]
+    public async Task A_failed_step_up_counts_against_signing_in_too()
+    {
+        // One counter, not two. An attacker who could exhaust the step-up
+        // budget without touching the login budget would simply have two
+        // oracles instead of one.
+        var client = await SignedInMemberAsync();
+
+        for (var attempt = 0; attempt < 5; attempt++)
+        {
+            await client.PostAsJsonAsync(
+                "/v1/identity/me/erase", new { password = $"wrong-password-{attempt}" });
+        }
+
+        var login = await factory.CreateClient().PostAsJsonAsync("/v1/identity/login", new
+        {
+            mobileOrEmail = Member,
+            password = Password,
+        });
+
+        login.StatusCode.Should().Be(HttpStatusCode.Forbidden);
+
+        (await login.Content.ReadFromJsonAsync<JsonElement>())
+            .GetProperty("title").GetString().Should().Be("Auth.LockedOut");
+    }
+
+    [Fact]
+    public async Task An_empty_password_never_reaches_the_step_up_at_all()
+    {
+        // 400 from ValidationBehavior, which runs before the handler, so the
+        // step-up never sees it and no password is checked. That makes an empty
+        // body neither an attempt against the lockout nor a free probe of it:
+        // the answer is the same whatever the account's state, so it carries no
+        // information about the password or the lockout.
+        //
+        // The empty-password branch inside ConfirmAsync is still load-bearing
+        // for the tenant-status step-up, where the password is optional on the
+        // command because activating a Samaaj deliberately does not ask for one.
+        var client = await SignedInMemberAsync();
+
+        var empty = await client.PostAsJsonAsync("/v1/identity/me/erase", new { password = "" });
+
+        empty.StatusCode.Should().Be(HttpStatusCode.BadRequest);
+
+        // Still erasable afterwards: a rejected empty body has cost nothing.
+        var erased = await client.PostAsJsonAsync(
+            "/v1/identity/me/erase", new { password = Password });
+
+        erased.StatusCode.Should().Be(HttpStatusCode.OK);
+    }
 }
