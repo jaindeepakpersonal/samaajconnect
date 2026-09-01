@@ -227,16 +227,34 @@ enforced by `TenantAuthorizationBehavior`, not just UI hiding.
 
 ## boli-service — `/v1/boli`
 
-| Method | Path | Roles | Purpose |
+Permissions rather than roles below: `Boli.Manage` and
+`Boli.PublishResults` are both held by `SamaajAdmin` and `BoliManager`
+today, but the split is what the service gates on.
+
+The paths really do read `/v1/boli/boli/{id}` — the service prefix plus
+the resource under it, the same shape as `/v1/pathshala/pathshalas`.
+
+| Method | Path | Permission | Purpose |
 |---|---|---|---|
-| POST | `/occasions` | BoliManager | Create occasion |
-| POST | `/occasions/{id}/boli-types` | BoliManager | Define Boli type |
-| POST | `/occasions/{id}/boli` | BoliManager | Open a Boli for bidding |
-| POST | `/boli/{id}/bids` | Member | Place bid |
-| GET | `/boli/{id}/bids` | Member, BoliManager | Bid history |
-| POST | `/boli/{id}/close` | BoliManager | Close bidding |
-| POST | `/boli/{id}/result` | BoliManager | Record result |
-| POST | `/boli/{id}/result/publish` | BoliManager | Publish (locks result) |
+| GET | `/occasions` | `Members.Read` | Occasions, newest first |
+| POST | `/occasions` | `Boli.Manage` | Create occasion |
+| GET | `/occasions/{id}` | `Members.Read` | Types and the Boli under it |
+| POST | `/occasions/{id}/boli-types` | `Boli.Manage` | Define Boli type. One name per occasion |
+| POST | `/occasions/{id}/status` | `Boli.Manage` | Activate or close. Never backwards |
+| POST | `/occasions/{id}/boli` | `Boli.Manage` | Open a Boli for bidding |
+| GET | `/boli/active` | `Members.Read` | Every Boli taking bids right now |
+| GET | `/boli/{id}` | `Members.Read` | One Boli, its highest and the minimum next bid |
+| POST | `/boli/{id}/bids` | `Members.Read` | Place bid. Being outbid answers **200** with `accepted: false` |
+| GET | `/boli/{id}/bids` | `Members.Read` | Bid history: amounts and times, never who bid |
+| POST | `/boli/{id}/close` | `Boli.Manage` | Close bidding. Idempotent |
+| POST | `/boli/{id}/result` | `Boli.Manage` | Record result from the highest bid. Winner is not a parameter |
+| GET | `/boli/{id}/result` | `Members.Read` | 404 until recorded; names no winner until published |
+| POST | `/boli/{id}/result/publish` | `Boli.PublishResults` | Publish. Idempotent, and irreversible here |
+| GET | `/results` | `Members.Read` | Everything announced, newest first |
+
+Amounts are integers in paise. A Boli is money, and a floating-point
+field accumulates error that shows up as a winning bid a rupee off what
+somebody actually offered.
 
 ## audit-notification-service — `/v1/audit`, `/v1/notifications`
 

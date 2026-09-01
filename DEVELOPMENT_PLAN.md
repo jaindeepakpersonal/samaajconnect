@@ -8,25 +8,23 @@ version of the plan; the reasoning behind the ordering lives in
 ## Current Status
 
 - **Stage:** Phase 4 built; six member modules have screens
-- **Last updated:** 2026-09-01 - the member portal's DPDP rights screen
-  (`/privacy`), after the Jain Pathshala and Celebrities of Samaaj ones. The
-  erasure, export and consent-withdrawal endpoints had existed and been tested
-  for weeks, but a right reachable only with curl is not one a member has; that
-  gap is now closed and driven end to end, real erasure included. Driving
-  Celebrity Voting against the running stack earlier in the same run found a
-  gateway bug that had been breaking every module-gated screen in the app: a
-  gated route answered 404 rather than 401 when the caller's access token had
-  expired, so the portals' silent renew-and-retry never fired and the screen
-  printed "No such endpoint." from fifteen minutes after sign-in onwards. 1,047
-  tests green (780 backend, 267 frontend) plus 240 smoke checks against a stack
-  built from empty volumes, re-runnable against a dirty one.
-- **Blocking item:** none. **Every member module with a service now has
-  screens**: Timeline, Events, Volunteer Groups, Social Issues, Members, Family,
-  Celebrity Voting and Pathshala. Only Boli is left, and it has neither a
-  service nor screens. After that: the Phase 5 `boli-service`, or the two
-  remaining Phase 1 leftovers (an editable role matrix, and the two DPDP
-  obligations — breach notification and the right to nominate — that need a
-  notification channel first). The vote endpoint's throughput load test is
+- **Last updated:** 2026-09-01 - `boli-service`, the tenth and last service,
+  after the member portal's DPDP rights screen (`/privacy`) and the Pathshala
+  and Celebrities of Samaaj screens. Boli's guarantee is one *highest* bid
+  rather than one vote each, which needs a row lock as well as a unique index;
+  fifteen simultaneous identical bids through the gateway leave exactly one.
+  Driving Celebrity Voting against the running stack earlier in the same run
+  found a gateway bug that had been breaking every module-gated screen in the
+  app: a gated route answered 404 rather than 401 when the caller's access
+  token had expired, so the portals' silent renew-and-retry never fired and the
+  screen printed "No such endpoint." from fifteen minutes after sign-in
+  onwards. 1,081 tests green (814 backend, 267 frontend) plus 240 smoke checks
+  against a stack built from empty volumes, re-runnable against a dirty one.
+- **Blocking item:** none. **Every module the platform has now has a
+  service**, and every one but Boli has member screens. What is left is the
+  Boli screens (`#boli`, `#bolidetail`), an editable role matrix, and the two
+  DPDP obligations — breach notification and the right to nominate — that need
+  a notification channel first. The vote endpoint's throughput load test is
   carried to Phase 5, since it needs a deployed environment; its correctness
   half is done. The five questions in `docs/product/DPDP-COMPLIANCE.md` still
   need counsel before any of this ships to real users.
@@ -265,7 +263,17 @@ unit tested.
 
 ## Phase 5 — Boli + Hardening
 
-- [ ] `boli-service`
+- [x] `boli-service` — occasions, Boli types, bidding, and a result that
+      is recorded before it is announced. The correctness requirement here
+      is not "one each" as in celebrity voting but **one highest**: a row
+      lock on the Boli serialises bidders (deliberately the opposite of the
+      vote path, which avoids serialising them — here it is the point),
+      and a unique index on `(BoliId, Amount)` is what holds if a future
+      code path forgets the lock or the service runs on two instances.
+      Being outbid answers 200 with `accepted: false` and the amount now
+      needed. Amounts are integer paise. The bid history never names who
+      bid, and a recorded result names nobody until it is published
+- [ ] Member portal: the Boli screens (`#boli`, `#bolidetail`)
 - [ ] Full `SECURITY-CHECKLIST.md` pass across every service
 - [ ] HTTPS-only in production: TLS termination, HSTS, secure-cookie policy,
       and `ForwardedHeaders` so the gateway rate limiter partitions on the real

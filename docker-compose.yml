@@ -217,6 +217,20 @@ services:
     ports:
       - "5109:8080"
 
+  boli-service:
+    <<: *service-defaults
+    build:
+      context: .
+      dockerfile: services/boli-service/Dockerfile
+    container_name: samaajconnect-boli
+    environment:
+      <<: *service-environment
+      ConnectionStrings__Default: "Host=postgres;Port=5432;Database=samaajconnect_boli;Username=samaajconnect;Password=samaajconnect"
+      Jwt__SigningKey: "${JWT_SIGNING_KEY:-local-development-signing-key-do-not-use-in-production}"
+      Outbox__PollIntervalSeconds: "5"
+    ports:
+      - "5110:8080"
+
   gateway:
     build:
       context: .
@@ -243,6 +257,8 @@ services:
       celebrity-voting-service:
         condition: service_started
       pathshala-service:
+        condition: service_started
+      boli-service:
         condition: service_started
     environment:
       ASPNETCORE_ENVIRONMENT: Development
