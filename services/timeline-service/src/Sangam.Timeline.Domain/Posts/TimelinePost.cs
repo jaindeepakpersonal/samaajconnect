@@ -96,6 +96,49 @@ public sealed class TimelinePost : AggregateRoot, ITenantScopedEntity
     public bool IsPubliclyVisible => Status == PostStatus.Approved;
 
     /// <summary>
+    /// The decisions worth offering a moderator looking at this post.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// Here rather than in the screen, for the reason the social-issues
+    /// transition table is: a moderation queue that works out its own buttons
+    /// keeps a second copy of this rule, and the first time a state is added
+    /// the screen is confidently wrong. The queue carries this list and the
+    /// screen renders exactly what it is given.
+    /// </para>
+    /// <para>
+    /// It is what is <i>sensible to offer</i>, not a gate.
+    /// <see cref="Moderate"/> stays permissive and reports a decision that
+    /// changes nothing as success, because two moderators reaching the same
+    /// conclusion is agreement rather than an error. Narrowing it here is about
+    /// not putting a button in front of somebody that would do nothing, or that
+    /// means the same as the one beside it: Approve and Restore both end at
+    /// Approved, so a post is only ever offered whichever of the two describes
+    /// what is actually happening to it.
+    /// </para>
+    /// </remarks>
+    public IReadOnlyList<ModerationDecision> AvailableDecisions => Status switch
+    {
+        // Waiting to be seen for the first time: publish it or refuse it.
+        PostStatus.PendingReview => [ModerationDecision.Approve, ModerationDecision.Reject],
+
+        // Already published, and in the queue because somebody reported it.
+        // Taking it down is Hide, not Reject - Reject is for something that was
+        // never published, and the member has already seen this one go up.
+        PostStatus.Approved => [ModerationDecision.Hide],
+
+        // A moderator reconsidering their own refusal.
+        PostStatus.Rejected => [ModerationDecision.Approve],
+
+        // Restore rather than Approve, so the moderation history reads as what
+        // happened: this post went up, came down, and went back up.
+        PostStatus.Hidden => [ModerationDecision.Restore],
+
+        // A draft is its author's, and is not in anybody's queue.
+        _ => [],
+    };
+
+    /// <summary>
     /// Records a moderator's decision. Returns false when the post is already in
     /// that state, so a second click is not a second audit entry.
     /// </summary>

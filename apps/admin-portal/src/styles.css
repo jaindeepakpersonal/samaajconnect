@@ -256,6 +256,13 @@ textarea.input {
   color: var(--ok-ink);
 }
 
+/* Sets a text colour as well as a background, like every other variant here:
+   a state carried by hue alone is a state some readers do not get. */
+.pill.danger {
+  background: var(--danger-soft);
+  color: var(--danger);
+}
+
 .notice {
   background: var(--warn-soft);
   border: 1px solid var(--warn-line);

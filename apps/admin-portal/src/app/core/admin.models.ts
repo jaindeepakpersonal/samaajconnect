@@ -186,3 +186,44 @@ export interface BroadcastResult {
   readonly id: string;
   readonly sentAt: string;
 }
+
+/** `PostStatus` in timeline-service's domain. */
+export type PostStatus = 'Draft' | 'PendingReview' | 'Approved' | 'Rejected' | 'Hidden';
+
+/** `ModerationDecision`. The queue says which of these it will accept. */
+export type ModerationDecision = 'Approve' | 'Reject' | 'Hide' | 'Restore';
+
+/** Mirrors `PostResponse`. `authorMemberId` is an id; names live elsewhere. */
+export interface TimelinePost {
+  readonly id: string;
+  readonly authorMemberId: string;
+  readonly type: string;
+  readonly title: string;
+  readonly body: string;
+  readonly status: PostStatus;
+  readonly reportCount: number;
+  readonly commentCount: number;
+  readonly createdAt: string;
+  readonly moderatedAt: string | null;
+}
+
+/** Mirrors `ModerationActionResponse`. */
+export interface ModerationAction {
+  readonly actorUserId: string;
+  readonly action: string;
+  readonly reason: string | null;
+  readonly createdAt: string;
+}
+
+/**
+ * Mirrors `ModerationQueueItem`.
+ *
+ * `availableDecisions` comes from `TimelinePost.AvailableDecisions` in the
+ * domain. The screen renders these and derives nothing from the status, so a
+ * state added to the domain cannot leave this panel offering the wrong buttons.
+ */
+export interface ModerationQueueEntry {
+  readonly post: TimelinePost;
+  readonly history: readonly ModerationAction[];
+  readonly availableDecisions: readonly ModerationDecision[];
+}

@@ -46,7 +46,15 @@ public sealed record PostDetailResponse(PostResponse Post, IReadOnlyList<Comment
 /// </summary>
 public sealed record ModerationQueueItem(
     PostResponse Post,
-    IReadOnlyList<ModerationActionResponse> History);
+    IReadOnlyList<ModerationActionResponse> History,
+
+    /// <summary>
+    /// What this moderator may usefully do next, from
+    /// <c>TimelinePost.AvailableDecisions</c>. The screen renders these and
+    /// derives nothing, so a state added to the domain cannot leave the queue
+    /// offering the wrong buttons.
+    /// </summary>
+    IReadOnlyList<string> AvailableDecisions);
 
 public sealed record ModerationActionResponse(
     Guid ActorUserId,

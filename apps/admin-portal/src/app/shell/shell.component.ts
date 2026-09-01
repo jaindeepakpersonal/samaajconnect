@@ -234,7 +234,7 @@ const NAV: readonly NavGroup[] = [
       // all of them. What is missing here is the administrative view.
       { label: 'Members', pending: 'The member directory screen is not built yet.' },
       { label: 'Families & Children', route: '/conversions' },
-      { label: 'Timeline / Moderation', pending: 'The moderation screen is not built yet.' },
+      { label: 'Timeline / Moderation', route: '/moderation' },
       { label: 'Volunteer Groups', pending: 'The group administration screen is not built yet.' },
       { label: 'Events', pending: 'The event administration screen is not built yet.' },
       { label: 'Social Issues', pending: 'The review queue screen is not built yet.' },

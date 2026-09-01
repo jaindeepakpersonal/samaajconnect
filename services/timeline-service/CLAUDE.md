@@ -147,6 +147,20 @@ taken deliberately.
 **Reporting answers the same way whether or not it counted.** A member who
 learns their own report was ignored has learned how the queue is fed.
 
+**The queue says what may be done to each post, and the screen renders that.**
+`TimelinePost.AvailableDecisions` is the list; the admin panel derives nothing
+from the status. A moderation screen that worked out its own buttons would keep
+a second copy of this rule, and the first time a state is added it would be
+confidently wrong - the same reasoning as social-issues' `availableTransitions`.
+
+It is what is *sensible to offer*, not a gate. `Moderate` stays permissive and
+reports a decision that changes nothing as success, because two moderators
+reaching the same conclusion is agreement rather than an error. The narrowing is
+about not offering a button that would do nothing, or two that mean the same
+thing: Approve and Restore both end at Approved, so a post is offered whichever
+one describes what is actually happening to it - Restore for something that went
+up and came down, Approve for something that never went up.
+
 **Rejecting or hiding needs a reason; approving does not.** Those are the cases
 where the member will ask why, and "no reason given" is not an answer.
 

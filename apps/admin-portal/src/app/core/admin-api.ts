@@ -6,6 +6,8 @@ import {
   AdminUser,
   AssignRoleResult,
   AuditLogEntry,
+  ModerationDecision,
+  ModerationQueueEntry,
   Broadcast,
   BroadcastResult,
   ConversionRequest,
@@ -174,5 +176,46 @@ export class AdminApi {
 
   listBroadcasts(): Observable<Broadcast[]> {
     return this.http.get<Broadcast[]>('/v1/notifications/broadcasts');
+  }
+
+  // ---- Timeline moderation ----------------------------------------------
+
+  /**
+   * Posts awaiting review, plus approved posts members have reported.
+   *
+   * Reported posts are in the same queue deliberately: a separate reports
+   * screen is a screen somebody has to remember to open, and the point of a
+   * report is that it should not wait for that.
+   *
+   * Module-gated on `community` at the gateway, so a Samaaj that has switched
+   * that module off answers 404 here rather than an empty queue.
+   */
+  moderationQueue(): Observable<ModerationQueueEntry[]> {
+    return this.http.get<ModerationQueueEntry[]>('/v1/timeline/posts/moderation-queue');
+  }
+
+  /**
+   * Records a decision. The service requires `reason` for Reject and Hide —
+   * those are the cases where the member will ask why — and ignores it
+   * otherwise.
+   */
+  moderatePost(
+    postId: string,
+    decision: ModerationDecision,
+    reason: string | null,
+  ): Observable<unknown> {
+    return this.http.post(`/v1/timeline/posts/${postId}/moderate`, { decision, reason });
+  }
+
+  /**
+   * The Samaaj directory, used only to put a name against a post's author id.
+   *
+   * One call for the whole queue rather than one per row, the same approach the
+   * member portal takes. An administrator's directory includes members who have
+   * taken themselves out of it, so a moderator never meets an unresolvable id
+   * because the author chose to be unlisted.
+   */
+  listMembers(): Observable<{ id: string; fullName: string }[]> {
+    return this.http.get<{ id: string; fullName: string }[]>('/v1/members?limit=100');
   }
 }

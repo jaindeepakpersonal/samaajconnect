@@ -74,6 +74,14 @@ export const routes: Routes = [
           import('./features/audit/audit-log.component').then((m) => m.AuditLogComponent),
       },
       {
+        path: 'moderation',
+        title: 'Content moderation - samaajconnect admin',
+        loadComponent: () =>
+          import('./features/moderation/moderation-queue.component').then(
+            (m) => m.ModerationQueueComponent,
+          ),
+      },
+      {
         path: 'notifications',
         title: 'Notifications - samaajconnect admin',
         loadComponent: () =>

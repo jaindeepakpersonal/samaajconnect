@@ -8,25 +8,28 @@ version of the plan; the reasoning behind the ordering lives in
 ## Current Status
 
 - **Stage:** every module has a service and member screens; Phase 5 hardening under way
-- **Last updated:** 2026-09-01 - **My Profile**, the screen the platform had
-  been telling members to use since registration first raised a welcome
-  notification saying "complete your profile". The endpoint existed, the client
-  method existed, and nothing called either.
+- **Last updated:** 2026-09-01 - **Timeline / Content Moderation** in the admin
+  panel. Nothing on the platform could approve a post before it: a member writes
+  one, `TimelinePost.Create` puts it in `PendingReview`, and the only way it
+  ever reached the Samaaj timeline was somebody curling the moderate endpoint.
+  The queue endpoint and the moderate endpoint both existed and no screen in
+  either app called either - the second time in two cycles that an endpoint with
+  no caller turned out to be the gap worth filling.
 
-  It brought the wireframe's "Profile listed in directory" checkbox with it,
-  which had no field behind it: per-field privacy cannot take a member out of
-  the directory, because a listing is a name. `IsListedInDirectory` hides them
-  from the directory search and from nothing else - a profile stays reachable by
-  id, which is what group applications, post authorship and household
-  membership all need. Erasure now uses it too; an erased profile used to sit in
-  the directory as a row reading "Erased member".
+  The buttons come from `TimelinePost.AvailableDecisions`, not from the status,
+  so a state added to the domain cannot leave the panel offering the wrong ones.
+  Approve and Restore both end at Approved, so a post is offered whichever one
+  describes what is happening to it.
 
-  Three integration tests caught an EF trap worth knowing: `HasDefaultValue(true)`
-  makes a property `ValueGeneratedOnAdd`, so EF left the CLR default `false` out
-  of the INSERT and the database default won - a profile created unlisted came
-  back listed. `ValueGeneratedNever()` is the fix, and it is the same lesson the
-  Family keys already carry. 1,289 tests green (961 backend across 21 suites,
-  328 frontend) plus 261 smoke checks against empty volumes.
+  Two smoke-script repairs, both of checks that were right about the platform
+  and wrong about themselves: the admin-list check grepped for a member by name,
+  and that member is granted PathshalaTeacher later in the same script, so it
+  failed on every re-run; it asserts on roles now. And editing this script while
+  a run of it is in flight corrupts that run - bash reads a script incrementally,
+  so the offsets shift and it resumes mid-token, several hundred lines from
+  anything that changed. That is written at the top of the file now, having cost
+  two confusing failures in three minutes. 1,306 tests green (967 backend across
+  21 suites, 339 frontend) plus 262 smoke checks against empty volumes.
 - **Blocking item:** none. **Every module the platform has now has both a
   service and member screens**, and the role matrix is editable per Samaaj. What
   is left needs things this repository cannot supply on its own: TLS and a
@@ -143,6 +146,13 @@ unit tested.
       a listing is a name. It hides them from the directory search and from
       nothing else - a profile stays reachable by id, which is what group
       applications and post authorship need
+- [x] The admin panel's **Timeline / Content Moderation** screen. Nothing on the
+      platform could approve a post before it: a member writes one, it lands
+      `PendingReview`, and the only way it ever reached the Samaaj's timeline
+      was somebody curling the moderate endpoint. Both that endpoint and the
+      queue existed; no screen in either app called either. The buttons come
+      from `TimelinePost.AvailableDecisions` rather than from the status, so a
+      state added to the domain cannot leave the panel offering the wrong ones
 - [ ] A real email or SMS provider, so `Sent` means a person was reached.
       One class implementing `INotificationChannel` and one registration; the
       choice of provider is a hosting decision

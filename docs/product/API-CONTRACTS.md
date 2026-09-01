@@ -57,7 +57,7 @@ enforced by `TenantAuthorizationBehavior`, not just UI hiding.
 |---|---|---|---|
 | GET | `/posts` | `Timeline.Post` | The Samaaj's timeline, plus this member's own posts whatever their status |
 | POST | `/posts` | `Timeline.Post` | Write a post. A member's goes to the queue; `asAnnouncement` needs `Timeline.Moderate` |
-| GET | `/posts/moderation-queue` | `Timeline.Moderate` | Posts awaiting review, and approved posts members have reported |
+| GET | `/posts/moderation-queue` | `Timeline.Moderate` | Posts awaiting review, and approved posts members have reported. Each row carries `availableDecisions` — what the domain says is worth offering for that post — so a moderation screen renders buttons rather than deriving them from the status |
 | GET | `/posts/{id}` | `Timeline.Post` | One post with its comments |
 | POST | `/posts/{id}/moderate` | `Timeline.Moderate` | `{decision, reason}` — Approve, Reject, Hide or Restore. Reject and Hide need a reason |
 | POST | `/posts/{id}/comments` | `Timeline.Post` | Comment on an approved post |

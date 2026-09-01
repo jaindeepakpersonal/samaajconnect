@@ -42,5 +42,6 @@ internal static class PostMappings
         [.. post.ModerationActions
             .OrderByDescending(a => a.CreatedAt)
             .Select(a => new ModerationActionResponse(
-                a.ActorUserId, a.Action.ToString(), a.Reason, a.CreatedAt))]);
+                a.ActorUserId, a.Action.ToString(), a.Reason, a.CreatedAt))],
+        [.. post.AvailableDecisions.Select(d => d.ToString())]);
 }

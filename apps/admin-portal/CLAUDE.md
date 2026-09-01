@@ -18,8 +18,9 @@ screen. The spec is `docs/product/wireframes/admin-panel-wireframes.html`.
 | Role & Permission Matrix | `/roles` | `#rolematrix` | built, editable per Samaaj |
 | Adult Child Conversion Queue | `/conversions` | `#conversionqueue` | built |
 | Audit Logs | `/audit` | `#audit` | built |
+| Timeline / Moderation | `/moderation` | `#content` | built |
 | Notifications | `/notifications` | `#notifications` | built — compose and recent, without the Audience and Channel dropdowns |
-| Members, Timeline, Groups, Events, Issues, Celebrity, Pathshala, Boli, Reports, Settings | — | various | not built. Every one of those services exists and the member portal has screens for them; what is missing is the administrative view |
+| Members, Groups, Events, Issues, Celebrity, Pathshala, Boli, Reports, Settings | — | various | not built. Every one of those services exists and the member portal has screens for them; what is missing is the administrative view |
 
 The unbuilt screens appear in the nav, disabled, each saying why. That is
 deliberate: the wireframe promised them, and an administrator who cannot see
@@ -130,6 +131,31 @@ that was never there.
 **A refused change re-reads the matrix.** A checkbox has already flipped itself
 in the DOM by the time the request fails, and leaving it showing a change the
 server refused is the one thing this screen must never do.
+
+**Nothing on the platform could approve a post before the moderation screen.**
+A member writes one, it lands `PendingReview`, and the only way it ever reached
+the Samaaj's timeline was somebody curling the moderate endpoint. Both that and
+the queue endpoint existed; no screen in either app called either. Worth
+repeating as a habit: an endpoint with no caller is where these gaps live.
+
+**The moderation buttons come from the server.** Each queue row carries
+`availableDecisions` from `TimelinePost.AvailableDecisions`, and the screen
+renders exactly those. Deriving them from the status would put a second copy of
+the rule in the panel - the mistake the member portal's social-issues screen
+exists not to make.
+
+**A 404 from the moderation queue means the module is off, not that something
+broke.** The gateway answers 404 for a Samaaj that has switched `community` off,
+so that a Samaaj without the module is indistinguishable from a platform with no
+such feature. Reporting it as an error would send an administrator hunting a bug
+that is a setting.
+
+**The author's name is resolved, in one call.** The queue carries member ids;
+the panel loads the directory once and maps them, the same approach the member
+portal takes, and falls back to "A member" rather than printing an id. An
+administrator's directory includes members who have taken themselves out of it,
+so a moderator does not meet an unresolvable author because that member chose to
+be unlisted.
 
 **The Compose form drops two of the wireframe's four fields.** Audience offered
 "All Members" across every Samaaj and "Specific Role"; Channel offered
