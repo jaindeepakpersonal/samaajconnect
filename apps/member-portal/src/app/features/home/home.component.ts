@@ -1,6 +1,6 @@
 import { HttpClient } from '@angular/common/http';
 import { Component, OnInit, computed, inject, signal } from '@angular/core';
-import { Router } from '@angular/router';
+import { Router, RouterLink } from '@angular/router';
 import {
   AuthService,
   CurrentUser,
@@ -42,6 +42,7 @@ interface ModuleTile {
  */
 @Component({
   selector: 'app-home',
+  imports: [RouterLink],
   styleUrl: './home.css',
   template: `
     <div class="home">
@@ -98,7 +99,18 @@ interface ModuleTile {
 
               <div class="actions">
                 @if (tile.route; as target) {
-                  <button class="btn" type="button" (click)="open(target)">{{ tile.action }}</button>
+                  <!-- A link, not a button. This is navigation: it belongs in
+                       the tab order as a link, it should say "link" to a screen
+                       reader rather than "button", and a member should be able
+                       to middle-click or long-press it to open their Samaaj's
+                       events in a second tab like anything else on the web.
+                       A button that calls router.navigateByUrl can do none of
+                       those, and it looked identical on screen, which is why
+                       it survived this long. -->
+                  <a class="btn" [routerLink]="target">
+                    {{ tile.action }}
+                    <span class="sr-only">{{ tile.title }}</span>
+                  </a>
                 } @else {
                   <button class="btn" type="button" disabled>{{ tile.action }}</button>
                   <span class="pill">Coming soon</span>
@@ -241,10 +253,6 @@ export class HomeComponent implements OnInit {
         this.error.set(describeError(failure));
       },
     });
-  }
-
-  open(route: string): void {
-    void this.router.navigateByUrl(route);
   }
 
   signOut(): void {

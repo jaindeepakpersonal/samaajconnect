@@ -30,7 +30,10 @@ const ADMIN_ROLES = [
   imports: [ReactiveFormsModule],
   styleUrl: './login.css',
   template: `
-    <div class="login-wrap">
+    <!-- A landmark, but no skip link: this page has nothing before its content
+         to skip past, and a skip link that jumps nowhere is noise in the tab
+         order rather than a service. -->
+    <main class="login-wrap">
       <div class="brand">samaajconnect<br /><span>Unified Admin</span></div>
 
       <div class="card">
@@ -87,7 +90,7 @@ const ADMIN_ROLES = [
           Samaaj administrator gave them, in the member portal.
         </p>
       </div>
-    </div>
+    </main>
   `,
 })
 export class AdminLoginComponent {

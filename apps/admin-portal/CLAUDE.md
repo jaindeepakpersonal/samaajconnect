@@ -151,5 +151,19 @@ reason in a `title` attribute, which becomes the element's accessible name and
 exist yet" with no way to tell which item that was. The reason is now a
 visually-hidden span after the label.
 
-A full audit has not been done; that is a Phase 5 item in
-`DEVELOPMENT_PLAN.md`.
+**The audit was done on 2026-09-01**, alongside member-portal's — see that app's
+`CLAUDE.md` for what was checked and what the palette measured. Two things
+changed here.
+
+**The shell now has a skip link**, and it matters more in this app than in the
+member portal: the whole left rail is navigation, so a keyboard user without one
+tabs through every section link on every page before reaching the content.
+`<main>` gained `id="main-content"` and `tabindex="-1"` so the link has
+somewhere focusable to land.
+
+**Sign-in has a `<main>` and deliberately no skip link.** It sits outside the
+shell, so it has no navigation to skip past, and a skip link that jumps nowhere
+is noise in the tab order rather than a service.
+
+Not yet done: a pass with a real screen reader, and a keyboard-only walkthrough
+of the role matrix, which is the widest table in either app.

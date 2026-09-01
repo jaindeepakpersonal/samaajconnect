@@ -335,9 +335,52 @@ and what makes them need CSRF protection - and this platform has none.
 
 ## Accessibility
 
-The requirements call for WCAG 2.1 AA. What is in place so far: labelled form
-controls, `aria-invalid` on failed fields, `role="alert"` on errors and
-`role="status"` on progress and confirmations, a visible focus ring that is
-restyled rather than removed, and disabled controls carrying a `title`
-explaining why. A full audit has not been done; that is a Phase 5 item in
-`DEVELOPMENT_PLAN.md`.
+The requirements call for WCAG 2.1 AA. **The audit was done on 2026-09-01**;
+what it checked and what it found are below, so the next pass knows what has
+already been looked at rather than starting over.
+
+**Already in place, and confirmed:** labelled form controls — every one of the
+57 across both apps, including the checkboxes that are wrapped in a `<label>`
+rather than pointing at one by id; `aria-invalid` on failed fields;
+`role="alert"` on errors and `role="status"` on progress and confirmations; a
+focus ring restyled rather than removed; exactly one `<h1>` on every screen;
+wide tables scrolling inside their own container; `lang="en"` on the document.
+
+**The palette passes AA everywhere**, checked rather than assumed — the tightest
+pair is muted text on the page background at 4.56:1, and every other
+combination the apps use is above 4.9:1. Nothing needed changing, which is
+worth writing down: the next person to add a colour has a floor to clear.
+
+Three things it found.
+
+**The app had no `<main>` and no skip link.** `App` was a bare
+`<router-outlet />`, so nothing on any screen was inside a landmark and there
+was no way to bypass repeated blocks (WCAG 2.4.1, level A). Both apps now have
+a visible-on-focus skip link as the first thing in the tab order, and a
+`<main id="main-content" tabindex="-1">`. The `tabindex` is what makes the link
+work at all: without it the target is not focusable, the browser scrolls but
+leaves focus on the link, and the next Tab goes straight back into what the
+member was skipping.
+
+**Home's module tiles were buttons that navigated.** They called
+`router.navigateByUrl` from a `<button>`, which looks identical on screen and
+is wrong in every other way — announced as "button" rather than "link", absent
+from the list of links on the page, and impossible to middle-click or
+long-press into a second tab. They are anchors now. Each also carries its tile
+title in a visually-hidden span, because every visible label is "Open" and a
+screen reader listing the page's links otherwise reads "Open, Open, Open".
+
+**Nothing moved focus on navigation.** A full page load resets focus and a
+screen reader starts reading; a router navigation does neither, so focus stayed
+on a tile that no longer existed and the member was told the page had changed
+by sighted layout alone. `App` now focuses the `<main>` after every navigation
+except the first, which the browser has already handled.
+
+Also added: a `prefers-reduced-motion` block in both apps. The only motion
+today is the skip link sliding in, which is small — but the preference is a
+preference rather than a threshold, and the rule belongs there before something
+larger is added and nobody remembers to ask.
+
+Not yet done: a pass with a real screen reader, and keyboard-only walkthroughs
+of the longer workflows (the Boli bid form, the issue transitions). Those need a
+person, not a script.

@@ -336,7 +336,18 @@ unit tested.
       does not stop the rules after it; they needed a `When`. It hit any caller,
       including a member editing their own profile, and was found incidentally
       by the isolation probe
-- [ ] Accessibility pass (WCAG 2.1 AA) on both Angular apps
+- [x] Accessibility pass (WCAG 2.1 AA) on both Angular apps. Found three real
+      things: neither app had a `<main>` landmark or a skip link (2.4.1, level
+      A); Home's module tiles were `<button>`s calling `router.navigateByUrl`,
+      so they announced as buttons and could not be opened in a new tab; and
+      nothing moved focus on navigation, so a screen reader announced nothing
+      when the page changed. All three fixed, plus a `prefers-reduced-motion`
+      block. The palette was measured rather than assumed and passes AA
+      everywhere — tightest pair 4.56:1. What each app's `CLAUDE.md` now records
+      is what was checked, so the next pass does not start over
+- [ ] Accessibility: a pass with a real screen reader, and keyboard-only
+      walkthroughs of the longer workflows (the Boli bid form, the issue
+      transitions, the role matrix). Those need a person, not a script
 - [ ] Backup/restore drill
 
 ---

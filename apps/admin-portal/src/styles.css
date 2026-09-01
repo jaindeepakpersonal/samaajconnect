@@ -365,6 +365,35 @@ tbody tr:last-child td {
   color: var(--muted);
 }
 
+/* The first thing in the tab order, and invisible until it has focus. This
+   panel's whole left rail is navigation, so a keyboard user without it tabs
+   through every section link on every page before reaching the content.
+   Visible-on-focus rather than permanently hidden: a sighted keyboard user
+   needs to see where their focus went as much as anybody else does. */
+.skip-link {
+  position: absolute;
+  left: var(--space-3);
+  top: -4rem;
+  z-index: 100;
+  padding: var(--space-2) var(--space-4);
+  background: var(--panel);
+  color: var(--accent-ink);
+  border: 2px solid var(--accent);
+  border-radius: var(--radius-sm);
+  text-decoration: none;
+  transition: top 120ms ease-in-out;
+}
+
+.skip-link:focus {
+  top: var(--space-3);
+}
+
+/* Takes focus when the skip link is used. It must not draw a ring for that -
+   nobody clicked it - so the ring is suppressed here and nowhere else. */
+main:focus {
+  outline: none;
+}
+
 /* Visually hidden but still announced - used for live regions reporting
    loading and error states to screen readers. */
 .sr-only {
@@ -377,4 +406,20 @@ tbody tr:last-child td {
   clip: rect(0, 0, 0, 0);
   white-space: nowrap;
   border: 0;
+}
+
+/* Respect a stated preference for less motion.
+   The only movement either app has today is the skip link sliding into view,
+   which is small - but the preference is a preference, not a threshold, and the
+   rule belongs here before something larger is added and nobody remembers to
+   ask. Written as a blanket override so it keeps covering whatever comes next. */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
 }

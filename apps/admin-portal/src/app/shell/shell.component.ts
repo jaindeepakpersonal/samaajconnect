@@ -36,6 +36,8 @@ interface NavGroup {
   imports: [RouterOutlet, RouterLink, RouterLinkActive],
   styleUrl: './shell.css',
   template: `
+    <a class="skip-link" href="#main-content">Skip to the main content</a>
+
     <div class="app">
       <aside class="side">
         <div class="brand">samaajconnect<br /><span>Unified Admin</span></div>
@@ -71,7 +73,7 @@ interface NavGroup {
         </nav>
       </aside>
 
-      <main>
+      <main id="main-content" tabindex="-1">
         <div class="bar">
           <div>
             <b>{{ scopeLabel() }}</b>

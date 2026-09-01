@@ -179,6 +179,41 @@ describe('HomeComponent', () => {
     expect(text()).not.toContain('Coming soon');
   });
 
+  it('offers each tile as a link, not a button that navigates', () => {
+    // These were buttons calling router.navigateByUrl. Identical on screen, and
+    // wrong in every other way: announced as "button" rather than "link", and
+    // impossible to middle-click or long-press into a second tab. This is
+    // navigation, so it is an anchor with an href.
+    load({ modules: ['Community'] });
+
+    const root = fixture.nativeElement as HTMLElement;
+    const links = root.querySelectorAll('.card a[href]');
+    const navButtons = root.querySelectorAll('.card button:not([disabled])');
+
+    expect(links.length).toBeGreaterThan(0);
+    expect(navButtons.length).toBe(0);
+  });
+
+  it('gives each tile link a name that says which tile it is', () => {
+    // Every tile's visible label is "Open", so a screen reader listing the
+    // links on this page would read "Open, Open, Open". The tile's title is
+    // appended for assistive technology and hidden from sighted readers.
+    load({ modules: ['Community'] });
+
+    const cards = Array.from((fixture.nativeElement as HTMLElement).querySelectorAll('.card'));
+
+    expect(cards.length).toBeGreaterThan(0);
+
+    for (const card of cards) {
+      const link = card.querySelector('a[href]');
+      const title = card.querySelector('h3')?.textContent?.trim() ?? '';
+
+      expect(link).not.toBeNull();
+      expect(link?.textContent).toContain(title);
+      expect(link?.querySelector('.sr-only')).not.toBeNull();
+    }
+  });
+
   it('says so when the Samaaj has no modules enabled at all', () => {
     load({ modules: [] });
 
