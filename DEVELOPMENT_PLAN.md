@@ -7,24 +7,23 @@ version of the plan; the reasoning behind the ordering lives in
 
 ## Current Status
 
-- **Stage:** Phase 4 built; six member modules have screens
-- **Last updated:** 2026-09-01 - `boli-service`, the tenth and last service,
-  after the member portal's DPDP rights screen (`/privacy`) and the Pathshala
-  and Celebrities of Samaaj screens. Boli's guarantee is one *highest* bid
-  rather than one vote each, which needs a row lock as well as a unique index;
-  fifteen simultaneous identical bids through the gateway leave exactly one.
-  Driving Celebrity Voting against the running stack earlier in the same run
-  found a gateway bug that had been breaking every module-gated screen in the
-  app: a gated route answered 404 rather than 401 when the caller's access
-  token had expired, so the portals' silent renew-and-retry never fired and the
-  screen printed "No such endpoint." from fifteen minutes after sign-in
-  onwards. 1,081 tests green (814 backend, 267 frontend) plus 240 smoke checks
-  against a stack built from empty volumes, re-runnable against a dirty one.
-- **Blocking item:** none. **Every module the platform has now has a
-  service**, and every one but Boli has member screens. What is left is the
-  Boli screens (`#boli`, `#bolidetail`), an editable role matrix, and the two
-  DPDP obligations — breach notification and the right to nominate — that need
-  a notification channel first. The vote endpoint's throughput load test is
+- **Stage:** every module has a service and member screens; Phase 5 hardening next
+- **Last updated:** 2026-09-01 - the member portal's Boli screens, closing the
+  last module. `boli-service` shipped in the same run as the tenth and final
+  service: its guarantee is one *highest* bid rather than one vote each, which
+  needs a row lock as well as a unique index, and fifteen simultaneous
+  identical bids through the gateway leave exactly one. Driving Celebrity
+  Voting against the running stack earlier in the run found a gateway bug that
+  had been breaking every module-gated screen in the app: a gated route
+  answered 404 rather than 401 when the caller's access token had expired, so
+  the portals' silent renew-and-retry never fired and the screen printed "No
+  such endpoint." from fifteen minutes after sign-in onwards. 1,087 tests green
+  (814 backend, 273 frontend) plus 240 smoke checks against a stack built from
+  empty volumes, re-runnable against a dirty one.
+- **Blocking item:** none. **Every module the platform has now has both a
+  service and member screens.** What is left is Phase 5 hardening, an editable
+  role matrix, and the two DPDP obligations — breach notification and the right
+  to nominate — that need a notification channel first. The vote endpoint's throughput load test is
   carried to Phase 5, since it needs a deployed environment; its correctness
   half is done. The five questions in `docs/product/DPDP-COMPLIANCE.md` still
   need counsel before any of this ships to real users.
@@ -273,7 +272,13 @@ unit tested.
       Being outbid answers 200 with `accepted: false` and the amount now
       needed. Amounts are integer paise. The bid history never names who
       bid, and a recorded result names nobody until it is published
-- [ ] Member portal: the Boli screens (`#boli`, `#bolidetail`)
+- [x] Member portal: the Boli screens - the hub, one Boli with its bid form
+      and history, and an occasion screen the wireframe's "View Occasion"
+      button had nothing behind it. Money is integer paise converted in one
+      place; being outbid is an info notice with the new minimum already in the
+      field, not a red error; and "You are leading" is only said while bidding
+      is open, because on a closed-but-unpublished Boli it would announce the
+      winner before the Samaaj did
 - [ ] Full `SECURITY-CHECKLIST.md` pass across every service
 - [ ] HTTPS-only in production: TLS termination, HSTS, secure-cookie policy,
       and `ForwardedHeaders` so the gateway rate limiter partitions on the real

@@ -120,6 +120,28 @@ export const routes: Routes = [
       import('./features/pathshala/enrolment.component').then((m) => m.EnrolmentComponent),
   },
   {
+    path: 'boli',
+    title: 'Auctions / Boli - samaajconnect',
+    canActivate: [authGuard],
+    loadComponent: () =>
+      import('./features/boli/boli-list.component').then((m) => m.BoliListComponent),
+  },
+  {
+    // Declared before 'boli/:id' so the literal segment is not shadowed.
+    path: 'boli/occasions/:id',
+    title: 'Boli occasion - samaajconnect',
+    canActivate: [authGuard],
+    loadComponent: () =>
+      import('./features/boli/occasion.component').then((m) => m.OccasionComponent),
+  },
+  {
+    path: 'boli/:id',
+    title: 'Boli - samaajconnect',
+    canActivate: [authGuard],
+    loadComponent: () =>
+      import('./features/boli/boli-detail.component').then((m) => m.BoliDetailComponent),
+  },
+  {
     path: 'privacy',
     title: 'Your data and privacy - samaajconnect',
     canActivate: [authGuard],

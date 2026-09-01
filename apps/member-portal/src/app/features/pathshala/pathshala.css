@@ -35,14 +35,6 @@
   margin-bottom: 0;
 }
 
-/* A percentage nothing can be computed for yet. Not a zero, and it should not
-   look like one: lighter, and set in the body face rather than the tile face. */
-.stat.unknown {
-  font-size: 1rem;
-  font-weight: 400;
-  color: var(--muted);
-}
-
 /* The timetable. Days read as a list rather than a table because a class has
    one or two slots, not a week of them. */
 .slots {

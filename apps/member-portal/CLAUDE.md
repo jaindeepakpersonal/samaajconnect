@@ -26,9 +26,12 @@ before translating another screen.
 | Your data and privacy | `/privacy` | — | built; no wireframe covers the DPDP rights, and endpoints reachable only with curl are not rights a member has |
 | Jain Pathshala | `/pathshala` | `#pathshala` | built |
 | Pathshala enrolment | `/pathshala/:id` | `#myclass` + `#attendance` + `#exams` + `#progress` | built as one screen |
+| Auctions / Boli | `/boli` | `#boli` | built |
+| Boli detail | `/boli/:id` | `#bolidetail` | built |
+| Boli occasion | `/boli/occasions/:id` | — | built; the wireframe's "View Occasion" had no screen behind it |
 | Pathshala events | — | `#pathevents` | not built — no endpoint exists |
 | Forgot password / OTP | — | `#forgot`, `#otp` | not built — no endpoint exists |
-| Profile, Boli, Notifications | — | various | not built |
+| Profile, Notifications | — | various | not built |
 
 ## Where things live
 
@@ -187,6 +190,33 @@ know and that actually matters to the reader - "Your post", "You", "The
 president", "A member", "A volunteer group" - rather than printing an id or a
 placeholder. The wireframes' "President: Rajesh Jain" is prototype data, not a
 field the API has.
+
+**Money is integer paise on the wire and converted in exactly one place.**
+boli-service holds every amount as a `long` because a Boli is money the Samaaj
+announces and collects against. `boli.format.ts` is the only file that divides
+or multiplies by 100, and it rounds rather than truncating: `15600.07` parsed as
+a float and multiplied by 100 is `1560006.9999999998`, which truncates to a
+paisa less than the member typed. It also refuses input `parseFloat` would
+accept — `parseFloat('12abc')` is `12`, and bidding a number nobody typed is the
+worst possible way to be lenient. Amounts are grouped `en-IN` explicitly, so a
+member on a US-locale phone still sees ₹1,50,000 rather than ₹150,000.
+
+**A bid the server refuses as too low is a notice, not an error.** The service
+answers 200 with `accepted: false` and the amount now needed, because somebody
+outbid while their form was open has done nothing wrong. The screen puts that in
+an info notice, refills the field with the new minimum, and leaves the red
+`role="alert"` for things the member can actually fix. The minimum itself always
+comes from the server — the increment rule belongs to the Boli, and a second
+copy here would be the one that drifts.
+
+**"You are leading" is only ever said while bidding is open.** It shipped
+appearing beside "Result announced", which is the wrong tense on a race that
+finished hours ago — and on a Boli closed *without* a published result it would
+have been worse than wrong, telling the reader they had won before the Samaaj
+announced it. That is precisely what the service's record-then-publish split
+exists to prevent, and a screen is as able to break it as a handler. Once a
+result is published the list says "Won by you", from the result rather than from
+the leading bid.
 
 **Withdrawing a consent has no confirmation step, and erasing has two.** DPDP
 section 6(4) requires withdrawing to be as easy as giving, and giving was a tick

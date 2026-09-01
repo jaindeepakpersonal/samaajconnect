@@ -162,15 +162,21 @@ describe('HomeComponent', () => {
     expect(text()).not.toContain('1248');
   });
 
-  it('marks tiles whose screens do not exist yet instead of linking nowhere', () => {
-    // Boli is the last module with a tile and no screen; Pathshala was the
-    // example here until its screens shipped.
-    load({ modules: ['Boli'] });
+  it('every tile it offers actually goes somewhere', () => {
+    // This used to assert the opposite half: that a tile with no screen yet is
+    // marked "Coming soon" rather than linking nowhere. Every module now has
+    // screens, so there is no such tile left to point at, and the property
+    // worth holding is the stronger one. The template still handles a
+    // routeless tile - a module can land before its screen again - it just has
+    // no example to test against today.
+    load({ modules: ['Community', 'Pathshala', 'Boli', 'CelebrityVoting', 'SocialIssues'] });
 
-    const disabled = (fixture.nativeElement as HTMLElement).querySelectorAll('.card button[disabled]');
+    const cards = (fixture.nativeElement as HTMLElement).querySelectorAll('.card');
+    const dead = (fixture.nativeElement as HTMLElement).querySelectorAll('.card button[disabled]');
 
-    expect(disabled.length).toBeGreaterThan(0);
-    expect(text()).toContain('Coming soon');
+    expect(cards.length).toBeGreaterThan(0);
+    expect(dead.length).toBe(0);
+    expect(text()).not.toContain('Coming soon');
   });
 
   it('says so when the Samaaj has no modules enabled at all', () => {

@@ -200,7 +200,7 @@ export class HomeComponent implements OnInit {
       title: 'Boli',
       description: 'View active and published Boli results.',
       action: 'Open',
-      route: null,
+      route: '/boli',
     },
   ];
 

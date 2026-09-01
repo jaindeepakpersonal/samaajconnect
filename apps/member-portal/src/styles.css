@@ -105,6 +105,16 @@ h3 {
   font-weight: 800;
 }
 
+/* A figure that cannot be computed yet — no register marked, no exam sat, no
+   bid placed. Deliberately not styled like a number, because it is not one and
+   a nil that looks like a stat reads as a zero. Shared: Pathshala and Boli both
+   have to say "not yet" without saying "none". */
+.stat.unknown {
+  font-size: 1rem;
+  font-weight: 400;
+  color: var(--muted);
+}
+
 .grid {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
