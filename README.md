@@ -53,8 +53,8 @@ an explicit `Host:` header locally, so no `/etc/hosts` entries are needed:
 bash scripts/smoke-through-gateway.sh
 ```
 
-Two other scripts check things the test suites cannot, and both are safe to run
-against the compose stack while it is up.
+Three other scripts check things the test suites cannot. The two that talk to the
+stack are safe to run against it while it is up.
 
 Cross-tenant isolation — a second Samaaj's member and administrator attempting
 36 reads and writes against the first Samaaj's data, every one of which must be
@@ -62,6 +62,13 @@ refused with 404:
 
 ```bash
 bash scripts/tenant-isolation-probe.sh
+```
+
+Which endpoints no screen can reach — three cycles running, the most valuable
+thing to build next was on this list. It reads the source and needs no stack:
+
+```bash
+bash scripts/unreachable-endpoints.sh
 ```
 
 Backup and restore — every logical database dumped, restored into a scratch

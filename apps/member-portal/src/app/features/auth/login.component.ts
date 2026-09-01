@@ -37,6 +37,10 @@ type SignInMethod = 'password' | 'otp';
           </p>
         }
 
+        @if (justActivated()) {
+          <p class="notice info" role="status">Your password is set. Sign in to continue.</p>
+        }
+
         @if (justRegistered()) {
           <p class="notice info" role="status">
             Your account is ready. Sign in to continue. We will ask you to verify your mobile
@@ -119,6 +123,17 @@ type SignInMethod = 'password' | 'otp';
             Forgot password?
           </button>
         </p>
+
+        <!--
+          The way in for anyone an administrator invited, and for an adult child
+          whose conversion was approved. Three screens in the admin panel tell
+          people to redeem their code "in the member portal", so it has to be
+          findable from the screen they land on.
+        -->
+        <p class="small auth-footer">
+          Given a one-time code?
+          <a routerLink="/activate">Set your password</a>
+        </p>
       </div>
     </div>
   `,
@@ -135,6 +150,7 @@ export class LoginComponent {
   readonly resetNotice = signal(false);
   readonly sessionExpired = signal(this.route.snapshot.queryParamMap.get('expired') === 'true');
   readonly justRegistered = signal(this.route.snapshot.queryParamMap.get('registered') === 'true');
+  readonly justActivated = signal(this.route.snapshot.queryParamMap.get('activated') === 'true');
   readonly otherSamaaj = signal(this.route.snapshot.queryParamMap.get('otherSamaaj') === 'true');
 
   readonly form = this.formBuilder.nonNullable.group({

@@ -31,6 +31,7 @@ before translating another screen.
 | Boli occasion | `/boli/occasions/:id` | — | built; the wireframe's "View Occasion" had no screen behind it |
 | Notifications | `/notifications` | `#notifications` | built |
 | Pathshala events | — | `#pathevents` | not built — no endpoint exists |
+| Set your password | `/activate` | — | built; no wireframe covers redeeming an activation code, and three admin screens told people to do it here |
 | Forgot password / OTP | — | `#forgot`, `#otp` | not built — no endpoint exists |
 | My Profile | `/profile` | `#profile` | built |
 
@@ -154,6 +155,16 @@ claim otherwise.** member-family-service returns null for a field the viewer
 may not see rather than masking it, because a mask like "+91 98xxxxxx10" still
 leaks length and shape. From the client the two cases are indistinguishable, so
 the only honest label is "Not shared" - never "None" and never a bare dash.
+
+**Three cycles running, the gap worth filling was an endpoint with no caller.**
+The profile screen the welcome notification points at; timeline moderation,
+without which no member post could ever be approved; and redeeming an
+activation code, which the admin panel told people to do in this app while this
+app had nowhere to do it - so no invited administrator could sign in and no
+converted adult child could get an account. All three were complete, tested and
+reachable only by curl, and nothing failed to say so.
+`scripts/unreachable-endpoints.sh` is that check made repeatable; run it before
+guessing at what to build.
 
 **A member could be told to complete their profile and had nowhere to do it.**
 The welcome notification every registration raises says "Complete your profile

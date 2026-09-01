@@ -66,6 +66,19 @@ export interface RegisterResult {
   readonly isContactVerified: boolean;
 }
 
+/**
+ * Mirrors `ActivateAccountResponse`.
+ *
+ * No token: redeeming a code sets a first password, it does not sign anybody
+ * in. The next step is the ordinary login, which is also the first proof the
+ * password works.
+ */
+export interface ActivationResult {
+  readonly userId: string;
+  readonly tenantSlug: string;
+  readonly fullName: string;
+}
+
 /** Mirrors TenantSummaryResponse - what the anonymous slug lookup returns. */
 export interface TenantSummary {
   readonly id: string;

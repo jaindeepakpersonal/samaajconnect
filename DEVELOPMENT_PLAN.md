@@ -8,31 +8,28 @@ version of the plan; the reasoning behind the ordering lives in
 ## Current Status
 
 - **Stage:** every module has a service and member screens; Phase 5 hardening under way
-- **Last updated:** 2026-09-01 - **Timeline / Content Moderation** in the admin
-  panel. Nothing on the platform could approve a post before it: a member writes
-  one, `TimelinePost.Create` puts it in `PendingReview`, and the only way it
-  ever reached the Samaaj timeline was somebody curling the moderate endpoint.
-  The queue endpoint and the moderate endpoint both existed and no screen in
-  either app called either - the second time in two cycles that an endpoint with
-  no caller turned out to be the gap worth filling.
+- **Last updated:** 2026-09-01 - **redeeming an activation code**, and the sweep
+  that found it. Three screens in the admin panel told people to redeem their
+  one-time code "in the member portal", and the member portal had nowhere to do
+  it - so no invited administrator could ever sign in, and no adult child whose
+  conversion was approved could ever get an account. Both flows were complete,
+  tested, and reachable only by curl.
 
-  The buttons come from `TimelinePost.AvailableDecisions`, not from the status,
-  so a state added to the domain cannot leave the panel offering the wrong ones.
-  Approve and Restore both end at Approved, so a post is offered whichever one
-  describes what is happening to it.
-
-  Two smoke-script repairs, both of checks that were right about the platform
-  and wrong about themselves: the admin-list check grepped for a member by name,
-  and that member is granted PathshalaTeacher later in the same script, so it
-  failed on every re-run; it asserts on roles now. And editing this script while
-  a run of it is in flight corrupts that run - bash reads a script incrementally,
-  so the offsets shift and it resumes mid-token, several hundred lines from
-  anything that changed. That is written at the top of the file now, having cost
-  two confusing failures in three minutes. 1,306 tests green (967 backend across
-  21 suites, 339 frontend) plus 262 smoke checks against empty volumes.
+  That was the third cycle running where the gap worth filling was an endpoint
+  with no caller, so it is a script now:
+  `scripts/unreachable-endpoints.sh` reads the source and lists every endpoint
+  neither app calls. It found 27; this cycle closed one. The remaining 26 are
+  listed under Phase 5 - one belongs to the gateway and is not a gap, and the
+  other 25 cluster hard, thirteen of them Pathshala administration, which is a
+  whole module that can only be operated with curl. 1,314 tests green (967
+  backend across 21 suites, 347 frontend) plus 262 smoke checks against empty
+  volumes.
 - **Blocking item:** none. **Every module the platform has now has both a
   service and member screens**, and the role matrix is editable per Samaaj. What
-  is left needs things this repository cannot supply on its own: TLS and a
+  is left that needs nothing from outside is the 25 unreachable endpoints listed
+  in Phase 5 - screens for Pathshala, Boli, events, voting and volunteer-group
+  administration. Beyond those, what is left needs things this repository cannot
+  supply on its own: TLS and a
   backup drill need a deployed environment, platform-hosted images need storage,
   the two remaining DPDP obligations - breach notification and the right to
   nominate - are no longer blocked on a channel but still need a real provider
@@ -153,6 +150,12 @@ unit tested.
       queue existed; no screen in either app called either. The buttons come
       from `TimelinePost.AvailableDecisions` rather than from the status, so a
       state added to the domain cannot leave the panel offering the wrong ones
+- [x] Redeeming an activation code, in the member portal at `/activate`. Three
+      screens in the admin panel told people to do this there - the invite
+      screen, the admin sign-in screen and the conversion queue - and the member
+      portal had nowhere to do it, so **no invited administrator could ever sign
+      in and no converted adult child could ever get an account**. The endpoint
+      was complete and covered by the smoke script through curl
 - [ ] A real email or SMS provider, so `Sent` means a person was reached.
       One class implementing `INotificationChannel` and one registration; the
       choice of provider is a hosting decision
@@ -437,6 +440,35 @@ unit tested.
       own comment was about, and ignores `publishedAt` — the first response
       carries .NET's 100ns timestamp and the second Postgres's microseconds,
       a round-trip artifact rather than a result that moved
+- [x] `scripts/unreachable-endpoints.sh` — lists every endpoint the services map
+      that neither app calls. Three cycles running, that list is where the next
+      thing worth building turned out to be: the profile screen the welcome
+      notification points at, timeline moderation without which no post could be
+      approved, and redeeming an activation code, which three admin screens told
+      people to do "in the member portal" while the member portal had nowhere to
+      do it. All three were complete, tested, and reachable only by curl
+- [ ] **26 endpoints nobody can reach from either app.** One is not a gap:
+      `GET /v1/identity/tenants/by-id/{id}` is the gateway's. The other 25 are
+      screens nobody has built, and they cluster:
+  - [ ] **Pathshala administration (13).** The largest by far, and a whole
+        module that can only be operated with curl. A parent can ask for a
+        place; nobody can open a session, create a class, assign a teacher, set
+        a timetable, place a child, mark a register, set an exam or record a
+        result. Sessions, classes, teachers, schedule, placement, attendance,
+        exams, results, the class roll, the Pathshala detail, the enrolment
+        request queue, and the two deletes
+  - [ ] **Boli administration (5).** Members can bid; nobody can run an
+        auction. Occasion status, Boli types, opening a Boli, closing one,
+        publishing a result
+  - [ ] **Events administration (3).** Members can register; nobody can publish
+        or cancel an event, or see who is coming
+  - [ ] **Celebrity voting administration (2).** Deciding a nomination, and
+        moving a campaign between stages
+  - [ ] **Volunteer groups (1).** Deactivating a group
+  - [ ] **Social issues (1).** The reviewer's approval queue. The one item here
+        that is a convenience rather than a dead end: the member portal's issue
+        detail already renders `availableTransitions`, so a reviewer can decide
+        without it
 - [ ] A smoke run that fails loudly when an id extraction goes wrong. The
       session-id bug was invisible for a reason worth fixing properly: every
       downstream check reported someone else's service returning 404, and

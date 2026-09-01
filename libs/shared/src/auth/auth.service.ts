@@ -6,6 +6,7 @@ import {
   CurrentUser,
   LoginResult,
   RegisterRequest,
+  ActivationResult,
   RegisterResult,
   TenantSummary,
 } from './auth.models';
@@ -32,6 +33,26 @@ export class AuthService {
 
   register(request: RegisterRequest): Observable<RegisterResult> {
     return this.http.post<RegisterResult>('/v1/identity/register', request);
+  }
+
+  /**
+   * Redeems a one-time activation code and sets the account's first password.
+   *
+   * Anonymous by necessity: whoever is doing this cannot sign in yet, and the
+   * code is what stands in for authentication. It answers with who the account
+   * belongs to and no token, so the next step is signing in normally.
+   *
+   * Here beside login and register because it is the identity service's third
+   * anonymous entry point, not because the admin panel uses it - that panel
+   * sends people to the member portal to do this, which is the whole reason the
+   * screen had to exist.
+   */
+  activate(mobileOrEmail: string, code: string, password: string): Observable<ActivationResult> {
+    return this.http.post<ActivationResult>('/v1/identity/activations/redeem', {
+      mobileOrEmail,
+      code,
+      password,
+    });
   }
 
   loadCurrentUser(): Observable<CurrentUser> {

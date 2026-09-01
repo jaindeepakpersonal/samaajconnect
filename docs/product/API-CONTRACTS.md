@@ -26,7 +26,7 @@ enforced by `TenantAuthorizationBehavior`, not just UI hiding.
 | POST | `/login` | Anonymous | Common login → returns tenant-scoped JWT |
 | GET | `/activations/pending` | SamaajAdmin | Accounts awaiting activation |
 | POST | `/activations/{userId}/code` | SamaajAdmin | Mint a one-time activation code (returned once) |
-| POST | `/activations/redeem` | Anonymous | Redeem a code and set a first password |
+| POST | `/activations/redeem` | Anonymous | Redeem a code and set a first password. The member portal's `/activate` screen; answers with who the account belongs to and **no token**, so the next step is an ordinary sign-in |
 | GET | `/consent-notice` | Anonymous | The consent notice and its version (DPDP s.5) |
 | POST | `/me/consents/{purpose}/withdraw` | Authenticated | Withdraw one consent (DPDP s.6(4)) |
 | GET | `/me/data-export` | Authenticated | What this service holds about you (DPDP s.11) |

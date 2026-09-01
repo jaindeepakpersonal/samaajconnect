@@ -14,6 +14,12 @@ export const routes: Routes = [
       import('./features/auth/register.component').then((m) => m.RegisterComponent),
   },
   {
+    path: 'activate',
+    title: 'Set your password - samaajconnect',
+    loadComponent: () =>
+      import('./features/auth/activate.component').then((m) => m.ActivateComponent),
+  },
+  {
     path: 'home',
     title: 'Home - samaajconnect',
     canActivate: [authGuard],
