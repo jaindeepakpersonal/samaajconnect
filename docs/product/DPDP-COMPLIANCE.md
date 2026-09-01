@@ -252,9 +252,25 @@ every write path; JWTs short-lived and validated by every service rather than
 by the gateway alone; no credential ever placed in a Kafka event, because the
 audit log records payloads verbatim.
 
+Cross-tenant isolation is probed rather than assumed:
+`scripts/tenant-isolation-probe.sh` has a second Samaaj's member and
+administrator attempt 36 reads and writes against the first Samaaj's ids, and
+all 36 are refused. And the databases are provably restorable —
+`scripts/backup-restore-drill.sh` dumps all ten and restores each into a scratch
+copy, comparing row counts and the unique indexes that are correctness
+guarantees.
+
 Not in place: encryption at rest (a deployment concern, not yet specified),
 TLS termination policy, key rotation, a breach-detection process, and
 penetration testing — the last is already Phase 5 in `DEVELOPMENT_PLAN.md`.
+
+**Availability is a safeguard too, and only half of it is done.** §8(4) asks for
+safeguards against loss as well as against breach. The drill proves a dump
+restores; it does not make a dump a backup. The dumps land beside the database
+they came from, and being full dumps the recovery point is whenever one last
+ran. Off-host storage, WAL archiving for point-in-time recovery, and a schedule
+are hosting decisions, and until they are made the platform can restore from a
+backup it has but does not reliably have one to restore from.
 
 ## What each Samaaj must decide, not the software
 

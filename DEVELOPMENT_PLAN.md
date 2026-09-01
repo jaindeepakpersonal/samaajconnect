@@ -357,7 +357,18 @@ unit tested.
 - [ ] Accessibility: a pass with a real screen reader, and keyboard-only
       walkthroughs of the longer workflows (the Boli bid form, the issue
       transitions, the role matrix). Those need a person, not a script
-- [ ] Backup/restore drill
+- [x] Backup/restore drill — `scripts/backup-restore-drill.sh`. Dumps all ten
+      logical databases, restores each into a `_drill` copy, and compares row
+      counts per table and the unique indexes that are correctness guarantees.
+      Never touches the live databases, so it is safe to run against a running
+      system — a drill that can only be run somewhere safe is a drill nobody
+      runs. 20 checks, all passing, and both kinds of check were shown to fail
+      when a row or an index is removed from the restored copy
+- [ ] **Backups are not deployed, only proven restorable.** The drill writes
+      dumps next to the database they came from, which protects against nothing,
+      and full dumps mean the recovery point is whenever the dump ran. A real
+      deployment needs WAL archiving for point-in-time recovery, off-host
+      storage, and a schedule. All three are hosting decisions
 
 ---
 

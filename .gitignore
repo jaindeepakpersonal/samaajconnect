@@ -36,3 +36,12 @@ Desktop.ini
 
 # Docker volumes (local bind mounts, if any)
 .data/
+
+# Database dumps from scripts/backup-restore-drill.sh.
+#
+# These are full copies of every logical database, so they contain real member
+# data - names, contact details, children's records, consent history. Committing
+# one would put personal data in git history, which is close to the hardest
+# place on this platform to remove it from, and would defeat the erasure the
+# platform goes to some trouble to honour.
+.backup-drill/

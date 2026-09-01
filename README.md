@@ -53,6 +53,24 @@ an explicit `Host:` header locally, so no `/etc/hosts` entries are needed:
 bash scripts/smoke-through-gateway.sh
 ```
 
+Two other scripts check things the test suites cannot, and both are safe to run
+against the compose stack while it is up.
+
+Cross-tenant isolation — a second Samaaj's member and administrator attempting
+36 reads and writes against the first Samaaj's data, every one of which must be
+refused with 404:
+
+```bash
+bash scripts/tenant-isolation-probe.sh
+```
+
+Backup and restore — every logical database dumped, restored into a scratch
+copy, and compared. It never writes to the live databases:
+
+```bash
+bash scripts/backup-restore-drill.sh
+```
+
 Then start the member portal against it:
 
 ```bash
