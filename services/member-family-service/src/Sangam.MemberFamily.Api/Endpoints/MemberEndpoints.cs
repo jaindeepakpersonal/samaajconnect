@@ -90,7 +90,8 @@ public static class MemberEndpoints
                     request.Address,
                     request.Locality,
                     request.Profession,
-                    request.Privacy);
+                    request.Privacy,
+                    request.IsListedInDirectory);
 
                 var result = await sender.Send(command, cancellationToken);
 
@@ -116,5 +117,6 @@ public static class MemberEndpoints
         string? Address,
         string? Locality,
         string? Profession,
-        PrivacySettings Privacy);
+        PrivacySettings Privacy,
+        bool? IsListedInDirectory);
 }

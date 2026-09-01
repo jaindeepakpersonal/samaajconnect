@@ -33,7 +33,13 @@ public sealed record UpdateProfileCommand(
     string? Address,
     string? Locality,
     string? Profession,
-    PrivacySettings Privacy) : ICommand<MyProfileResponse>;
+    PrivacySettings Privacy,
+    // Nullable and required, for the same reason Privacy is: this command
+    // replaces the whole profile, so a body that omits this is malformed rather
+    // than partial. Defaulting it to true would quietly put a member who had
+    // taken themselves out of the directory back into it, which is the exact
+    // failure the privacy rule below it exists to prevent.
+    bool? IsListedInDirectory) : ICommand<MyProfileResponse>;
 
 public sealed record PrivacySettings(
     string Mobile,

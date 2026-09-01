@@ -247,6 +247,63 @@ check "children of a member with no family" 200 "$(status -H "Authorization: Bea
 check "conversion queue is refused to a member" 403 "$(status -H "Authorization: Bearer $MEMBER_TOKEN" \
   "$GATEWAY/v1/children/conversion-requests")"
 
+echo
+echo "The profile screen's endpoint, and taking yourself out of the directory"
+
+MEMBER_ID=$(curl -s -H "Authorization: Bearer $MEMBER_TOKEN" "$GATEWAY/v1/members/me" | json_field id)
+
+profile_body() {
+  # $1 is the isListedInDirectory value, or "omit" to leave it out entirely.
+  local listed="$1"
+  local listing=",\"isListedInDirectory\":$listed"
+
+  [ "$listed" = "omit" ] && listing=""
+
+  printf '{"fullName":"Smoke Member","gender":"Male","mobile":"+919812345678","locality":"Udaipur","privacy":{"mobile":"SamaajOnly","email":"Private","address":"Private","profession":"SamaajOnly","dateOfBirth":"Private"}%s}' "$listing"
+}
+
+check "a member edits their own profile" 200 \
+  "$(status -X PATCH "$GATEWAY/v1/members/$MEMBER_ID" -H 'Content-Type: application/json' \
+     -H "Authorization: Bearer $MEMBER_TOKEN" -d "$(profile_body true)")"
+
+# Not defaulted to true. A client that does not know about the field would
+# otherwise put a member who had opted out back into the directory, silently,
+# because they edited their address.
+check "an update that omits the directory setting is refused" 400 \
+  "$(status -X PATCH "$GATEWAY/v1/members/$MEMBER_ID" -H 'Content-Type: application/json' \
+     -H "Authorization: Bearer $MEMBER_TOKEN" -d "$(profile_body omit)")"
+
+check "and taking themselves out of the directory" 200 \
+  "$(status -X PATCH "$GATEWAY/v1/members/$MEMBER_ID" -H 'Content-Type: application/json' \
+     -H "Authorization: Bearer $MEMBER_TOKEN" -d "$(profile_body false)")"
+
+if curl -s -H "Authorization: Bearer $MEMBER_TOKEN" "$GATEWAY/v1/members" \
+   | grep -q "$MEMBER_ID"; then
+  echo "  FAIL  an unlisted member is still in the directory"
+  fail=$((fail + 1))
+else
+  echo "  ok    they are gone from the directory search"
+  pass=$((pass + 1))
+fi
+
+# Unlisted, not unreachable. A group president has to see who applied and a post
+# has an author; if this 404'd, those would break.
+check "but still reachable by id" 200 \
+  "$(status -H "Authorization: Bearer $MEMBER_TOKEN" "$GATEWAY/v1/members/$MEMBER_ID")"
+
+if curl -s -H "Authorization: Bearer $ADMIN_TOKEN" -H "X-Tenant-Override-Id: $TENANT_ID" \
+   "$GATEWAY/v1/members" | grep -q "$MEMBER_ID"; then
+  echo "  ok    and an administrator still finds them"
+  pass=$((pass + 1))
+else
+  echo "  FAIL  an administrator cannot find an unlisted member"
+  fail=$((fail + 1))
+fi
+
+check "back into the directory" 200 \
+  "$(status -X PATCH "$GATEWAY/v1/members/$MEMBER_ID" -H 'Content-Type: application/json' \
+     -H "Authorization: Bearer $MEMBER_TOKEN" -d "$(profile_body true)")"
+
 
 echo
 echo "Adult-child conversion, end to end across three services"

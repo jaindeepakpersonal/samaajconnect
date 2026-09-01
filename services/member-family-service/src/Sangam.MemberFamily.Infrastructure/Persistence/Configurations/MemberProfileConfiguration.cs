@@ -25,6 +25,27 @@ public sealed class MemberProfileConfiguration : IEntityTypeConfiguration<Member
         builder.Property(p => p.Profession).HasMaxLength(120);
         builder.Property(p => p.CreatedAt).IsRequired();
 
+        // Defaulted in the database as well as in the aggregate, so the rows that
+        // exist when the column arrives are listed rather than silently
+        // disappearing from every Samaaj's directory at once.
+        //
+        // **ValueGeneratedNever is load-bearing, and it was missing.**
+        // HasDefaultValue makes a property ValueGeneratedOnAdd, and EF then
+        // leaves a CLR-default value out of the INSERT so the database default
+        // can apply. The CLR default of a bool is `false` — which is exactly the
+        // value that means "not listed". So inserting an unlisted profile wrote
+        // no column at all and the row came back listed, silently, with the
+        // aggregate and the database disagreeing. Three integration tests caught
+        // it. Updates were never affected, which is what made it a landmine
+        // rather than an outage.
+        //
+        // Same lesson as the ValueGeneratedNever on the Family keys below: when
+        // the aggregate owns a value, say so, or EF will decide it owns it too.
+        builder.Property(p => p.IsListedInDirectory)
+            .IsRequired()
+            .HasDefaultValue(true)
+            .ValueGeneratedNever();
+
         builder.Property(p => p.Gender).HasConversion<string>().HasMaxLength(20).IsRequired();
 
         // Owned rather than a table of its own: five levels that only ever

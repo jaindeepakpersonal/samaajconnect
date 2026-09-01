@@ -32,6 +32,7 @@ public sealed class MemberProfilePrivacyTests
             locality: "Udaipur",
             profession: "Architect",
             privacy,
+            isListedInDirectory: true,
             Now, Guid.NewGuid());
 
         return profile;

@@ -75,7 +75,7 @@ enforced by `TenantAuthorizationBehavior`, not just UI hiding.
 |---|---|---|---|
 | GET | `/members` | Member, SamaajAdmin | Search/filter tenant directory |
 | GET | `/members/{id}` | `Members.Read` | One member, through the same per-field privacy mapper the directory uses |
-| PATCH | `/members/{id}` | Member (self), SamaajAdmin | Update profile |
+| PATCH | `/members/{id}` | Member (self), SamaajAdmin | Update profile. Replaces it whole: `privacy` and `isListedInDirectory` are both **required**, because defaulting either would silently reopen something a member had closed |
 | POST | `/families` | Member | Create family, become head |
 | POST | `/families/join-requests` | Member | Request to join via family code |
 | POST | `/families/join-requests/{id}/decide` | FamilyHead | Accept/reject |

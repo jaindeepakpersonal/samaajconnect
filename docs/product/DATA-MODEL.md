@@ -97,8 +97,15 @@ for Super Admin), AssignedAt`
 ## 3. Member & Family
 
 **MemberProfile** — `Id (=UserId), TenantId, FullName, PhotoUrl, DOB,
-Gender, Mobile, Email, Address, Locality, Profession, PrivacyLevel
-(Public/SamaajOnly/Private), CreatedAt`
+Gender, Mobile, Email, Address, Locality, Profession, FieldPrivacy (a
+Public/SamaajOnly/Private level per field, not one for the profile),
+IsListedInDirectory, CreatedAt, UpdatedAt`
+
+`IsListedInDirectory` is not a sixth privacy level and could not be one: a
+member who marks every field Private is still in the directory under their
+name, because a listing is a name. It hides them from the directory search and
+from nothing else - a profile stays reachable by id, which is what group
+applications, post authorship and household membership need.
 
 **Family** — `Id, TenantId, FamilyHeadUserId, FamilyCode (unique per
 tenant, used for join requests), CreatedAt`

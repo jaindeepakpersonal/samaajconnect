@@ -23,8 +23,18 @@ public interface IMemberProfileRepository
     /// Matching is on name and locality only - searching by someone's private
     /// mobile number would leak it one guess at a time.
     /// </summary>
+    /// <param name="includeUnlisted">
+    /// True only for a Samaaj administrator. A member who has taken themselves
+    /// out of the directory is still someone an administrator has to be able to
+    /// find - correcting a member's details is part of the job, and a member
+    /// nobody can look up is a member nobody can help.
+    /// </param>
     Task<IReadOnlyList<MemberProfile>> SearchAsync(
-        string? term, string? locality, int limit, CancellationToken cancellationToken = default);
+        string? term,
+        string? locality,
+        int limit,
+        bool includeUnlisted,
+        CancellationToken cancellationToken = default);
 
     /// <summary>Bypasses the tenant filter, for consumers. See ExistsAsync.</summary>
     Task<MemberProfile?> GetForConsumerAsync(Guid id, CancellationToken cancellationToken = default);

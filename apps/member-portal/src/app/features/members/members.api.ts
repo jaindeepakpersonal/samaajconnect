@@ -70,6 +70,11 @@ export class MembersApi {
       locality: profile.locality,
       profession: profile.profession,
       privacy: profile.privacy,
+      // Always sent. The service refuses a body without it rather than
+      // defaulting, because defaulting would put a member who had taken
+      // themselves out of the directory back into it the next time they
+      // edited anything else.
+      isListedInDirectory: profile.isListedInDirectory,
     });
   }
 

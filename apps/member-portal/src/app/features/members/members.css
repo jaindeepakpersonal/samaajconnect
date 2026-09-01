@@ -120,3 +120,44 @@
   font-weight: 400;
   font-size: 14px;
 }
+
+/* --- My Profile ---------------------------------------------------------- */
+
+/* A label and its control on one line, which is what makes the privacy card
+   read as a list of decisions rather than as another form. Wraps rather than
+   squeezing the select on a narrow screen. */
+.privacy-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+  flex-wrap: wrap;
+  padding: var(--space-2) 0;
+  border-bottom: 1px solid var(--line);
+}
+
+.privacy-row:last-of-type {
+  border-bottom: 0;
+}
+
+/* The shared `label` rule adds a top margin for stacked forms; here the label
+   sits beside its control. */
+.privacy-row label {
+  margin: 0;
+}
+
+.privacy-select {
+  width: 160px;
+  margin: 0;
+  flex: none;
+}
+
+/* The directory checkbox is a different kind of decision from the five levels
+   above it - it removes the row rather than a field - so it is separated
+   rather than lined up as if it were a sixth level. */
+.listing-row {
+  margin-top: var(--space-4);
+  border-top: 1px solid var(--line);
+  border-bottom: 0;
+  padding-top: var(--space-4);
+}

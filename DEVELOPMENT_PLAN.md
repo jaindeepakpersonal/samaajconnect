@@ -8,24 +8,25 @@ version of the plan; the reasoning behind the ordering lives in
 ## Current Status
 
 - **Stage:** every module has a service and member screens; Phase 5 hardening under way
-- **Last updated:** 2026-09-01 - the notification endpoints the API contract
-  promised and nothing implemented: mark one read, mark all read, and a
-  Samaaj-wide announcement with the recent-announcement list beside it. Screens
-  in both apps.
+- **Last updated:** 2026-09-01 - **My Profile**, the screen the platform had
+  been telling members to use since registration first raised a welcome
+  notification saying "complete your profile". The endpoint existed, the client
+  method existed, and nothing called either.
 
-  The interesting part was read state. A broadcast is one row a whole Samaaj
-  shares, so a read flag on the notification is set by the first member to open
-  it and read for everyone after; it moved to a row per person per message, and
-  `NotificationStatus` lost `Read` with it and is now purely about delivery.
-  Erasure needed a second delete for the same reason - a broadcast survives the
-  member who read it, and so would the row saying they had. The member portal's
-  unread badge had been counting the whole list, so it never moved.
+  It brought the wireframe's "Profile listed in directory" checkbox with it,
+  which had no field behind it: per-field privacy cannot take a member out of
+  the directory, because a listing is a name. `IsListedInDirectory` hides them
+  from the directory search and from nothing else - a profile stays reachable by
+  id, which is what group applications, post authorship and household
+  membership all need. Erasure now uses it too; an erased profile used to sit in
+  the directory as a row reading "Erased member".
 
-  The new member screen was written against three class and token names the
-  member portal does not have (`.muted`, `.visually-hidden`, `--border`; it has
-  `.small`, `.sr-only`, `--line`). Nothing fails - the elements render unstyled
-  and look almost right. Caught by opening the page. 1,264 tests green (945 backend
-  across 21 suites, 319 frontend) plus 254 smoke checks against empty volumes.
+  Three integration tests caught an EF trap worth knowing: `HasDefaultValue(true)`
+  makes a property `ValueGeneratedOnAdd`, so EF left the CLR default `false` out
+  of the INSERT and the database default won - a profile created unlisted came
+  back listed. `ValueGeneratedNever()` is the fix, and it is the same lesson the
+  Family keys already carry. 1,289 tests green (961 backend across 21 suites,
+  328 frontend) plus 261 smoke checks against empty volumes.
 - **Blocking item:** none. **Every module the platform has now has both a
   service and member screens**, and the role matrix is editable per Samaaj. What
   is left needs things this repository cannot supply on its own: TLS and a
@@ -132,6 +133,16 @@ unit tested.
       it and read for everyone after. `NotificationStatus` lost `Read` with it
       and is now purely about delivery. Screens in both apps; the member
       portal's unread badge counted the whole list until now
+- [x] The member portal's **My Profile** screen. The welcome notification every
+      registration raises says "complete your profile", `PATCH /v1/members/{id}`
+      existed, `MembersApi.updateMe` existed, and no screen called either - so a
+      member could be told to do something the app gave them nowhere to do.
+      Basic details, the five privacy levels beside them, and the wireframe's
+      "Profile listed in directory" checkbox, which had no field behind it until
+      now: per-field privacy cannot take a member out of the directory, because
+      a listing is a name. It hides them from the directory search and from
+      nothing else - a profile stays reachable by id, which is what group
+      applications and post authorship need
 - [ ] A real email or SMS provider, so `Sent` means a person was reached.
       One class implementing `INotificationChannel` and one registration; the
       choice of provider is a hosting decision

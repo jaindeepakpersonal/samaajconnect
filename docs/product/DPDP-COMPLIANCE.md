@@ -337,6 +337,9 @@ These are Data Fiduciary obligations that no amount of code discharges:
    recorded with a timestamp and notice version, sufficient?
 4. Does a member's Samaaj-facing directory listing need consent, or is it
    "necessary for the specified purpose" of running a membership organisation?
+   A member can now take themselves out of the directory from their profile
+   screen, which makes the listing declinable without leaving the Samaaj - but
+   it is opt-out, and whether the Act wants opt-in here is the question.
 5. Are the Samaaj and the platform operator joint fiduciaries, or is the
    operator a Data Processor? This changes who notifies the Board on a breach.
 6. After erasure, is a bare `MemberId` left behind in a service that holds no

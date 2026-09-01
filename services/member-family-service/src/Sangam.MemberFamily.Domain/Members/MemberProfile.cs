@@ -29,6 +29,32 @@ public sealed class MemberProfile : AggregateRoot, ITenantScopedEntity
 
     public FieldPrivacy Privacy { get; private set; } = FieldPrivacy.Default;
 
+    /// <summary>
+    /// Whether this member appears in the Samaaj directory search.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// Per-field privacy cannot express this. A member who marks every field
+    /// Private is still in the directory under their name, because a directory
+    /// listing <i>is</i> a name — there is no privacy level that removes the
+    /// row. The wireframe's profile screen has asked for this since the start.
+    /// </para>
+    /// <para>
+    /// <b>It hides a member from the directory search and from nothing else.</b>
+    /// Fetching a profile by id still works, and has to: a volunteer group's
+    /// president needs to see who applied, a timeline post has an author, a
+    /// family has members. Making an unlisted member unreachable by id would
+    /// break those and would be read as an access control, which this is not.
+    /// It is the difference between being unlisted and being unreachable.
+    /// </para>
+    /// <para>
+    /// A Samaaj administrator still finds them, because correcting a member's
+    /// details is part of the job and a member an administrator cannot find is
+    /// a member nobody can help.
+    /// </para>
+    /// </remarks>
+    public bool IsListedInDirectory { get; private set; } = true;
+
     public DateTimeOffset CreatedAt { get; private set; }
     public DateTimeOffset? UpdatedAt { get; private set; }
 
@@ -58,6 +84,10 @@ public sealed class MemberProfile : AggregateRoot, ITenantScopedEntity
             FullName = fullName.Trim(),
             Gender = Gender.Unspecified,
             Privacy = FieldPrivacy.Default,
+            // Listed by default: a member directory that nobody is in by
+            // default is not a directory, and the wireframe draws the checkbox
+            // ticked. Opting out is a decision the member makes.
+            IsListedInDirectory = true,
             CreatedAt = createdAt,
         };
 
@@ -106,6 +136,10 @@ public sealed class MemberProfile : AggregateRoot, ITenantScopedEntity
             PrivacyLevel.Private,
             PrivacyLevel.Private,
             PrivacyLevel.Private);
+        // And out of the directory. An erased profile keeps its row so family
+        // links do not dangle, but "Erased member" has no business appearing in
+        // a list of people you can look up.
+        IsListedInDirectory = false;
         UpdatedAt = erasedAt;
     }
 
@@ -120,6 +154,7 @@ public sealed class MemberProfile : AggregateRoot, ITenantScopedEntity
         string? locality,
         string? profession,
         FieldPrivacy privacy,
+        bool isListedInDirectory,
         DateTimeOffset updatedAt,
         Guid updatedBy)
     {
@@ -153,6 +188,11 @@ public sealed class MemberProfile : AggregateRoot, ITenantScopedEntity
             changed.Add(nameof(Privacy));
         }
 
+        if (IsListedInDirectory != isListedInDirectory)
+        {
+            changed.Add(nameof(IsListedInDirectory));
+        }
+
         FullName = fullName.Trim();
         PhotoUrl = Normalize(photoUrl);
         DateOfBirth = dateOfBirth;
@@ -163,6 +203,7 @@ public sealed class MemberProfile : AggregateRoot, ITenantScopedEntity
         Locality = Normalize(locality);
         Profession = Normalize(profession);
         Privacy = privacy;
+        IsListedInDirectory = isListedInDirectory;
         UpdatedAt = updatedAt;
 
         Raise(new MemberProfileUpdatedDomainEvent(

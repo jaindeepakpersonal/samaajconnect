@@ -144,6 +144,15 @@ export class HomeComponent implements OnInit {
    */
   private static readonly AllTiles: readonly ModuleTile[] = [
     {
+      // First, because the welcome message every new member gets tells them to
+      // complete their profile, and for a long time there was nowhere to do it.
+      moduleKey: null,
+      title: 'My profile',
+      description: 'Your details, and who in your Samaaj can see each one.',
+      action: 'Edit',
+      route: '/profile',
+    },
+    {
       moduleKey: null,
       title: 'Members',
       description: 'Explore the Samaaj member directory.',

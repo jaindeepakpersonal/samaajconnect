@@ -42,6 +42,7 @@ public static class MemberMappings
             profile.Privacy.Address.ToString(),
             profile.Privacy.Profession.ToString(),
             profile.Privacy.DateOfBirth.ToString()),
+        profile.IsListedInDirectory,
         profile.CreatedAt,
         profile.UpdatedAt);
 }

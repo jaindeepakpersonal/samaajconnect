@@ -65,6 +65,17 @@ export interface MyProfile {
   readonly locality: string | null;
   readonly profession: string | null;
   readonly privacy: FieldPrivacy;
+
+  /**
+   * Whether this member appears in the Samaaj directory search.
+   *
+   * Per-field privacy cannot express this: a member who marks every field
+   * Private is still in the directory under their name, because a listing is a
+   * name. It hides them from the search and from nothing else — a profile is
+   * still reachable by id, which is what group applications and post authors
+   * need.
+   */
+  readonly isListedInDirectory: boolean;
   readonly createdAt: string;
   readonly updatedAt: string | null;
 }

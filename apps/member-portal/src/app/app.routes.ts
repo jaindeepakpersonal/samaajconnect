@@ -92,6 +92,13 @@ export const routes: Routes = [
       import('./features/members/member-detail.component').then((m) => m.MemberDetailComponent),
   },
   {
+    path: 'profile',
+    title: 'My Profile - samaajconnect',
+    canActivate: [authGuard],
+    loadComponent: () =>
+      import('./features/members/profile.component').then((m) => m.ProfileComponent),
+  },
+  {
     path: 'family',
     title: 'My Family - samaajconnect',
     canActivate: [authGuard],

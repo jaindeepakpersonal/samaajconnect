@@ -55,6 +55,11 @@ public sealed class UpdateProfileCommandHandler(
             command.Locality,
             command.Profession,
             ToFieldPrivacy(command.Privacy),
+            // Falls back to what the profile already says, never to true. The
+            // validator makes a null here impossible; if one ever arrives by
+            // another path, keeping the member where they put themselves is the
+            // safe reading - the same rule as Level() below.
+            command.IsListedInDirectory ?? profile.IsListedInDirectory,
             clock.UtcNow,
             // Recorded on the event so the audit row can tell a member fixing
             // their own details apart from an admin correcting them.

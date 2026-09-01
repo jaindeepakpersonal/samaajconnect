@@ -41,5 +41,6 @@ public sealed record MyProfileResponse(
     string? Locality,
     string? Profession,
     FieldPrivacyResponse Privacy,
+    bool IsListedInDirectory,
     DateTimeOffset CreatedAt,
     DateTimeOffset? UpdatedAt);

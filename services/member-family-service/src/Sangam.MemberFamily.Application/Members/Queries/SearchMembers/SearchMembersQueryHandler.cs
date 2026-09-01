@@ -15,12 +15,20 @@ public sealed class SearchMembersQueryHandler(
         SearchMembersQuery query,
         CancellationToken cancellationToken)
     {
-        var found = await profiles.SearchAsync(
-            query.Term, query.Locality, Math.Clamp(query.Limit, 1, 100), cancellationToken);
+        var isAdmin = currentUser.IsInRole(Roles.SamaajAdmin) || currentUser.IsInRole(Roles.SuperAdmin);
 
-        var viewer = new ProfileViewer(
-            currentUser.UserId,
-            currentUser.IsInRole(Roles.SamaajAdmin) || currentUser.IsInRole(Roles.SuperAdmin));
+        var found = await profiles.SearchAsync(
+            query.Term,
+            query.Locality,
+            Math.Clamp(query.Limit, 1, 100),
+            // Administrators see members who have taken themselves out of the
+            // directory; nobody else does. The same role decides whether the
+            // privacy levels are seen through, and for the same reason:
+            // correcting a member's details is administrative work.
+            includeUnlisted: isAdmin,
+            cancellationToken);
+
+        var viewer = new ProfileViewer(currentUser.UserId, isAdmin);
 
         IReadOnlyList<MemberResponse> results = found
             .Select(profile => profile.ToDirectoryResponse(viewer))

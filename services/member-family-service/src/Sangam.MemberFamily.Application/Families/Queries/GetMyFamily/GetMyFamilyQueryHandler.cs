@@ -28,7 +28,12 @@ public sealed class GetMyFamilyQueryHandler(
                 "Family.None", "You do not belong to a family yet."));
         }
 
-        var memberProfiles = await profiles.SearchAsync(null, null, 200, cancellationToken);
+        // includeUnlisted, because this is a household and not the directory.
+        // Taking yourself out of the member search does not take you out of your
+        // own family, and a relative who came back as a blank row would be the
+        // reading nobody intends.
+        var memberProfiles = await profiles.SearchAsync(
+            null, null, 200, includeUnlisted: true, cancellationToken);
 
         return Result.Success(family.ToResponse(memberId, memberProfiles));
     }

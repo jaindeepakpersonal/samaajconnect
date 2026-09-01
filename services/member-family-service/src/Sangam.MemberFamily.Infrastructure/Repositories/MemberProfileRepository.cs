@@ -21,11 +21,22 @@ public sealed class MemberProfileRepository(MemberFamilyDbContext dbContext) : I
         string? term,
         string? locality,
         int limit,
+        bool includeUnlisted,
         CancellationToken cancellationToken = default)
     {
         // Tenant-filtered, never IgnoreQueryFilters: this is the one query a
         // signed-in member can drive with their own input.
         var query = dbContext.MemberProfiles.AsNoTracking();
+
+        if (!includeUnlisted)
+        {
+            // The only thing IsListedInDirectory does. It is not an access
+            // control: GetByIdAsync still returns an unlisted member, because a
+            // group's president has to see who applied and a post has an author.
+            // It also takes erased profiles out of the directory, which used to
+            // rely on every field being null and the row still being listed.
+            query = query.Where(p => p.IsListedInDirectory);
+        }
 
         if (!string.IsNullOrWhiteSpace(term))
         {

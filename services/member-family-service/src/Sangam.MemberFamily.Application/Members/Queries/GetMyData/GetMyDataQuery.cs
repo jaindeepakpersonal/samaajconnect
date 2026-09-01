@@ -64,7 +64,11 @@ public sealed class GetMyDataQueryHandler(
 
         if (family is not null)
         {
-            var householdProfiles = await profiles.SearchAsync(null, null, 200, cancellationToken);
+            // includeUnlisted: this is the member's own DPDP s.11 export, and
+            // an export that hides a household member because of a directory
+            // setting is an incomplete answer to a right.
+            var householdProfiles = await profiles.SearchAsync(
+                null, null, 200, includeUnlisted: true, cancellationToken);
             familyResponse = family.ToResponse(memberId, householdProfiles);
 
             var pending = await conversions.ListPendingAsync(cancellationToken);

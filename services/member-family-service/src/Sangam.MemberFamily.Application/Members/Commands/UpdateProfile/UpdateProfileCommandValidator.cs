@@ -41,6 +41,12 @@ public sealed class UpdateProfileCommandValidator : AbstractValidator<UpdateProf
             .NotNull()
             .WithMessage("Privacy levels are required. Send the whole set, not a partial update.");
 
+        RuleFor(x => x.IsListedInDirectory)
+            .NotNull()
+            .WithMessage(
+                "Say whether this profile is listed in the directory. Send the whole profile, "
+                + "not a partial update.");
+
         // **The When is load-bearing, and it was missing.** `Privacy` is a
         // non-nullable reference type on the command, which is a compile-time
         // claim and nothing more: the JSON deserialiser leaves it null when the

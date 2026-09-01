@@ -26,6 +26,7 @@ public sealed class ProfileErasureTests
             new FieldPrivacy(
                 PrivacyLevel.Public, PrivacyLevel.Public, PrivacyLevel.Public,
                 PrivacyLevel.Public, PrivacyLevel.Public),
+            isListedInDirectory: true,
             Now, Guid.NewGuid());
 
         return profile;

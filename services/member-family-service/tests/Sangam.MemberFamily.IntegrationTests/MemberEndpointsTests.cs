@@ -67,6 +67,7 @@ public sealed class MemberEndpointsTests(MemberFamilyApiFactory factory)
                 PrivacyLevel.Private,
                 PrivacyLevel.SamaajOnly,
                 PrivacyLevel.Private),
+            isListedInDirectory: true,
             DateTimeOffset.UtcNow, Guid.NewGuid());
 
         db.MemberProfiles.Add(profile);
@@ -220,7 +221,7 @@ public sealed class MemberEndpointsTests(MemberFamilyApiFactory factory)
     {
         var response = await MemberClient(_ravi, TenantA).PatchAsJsonAsync(
             "/v1/members/" + _ravi,
-            new { fullName = Named("Ravi K Shah"), locality = "Jaipur", privacy = PrivacyAll("Private") });
+            new { fullName = Named("Ravi K Shah"), locality = "Jaipur", privacy = PrivacyAll("Private"), isListedInDirectory = true });
 
         response.StatusCode.Should().Be(HttpStatusCode.OK);
 
@@ -235,7 +236,7 @@ public sealed class MemberEndpointsTests(MemberFamilyApiFactory factory)
     {
         var response = await MemberClient(_ravi, TenantA).PatchAsJsonAsync(
             "/v1/members/" + _meera,
-            new { fullName = "Hijacked", privacy = PrivacyAll("Public") });
+            new { fullName = "Hijacked", privacy = PrivacyAll("Public"), isListedInDirectory = true });
 
         response.StatusCode.Should().Be(HttpStatusCode.Forbidden);
     }
@@ -247,7 +248,7 @@ public sealed class MemberEndpointsTests(MemberFamilyApiFactory factory)
         // than trusting the query filter alone.
         var response = await AdminClient(TenantA).PatchAsJsonAsync(
             "/v1/members/" + _outsider,
-            new { fullName = "Hijacked", privacy = PrivacyAll("Public") });
+            new { fullName = "Hijacked", privacy = PrivacyAll("Public"), isListedInDirectory = true });
 
         response.StatusCode.Should().Be(HttpStatusCode.NotFound);
     }

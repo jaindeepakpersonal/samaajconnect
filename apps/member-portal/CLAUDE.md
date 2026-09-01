@@ -32,7 +32,7 @@ before translating another screen.
 | Notifications | `/notifications` | `#notifications` | built |
 | Pathshala events | — | `#pathevents` | not built — no endpoint exists |
 | Forgot password / OTP | — | `#forgot`, `#otp` | not built — no endpoint exists |
-| Profile | — | `#profile` | not built |
+| My Profile | `/profile` | `#profile` | built |
 
 ## Where things live
 
@@ -154,6 +154,25 @@ claim otherwise.** member-family-service returns null for a field the viewer
 may not see rather than masking it, because a mask like "+91 98xxxxxx10" still
 leaks length and shape. From the client the two cases are indistinguishable, so
 the only honest label is "Not shared" - never "None" and never a bare dash.
+
+**A member could be told to complete their profile and had nowhere to do it.**
+The welcome notification every registration raises says "Complete your profile
+to appear in the member directory"; `PATCH /v1/members/{id}` existed, and so did
+`MembersApi.updateMe`, and no screen called either. That is the shape of gap
+this app should look for: a client method with no caller.
+
+**Unticking "listed in the member directory" is explained, not just offered.**
+It takes a member out of the directory search and out of nothing else - their
+name still appears on a post they wrote, in their family, and to the president
+of a group they apply to. A checkbox that read as "hide me from the platform"
+would be promising something the platform does not do, so the sentence under it
+says what it does.
+
+**"Upload Photo" is a link field, because that is what the API takes.** There is
+no file storage, and the service accepts an absolute http(s) URL. The note says
+what a link costs - every member who opens the directory fetches it from
+whatever host it points at - which is the tracking gap `ImageUrl` documents and
+does not close.
 
 **The directory has no profession filter, and that is a privacy decision.**
 Profession carries a per-field privacy level. A server-side filter on it would

@@ -98,6 +98,35 @@ from a token's `sub` claim with no lookup in between. It also makes "have I
 already created this profile?" a primary-key check rather than a dedupe table,
 which is what makes the consumer idempotent.
 
+**Being unlisted is not a privacy level, and could not be one.** Per-field
+privacy cannot remove a member from the directory: someone who marks every
+field Private is still there under their name, because a directory listing *is*
+a name. `MemberProfile.IsListedInDirectory` is the wireframe's "Profile listed
+in directory" checkbox, which had no field behind it until now.
+
+**It hides a member from the directory search and from nothing else.**
+`GetByIdAsync` still returns them, and has to: a volunteer group's president
+needs to see who applied, a timeline post has an author, a household has
+members. Making an unlisted profile 404 would break all three and would turn a
+listing preference into an access control it was never meant to be. Three of
+the four `SearchAsync` callers therefore pass `includeUnlisted: true` - the
+household ones and the DPDP s.11 export - and only the directory itself passes
+false. A Samaaj admin passes true as well, for the same reason they see through
+privacy levels: a member an administrator cannot find is a member nobody can
+help.
+
+**The setting is required on update, not defaulted.** `UpdateProfileCommand`
+takes `bool?` and the validator refuses null, exactly like `Privacy`. Defaulting
+it to true would have put a member who opted out back into the directory the
+next time they edited their address - silently, and by a client that had never
+heard of the field.
+
+**Erasure now takes the profile out of the directory too.** The row survives so
+family links do not dangle, and until this flag existed there was no way to say
+"keep the row, drop the listing" - so an erased profile stayed in the directory
+as a row reading "Erased member". The migration backfills the ones that were
+already there.
+
 **Privacy is per field, not one toggle.** SECURITY-CHECKLIST.md is explicit
 about this. `FieldPrivacy` carries a level for mobile, email, address,
 profession and date of birth separately, and `MemberMappings.ToDirectoryResponse`
@@ -130,6 +159,18 @@ platform.
 
 **Family codes avoid 0/O and 1/I/L.** These travel by being read aloud between
 relatives, which is exactly when those characters go wrong.
+
+**A bool with a database default needs `ValueGeneratedNever` too.**
+`HasDefaultValue(true)` on `IsListedInDirectory` made it `ValueGeneratedOnAdd`,
+and EF then leaves a CLR-default value out of the INSERT so the database default
+can apply. The CLR default of a bool is `false` - which is exactly the value
+that means "not listed" - so inserting an unlisted profile wrote no column and
+the row came back listed, with the aggregate and the database quietly
+disagreeing. Updates were never affected, which is what made it a landmine
+rather than an outage: it only bites a row created unlisted. Three integration
+tests caught it. `HasDefaultValue` is worth keeping - it is what lets the column
+be added to a live table without emptying every directory - so the fix is to say
+the aggregate owns the value.
 
 **Family and FamilyMember ids are `ValueGeneratedNever`.** The aggregates assign
 them. Left as EF's default `ValueGeneratedOnAdd`, a child added to a *tracked*
@@ -260,3 +301,11 @@ dotnet test services/member-family-service/Sangam.MemberFamily.sln
 
 `scripts/smoke-through-gateway.sh` covers the same path through the gateway,
 including waiting for the profile to arrive over Kafka after registration.
+
+**Running every service's suite back to back needs a pause between them.** This
+is the largest set of integration tests on the platform and the one that fails
+first: with eleven solutions started in a row, its Postgres and Kafka containers
+compete with the previous solution's still shutting down, and it failed 13 of 67
+once and 0 of 67 on the next run with a ten-second gap. CI is unaffected - it
+runs one job per service. If this suite fails in a local sweep, re-run it alone
+before believing it.
