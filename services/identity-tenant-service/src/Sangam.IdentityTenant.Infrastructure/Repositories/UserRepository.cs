@@ -64,10 +64,42 @@ public sealed class UserRepository(IdentityTenantDbContext dbContext) : IUserRep
             .Select(r => r.Name)
             .ToListAsync(cancellationToken);
 
-        var permissions = await dbContext.RolePermissions
+        var permissionIds = await dbContext.RolePermissions
             .Where(rp => roleIds.Contains(rp.RoleId))
-            .Join(dbContext.Permissions, rp => rp.PermissionId, p => p.Id, (_, p) => p.Key)
-            .Distinct()
+            .Select(rp => new { rp.RoleId, rp.PermissionId })
+            .ToListAsync(cancellationToken);
+
+        // This Samaaj's departures from the platform defaults. Applied here
+        // rather than only on the matrix screen, because this is the method that
+        // decides what goes in the token - a matrix that displayed differently
+        // from what is enforced would be worse than no matrix at all.
+        //
+        // Deliberately not filtered by the query filter: this runs on the login
+        // path, before any request context exists, so a filtered read would
+        // compare against Guid.Empty and quietly find nothing.
+        var overrides = await dbContext.RolePermissionOverrides
+            .IgnoreQueryFilters()
+            .Where(o => o.TenantId == tenantId && roleIds.Contains(o.RoleId))
+            .ToListAsync(cancellationToken);
+
+        // Resolved per role and then unioned, rather than by adding and removing
+        // from one set. A member usually holds several roles, and "revoked from
+        // SamaajAdmin" must not take a permission they also hold as a group
+        // president - which is exactly what a single set gets wrong depending on
+        // the order the overrides happen to come back in.
+        var revoked = overrides.Where(o => !o.Granted)
+            .Select(o => (o.RoleId, o.PermissionId))
+            .ToHashSet();
+
+        var effective = permissionIds
+            .Where(rp => !revoked.Contains((rp.RoleId, rp.PermissionId)))
+            .Select(rp => rp.PermissionId)
+            .Concat(overrides.Where(o => o.Granted).Select(o => o.PermissionId))
+            .ToHashSet();
+
+        var permissions = await dbContext.Permissions
+            .Where(p => effective.Contains(p.Id))
+            .Select(p => p.Key)
             .ToListAsync(cancellationToken);
 
         return new UserAuthorization(roles, permissions);

@@ -29,6 +29,8 @@ public sealed class IdentityTenantDbContext(
 
     public DbSet<RolePermission> RolePermissions => Set<RolePermission>();
 
+    public DbSet<RolePermissionOverride> RolePermissionOverrides => Set<RolePermissionOverride>();
+
     public DbSet<UserRole> UserRoles => Set<UserRole>();
 
     public DbSet<ConsentRecord> ConsentRecords => Set<ConsentRecord>();

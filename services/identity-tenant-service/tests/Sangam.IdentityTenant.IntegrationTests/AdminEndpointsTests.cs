@@ -247,10 +247,16 @@ public sealed class AdminEndpointsTests(IdentityTenantApiFactory factory)
     }
 
     [Fact]
-    public async Task The_role_matrix_says_it_is_not_editable()
+    public async Task An_ordinary_member_may_read_the_matrix_but_is_not_told_it_is_editable()
     {
+        // `editable` means "this caller can edit", not "this matrix is
+        // editable". A screen told the second would offer a member controls the
+        // server refuses. Reading it is deliberately open to everybody: it
+        // describes the platform's shape, and somebody seeing why they were
+        // refused something is a good thing.
         var matrix = await Member().GetFromJsonAsync<JsonElement>("/v1/identity/roles");
 
+        matrix.GetProperty("roles").EnumerateArray().Should().NotBeEmpty();
         matrix.GetProperty("editable").GetBoolean().Should().BeFalse();
     }
 

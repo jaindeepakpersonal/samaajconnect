@@ -15,7 +15,7 @@ screen. The spec is `docs/product/wireframes/admin-panel-wireframes.html`.
 | Create Samaaj | `/tenants/new` | `#createtenant` | built |
 | Admin Users & Roles | `/admins` | `#admins` | built |
 | Invite Admin | `/admins/invite` | `#inviteadmin` | built |
-| Role & Permission Matrix | `/roles` | `#rolematrix` | built, read-only |
+| Role & Permission Matrix | `/roles` | `#rolematrix` | built, editable per Samaaj |
 | Adult Child Conversion Queue | `/conversions` | `#conversionqueue` | built |
 | Audit Logs | `/audit` | `#audit` | built |
 | Members, Timeline, Groups, Events, Issues, Celebrity, Pathshala, Boli, Notifications, Reports, Settings | — | various | not built — no service exists |
@@ -109,11 +109,21 @@ cosmetic: it made a Super Admin's tenant tile blank and made Samaaj-scoped
 tiles show a confident `0` for a Samaaj nobody had selected. Both look exactly
 like permission bugs.
 
-**The role matrix displays; it does not edit.** The wireframe says the screen
-"edits it, not just displays it". `GET /v1/identity/roles` reports
-`editable: false` and the screen renders what the backend says rather than
-deciding for itself. See `ListRolesQuery` in identity-tenant-service for the
-reasoning, and `DEVELOPMENT_PLAN.md` for the work an editable matrix needs.
+**The role matrix edits now, and the screen still decides nothing.** The
+wireframe always said it should edit; it took per-tenant overrides, an audit
+trail and a lock-out floor before that was safe. What the screen renders is
+still entirely the backend's answer: the response says whether this caller may
+edit, each role says whether it may be edited, and a cell is a checkbox only
+when both are true. SuperAdmin comes back not editable.
+
+The one rule duplicated from the backend is that a Samaaj administrator cannot
+lose `Roles.Manage`, drawn as a fixed tick rather than a checkbox. That is a
+deliberate copy: offering a click that always answers 409 is offering a choice
+that was never there.
+
+**A refused change re-reads the matrix.** A checkbox has already flipped itself
+in the DOM by the time the request fails, and leaving it showing a change the
+server refused is the one thing this screen must never do.
 
 **The one-time activation code is shown once and then removed from the DOM.**
 Only its hash is stored, so it cannot be looked up again. "Invite another"

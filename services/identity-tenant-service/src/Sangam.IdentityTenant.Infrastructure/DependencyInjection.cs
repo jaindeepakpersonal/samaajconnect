@@ -34,6 +34,7 @@ public static class DependencyInjection
         services.AddScoped<IUnitOfWork, UnitOfWork>();
         services.AddScoped<ITenantRepository, TenantRepository>();
         services.AddScoped<IUserRepository, UserRepository>();
+        services.AddScoped<IAuthorizationCatalogRepository, AuthorizationCatalogRepository>();
         services.AddScoped<IConsentRepository, ConsentRepository>();
         services.AddSingleton<IDateTimeProvider, SystemDateTimeProvider>();
         services.AddSingleton<IPasswordHasher, PasswordHasher>();

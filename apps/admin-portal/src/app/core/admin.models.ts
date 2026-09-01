@@ -51,8 +51,9 @@ export interface RoleMatrix {
   readonly roles: readonly Role[];
 
   /**
-   * False today, and the backend says so rather than leaving the screen to
-   * assume. See `ListRolesQuery` for why the matrix is read-only.
+   * Whether **this caller, in this scope** may edit — not whether the matrix is
+   * editable in principle. An ordinary member may read it, and a screen told
+   * the second would offer them controls the server refuses.
    */
   readonly editable: boolean;
   readonly editableNote: string;
@@ -63,6 +64,14 @@ export interface Role {
   readonly name: string;
   readonly assignableToAdmins: boolean;
   readonly permissions: readonly string[];
+
+  /**
+   * False for SuperAdmin, which is platform administration rather than Samaaj
+   * administration — and the role that has to stay able to repair a Samaaj
+   * that has locked itself out. Sent per role so the screen disables that
+   * column rather than discovering the refusal on submit.
+   */
+  readonly editable: boolean;
 }
 
 /** Mirrors `AdminUserResponse`. */

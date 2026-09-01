@@ -106,7 +106,7 @@ public sealed class IdentityTenantApiFactory : WebApplicationFactory<Program>, I
             // passes alone and fails in the suite - which is how refresh_tokens
             // announced itself.
             "TRUNCATE TABLE refresh_tokens, consent_records, user_roles, users, tenants, "
-            + "outbox_messages RESTART IDENTITY CASCADE;");
+            + "role_permission_overrides, outbox_messages RESTART IDENTITY CASCADE;");
 
         Publisher.Clear();
     }

@@ -2,18 +2,21 @@
 using System;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 using Sangam.IdentityTenant.Infrastructure.Persistence;
 
 #nullable disable
 
-namespace Sangam.IdentityTenant.Infrastructure.Persistence.Migrations
+namespace Sangam.IdentityTenant.Infrastructure.Migrations
 {
     [DbContext(typeof(IdentityTenantDbContext))]
-    partial class IdentityTenantDbContextModelSnapshot : ModelSnapshot
+    [Migration("20260901085720_EditableRoleMatrix")]
+    partial class EditableRoleMatrix
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder

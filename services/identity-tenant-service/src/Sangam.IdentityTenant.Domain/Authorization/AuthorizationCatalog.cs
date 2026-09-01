@@ -46,6 +46,7 @@ public static class AuthorizationCatalog
         public static readonly Guid BoliPublishResults = new("b0000000-0000-0000-0000-000000000011");
         public static readonly Guid AuditRead = new("b0000000-0000-0000-0000-000000000012");
         public static readonly Guid VolunteerGroupsLead = new("b0000000-0000-0000-0000-000000000013");
+        public static readonly Guid RolesManage = new("b0000000-0000-0000-0000-000000000014");
     }
 
     public static IReadOnlyList<Role> Roles { get; } =
@@ -82,6 +83,7 @@ public static class AuthorizationCatalog
         new(PermissionIds.BoliPublishResults, "Boli.PublishResults"),
         new(PermissionIds.AuditRead, "Audit.Read"),
         new(PermissionIds.VolunteerGroupsLead, "VolunteerGroups.Lead"),
+        new(PermissionIds.RolesManage, "Roles.Manage"),
     ];
 
     /// <summary>
@@ -116,6 +118,7 @@ public static class AuthorizationCatalog
         new(RoleIds.SamaajAdmin, PermissionIds.BoliManage),
         new(RoleIds.SamaajAdmin, PermissionIds.BoliPublishResults),
         new(RoleIds.SamaajAdmin, PermissionIds.AuditRead),
+        new(RoleIds.SamaajAdmin, PermissionIds.RolesManage),
 
         new(RoleIds.Member, PermissionIds.MembersRead),
         new(RoleIds.Member, PermissionIds.TimelinePost),

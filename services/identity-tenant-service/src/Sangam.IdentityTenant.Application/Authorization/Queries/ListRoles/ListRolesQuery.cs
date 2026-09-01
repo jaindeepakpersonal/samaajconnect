@@ -7,28 +7,22 @@ namespace Sangam.IdentityTenant.Application.Authorization.Queries.ListRoles;
 /// The role and permission matrix: every role, and which permissions it carries.
 /// </summary>
 /// <remarks>
-/// <b>Read-only, and that is a decision rather than an omission.</b> The admin
-/// wireframe's Role & Permission Matrix screen says "this screen edits it, not
-/// just displays it", and it should not, at least not yet.
+/// <b>Editable per Samaaj</b>, which it was not until the three things this
+/// remark used to name as preconditions existed: per-tenant role definitions,
+/// an audit trail of matrix changes, and a floor of permissions no edit may
+/// remove. See <c>SetRolePermissionCommand</c> and <c>MatrixEditing</c>.
 ///
-/// Every command and query on this platform declares the roles and permissions
-/// it requires as an attribute on the request type. Those declarations are
-/// compiled in. A matrix editable at runtime would mean the answer to "who can
-/// approve a conversion?" lives half in source control and half in a table
-/// somebody changed on a Tuesday, and neither half is reviewable against the
-/// other. Worse, the matrix is platform-wide: a Samaaj Admin editing it would
-/// be editing what a Samaaj Admin means everywhere.
-///
-/// Making it editable is a real requirement and a real design problem - it
-/// needs per-tenant role definitions, an audit trail of matrix changes, and a
-/// floor of permissions no edit may remove or the platform locks itself out.
-/// That is its own piece of work. Until then this endpoint tells the truth
-/// about what the backend actually enforces, which is more useful than a screen
-/// that accepts edits the backend ignores.
+/// The objection that used to stand here - that an editable matrix would put
+/// "who can approve a conversion?" half in source control and half in a table -
+/// does not apply to the shape it was eventually given. A command's
+/// <c>[RequiresPermission]</c> is still compiled in and still says what that
+/// command needs; the matrix says who carries a permission. Those are the two
+/// halves of role-based access control and they answer different questions.
 ///
 /// Anyone authenticated may read it. It describes the platform's shape, not any
 /// person's access, and a member being able to see why they were refused
-/// something is a good thing.
+/// something is a good thing. <c>Editable</c> on the response says whether
+/// <i>this caller</i> may change it, which is not the same question.
 /// </remarks>
 [RequiresRoles(
     Roles.SuperAdmin,
@@ -56,4 +50,9 @@ public sealed record RoleResponse(
     Guid Id,
     string Name,
     bool AssignableToAdmins,
-    IReadOnlyList<string> Permissions);
+    IReadOnlyList<string> Permissions,
+
+    // False for SuperAdmin, which is platform administration rather than
+    // Samaaj administration. Sent per role so the screen disables that row
+    // rather than discovering the refusal on submit.
+    bool Editable);

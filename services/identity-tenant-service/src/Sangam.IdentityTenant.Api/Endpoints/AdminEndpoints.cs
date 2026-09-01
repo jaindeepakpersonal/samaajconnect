@@ -1,5 +1,6 @@
 using MediatR;
 using Sangam.IdentityTenant.Api.Extensions;
+using Sangam.IdentityTenant.Application.Authorization.Commands.SetRolePermission;
 using Sangam.IdentityTenant.Application.Authorization.Queries.ListRoles;
 using Sangam.IdentityTenant.Application.Users.Commands.AssignRole;
 using Sangam.IdentityTenant.Application.Users.Commands.InviteAdmin;
@@ -25,9 +26,32 @@ public static class AdminEndpoints
             })
             .RequireAuthorization()
             .WithName("ListRoles")
-            .WithSummary("The role and permission matrix. Read-only; see ListRolesQuery for why.")
+            .WithSummary("The role and permission matrix, as the calling Samaaj sees it.")
             .Produces<RoleMatrixResponse>()
             .ProducesProblem(StatusCodes.Status401Unauthorized);
+
+        group.MapPut("/roles/{roleId:guid}/permissions/{permissionKey}", async (
+                Guid roleId,
+                string permissionKey,
+                SetRolePermissionRequest request,
+                ISender sender,
+                CancellationToken cancellationToken) =>
+            {
+                var result = await sender.Send(
+                    new SetRolePermissionCommand(roleId, permissionKey, request.Granted),
+                    cancellationToken);
+
+                return result.ToApiResult();
+            })
+            .RequireAuthorization()
+            .WithName("SetRolePermission")
+            .WithSummary("Grant or revoke one permission on one role, for this Samaaj.")
+            .Produces<RoleMatrixResponse>()
+            .ProducesValidationProblem()
+            .ProducesProblem(StatusCodes.Status401Unauthorized)
+            .ProducesProblem(StatusCodes.Status403Forbidden)
+            .ProducesProblem(StatusCodes.Status404NotFound)
+            .ProducesProblem(StatusCodes.Status409Conflict);
 
         group.MapGet("/admins", async (ISender sender, CancellationToken cancellationToken) =>
             {
@@ -100,4 +124,7 @@ public static class AdminEndpoints
     /// AssignRoleCommandHandler have to be right.
     /// </summary>
     public sealed record AssignRoleRequest(bool Granted);
+
+    /// <summary>Whether the role should carry this permission in this Samaaj.</summary>
+    public sealed record SetRolePermissionRequest(bool Granted);
 }

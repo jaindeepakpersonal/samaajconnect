@@ -388,22 +388,42 @@ within a minute with no consumer to keep in step. The event exists because
 switching a module off makes a whole area of the platform answer 404 for
 everyone in that Samaaj, which is a decision worth having in the audit log.
 
-**The role matrix is read-only, and that is a decision rather than an
-omission.** The wireframe's Role & Permission Matrix screen says "this screen
-edits it, not just displays it". Every command and query on this platform
-declares the roles and permissions it requires as a compiled-in attribute, so a
-runtime-editable matrix would split the answer to "who may approve a
-conversion?" between source control and a table someone changed on a Tuesday,
-with neither half reviewable against the other. It is also platform-wide: a
-Samaaj Admin editing it would be editing what a Samaaj Admin means everywhere.
+**The role matrix is editable per Samaaj**, which it was not until the three
+things `ListRolesQuery` named as preconditions existed: per-tenant definitions,
+an audit trail, and a floor of permissions no edit may remove.
 
-Making it editable is a real requirement and its own piece of work - it needs
-per-tenant role definitions, an audit trail of matrix changes, and a floor of
-permissions no edit may remove or the platform locks itself out. Until then
-`GET /v1/identity/roles` reports what the pipeline actually enforces, reading
-straight from `AuthorizationCatalog` rather than the database so it cannot
-report a matrix that has drifted, and says `editable: false` so a screen does
-not have to assume.
+`AuthorizationCatalog` stays the platform default for every Samaaj.
+`RolePermissionOverride` records only where one has decided differently, as a
+row saying "for this Samaaj, this role does - or does not - carry this
+permission". A Samaaj that has changed nothing has no rows and behaves exactly
+as it did before the feature existed, and one that sets a permission back to its
+default has its override deleted rather than stored, so it resumes tracking that
+default as it changes.
+
+What a command *requires* is still compiled in. This decides who *carries* a
+permission, not what a command *needs* - the two halves of role-based access
+control, and only one of them is a runtime decision. That is why the objection
+the read-only version raised does not apply: the answer is not split between
+source and a table, because the two answer different questions.
+
+The floor is in `MatrixEditing`, and it is two rules. **SuperAdmin cannot be
+edited by a Samaaj** - it is platform administration, and the role that has to
+stay able to repair a Samaaj that has locked itself out. **A Samaaj Admin cannot
+lose `Roles.Manage`** - the one revocation a Samaaj could not undo for itself,
+since without it the screen that edits the matrix refuses the administrator who
+just used it. It is a floor rather than a warning because a warning is something
+somebody clicks past at the end of a long afternoon.
+
+It is gated on `Roles.Manage`, a key of its own rather than `AdminUsers.Manage`.
+Inviting an administrator hands somebody an existing bundle of permissions; this
+redefines the bundle, for everyone who holds the role and everyone who ever
+will. Every change raises `identity.role-matrix.changed.v1` carrying who made
+it and what it was before.
+
+`editable` on the response means **this caller, in this scope, may edit** rather
+than "this matrix is editable". Reading the matrix stays open to everybody -
+seeing why you were refused something is a good thing - and a screen told the
+second would offer an ordinary member controls the server refuses.
 
 **Which modules a Samaaj runs is a Super Admin decision; who administers it is
 the Samaaj Admin's.** Modules are what the gateway routes on, and switching one

@@ -86,6 +86,20 @@ export class AdminApi {
     return this.http.get<RoleMatrix>('/v1/identity/roles');
   }
 
+  /**
+   * Grants or revokes one permission on one role, for the Samaaj in scope.
+   *
+   * Answers with the whole matrix rather than the one cell, so the screen never
+   * has to guess what the change did to the rest of it — and so a refusal
+   * leaves the screen showing what is actually true rather than the optimistic
+   * tick it drew a moment ago.
+   */
+  setRolePermission(roleId: string, permission: string, granted: boolean) {
+    const path = `/v1/identity/roles/${roleId}/permissions/${encodeURIComponent(permission)}`;
+
+    return this.http.put<RoleMatrix>(path, { granted });
+  }
+
   listAdmins(): Observable<AdminUser[]> {
     return this.http.get<AdminUser[]>('/v1/identity/admins');
   }

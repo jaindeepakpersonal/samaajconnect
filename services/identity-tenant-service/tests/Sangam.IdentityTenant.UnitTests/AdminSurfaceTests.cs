@@ -125,12 +125,16 @@ public sealed class SetTenantModulesCommandValidatorTests
     }
 }
 
+/// <summary>
+/// The matrix as the platform defines it, before any Samaaj has changed
+/// anything. Asserted against the catalogue directly rather than through the
+/// handler, which now needs a repository to answer per Samaaj - what these
+/// tests are actually about is the catalogue's own shape.
+/// </summary>
 public sealed class RoleMatrixTests
 {
-    private readonly ListRolesQueryHandler _handler = new();
-
-    private RoleMatrixResponse Matrix() =>
-        _handler.Handle(new ListRolesQuery(), CancellationToken.None).Result.Value;
+    private static RoleMatrixResponse Matrix() =>
+        DefaultMatrix.Build();
 
     [Fact]
     public void The_matrix_reports_the_catalogue_the_pipeline_actually_checks()
@@ -150,12 +154,23 @@ public sealed class RoleMatrixTests
     }
 
     [Fact]
-    public void The_matrix_says_it_is_not_editable_rather_than_letting_a_screen_assume()
+    public void The_platform_defaults_are_not_editable_because_there_is_nowhere_to_write_them
+        ()
     {
+        // An override belongs to a Samaaj. A caller with none in scope - a Super
+        // Admin who has not chosen one - is looking at the defaults, and the
+        // screen is told so rather than left to assume.
         var matrix = Matrix();
 
         matrix.Editable.Should().BeFalse();
         matrix.EditableNote.Should().NotBeNullOrWhiteSpace();
+    }
+
+    [Fact]
+    public void SuperAdmin_is_the_one_role_no_Samaaj_may_edit()
+    {
+        Matrix().Roles.Single(r => r.Name == Roles.SuperAdmin).Editable.Should().BeFalse();
+        Matrix().Roles.Single(r => r.Name == Roles.SamaajAdmin).Editable.Should().BeTrue();
     }
 
     [Fact]
@@ -353,5 +368,35 @@ public sealed class UserRoleGrantTests
             Now);
 
         invited.Roles.Count(r => r.RoleId == AuthorizationCatalog.RoleIds.Member).Should().Be(1);
+    }
+}
+
+/// <summary>
+/// Builds the matrix the way the repository does, without a database — the
+/// platform defaults, no Samaaj in scope.
+/// </summary>
+internal static class DefaultMatrix
+{
+    public static RoleMatrixResponse Build()
+    {
+        var permissionsById = AuthorizationCatalog.Permissions.ToDictionary(p => p.Id, p => p.Key);
+
+        var roles = AuthorizationCatalog.Roles
+            .Select(role => new RoleResponse(
+                role.Id,
+                role.Name,
+                AuthorizationCatalog.IsAdminAssignable(role.Id),
+                [.. AuthorizationCatalog.RolePermissions
+                    .Where(rp => rp.RoleId == role.Id)
+                    .Select(rp => permissionsById[rp.PermissionId])
+                    .OrderBy(key => key, StringComparer.Ordinal)],
+                MatrixEditing.IsEditable(role.Id)))
+            .ToList();
+
+        return new RoleMatrixResponse(
+            [.. AuthorizationCatalog.Permissions.Select(p => p.Key)],
+            roles,
+            Editable: false,
+            "These are the platform defaults.");
     }
 }

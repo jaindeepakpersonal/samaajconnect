@@ -21,9 +21,12 @@ version of the plan; the reasoning behind the ordering lives in
   (814 backend, 273 frontend) plus 240 smoke checks against a stack built from
   empty volumes, re-runnable against a dirty one.
 - **Blocking item:** none. **Every module the platform has now has both a
-  service and member screens.** What is left is Phase 5 hardening, an editable
-  role matrix, and the two DPDP obligations — breach notification and the right
-  to nominate — that need a notification channel first. The vote endpoint's throughput load test is
+  service and member screens**, and the role matrix is editable per Samaaj. What
+  is left needs things this repository cannot supply on its own: TLS and a
+  backup drill need a deployed environment, platform-hosted images need storage,
+  the two remaining DPDP obligations - breach notification and the right to
+  nominate - need a notification channel, and a screen-reader pass needs a
+  person. The vote endpoint's throughput load test is
   carried to Phase 5, since it needs a deployed environment; its correctness
   half is done. The five questions in `docs/product/DPDP-COMPLIANCE.md` still
   need counsel before any of this ships to real users.
@@ -120,19 +123,25 @@ unit tested.
       export endpoint. Driven end to end against the running stack, including a
       real erasure of a throwaway account
 - [x] Admin backend: Super Admin tenant list (`GET /v1/identity/tenants`), a
-      closed `ModuleCatalog` with runtime toggles, the read-only role and
+      closed `ModuleCatalog` with runtime toggles, the role and
       permission matrix, listing administrators, inviting one with a one-time
       activation code, and granting/revoking a role
 - [x] Admin portal: the Angular SPA itself — sign-in, the Samaaj list with
       status and module toggles, Create Samaaj, administrators with role
-      assignment, Invite Admin with its one-time code, the read-only role
+      assignment, Invite Admin with its one-time code, the role
       matrix, the adult-child conversion queue, and the audit log. Screens with
       no service appear in the nav, disabled, saying why
-- [ ] Admin: an editable role and permission matrix. `GET /v1/identity/roles`
-      reports what the backend enforces and says `editable: false`; making it
-      editable needs per-tenant role definitions, an audit trail of matrix
-      changes, and a floor of permissions no edit may remove. See
-      "The admin surface" in `services/identity-tenant-service/CLAUDE.md`
+- [x] Admin: an editable role and permission matrix, per Samaaj. The three
+      preconditions `ListRolesQuery` named all exist now:
+      `RolePermissionOverride` records only where a Samaaj departs from the
+      platform defaults (so one that changes nothing keeps tracking those
+      defaults, and one that undoes a change has its override deleted rather
+      than pinned); `identity.role-matrix.changed.v1` carries who changed what
+      and what it was before; and `MatrixEditing` is the floor - SuperAdmin
+      cannot be edited by a Samaaj, and a Samaaj Admin cannot lose
+      `Roles.Manage`, which is the one revocation a Samaaj could not undo for
+      itself. Gated on its own key rather than `AdminUsers.Manage`: inviting an
+      administrator hands somebody an existing bundle, this redefines it
 - [x] `docs/product/SECURITY-CHECKLIST.md` pass on both Stage-0 +
       Phase-1 services. Every box walked against the code; the file now records
       what is asserted, what is missing and where each gap is tracked. Added on
