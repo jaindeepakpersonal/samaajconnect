@@ -9,4 +9,12 @@ namespace Sangam.AuditNotification.Application.Security;
 public static class PermissionKeys
 {
     public const string AuditRead = "Audit.Read";
+
+    /// <summary>
+    /// Putting a message in front of every member of a Samaaj at once.
+    /// Deliberately not folded into an existing administrative key: it is a
+    /// different power from managing members, and a Samaaj should be able to
+    /// hand out one without the other.
+    /// </summary>
+    public const string NotificationsBroadcast = "Notifications.Broadcast";
 }

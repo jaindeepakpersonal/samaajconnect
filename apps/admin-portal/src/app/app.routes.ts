@@ -73,6 +73,12 @@ export const routes: Routes = [
         loadComponent: () =>
           import('./features/audit/audit-log.component').then((m) => m.AuditLogComponent),
       },
+      {
+        path: 'notifications',
+        title: 'Notifications - samaajconnect admin',
+        loadComponent: () =>
+          import('./features/notifications/broadcast.component').then((m) => m.BroadcastComponent),
+      },
       { path: '', pathMatch: 'full', redirectTo: 'dashboard' },
       { path: '**', redirectTo: 'dashboard' },
     ],

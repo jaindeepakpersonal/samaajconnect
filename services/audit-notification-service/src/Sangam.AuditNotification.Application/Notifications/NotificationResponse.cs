@@ -1,5 +1,11 @@
 namespace Sangam.AuditNotification.Application.Notifications;
 
+/// <param name="ReadAt">
+/// When <b>the caller</b> read it, not when anyone did. A broadcast is one row
+/// seen by a whole Samaaj, so this is looked up per member against
+/// <c>NotificationRead</c>; null means unread by this member, whatever everyone
+/// else has done with it.
+/// </param>
 /// <param name="Destination">
 /// Where an outbound message was sent - null for in-app, which is addressed by
 /// user id. Present so the DPDP s.11 export is complete about what this service

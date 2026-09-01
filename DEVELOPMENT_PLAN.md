@@ -8,19 +8,24 @@ version of the plan; the reasoning behind the ordering lives in
 ## Current Status
 
 - **Stage:** every module has a service and member screens; Phase 5 hardening under way
-- **Last updated:** 2026-09-01 - an outbound notification channel. Everything
-  above the transport is real - deciding a message is due, addressing it,
-  queueing, retrying, giving up - and the adapter behind it writes to the log
-  and delivers nothing, which the service says at Warning on every start.
-  Registration now sends a welcome to the identifier the member signed up with.
-  The claim is a single conditional UPDATE rather than a read-then-write,
-  because two dispatchers that both take a row send a member two text messages;
-  breaking it on purpose confirmed the test catches that, and confirmed that
-  `FOR UPDATE SKIP LOCKED` is throughput rather than correctness. Running the
-  smoke suite against a stack built from empty volumes found 20 red checks, all
-  four root causes in the script rather than in any service - one wrong id
-  extraction accounted for 17 of them. 1,222 tests green (913 backend across 21
-  suites, 309 frontend) plus 241 smoke checks against empty volumes.
+- **Last updated:** 2026-09-01 - the notification endpoints the API contract
+  promised and nothing implemented: mark one read, mark all read, and a
+  Samaaj-wide announcement with the recent-announcement list beside it. Screens
+  in both apps.
+
+  The interesting part was read state. A broadcast is one row a whole Samaaj
+  shares, so a read flag on the notification is set by the first member to open
+  it and read for everyone after; it moved to a row per person per message, and
+  `NotificationStatus` lost `Read` with it and is now purely about delivery.
+  Erasure needed a second delete for the same reason - a broadcast survives the
+  member who read it, and so would the row saying they had. The member portal's
+  unread badge had been counting the whole list, so it never moved.
+
+  The new member screen was written against three class and token names the
+  member portal does not have (`.muted`, `.visually-hidden`, `--border`; it has
+  `.small`, `.sr-only`, `--line`). Nothing fails - the elements render unstyled
+  and look almost right. Caught by opening the page. 1,264 tests green (945 backend
+  across 21 suites, 319 frontend) plus 254 smoke checks against empty volumes.
 - **Blocking item:** none. **Every module the platform has now has both a
   service and member screens**, and the role matrix is editable per Samaaj. What
   is left needs things this repository cannot supply on its own: TLS and a
@@ -119,6 +124,14 @@ unit tested.
       means "handed to the channel", which the service says at Warning on
       every start. Registration now sends a welcome to the identifier the
       member signed up with, proving the path end to end
+- [x] The notification endpoints the API contract promised and nothing
+      implemented: mark one read, mark all read, and a Samaaj-wide announcement
+      with the recent-announcement list beside it. Read state moved off the
+      notification and onto a row per person - a broadcast is one row a whole
+      Samaaj shares, so a read flag on it was marked by the first member to open
+      it and read for everyone after. `NotificationStatus` lost `Read` with it
+      and is now purely about delivery. Screens in both apps; the member
+      portal's unread badge counted the whole list until now
 - [ ] A real email or SMS provider, so `Sent` means a person was reached.
       One class implementing `INotificationChannel` and one registration; the
       choice of provider is a hosting decision

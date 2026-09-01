@@ -1,0 +1,72 @@
+/* Only what is specific to this screen. The card, the buttons, `.small`,
+   `.notice` and `.actions` are shared primitives in `src/styles.css`. */
+
+.notifications-page {
+  max-width: 720px;
+  margin: 0 auto;
+  padding: var(--space-6) var(--space-4);
+}
+
+.page-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: var(--space-4);
+  flex-wrap: wrap;
+  margin-bottom: var(--space-4);
+}
+
+.notification-row {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--space-4);
+  padding: var(--space-3) 0;
+  border-bottom: 1px solid var(--line);
+}
+
+.notification-row:last-child {
+  border-bottom: 0;
+}
+
+.notification-text {
+  min-width: 0;
+}
+
+.notification-title {
+  margin: 0;
+  font-weight: 600;
+}
+
+/* Preserves the line breaks somebody typed into an announcement without letting
+   a long word widen the card past the page. */
+.notification-body {
+  margin: var(--space-1) 0 0;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+.notification-meta {
+  margin: var(--space-1) 0 0;
+  font-size: 12px;
+  color: var(--muted);
+}
+
+/* Unread is carried by a bar and a heavier title, never by colour alone - the
+   same rule the pill variants in styles.css follow. The wireframe used a "New"
+   pill; the button beside the row already says the row is unread, and a pill as
+   well would be two controls saying one thing. */
+.notification-row.unread {
+  border-left: 3px solid var(--accent);
+  padding-left: var(--space-3);
+  margin-left: calc(var(--space-3) * -1);
+}
+
+.notification-row.unread .notification-title {
+  font-weight: 700;
+}
+
+.small-btn {
+  flex: none;
+  white-space: nowrap;
+}

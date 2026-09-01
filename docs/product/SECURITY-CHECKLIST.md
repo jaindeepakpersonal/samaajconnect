@@ -104,6 +104,7 @@ existing platform (`Pathshala.Attendance.Write`, `Issue.Approve`):
 | `Boli.Manage` | Occasion/type/open/close |
 | `Boli.PublishResults` | Publish (irreversible without correction flow) |
 | `Audit.Read` | View audit log |
+| `Notifications.Broadcast` | Announce to every member of a Samaaj, and read what has been announced. Its own key rather than folded into an administrative one: managing members and putting a message in front of every one of them are different powers |
 
 `AuthorizationCatalog` in identity-tenant-service is the executable copy of
 this table, with stable hand-assigned ids so a grant means the same thing in

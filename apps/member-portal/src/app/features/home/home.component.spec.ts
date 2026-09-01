@@ -54,7 +54,16 @@ describe('HomeComponent', () => {
   afterEach(() => http.verify());
 
   /** Answers the three calls Home makes on load. */
-  function load(options: { modules?: string[]; user?: CurrentUser; notifications?: number } = {}): void {
+  function load(
+    options: {
+      modules?: string[];
+      user?: CurrentUser;
+      /** How many notifications, all of them unread. */
+      notifications?: number;
+      /** Exact rows, when a test cares which of them have been read. */
+      notificationRows?: { readAt: string | null }[];
+    } = {},
+  ): void {
     fixture.detectChanges();
 
     http.expectOne('/v1/identity/me').flush(options.user ?? member);
@@ -63,7 +72,10 @@ describe('HomeComponent', () => {
       .flush(samaajWith(options.modules ?? ['Pathshala']));
     http
       .expectOne('/v1/notifications')
-      .flush(new Array(options.notifications ?? 0).fill({}));
+      .flush(
+        options.notificationRows ??
+          new Array(options.notifications ?? 0).fill({ readAt: null }),
+      );
 
     fixture.detectChanges();
   }
@@ -235,7 +247,28 @@ describe('HomeComponent', () => {
   it('reports notifications in the singular when there is one', () => {
     load({ notifications: 1 });
 
-    expect(text()).toContain('You have 1 notification.');
+    expect(text()).toContain('You have 1 unread notification.');
+  });
+
+  it('counts the unread ones, not every notification that exists', () => {
+    // It counted the length of the list until read state existed, so the badge
+    // sat at the same number no matter what the member did with it - which
+    // trains people to ignore a badge.
+    load({
+      notificationRows: [
+        { readAt: null },
+        { readAt: '2026-01-01T10:00:00Z' },
+        { readAt: '2026-01-02T10:00:00Z' },
+      ],
+    });
+
+    expect(text()).toContain('You have 1 unread notification.');
+  });
+
+  it('says nothing at all once everything has been read', () => {
+    load({ notificationRows: [{ readAt: '2026-01-01T10:00:00Z' }] });
+
+    expect(text()).not.toContain('unread');
   });
 
   it('shows an error with a retry when the profile call fails', () => {

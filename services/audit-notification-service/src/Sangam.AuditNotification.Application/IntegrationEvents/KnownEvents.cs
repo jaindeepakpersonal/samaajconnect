@@ -158,6 +158,17 @@ public static class KnownEvents
             EntityIdProperty: "userId",
             ActorIdProperty: "userId"),
 
+        // The one topic this service both publishes and consumes. Described
+        // here rather than left to the derived defaults for the usual reason:
+        // the derived descriptor would record a message sent to an entire
+        // Samaaj with no actor on it, and "who told everyone this?" is the only
+        // question an audit row about a broadcast exists to answer.
+        ["notifications.broadcast.sent.v1"] = new(
+            Action: "BroadcastSent",
+            EntityName: "Notification",
+            EntityIdProperty: "notificationId",
+            ActorIdProperty: "sentBy"),
+
         // Erasure is handled by ErasePersonalDataCommandHandler rather than
         // recorded through this path, and it writes its own row with no actor
         // deliberately. Listed here so the omission reads as a decision.

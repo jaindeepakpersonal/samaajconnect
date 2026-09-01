@@ -76,7 +76,7 @@ public sealed class GetMyDataQueryHandler(
         return Result.Success(new MyAuditDataResponse(
             clock.UtcNow.ToString("O"),
             "audit-notification-service",
-            mine.Select(ToResponse).ToList(),
+            [.. mine.Select(NotificationMapping.ToResponse)],
             actions,
             [
                 "We keep a record of what you were notified about, so your Samaaj can show "
@@ -94,14 +94,4 @@ public sealed class GetMyDataQueryHandler(
             ]));
     }
 
-    private static NotificationResponse ToResponse(Notification notification) => new(
-        notification.Id,
-        notification.Title,
-        notification.Body,
-        notification.Channel.ToString(),
-        notification.Status.ToString(),
-        notification.RecipientUserId is null,
-        notification.CreatedAt,
-        notification.ReadAt,
-        notification.Destination);
 }

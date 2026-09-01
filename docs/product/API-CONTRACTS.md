@@ -263,5 +263,27 @@ somebody actually offered.
 | GET | `/audit/logs` | SuperAdmin, SamaajAdmin | Query audit log (filterable) |
 | GET | `/audit/me/data-export` | Authenticated | My notifications and my actions (DPDP s.11) |
 | GET | `/notifications` | Authenticated | My notifications. In-app only: a message the platform also emailed is the same message, and returning both would show it twice |
-| POST | `/notifications/{id}/read` | Authenticated | Mark read |
-| POST | `/notifications/broadcast` | SamaajAdmin, SuperAdmin | Send tenant/platform announcement |
+| POST | `/notifications/{id}/read` | Authenticated | Mark read, for the caller only. Refuses 404 for another member's notification or another Samaaj's, and 409 for one sent by email or text - whether those were opened is not something this platform knows |
+| POST | `/notifications/read-all` | Authenticated | Mark everything in the caller's list read, in one request. Leaves the timestamps on ones already read |
+| POST | `/notifications/broadcast` | SamaajAdmin, SuperAdmin + `Notifications.Broadcast` | Announce to every member of **this** Samaaj. In-app only, and never platform-wide - see below |
+| GET | `/notifications/broadcasts` | SamaajAdmin, SuperAdmin + `Notifications.Broadcast` | This Samaaj's announcements, with how many members opened each |
+
+**A broadcast reaches one Samaaj, in the app.** The wireframe's Audience
+dropdown also offers "All Members" across every Samaaj and "Specific Role";
+neither is built. The first is a write that deliberately crosses tenants, which
+nothing else on this platform does and which should not arrive as a side effect
+of a dropdown. The second needs to know who holds which role, which lives in
+identity-tenant-service.
+
+Its Channel dropdown offers "In-App + Email" and "In-App + SMS/WhatsApp", and
+those are not built either: audit-notification-service learns a member's contact
+address from an event that carries one and keeps no directory, so there is no
+set of addresses to send a Samaaj-wide message to. That is the same missing
+piece as the DPDP s.8(6) duty to reach every affected person - see
+`DPDP-COMPLIANCE.md`.
+
+**Read state is per member, so a broadcast is one row a Samaaj shares and a
+thousand people each read separately.** `readAt` on a notification is always
+*the caller's*, never anyone else's. The unique index on
+`(notification_id, user_id)` is what makes opening the same notification in two
+tabs a no-op rather than an error.

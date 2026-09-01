@@ -38,7 +38,8 @@ public sealed record ErasePersonalDataCommand(IntegrationEventEnvelope Event)
 public sealed record ErasePersonalDataResult(
     bool AlreadyHandled,
     int NotificationsDeleted,
-    int AuditRowsDeIdentified);
+    int AuditRowsDeIdentified,
+    int ReadRecordsDeleted = 0);
 
 public sealed class ErasePersonalDataCommandHandler(
     IErasureRepository erasure,
@@ -78,6 +79,14 @@ public sealed class ErasePersonalDataCommandHandler(
             return Result.Success(new ErasePersonalDataResult(true, 0, 0));
         }
 
+        // Reads first, then the notifications. Order does not matter for
+        // correctness - the notification delete cascades to any read rows left
+        // pointing at it - but it does mean the count below is the reads that
+        // needed deleting on their own, which are the ones on broadcasts nobody
+        // is deleting.
+        var readsDeleted =
+            await erasure.DeleteNotificationReadsForAsync(payload.UserId, cancellationToken);
+
         var notificationsDeleted =
             await erasure.DeleteNotificationsForAsync(payload.UserId, cancellationToken);
 
@@ -109,13 +118,14 @@ public sealed class ErasePersonalDataCommandHandler(
         // Counts only. A log line naming who was erased would preserve exactly
         // what the request was to remove, somewhere nobody thinks to redact.
         logger.LogWarning(
-            "Erasure: deleted {NotificationCount} notification(s) and de-identified "
-            + "{AuditCount} audit row(s)",
+            "Erasure: deleted {NotificationCount} notification(s), {ReadCount} read record(s) "
+            + "and de-identified {AuditCount} audit row(s)",
             notificationsDeleted,
+            readsDeleted,
             rowsDeIdentified);
 
-        return Result.Success(
-            new ErasePersonalDataResult(false, notificationsDeleted, rowsDeIdentified));
+        return Result.Success(new ErasePersonalDataResult(
+            false, notificationsDeleted, rowsDeIdentified, readsDeleted));
     }
 
     private static UserErasedPayload? Parse(IntegrationEventEnvelope envelope)

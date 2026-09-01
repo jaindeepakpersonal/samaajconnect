@@ -6,6 +6,8 @@ import {
   AdminUser,
   AssignRoleResult,
   AuditLogEntry,
+  Broadcast,
+  BroadcastResult,
   ConversionRequest,
   CreateTenantRequest,
   InviteAdminRequest,
@@ -154,5 +156,23 @@ export class AdminApi {
     }
 
     return this.http.get<AuditLogEntry[]>('/v1/audit/logs', { params });
+  }
+
+  // ---- Notifications ----------------------------------------------------
+
+  /**
+   * Announces something to every member of the Samaaj currently in scope.
+   *
+   * The Samaaj is never in the body. A Samaaj Admin's token names theirs, and a
+   * Super Admin's scope selection travels as the override header
+   * `adminScopeInterceptor` adds - which the gateway audits. A tenant id in the
+   * payload would be a second way to say it, and the one nothing checks.
+   */
+  broadcast(title: string, body: string): Observable<BroadcastResult> {
+    return this.http.post<BroadcastResult>('/v1/notifications/broadcast', { title, body });
+  }
+
+  listBroadcasts(): Observable<Broadcast[]> {
+    return this.http.get<Broadcast[]>('/v1/notifications/broadcasts');
   }
 }

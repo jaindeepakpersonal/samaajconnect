@@ -227,30 +227,32 @@ const NAV: readonly NavGroup[] = [
   {
     heading: 'Community',
     items: [
+      // These say "the admin screen is not built", not "the service does not
+      // exist". They said the latter until every one of those services shipped,
+      // at which point the panel was telling administrators something plainly
+      // untrue about their own platform - and the member portal has screens for
+      // all of them. What is missing here is the administrative view.
       { label: 'Members', pending: 'The member directory screen is not built yet.' },
       { label: 'Families & Children', route: '/conversions' },
-      { label: 'Timeline / Moderation', pending: 'The timeline service does not exist yet.' },
-      { label: 'Volunteer Groups', pending: 'The volunteer-groups service does not exist yet.' },
-      { label: 'Events', pending: 'The events service does not exist yet.' },
-      { label: 'Social Issues', pending: 'The social-issues service does not exist yet.' },
-      { label: 'Celebrities / Voting', pending: 'The celebrity-voting service does not exist yet.' },
+      { label: 'Timeline / Moderation', pending: 'The moderation screen is not built yet.' },
+      { label: 'Volunteer Groups', pending: 'The group administration screen is not built yet.' },
+      { label: 'Events', pending: 'The event administration screen is not built yet.' },
+      { label: 'Social Issues', pending: 'The review queue screen is not built yet.' },
+      { label: 'Celebrities / Voting', pending: 'The campaign administration screen is not built yet.' },
     ],
   },
   {
     heading: 'Education',
-    items: [{ label: 'Jain Pathshala', pending: 'The Pathshala service does not exist yet.' }],
+    items: [{ label: 'Jain Pathshala', pending: 'The Pathshala administration screen is not built yet.' }],
   },
   {
     heading: 'Boli',
-    items: [{ label: 'Auctions / Boli', pending: 'The Boli service does not exist yet.' }],
+    items: [{ label: 'Auctions / Boli', pending: 'The Boli administration screen is not built yet.' }],
   },
   {
     heading: 'Operations',
     items: [
-      {
-        label: 'Notifications',
-        pending: 'There is no delivery channel yet, so there is nothing to send.',
-      },
+      { label: 'Notifications', route: '/notifications' },
       { label: 'Reports & Analytics', pending: 'Reporting is a later phase.' },
       { label: 'Settings', pending: 'Samaaj settings live on the Samaaj screen for now.' },
     ],

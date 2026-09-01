@@ -520,6 +520,138 @@ check "but cannot decide which modules their Samaaj runs" 403 \
 check "nor list every Samaaj on the platform" 403 \
   "$(status -H "Authorization: Bearer $SAMAAJ_ADMIN_TOKEN" "$GATEWAY/v1/identity/tenants")"
 
+echo
+echo "Notifications: reading your own, and announcing to the whole Samaaj"
+
+# Every notification the member can see, before anything is marked. The welcome
+# one raised by their registration event is in here.
+FIRST_NOTIFICATION=$(curl -s -H "Authorization: Bearer $MEMBER_TOKEN" \
+  "$GATEWAY/v1/notifications" | json_field id)
+
+if [ -n "$FIRST_NOTIFICATION" ]; then
+  echo "  ok    the member has a notification to read"
+  pass=$((pass + 1))
+else
+  echo "  FAIL  the member has a notification to read"
+  fail=$((fail + 1))
+fi
+
+check "marking it read" 200 \
+  "$(status -X POST "$GATEWAY/v1/notifications/$FIRST_NOTIFICATION/read" \
+     -H "Authorization: Bearer $MEMBER_TOKEN")"
+
+# Pressing it twice is not an error - the member has done nothing wrong, and the
+# response reports which happened. The unique index is what actually refuses the
+# second row.
+SECOND_READ=$(curl -s -X POST "$GATEWAY/v1/notifications/$FIRST_NOTIFICATION/read" \
+  -H "Authorization: Bearer $MEMBER_TOKEN")
+
+if printf '%s' "$SECOND_READ" | grep -q '"alreadyRead":true'; then
+  echo "  ok    and marking it read again changes nothing and is not an error"
+  pass=$((pass + 1))
+else
+  echo "  FAIL  a second read was treated as new (got '$SECOND_READ')"
+  fail=$((fail + 1))
+fi
+
+check "a member may not announce to their Samaaj" 403 \
+  "$(status -X POST "$GATEWAY/v1/notifications/broadcast" -H 'Content-Type: application/json' \
+     -H "Authorization: Bearer $MEMBER_TOKEN" \
+     -d '{"title":"Free money","body":"Send me your bank details."}')"
+
+check "an announcement with no message is refused" 400 \
+  "$(status -X POST "$GATEWAY/v1/notifications/broadcast" -H 'Content-Type: application/json' \
+     -H "Authorization: Bearer $SAMAAJ_ADMIN_TOKEN" \
+     -d '{"title":"Paryushan schedule","body":""}')"
+
+BROADCAST=$(curl -s -X POST "$GATEWAY/v1/notifications/broadcast" \
+  -H 'Content-Type: application/json' -H "Authorization: Bearer $SAMAAJ_ADMIN_TOKEN" \
+  -d '{"title":"Paryushan schedule","body":"Timings for the week, and where to gather."}')
+
+BROADCAST_ID=$(printf '%s' "$BROADCAST" | json_field id)
+
+if [ -n "$BROADCAST_ID" ]; then
+  echo "  ok    a Samaaj admin announces something to everybody"
+  pass=$((pass + 1))
+else
+  echo "  FAIL  a Samaaj admin announces something (got '$BROADCAST')"
+  fail=$((fail + 1))
+fi
+
+# The member never received this one personally; it is addressed to the Samaaj.
+if curl -s -H "Authorization: Bearer $MEMBER_TOKEN" "$GATEWAY/v1/notifications" \
+   | grep -q "$BROADCAST_ID"; then
+  echo "  ok    and an ordinary member sees it in their list"
+  pass=$((pass + 1))
+else
+  echo "  FAIL  the announcement did not reach a member's list"
+  fail=$((fail + 1))
+fi
+
+# The point of a row per person: the member above has read their own welcome
+# message, and that must not have marked this announcement read for them, nor
+# for anybody else.
+if curl -s -H "Authorization: Bearer $MEMBER_TOKEN" "$GATEWAY/v1/notifications" \
+   | tr '{' '\n' | grep "$BROADCAST_ID" | grep -q '"readAt":null'; then
+  echo "  ok    unread, because reading one message does not read another"
+  pass=$((pass + 1))
+else
+  echo "  FAIL  the announcement came back already read"
+  fail=$((fail + 1))
+fi
+
+check "marking everything read in one request" 200 \
+  "$(status -X POST "$GATEWAY/v1/notifications/read-all" \
+     -H "Authorization: Bearer $MEMBER_TOKEN")"
+
+if curl -s -H "Authorization: Bearer $MEMBER_TOKEN" "$GATEWAY/v1/notifications" \
+   | grep -q '"readAt":null'; then
+  echo "  FAIL  something was still unread after mark-all"
+  fail=$((fail + 1))
+else
+  echo "  ok    and nothing is left unread afterwards"
+  pass=$((pass + 1))
+fi
+
+check "a member may not read the Samaaj's announcement history" 403 \
+  "$(status -H "Authorization: Bearer $MEMBER_TOKEN" "$GATEWAY/v1/notifications/broadcasts")"
+
+# The count the wireframe's "Delivered" column wanted to be: an in-app
+# announcement is delivered the moment the row exists, so only a read count says
+# anything.
+#
+# Matched with the closing brace, not as a bare prefix: `"readCount":1` also
+# matches 10, 12 and 100, so on a Samaaj with a few members this check would
+# have passed for a count it was not testing.
+if curl -s -H "Authorization: Bearer $SAMAAJ_ADMIN_TOKEN" \
+   "$GATEWAY/v1/notifications/broadcasts" | grep -q '"readCount":1}'; then
+  echo "  ok    and the admin sees one member has opened it"
+  pass=$((pass + 1))
+else
+  echo "  FAIL  the announcement's read count did not reach exactly 1"
+  fail=$((fail + 1))
+fi
+
+# A broadcast is one person messaging everybody, so it has to be traceable to
+# them. The row arrives over Kafka through this service's own outbox.
+broadcast_audited=0
+for attempt in $(seq 1 20); do
+  if curl -s -H "Authorization: Bearer $ADMIN_TOKEN" -H "$ADMIN_TENANT_HEADER" \
+     "$GATEWAY/v1/audit/logs?action=BroadcastSent" | grep -q "$BROADCAST_ID"; then
+    broadcast_audited=1
+    break
+  fi
+  sleep 2
+done
+
+if [ "$broadcast_audited" = "1" ]; then
+  echo "  ok    and it is in the audit log, with the administrator who sent it"
+  pass=$((pass + 1))
+else
+  echo "  FAIL  the announcement never reached the audit log"
+  fail=$((fail + 1))
+fi
+
 check "granting a role" 200 \
   "$(status -X PUT "$GATEWAY/v1/identity/admins/$INVITED_ID/roles/BoliManager" \
      -H 'Content-Type: application/json' -H "Authorization: Bearer $ADMIN_TOKEN" \

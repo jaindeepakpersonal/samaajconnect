@@ -19,6 +19,8 @@ public sealed class AuditNotificationDbContext(
 
     public DbSet<Notification> Notifications => Set<Notification>();
 
+    public DbSet<NotificationRead> NotificationReads => Set<NotificationRead>();
+
     public DbSet<OutboxMessage> OutboxMessages => Set<OutboxMessage>();
 
     /// <summary>

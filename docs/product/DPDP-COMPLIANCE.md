@@ -32,7 +32,7 @@ deferrable — it attaches the moment the first child record is created.
 | 6(7) | Consent records retained and producible | **built** | `ConsentRecord` is append-only |
 | 8(1) | Process only for the consented purpose | partial | Purpose is recorded; enforcement is by code review, not by a runtime check |
 | 8(4) | Reasonable security safeguards | partial | See "Security" below |
-| 8(6) | Breach notification to the Board and affected principals | **not built** | A channel now exists to send on; the detection process, the Board form and the text do not. See "Breach notification" below |
+| 8(6) | Breach notification to the Board and affected principals | **not built** | Every member of a Samaaj can now be addressed at once, but in-app only; the provider, the Board form, the text and the detection do not exist. See "Breach notification" below |
 | 8(7) | Erase when consent is withdrawn or the purpose is served | **built** | `POST /v1/identity/me/erase`; see "Erasure vs. the audit log" |
 | 9 | **Verifiable parental consent for under-18s** | partial | `ParentalConsent` on `ChildProfile`, required to create one; "verifiable" needs counsel |
 | 9(3) | No tracking or behavioural monitoring of children | **built by absence** | The platform does none. Keep it that way. |
@@ -296,12 +296,19 @@ here evidences that affected data principals were told. §8(6) also wants a
 Board notification and a description of the breach, neither of which is a
 message-sending problem.
 
-What is still needed, in order: a provider (email or SMS) so `Sent` means what
-it says; a way to address a message to every affected member rather than one at
-a time, which the current design does not have — an event raises a notification
-for the member it names; the wording, and the Board's prescribed form; and the
-detection that starts any of it, which is a monitoring question the platform has
-not answered.
+There is now a way to address every member of a Samaaj at once - a broadcast is
+one notification row with no recipient, and every member of that Samaaj sees it.
+That closes the "one at a time" gap, and closes it **in the app only**: a
+broadcast reaches a member when they next open the portal, which is not
+notification in any sense §8(6) would accept. Sending one by email or text needs
+somewhere to read every member's address from, and audit-notification-service
+holds no directory - it learns an address from an event that happens to carry
+one.
+
+What is still needed, in order: a provider so `Sent` means what it says; a
+source of every affected member's contact address; the wording, and the Board's
+prescribed form; and the detection that starts any of it, which is a monitoring
+question the platform has not answered.
 
 What the channel does discharge is the excuse: the reason §8(6) and §14 were
 both marked "needs a notification channel" no longer applies, and what is left

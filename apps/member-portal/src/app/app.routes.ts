@@ -20,6 +20,15 @@ export const routes: Routes = [
     loadComponent: () => import('./features/home/home.component').then((m) => m.HomeComponent),
   },
   {
+    path: 'notifications',
+    title: 'Notifications - samaajconnect',
+    canActivate: [authGuard],
+    loadComponent: () =>
+      import('./features/notifications/notifications.component').then(
+        (m) => m.NotificationsComponent,
+      ),
+  },
+  {
     path: 'timeline',
     title: 'Timeline - samaajconnect',
     canActivate: [authGuard],

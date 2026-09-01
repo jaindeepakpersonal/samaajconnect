@@ -18,11 +18,17 @@ screen. The spec is `docs/product/wireframes/admin-panel-wireframes.html`.
 | Role & Permission Matrix | `/roles` | `#rolematrix` | built, editable per Samaaj |
 | Adult Child Conversion Queue | `/conversions` | `#conversionqueue` | built |
 | Audit Logs | `/audit` | `#audit` | built |
-| Members, Timeline, Groups, Events, Issues, Celebrity, Pathshala, Boli, Notifications, Reports, Settings | — | various | not built — no service exists |
+| Notifications | `/notifications` | `#notifications` | built — compose and recent, without the Audience and Channel dropdowns |
+| Members, Timeline, Groups, Events, Issues, Celebrity, Pathshala, Boli, Reports, Settings | — | various | not built. Every one of those services exists and the member portal has screens for them; what is missing is the administrative view |
 
 The unbuilt screens appear in the nav, disabled, each saying why. That is
 deliberate: the wireframe promised them, and an administrator who cannot see
 that Pathshala is coming has been told less than the wireframe did.
+
+**What they say has to stay true.** Those reasons read "the events service does
+not exist yet" long after every one of those services shipped, which told an
+administrator something plainly false about their own platform. They now say the
+admin *screen* is not built, which is the thing that is actually missing.
 
 ## Where things live
 
@@ -124,6 +130,23 @@ that was never there.
 **A refused change re-reads the matrix.** A checkbox has already flipped itself
 in the DOM by the time the request fails, and leaving it showing a change the
 server refused is the one thing this screen must never do.
+
+**The Compose form drops two of the wireframe's four fields.** Audience offered
+"All Members" across every Samaaj and "Specific Role"; Channel offered
+"In-App + Email" and "In-App + SMS/WhatsApp". None of the four is real. A write
+that crosses every tenant is not something this platform does and should not
+arrive as a side effect of a dropdown; role membership lives in
+identity-tenant-service; and audit-notification-service holds no directory of
+member addresses, so there is no set of addresses to send a Samaaj-wide message
+to. The scope banner already names the Samaaj being written to, so the card says
+which rather than offering a choice of one.
+
+**The Recent table shows a read count, not "Delivered".** An in-app
+announcement is delivered the moment the row is written, so a Delivered pill -
+which the wireframe drew - is a word that is always true and therefore says
+nothing. How many members opened it is the question somebody opens this screen
+to ask, and nothing stops the same announcement being sent twice, so the list is
+also what makes a duplicate visible before it is sent.
 
 **The one-time activation code is shown once and then removed from the DOM.**
 Only its hash is stored, so it cannot be looked up again. "Invite another"

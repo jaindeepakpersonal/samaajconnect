@@ -106,25 +106,52 @@ public sealed class NotificationDeliveryStateTests
     }
 
     [Fact]
-    public void Reading_an_outbound_notification_cannot_take_it_off_the_queue()
+    public void A_broadcast_is_addressed_to_everybody()
     {
-        // Otherwise the way to never send a message would be to look at it.
-        var notification = Outbound();
+        var broadcast = Notification.Broadcast(
+            TenantId, "Paryushan schedule", "Timings for the week.",
+            Guid.NewGuid(), Guid.NewGuid(), Now);
 
-        notification.MarkRead(Now);
-
-        notification.Status.Should().Be(NotificationStatus.Pending);
-        notification.ReadAt.Should().BeNull();
+        broadcast.RecipientUserId.Should().BeNull();
+        broadcast.Channel.Should().Be(NotificationChannel.InApp);
+        broadcast.IsAddressedTo(Guid.NewGuid()).Should().BeTrue();
     }
 
     [Fact]
-    public void An_in_app_notification_can_still_be_read()
+    public void A_broadcast_raises_the_event_that_makes_it_auditable()
     {
-        var notification = InApp();
+        // One person putting a message in front of a whole Samaaj. Without the
+        // event, the only trace would be a log line.
+        var sender = Guid.NewGuid();
 
-        notification.MarkRead(Now);
+        var broadcast = Notification.Broadcast(
+            TenantId, "Paryushan schedule", "Timings for the week.",
+            Guid.NewGuid(), sender, Now);
 
-        notification.Status.Should().Be(NotificationStatus.Read);
-        notification.ReadAt.Should().Be(Now);
+        broadcast.DomainEvents.Should().ContainSingle()
+            .Which.Should().BeOfType<BroadcastSentDomainEvent>()
+            .Which.SentBy.Should().Be(sender);
     }
+
+    [Fact]
+    public void A_notification_addressed_to_one_member_is_not_addressed_to_another()
+    {
+        // The half of the read guard a tenant check cannot do: inside one
+        // Samaaj, somebody else's message is still not yours to touch.
+        var recipient = Guid.NewGuid();
+
+        var notification = Notification.Create(
+            TenantId, recipient, "Welcome", "Your membership is active.",
+            NotificationChannel.InApp, Guid.NewGuid(), Now);
+
+        notification.IsAddressedTo(recipient).Should().BeTrue();
+        notification.IsAddressedTo(Guid.NewGuid()).Should().BeFalse();
+    }
+
+    // Read state is deliberately not testable here: it is not on this aggregate
+    // any more. A broadcast is one row a whole Samaaj shares, so a read flag on
+    // it would have been set by the first member to open it and read for
+    // everyone after. It lives in NotificationRead, one row per person per
+    // message, and is exercised in the integration tests against a real unique
+    // index.
 }

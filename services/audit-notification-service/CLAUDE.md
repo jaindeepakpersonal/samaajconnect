@@ -16,6 +16,7 @@ services exist means revisiting all five (`docs/product/ROADMAP.md`).
 |---|---|---|
 | `AuditLog` | built | Append-only. No mutating method, no update or delete endpoint. One de-identifying exception - see below. |
 | `Notification` | built | `RecipientUserId == null` is a Samaaj-wide broadcast. Also the delivery record for anything leaving the platform - see "Outbound delivery". |
+| `NotificationRead` | built | One member having read one message. A row rather than a column, because a broadcast is one notification a whole Samaaj shares - see "Read state". |
 | `NotificationTemplate` | not built | Titles and bodies are still written inline in `KnownEvents`. Needed once there is more than one message and somebody wants to change the wording without a deploy. |
 
 ## Commands
@@ -24,7 +25,9 @@ services exist means revisiting all five (`docs/product/ROADMAP.md`).
 |---|---|---|
 | `RecordIntegrationEventCommand` | `[InternalRequest]` | built |
 | `ErasePersonalDataCommand` | `[InternalRequest]` | built |
-| `MarkNotificationReadCommand` | any authenticated role | not built |
+| `MarkNotificationReadCommand` | any authenticated role | built |
+| `MarkAllNotificationsReadCommand` | any authenticated role | built |
+| `BroadcastNotificationCommand` | `SuperAdmin`/`SamaajAdmin` + `Notifications.Broadcast` | built |
 
 `RecordIntegrationEventCommand` is raised by this service's own Kafka consumer
 and is not mapped to any endpoint. It carries `[InternalRequest]` rather than
@@ -39,13 +42,22 @@ genuinely externally-reachable unauthenticated surface greppable on its own.
 | `ListAuditLogsQuery` | `SuperAdmin`/`SamaajAdmin` + `Audit.Read` | built |
 | `GetMyNotificationsQuery` | any authenticated role | built |
 | `GetMyDataQuery` | any authenticated role | built |
+| `ListBroadcastsQuery` | `SuperAdmin`/`SamaajAdmin` + `Notifications.Broadcast` | built |
 
 ## Events published
 
-None yet. A delivery channel now exists, and `NotificationSent` still is not
-raised on it - nothing on the platform would consume one today, and an event
-with no consumer is a topic to keep in step for no reason. The Outbox tables and
-dispatcher are wired, so the first event raised cannot be lost.
+`notifications.broadcast.sent.v1` — and this service publishes it **to itself**.
+The consumer subscribes to every versioned topic, so an announcement goes out
+through the outbox and comes back as an audit row with the administrator who
+sent it on it. Without that, one person putting a message in front of an entire
+Samaaj would have left nothing but a log line.
+
+The event carries the title and not the body. Audit payloads are kept verbatim
+and forever; the body is up to 2000 characters that are already stored, once, on
+the notification the event names.
+
+`NotificationSent` is still not raised. Nothing on the platform would consume
+one, and an event with no consumer is a topic to keep in step for no reason.
 
 ## Events consumed
 
@@ -73,8 +85,87 @@ later has to be redacted.
 |---|---|---|
 | GET | `/v1/audit/logs` | `SuperAdmin`, `SamaajAdmin` + `Audit.Read` |
 | GET | `/v1/notifications` | any authenticated role |
+| POST | `/v1/notifications/{id}/read` | any authenticated role |
+| POST | `/v1/notifications/read-all` | any authenticated role |
+| POST | `/v1/notifications/broadcast` | `SuperAdmin`, `SamaajAdmin` + `Notifications.Broadcast` |
+| GET | `/v1/notifications/broadcasts` | `SuperAdmin`, `SamaajAdmin` + `Notifications.Broadcast` |
 | GET | `/v1/audit/me/data-export` | any authenticated role |
 | GET | `/health` | anonymous |
+
+## Read state
+
+**Read-ness is a fact about a person and a message, and it lives in
+`notification_reads`.** It used to be `Notification.ReadAt` plus a `Read` value
+in `NotificationStatus`, and that shape could not express a broadcast: a
+Samaaj-wide announcement is one row with no recipient, shared by everybody, so
+the first member to open it would have marked it read for all of them.
+
+Direct notifications could have kept the column while broadcasts gained a table.
+They did not, because two mechanisms for one idea is how the second gets
+forgotten - by the erasure path, by the unread count, by whoever adds the next
+channel. One table holds both, and `Notification` has no read state at all.
+
+**`NotificationStatus` is now purely about delivery.** `Read` is gone from it,
+and the number 4 is left as a gap rather than reused. The enum was two state
+machines wearing one name.
+
+**Marking read is an insert-or-nothing, not a check then a write.** Opening the
+same notification twice at once is ordinary - two tabs, a double tap, a client
+retrying - and a check followed by an insert lets both attempts past the check,
+leaving the unique index on `(notification_id, user_id)` to turn the loser into
+a 500. `TryRecordReadAsync` is one `INSERT ... ON CONFLICT DO NOTHING`, and the
+caller is told it was already read, which is what happened.
+
+**The two checks on marking read are both load-bearing.** The notification must
+be in the caller's Samaaj *and* addressed to them or to everybody. A tenant check
+alone lets a member mark another member's notification read; an addressed-to
+check alone lets them reach into another Samaaj's broadcast, because a broadcast
+has no recipient and so passes "is it mine" for everyone. Both refuse with 404,
+so neither confirms the id exists.
+
+**Erasure deletes read rows explicitly, not only by cascade.** Deleting a
+member's own notifications cascades to their read rows for those. A broadcast
+belongs to the Samaaj and survives - and the row saying this person opened it on
+Tuesday would survive with it, which is a record of one member's behaviour and
+exactly what erasure is for.
+
+**Mark-all-as-read chooses its set in SQL.** Reading a page of notifications and
+writing rows for those would leave a member with more notifications than the
+page holds still unread after pressing the button that says otherwise. It also
+passes the tenant explicitly: raw SQL does not get the global query filter, and
+a statement that did not name the Samaaj would mark every Samaaj's broadcasts
+read at once.
+
+## Broadcasts
+
+**One row addressed to nobody, not one row per member.** A Samaaj of two
+thousand people would otherwise mean two thousand copies of the same sentence,
+and erasing one member would have to find theirs among them.
+
+**This Samaaj, and never all of them.** The handler calls
+`ITenantContext.RequireTenantId()`, so a Super Admin who has not chosen a Samaaj
+cannot broadcast to every Samaaj on the platform. The admin wireframe's Audience
+dropdown offers exactly that under "All Members", along with "Specific Role";
+neither is built. A write that deliberately crosses tenants is not something any
+other part of this platform does, and it should not arrive as a side effect of a
+dropdown; role membership lives in identity-tenant-service.
+
+**In-app only, and not for want of a channel.** There is a delivery channel now,
+but this service holds no directory of member addresses - it learns one from an
+event that happens to carry it. There is no set of addresses here to send a
+Samaaj-wide message to, which is the same missing piece as the DPDP s.8(6) duty
+to reach every affected person.
+
+**Nothing stops the same announcement twice, deliberately.** Two identical
+messages an hour apart are two messages, and any rule that guessed otherwise -
+same title within five minutes, say - would eventually swallow one somebody
+meant to send. `ListBroadcastsQuery` is the answer instead: the admin screen
+shows what has already gone out, which makes a duplicate visible before it is
+sent rather than after.
+
+**`Notifications.Broadcast` is its own permission key.** Managing members and
+putting a message in front of every one of them are different powers, and the
+role matrix lets a Samaaj hand out the second without the first.
 
 ## Outbound delivery
 

@@ -166,3 +166,23 @@ export interface ActivationCode {
   readonly code: string;
   readonly expiresAt: string;
 }
+
+/**
+ * Mirrors `BroadcastResponse`. `readCount` is how many members have opened it,
+ * which is the number the wireframe's "Delivered" column wanted to be: an
+ * in-app announcement is delivered the moment the row exists, so "Delivered"
+ * says nothing at all.
+ */
+export interface Broadcast {
+  readonly id: string;
+  readonly title: string;
+  readonly body: string;
+  readonly sentAt: string;
+  readonly readCount: number;
+}
+
+/** Mirrors `BroadcastNotificationResult`. */
+export interface BroadcastResult {
+  readonly id: string;
+  readonly sentAt: string;
+}

@@ -78,8 +78,9 @@ import { AdminScope } from '../../core/admin-scope';
         <h3>Not built yet</h3>
         <p class="muted">
           The wireframe's dashboard also counts events, Pathshala students and auctions. Those
-          services do not exist yet, so there is nothing to count — the tiles arrive with the
-          services, not before.
+          services exist now, but each count is a call into a different one, and this panel does
+          not reach across service boundaries a tile at a time — the tiles arrive with a
+          reporting endpoint that can answer for them.
         </p>
         <div class="actions">
           <a class="btn link" routerLink="/audit">View the audit log →</a>

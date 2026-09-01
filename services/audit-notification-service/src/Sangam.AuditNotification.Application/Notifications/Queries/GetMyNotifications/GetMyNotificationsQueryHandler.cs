@@ -1,7 +1,6 @@
 using MediatR;
 using Sangam.AuditNotification.Application.Abstractions;
 using Sangam.AuditNotification.Application.Common;
-using Sangam.AuditNotification.Domain.Notifications;
 
 namespace Sangam.AuditNotification.Application.Notifications.Queries.GetMyNotifications;
 
@@ -23,18 +22,8 @@ public sealed class GetMyNotificationsQueryHandler(
         var found = await notifications.ListForRecipientAsync(
             userId, Math.Clamp(query.Limit, 1, 200), cancellationToken);
 
-        IReadOnlyList<NotificationResponse> results = found.Select(ToResponse).ToList();
+        IReadOnlyList<NotificationResponse> results = [.. found.Select(NotificationMapping.ToResponse)];
 
         return Result.Success(results);
     }
-
-    private static NotificationResponse ToResponse(Notification notification) => new(
-        notification.Id,
-        notification.Title,
-        notification.Body,
-        notification.Channel.ToString(),
-        notification.Status.ToString(),
-        notification.RecipientUserId is null,
-        notification.CreatedAt,
-        notification.ReadAt);
 }

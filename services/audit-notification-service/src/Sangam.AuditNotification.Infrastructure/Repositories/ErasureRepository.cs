@@ -21,6 +21,13 @@ public sealed class ErasureRepository(AuditNotificationDbContext dbContext) : IE
             .Where(n => n.RecipientUserId == userId)
             .ExecuteDeleteAsync(cancellationToken);
 
+    public Task<int> DeleteNotificationReadsForAsync(
+        Guid userId, CancellationToken cancellationToken = default) =>
+        dbContext.NotificationReads
+            .IgnoreQueryFilters()
+            .Where(r => r.UserId == userId)
+            .ExecuteDeleteAsync(cancellationToken);
+
     public Task<int> DeIdentifyAuditRowsForAsync(
         Guid userId, CancellationToken cancellationToken = default) =>
         dbContext.AuditLogs

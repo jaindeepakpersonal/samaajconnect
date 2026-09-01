@@ -47,6 +47,7 @@ public static class AuthorizationCatalog
         public static readonly Guid AuditRead = new("b0000000-0000-0000-0000-000000000012");
         public static readonly Guid VolunteerGroupsLead = new("b0000000-0000-0000-0000-000000000013");
         public static readonly Guid RolesManage = new("b0000000-0000-0000-0000-000000000014");
+        public static readonly Guid NotificationsBroadcast = new("b0000000-0000-0000-0000-000000000015");
     }
 
     public static IReadOnlyList<Role> Roles { get; } =
@@ -84,6 +85,7 @@ public static class AuthorizationCatalog
         new(PermissionIds.AuditRead, "Audit.Read"),
         new(PermissionIds.VolunteerGroupsLead, "VolunteerGroups.Lead"),
         new(PermissionIds.RolesManage, "Roles.Manage"),
+        new(PermissionIds.NotificationsBroadcast, "Notifications.Broadcast"),
     ];
 
     /// <summary>
@@ -119,6 +121,13 @@ public static class AuthorizationCatalog
         new(RoleIds.SamaajAdmin, PermissionIds.BoliPublishResults),
         new(RoleIds.SamaajAdmin, PermissionIds.AuditRead),
         new(RoleIds.SamaajAdmin, PermissionIds.RolesManage),
+
+        // Announcing to the whole Samaaj at once. Its own key rather than folded
+        // into AdminUsers.Manage, because "may administer members" and "may put
+        // a message in front of every one of them" are different powers, and a
+        // Samaaj that wants to hand the second to a content moderator without
+        // the first should be able to - which the role matrix now allows.
+        new(RoleIds.SamaajAdmin, PermissionIds.NotificationsBroadcast),
 
         new(RoleIds.Member, PermissionIds.MembersRead),
         new(RoleIds.Member, PermissionIds.TimelinePost),

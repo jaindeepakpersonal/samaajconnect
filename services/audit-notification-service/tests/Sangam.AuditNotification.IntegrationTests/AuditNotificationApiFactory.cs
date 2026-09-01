@@ -36,7 +36,13 @@ public sealed class AuditNotificationApiFactory : WebApplicationFactory<Program>
         "identity.user.registered.v1",
         "identity.user.logged-in.v1",
         "identity.tenant.created.v1",
+        "identity.user.erased.v1",
         "boli.bid.placed.v1",
+
+        // The one topic this service publishes as well as consumes. Seeded like
+        // the rest so a broadcast test is not waiting on topic auto-creation and
+        // then on a metadata refresh before its audit row can appear.
+        "notifications.broadcast.sent.v1",
     ];
 
     private readonly PostgreSqlContainer _postgres = new PostgreSqlBuilder()

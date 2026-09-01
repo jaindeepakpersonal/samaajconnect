@@ -233,7 +233,17 @@ IpAddress, CreatedAt` — immutable, append-only.
 
 **Notification** — `Id, TenantId, RecipientUserId (nullable for
 broadcast), Title, Body, Channel (InApp/Email/SMS/WhatsApp), Status
-(Pending/Sent/Failed/Read), CreatedAt`
+(Pending/Sending/Sent/Failed), Destination, DeliveryAttempts, LastAttemptAt,
+DeliveredAt, FailureReason, DeliveryClaimId, SourceMessageId, CreatedAt`
+
+`Status` is delivery only. It had a `Read` value, and that could not express a
+broadcast: one row with no recipient, shared by a whole Samaaj, so the first
+member to open it marked it read for everybody.
+
+**NotificationRead** — `Id, NotificationId, UserId, TenantId, ReadAt`. Unique on
+`(NotificationId, UserId)`. One member having read one message; the only place
+read-ness can live, because it is a fact about a person and a message rather
+than about a message.
 
 **NotificationTemplate** — `Id, TenantId (nullable = platform default),
 Key, Subject, Body, Channel`

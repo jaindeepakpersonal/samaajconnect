@@ -71,9 +71,47 @@ public sealed class Notification : AggregateRoot, ITenantScopedEntity
     public Guid SourceMessageId { get; private set; }
 
     public DateTimeOffset CreatedAt { get; private set; }
-    public DateTimeOffset? ReadAt { get; private set; }
 
     private Notification() { }
+
+    /// <summary>
+    /// A message to every member of one Samaaj.
+    /// </summary>
+    /// <remarks>
+    /// In-app only, and not because nobody has got round to the rest. This
+    /// service learns a member's contact address from the event that mentions
+    /// it - registration, today - and holds no directory of its own, so there
+    /// is no set of addresses here to send a Samaaj-wide message to. Emailing a
+    /// broadcast needs somewhere to read every member's address from, which is
+    /// the same missing piece as the DPDP s.8(6) duty to reach every affected
+    /// person; see docs/product/DPDP-COMPLIANCE.md.
+    /// </remarks>
+    public static Notification Broadcast(
+        Guid tenantId,
+        string title,
+        string body,
+        Guid sourceMessageId,
+        Guid sentBy,
+        DateTimeOffset createdAt)
+    {
+        var notification = Create(
+            tenantId,
+            recipientUserId: null,
+            title,
+            body,
+            NotificationChannel.InApp,
+            sourceMessageId,
+            createdAt);
+
+        // Raised here rather than in the handler (CLAUDE.md §4.5). The event is
+        // what makes a broadcast auditable: this service consumes every topic,
+        // so publishing to itself turns "somebody messaged the whole Samaaj"
+        // into an audit row with an actor on it.
+        notification.Raise(new BroadcastSentDomainEvent(
+            notification.Id, tenantId, notification.Title, sentBy, createdAt));
+
+        return notification;
+    }
 
     public static Notification Create(
         Guid tenantId,
@@ -217,18 +255,23 @@ public sealed class Notification : AggregateRoot, ITenantScopedEntity
         return true;
     }
 
-    public void MarkRead(DateTimeOffset readAt)
-    {
-        // Only in-app notifications are read on this platform: nothing reports
-        // back that an email was opened. Letting Read be set on a Pending
-        // outbound row would take it off the dispatcher's queue, so the way to
-        // never send a message would be to look at it.
-        if (Channel != NotificationChannel.InApp || Status == NotificationStatus.Read)
-        {
-            return;
-        }
+    /// <summary>
+    /// Whether this notification is one <paramref name="userId"/> is entitled
+    /// to read - addressed to them, or broadcast to their whole Samaaj.
+    /// </summary>
+    /// <remarks>
+    /// Here rather than in the handler because it is the rule that decides
+    /// whether marking something read is a member tidying their own list or a
+    /// member reaching into somebody else's. The handler still checks the
+    /// tenant separately: this answers "is it mine", not "is it in my Samaaj",
+    /// and a notification id from another Samaaj with a null recipient would
+    /// otherwise look like a broadcast addressed to everybody.
+    /// </remarks>
+    public bool IsAddressedTo(Guid userId) =>
+        RecipientUserId is null || RecipientUserId == userId;
 
-        Status = NotificationStatus.Read;
-        ReadAt = readAt;
-    }
+    // There is deliberately no MarkRead() and no ReadAt here. A broadcast is one
+    // row shared by a whole Samaaj, so a read flag on it would be marked by the
+    // first member to open it and read for everyone after. Read state lives in
+    // NotificationRead, one row per person per message.
 }

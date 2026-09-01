@@ -80,8 +80,9 @@ interface ModuleTile {
 
         @if (unreadNotifications() > 0) {
           <p class="notice info" role="status">
-            You have {{ unreadNotifications() }}
+            You have {{ unreadNotifications() }} unread
             {{ unreadNotifications() === 1 ? 'notification' : 'notifications' }}.
+            <a routerLink="/notifications">Read them</a>
           </p>
         }
 
@@ -278,9 +279,18 @@ export class HomeComponent implements OnInit {
     });
   }
 
+  /**
+   * Counts the ones this member has not read, not the ones that exist.
+   *
+   * It counted every row until read state was per member and there was
+   * anything to count: "You have 12 notifications" stayed at 12 no matter what
+   * the member did, which is a badge that trains people to ignore it. `readAt`
+   * is this member's own - a broadcast read by four hundred others is still
+   * unread for them - so this is now the number the word promises.
+   */
   private loadNotifications(): void {
-    this.http.get<unknown[]>('/v1/notifications').subscribe({
-      next: (found) => this.unreadNotifications.set(found.length),
+    this.http.get<{ readAt: string | null }[]>('/v1/notifications').subscribe({
+      next: (found) => this.unreadNotifications.set(found.filter((n) => !n.readAt).length),
       error: () => this.unreadNotifications.set(0),
     });
   }

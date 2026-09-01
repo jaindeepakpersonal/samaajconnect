@@ -161,10 +161,6 @@ namespace Sangam.AuditNotification.Infrastructure.Persistence.Migrations
                         .HasColumnType("timestamp with time zone")
                         .HasColumnName("last_attempt_at");
 
-                    b.Property<DateTimeOffset?>("ReadAt")
-                        .HasColumnType("timestamp with time zone")
-                        .HasColumnName("read_at");
-
                     b.Property<Guid?>("RecipientUserId")
                         .HasColumnType("uuid")
                         .HasColumnName("recipient_user_id");
@@ -206,6 +202,42 @@ namespace Sangam.AuditNotification.Infrastructure.Persistence.Migrations
                         .HasDatabaseName("ix_notifications_tenant_id_recipient_user_id_created_at");
 
                     b.ToTable("notifications", (string)null);
+                });
+
+            modelBuilder.Entity("Sangam.AuditNotification.Domain.Notifications.NotificationRead", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<Guid>("NotificationId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("notification_id");
+
+                    b.Property<DateTimeOffset>("ReadAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("read_at");
+
+                    b.Property<Guid>("TenantId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("tenant_id");
+
+                    b.Property<Guid>("UserId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("user_id");
+
+                    b.HasKey("Id")
+                        .HasName("pk_notification_reads");
+
+                    b.HasIndex("UserId")
+                        .HasDatabaseName("ix_notification_reads_user_id");
+
+                    b.HasIndex("NotificationId", "UserId")
+                        .IsUnique()
+                        .HasDatabaseName("ix_notification_reads_notification_id_user_id");
+
+                    b.ToTable("notification_reads", (string)null);
                 });
 
             modelBuilder.Entity("Sangam.AuditNotification.Infrastructure.Persistence.OutboxMessage", b =>
@@ -261,6 +293,16 @@ namespace Sangam.AuditNotification.Infrastructure.Persistence.Migrations
                         .HasFilter("processed_at IS NULL");
 
                     b.ToTable("outbox_messages", (string)null);
+                });
+
+            modelBuilder.Entity("Sangam.AuditNotification.Domain.Notifications.NotificationRead", b =>
+                {
+                    b.HasOne("Sangam.AuditNotification.Domain.Notifications.Notification", null)
+                        .WithMany()
+                        .HasForeignKey("NotificationId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired()
+                        .HasConstraintName("fk_notification_reads_notifications_notification_id");
                 });
 #pragma warning restore 612, 618
         }

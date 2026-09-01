@@ -16,6 +16,18 @@ public interface IErasureRepository
     Task<int> DeleteNotificationsForAsync(Guid userId, CancellationToken cancellationToken = default);
 
     /// <summary>
+    /// Deletes the record of what this member had read.
+    /// </summary>
+    /// <remarks>
+    /// Needed on top of the delete above rather than covered by it. Deleting a
+    /// member's own notifications cascades to their read rows for those, but a
+    /// broadcast belongs to the whole Samaaj and survives them - and the row
+    /// saying this person opened it on Tuesday would survive with it. That is a
+    /// record of one member's behaviour, which is exactly what erasure is for.
+    /// </remarks>
+    Task<int> DeleteNotificationReadsForAsync(Guid userId, CancellationToken cancellationToken = default);
+
+    /// <summary>
     /// Removes the person from the audit rows where they were the actor,
     /// keeping the fact that the action happened. Returns how many were changed.
     /// </summary>

@@ -179,11 +179,16 @@ and expose its endpoints behind the gateway at the route prefix shown.
   second aggregate in the same service, since both are pure event
   consumers with no cross-service queries of their own)
 - **Owns:** AuditLog, Notification, NotificationTemplate
-- **Key commands:** `SendNotificationCommand` (internal, event-driven —
-  not typically called from the gateway), `MarkNotificationReadCommand`
+- **Key commands:** `RecordIntegrationEventCommand` (internal, raised by this
+  service's own Kafka consumer, not mapped to any endpoint),
+  `MarkNotificationReadCommand`, `MarkAllNotificationsReadCommand`,
+  `BroadcastNotificationCommand`
 - **Key queries:** `GetAuditLogQuery` (Super Admin / Samaaj Admin),
-  `GetMyNotificationsQuery`
-- **Events published:** `NotificationSent`
+  `GetMyNotificationsQuery`, `ListBroadcastsQuery`
+- **Events published:** `notifications.broadcast.sent.v1`, and it publishes it
+  to itself - the consumer subscribes to every versioned topic, so an
+  announcement to a whole Samaaj becomes an audit row with the administrator
+  who sent it on it
 - **Events consumed:** *every* domain event listed above — this service
   has an `EventHandlers/` folder per consumed event type, each handler
   writing one AuditLog row and optionally emitting a Notification.

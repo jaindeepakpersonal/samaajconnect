@@ -29,9 +29,10 @@ before translating another screen.
 | Auctions / Boli | `/boli` | `#boli` | built |
 | Boli detail | `/boli/:id` | `#bolidetail` | built |
 | Boli occasion | `/boli/occasions/:id` | — | built; the wireframe's "View Occasion" had no screen behind it |
+| Notifications | `/notifications` | `#notifications` | built |
 | Pathshala events | — | `#pathevents` | not built — no endpoint exists |
 | Forgot password / OTP | — | `#forgot`, `#otp` | not built — no endpoint exists |
-| Profile, Notifications | — | various | not built |
+| Profile | — | `#profile` | not built |
 
 ## Where things live
 
@@ -142,8 +143,9 @@ calls anything. When the backend lands, wire them; do not fake them sooner.
 
 **A wireframe promise the platform cannot keep is dropped, not printed.** The
 event detail wireframe says "You'll receive a notification reminder 24 hours
-before the event". There is no notification channel yet, so the shipped screen
-does not say it - a disabled control can explain itself, but a sentence of prose
+before the event". A notification channel exists now, but nothing in
+events-service raises a reminder, so no reminder is sent and the shipped screen
+still does not say it - a disabled control can explain itself, but a sentence of prose
 cannot, and printing it would simply be a lie. There is a test asserting the
 words are absent.
 
@@ -299,6 +301,25 @@ vote actually held. The unique indexes are what enforce one each; the response
 just reports which happened. Both screens say so plainly — "They had already
 been put forward" — rather than showing an error for a button someone pressed
 twice.
+
+**"You have 12 notifications" counted the list, not the unread ones.** There was
+no read state to count until there was, so Home set the badge to
+`found.length` — a number that never moved no matter what the member did with
+it, which is how a badge trains people to ignore it. `readAt` is now this
+member's own and the notice says "unread".
+
+**A broadcast is one row a whole Samaaj shares, so "New" is a claim about the
+reader.** The service keeps read state per person; a Samaaj-wide announcement
+read by four hundred others is still unread for this member. The Notifications
+screen and Home both read `readAt` and never infer from anything else.
+
+**Class names are checked against `styles.css` before they are used.** This
+screen was written with `.muted` and `.visually-hidden`, neither of which
+exists here — the app has `.small` and `.sr-only`. Nothing fails: the elements
+render unstyled and look almost right, which is the same silent failure as the
+`.warn` pill that shipped in the wrong colour and the module keys that matched
+nothing. The tokens in a feature stylesheet need the same check; `--border` is
+not a token in this app, `--line` is.
 
 **Shared page primitives live in `src/styles.css`, not in a feature
 stylesheet.** The pill colours (`.ok`, `.warn`, `.danger`), the two-column
