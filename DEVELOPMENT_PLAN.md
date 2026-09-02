@@ -8,41 +8,40 @@ version of the plan; the reasoning behind the ordering lives in
 ## Current Status
 
 - **Stage:** every module has a service and member screens; Phase 5 hardening under way
-- **Last updated:** 2026-09-02 - **events administration**. Members could
-  register for events nobody could create.
+- **Last updated:** 2026-09-02 - **celebrity voting administration**. A member
+  could put a name forward and nothing could ever put it on the ballot.
 
-  Creating, publishing, cancelling and reading the attendee list were four
-  complete, tested, curl-only endpoints, while the member portal's events
-  screens - the capacity pill, the waitlist, the promotion when a place is given
-  up - had been shipped against events that could only be conjured with curl.
-  Two admin screens now cover all four.
+  Creating a campaign, moving it between stages, deciding a nomination and
+  freezing the result were four complete, tested, curl-only endpoints. Deciding
+  a nomination is the one that made the rest matter: without it a nomination sat
+  as `Nominated` forever, and because the service refuses `VotingOpen` on an
+  empty ballot, a campaign could be started and then simply not run. Two admin
+  screens now cover all four.
 
-  **The first of these clusters in three cycles that needed nothing built
-  first.** Pathshala needed a register that could be read back and an exam list;
-  Boli needed the publication queue its own two-step workflow implied. Events
-  needed neither, and events-service already had full gateway smoke coverage, so
-  this cycle is frontend only.
+  **The second cycle running that needed no backend work**, and voting already
+  had full gateway smoke coverage, so this is frontend only - and no smoke run,
+  since nothing backend changed.
 
-  **Two rules on the screen are worth the tests that hold them.** A blank
-  capacity is sent as null, not zero - null means no limit and zero is the one
-  value the service refuses, an event nobody can attend. And the attendee list
-  is three lists: going, waiting, and gave up a place. Somebody who cancelled is
-  not in the queue, and numbering them in it would put a position against a
-  person who is not waiting for anything.
+  **Three rules are worth the tests that hold them**, each proved by breaking
+  it. Removing a candidate stops being offered once voting opens, because
+  removing them would discard the votes already cast for them. The form refuses
+  a voting window starting before nominations close, exactly as the service
+  does, so members who vote early see the same ballot as members who vote late.
+  And the frozen result is only asked for once a campaign is published - a 404
+  before then is the normal state rather than an error, so the request is not
+  made at all rather than made and forgiven.
 
-  **One test was passing for the wrong reason and now is not.** The waitlist
-  test had no cancelled attendee in it, so "not registered" and "waitlisted"
-  picked out the same people - breaking the filter left it green. It has one
-  now, and breaking the filter fails it.
+  **A count of zero and a count you may not see are drawn differently.** `votes`
+  is null when the tally is hidden, and the screen says "Not visible" rather
+  than "0" - zero is a claim, and the wrong one.
 
-  1,399 tests green (985 backend across 21 suites, 414 frontend). No smoke run
+  1,435 tests green (985 backend across 21 suites, 450 frontend). No smoke run
   this cycle: nothing backend changed, so there was nothing new for it to prove.
 - **Blocking item:** none. **Every module the platform has now has both a
   service and member screens**, and the role matrix is editable per Samaaj. What
-  is left that needs nothing from outside is the 10 unreachable endpoints listed
-  in Phase 5 - voting and volunteer-group administration, the social issues
-  approval queue, and the two Pathshala endpoints. Beyond those, what is
-  left needs things this repository cannot supply on its own: TLS and a backup
+  is left that needs nothing from outside is the 6 unreachable endpoints listed
+  in Phase 5 - volunteer-group administration, the social issues approval queue,
+  and the two Pathshala endpoints. Beyond those, what is left needs things this repository cannot supply on its own: TLS and a backup
   drill need a deployed environment, platform-hosted images need storage,
   the two remaining DPDP obligations - breach notification and the right to
   nominate - are no longer blocked on a channel but still need a real provider
@@ -490,8 +489,8 @@ unit tested.
       `services/member-family-service/CLAUDE.md`. The handler keeps its explicit
       tenant check as belt and braces for a read whose ids come from another
       service, not as a workaround
-- [ ] **10 endpoints nobody can reach from either app.** One is not a gap:
-      `GET /v1/identity/tenants/by-id/{id}` is the gateway's. The other 9 are
+- [ ] **6 endpoints nobody can reach from either app.** One is not a gap:
+      `GET /v1/identity/tenants/by-id/{id}` is the gateway's. The other 5 are
       screens nobody has built, and they cluster:
   - [x] **Pathshala administration, setting it up (5 of 13).** The Pathshala
         detail, opening a session, adding a class, the enrolment request queue
@@ -515,8 +514,13 @@ unit tested.
         waiting and gave up a place. The first cluster in three cycles that
         needed no new endpoint — all four existed and simply had no caller, and
         events-service already had full gateway smoke coverage
-  - [ ] **Celebrity voting administration (4).** Creating a campaign, deciding a
-        nomination, moving a campaign between stages, and recording results
+  - [x] **Celebrity voting administration (4).** Two screens: campaigns with
+        the setup form, and a campaign's stage, ballot, nominations, running
+        count and frozen result. Deciding a nomination was the one that made the
+        others matter - without it a nomination sat as `Nominated` forever, and
+        since the service refuses `VotingOpen` on an empty ballot, a campaign
+        could be started and then not run. No new endpoints, and the service
+        already had full gateway smoke coverage
   - [ ] **Volunteer groups (2).** Creating a group, and deactivating one
   - [ ] **Social issues (1).** The reviewer's approval queue. The one item here
         that is a convenience rather than a dead end: the member portal's issue

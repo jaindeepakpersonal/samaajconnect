@@ -124,6 +124,22 @@ export const routes: Routes = [
           import('./features/events/event-detail.component').then((m) => m.EventDetailComponent),
       },
       {
+        path: 'voting',
+        title: 'Celebrities / Voting - samaajconnect admin',
+        loadComponent: () =>
+          import('./features/voting/campaign-list.component').then(
+            (m) => m.CampaignListComponent,
+          ),
+      },
+      {
+        path: 'voting/:id',
+        title: 'Campaign - samaajconnect admin',
+        loadComponent: () =>
+          import('./features/voting/campaign-detail.component').then(
+            (m) => m.CampaignDetailComponent,
+          ),
+      },
+      {
         path: 'moderation',
         title: 'Content moderation - samaajconnect admin',
         loadComponent: () =>

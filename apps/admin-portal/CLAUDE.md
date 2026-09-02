@@ -27,7 +27,9 @@ screen. The spec is `docs/product/wireframes/admin-panel-wireframes.html`.
 | Occasion detail | `/boli/:id` | — | built; no wireframe covers running an auction. Types, opening a Boli, closing, recording |
 | Events | `/events` | `#events` | built. Drafts and published together, create, publish, cancel |
 | Event detail | `/events/:id` | — | built; no wireframe covers one. Who is going, who is waiting, and in what order |
-| Members, Groups, Issues, Celebrity, Reports, Settings | — | various | not built. Every one of those services exists and the member portal has screens for them; what is missing is the administrative view |
+| Celebrities / Voting | `/voting` | `#celebrity` | built. Campaigns and setting one up |
+| Campaign detail | `/voting/:id` | — | built; no wireframe covers running one. Stage, ballot, nominations, tally, result |
+| Members, Groups, Issues, Reports, Settings | — | various | not built. Every one of those services exists and the member portal has screens for them; what is missing is the administrative view |
 
 The unbuilt screens appear in the nav, disabled, each saying why. That is
 deliberate: the wireframe promised them, and an administrator who cannot see
@@ -171,6 +173,44 @@ exactly those rows. Two tests hold it.
 `DELETE /enrollments/{id}` a placement decision does not use, and the screen says
 what it does: the child comes off the roll and their attendance and results
 stay. A child who left in March still attended from June.
+
+**Nominating somebody was a dead end until the decide endpoint had a screen.**
+A member puts a name forward and it sits as `Nominated` — never on the ballot,
+because approving is an administrator's act and nothing could perform it. Since
+the service refuses `VotingOpen` on an empty ballot, that made a campaign
+something a Samaaj could start and then could not run.
+
+**The stage is one button, because the sequence has one next step.** Draft →
+NominationsOpen → VotingOpen → Closed, and publishing is its own call rather
+than a sixth status. Four buttons with three refusals would be offering choices
+that were never there — the same reasoning as the Boli occasion's single
+forward move.
+
+**Removing a candidate stops being offered once voting opens.** Removing them
+then would discard the votes already cast for them, so the service refuses it
+and the screen does not draw a button that always answers 409.
+
+**Publishing is confirmed, and for a different reason than a Boli result.**
+There, a repeat announcement changes nothing. Here a second publish would
+compute a second ranking, and two rankings leave "the result" with no referent —
+so the service refuses the second, and the confirmation is not ceremony.
+
+**Zero votes and a tally you may not see are drawn differently.** `votes` is
+null when the count is hidden from the caller, and the screen says "Not visible"
+rather than "0". Zero is a claim, and the wrong one. An administrator sees the
+count throughout even on a `HiddenUntilClose` campaign, and the screen says so,
+because somebody has to be able to tell whether the thing is working.
+
+**The window rule is duplicated from the service and must stay in step.** The
+form refuses a voting window starting before nominations close, exactly as
+`CreateCampaignCommandValidator` does, so that members who vote early see the
+same ballot as members who vote late. Stricter here would be a campaign nobody
+can create; looser would be a round trip that reads as a bug.
+
+**The wireframe's "Eligible voters: 1,104" is gone, not faked.** That count
+lives in member-family-service and the directory call this panel makes is capped
+at a hundred — a number quietly wrong on any Samaaj larger than that is worse
+than no number, the same reason the tenant list dropped its Members column.
 
 **Members could register for events nobody could create.** The member portal's
 events screens — the capacity pill, the waitlist, the promotion when a place is

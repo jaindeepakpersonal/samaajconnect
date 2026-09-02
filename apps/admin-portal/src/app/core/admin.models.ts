@@ -485,3 +485,90 @@ export interface OrganizerGroup {
   readonly id: string;
   readonly name: string;
 }
+
+// ---- Celebrity voting ----------------------------------------------------
+
+/** Strictly forward. An election that can go backwards is not an election. */
+export type CampaignStatus =
+  | 'Draft'
+  | 'NominationsOpen'
+  | 'VotingOpen'
+  | 'Closed'
+  | 'Published';
+
+/** Whether members see the running count while voting is open. */
+export type ResultsVisibility = 'Live' | 'HiddenUntilClose';
+
+/** Nominated is put forward; Approved is on the ballot. */
+export type CandidateStatus = 'Nominated' | 'Approved';
+
+/** Mirrors `CampaignResponse`. */
+export interface Campaign {
+  readonly id: string;
+  readonly title: string;
+  readonly description: string | null;
+  readonly nominationStartAt: string;
+  readonly nominationEndAt: string;
+  readonly votingStartAt: string;
+  readonly votingEndAt: string;
+  readonly topN: number;
+  readonly resultsVisibility: ResultsVisibility;
+  readonly status: CampaignStatus;
+
+  /** Right now: the status says so *and* the clock agrees. */
+  readonly acceptsNominations: boolean;
+  readonly acceptsVotes: boolean;
+  readonly myVoteCandidateId: string | null;
+  readonly candidateCount: number;
+  readonly createdAt: string;
+}
+
+/**
+ * Mirrors `CandidateResponse`.
+ *
+ * `votes` is null when the tally is not visible to the caller — a
+ * HiddenUntilClose campaign still running, seen by a member. Null rather than
+ * zero, because zero is a claim and the wrong one. An administrator sees the
+ * count throughout, so on this panel it is null only if something is off.
+ */
+export interface Candidate {
+  readonly id: string;
+  readonly memberId: string;
+  readonly category: string | null;
+  readonly status: CandidateStatus;
+  readonly nominatedBy: string;
+  readonly votes: number | null;
+}
+
+/** Mirrors `CampaignDetailResponse`. */
+export interface CampaignDetail {
+  readonly campaign: Campaign;
+  readonly candidates: readonly Candidate[];
+
+  /**
+   * False when this caller is being shown a ballot without counts. The screen
+   * needs the difference between "no votes yet" and "you may not see them".
+   */
+  readonly tallyVisible: boolean;
+}
+
+/** One place in a frozen ranking. */
+export interface ResultEntry {
+  readonly rank: number;
+  readonly candidateId: string;
+  readonly memberId: string;
+  readonly votes: number;
+}
+
+/**
+ * Mirrors `CampaignResultResponse` — the ranking as it was announced.
+ *
+ * Stored, never recomputed: a result that moved after it was announced would be
+ * worse than no result at all.
+ */
+export interface CampaignResult {
+  readonly campaignId: string;
+  readonly ranking: readonly ResultEntry[];
+  readonly publishedBy: string;
+  readonly publishedAt: string;
+}

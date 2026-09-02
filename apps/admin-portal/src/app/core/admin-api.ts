@@ -10,6 +10,10 @@ import {
   AuditLogEntry,
   Boli,
   BoliType,
+  Campaign,
+  CampaignDetail,
+  CampaignResult,
+  CampaignStatus,
   ClassExam,
   ModerationDecision,
   ModerationQueueEntry,
@@ -32,6 +36,7 @@ import {
   PendingActivation,
   PendingResult,
   RegisterEntry,
+  ResultsVisibility,
   RoleMatrix,
   SamaajEvent,
   Tenant,
@@ -301,6 +306,87 @@ export class AdminApi {
       classId,
       place,
     });
+  }
+
+  // ---- Celebrity voting --------------------------------------------------
+
+  listCampaigns(): Observable<Campaign[]> {
+    return this.http.get<Campaign[]>('/v1/celebrity-voting/campaigns');
+  }
+
+  /** The ballot, and the tally when this caller may see it. */
+  campaign(id: string): Observable<CampaignDetail> {
+    return this.http.get<CampaignDetail>(`/v1/celebrity-voting/campaigns/${id}`);
+  }
+
+  /**
+   * Creates a campaign. It starts as a draft.
+   *
+   * The service refuses a voting window that starts before nominations close,
+   * so that members who vote early see the same ballot as members who vote
+   * late.
+   */
+  createCampaign(campaign: {
+    title: string;
+    description: string | null;
+    nominationStartAt: string;
+    nominationEndAt: string;
+    votingStartAt: string;
+    votingEndAt: string;
+    topN: number;
+    resultsVisibility: ResultsVisibility;
+  }): Observable<Campaign> {
+    return this.http.post<Campaign>('/v1/celebrity-voting/campaigns', campaign);
+  }
+
+  /**
+   * Moves a campaign on one stage.
+   *
+   * Draft → NominationsOpen → VotingOpen → Closed, and never backwards. The
+   * service refuses `VotingOpen` on an empty ballot. Publishing is its own
+   * call, not a status move.
+   */
+  moveCampaign(id: string, status: CampaignStatus): Observable<Campaign> {
+    return this.http.post<Campaign>(`/v1/celebrity-voting/campaigns/${id}/status`, { status });
+  }
+
+  /**
+   * Approves a nomination onto the ballot, or removes it.
+   *
+   * `approve` has no default in the request on purpose: a decision endpoint
+   * whose safest value is implicit is one where a mistyped request quietly puts
+   * somebody on a ballot. A candidate cannot be removed once voting has opened,
+   * because removing them would discard the votes already cast for them.
+   */
+  decideCandidate(
+    campaignId: string,
+    candidateId: string,
+    approve: boolean,
+  ): Observable<unknown> {
+    return this.http.post(
+      `/v1/celebrity-voting/campaigns/${campaignId}/candidates/${candidateId}/decide`,
+      { approve },
+    );
+  }
+
+  /**
+   * Computes the ranking and freezes it. Only from `Closed`, and only once.
+   *
+   * Publishing twice is refused rather than idempotent — unlike a Boli result,
+   * where a repeat announcement changes nothing. Here a second publish would
+   * compute a second ranking, and two rankings leave "the result" with no
+   * referent.
+   */
+  publishCampaignResults(id: string): Observable<CampaignResult> {
+    return this.http.post<CampaignResult>(
+      `/v1/celebrity-voting/campaigns/${id}/results`,
+      {},
+    );
+  }
+
+  /** The frozen ranking. 404 until it has been published. */
+  campaignResults(id: string): Observable<CampaignResult> {
+    return this.http.get<CampaignResult>(`/v1/celebrity-voting/campaigns/${id}/results`);
   }
 
   // ---- Events ------------------------------------------------------------
