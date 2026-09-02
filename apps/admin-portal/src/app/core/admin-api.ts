@@ -18,6 +18,7 @@ import {
   ModerationDecision,
   ModerationQueueEntry,
   Enrolment,
+  GroupStatus,
   Pathshala,
   PathshalaClass,
   PathshalaDetail,
@@ -27,6 +28,7 @@ import {
   CreateTenantRequest,
   InviteAdminRequest,
   InviteAdminResult,
+  IssueStatus,
   ModuleDescriptor,
   OrganizerGroup,
   OrganizerType,
@@ -39,8 +41,10 @@ import {
   ResultsVisibility,
   RoleMatrix,
   SamaajEvent,
+  SocialIssue,
   Tenant,
   TenantStatus,
+  VolunteerGroup,
 } from './admin.models';
 
 /**
@@ -252,6 +256,34 @@ export class AdminApi {
   }
 
   /**
+   * Creates the master record. **Super Admin only** (`DATA-MODEL.md` §9): the
+   * record belongs to the platform operator, and everything about running it
+   * belongs to the Samaaj.
+   */
+  createPathshala(
+    name: string,
+    address: string | null,
+    contactPerson: string | null,
+  ): Observable<Pathshala> {
+    return this.http.post<Pathshala>('/v1/pathshala/pathshalas', {
+      name,
+      address,
+      contactPerson,
+    });
+  }
+
+  /**
+   * Stops a Pathshala operating. Its records are kept and enrolments stop.
+   *
+   * Not deletion, and not reversible through this API — a Pathshala that closed
+   * still taught the children who attended it, and a Samaaj asked what its
+   * attendance was that year has to be able to answer.
+   */
+  deactivatePathshala(id: string): Observable<Pathshala> {
+    return this.http.delete<Pathshala>(`/v1/pathshala/pathshalas/${id}`);
+  }
+
+  /**
    * Opens an academic session, which becomes the current one.
    *
    * Answers with the whole Pathshala rather than the session, which is why the
@@ -306,6 +338,65 @@ export class AdminApi {
       classId,
       place,
     });
+  }
+
+  // ---- Volunteer groups --------------------------------------------------
+
+  listGroups(): Observable<VolunteerGroup[]> {
+    return this.http.get<VolunteerGroup[]>('/v1/volunteer-groups/groups');
+  }
+
+  /**
+   * Creates a group and installs its president in one act.
+   *
+   * The president is not optional: a group with nobody able to decide its
+   * applications is a group whose join requests go nowhere, which is the shape
+   * of gap this whole run of work has been closing.
+   */
+  createGroup(
+    name: string,
+    description: string | null,
+    focusArea: string | null,
+    presidentMemberId: string,
+  ): Observable<VolunteerGroup> {
+    return this.http.post<VolunteerGroup>('/v1/volunteer-groups/groups', {
+      name,
+      description,
+      focusArea,
+      presidentMemberId,
+    });
+  }
+
+  /**
+   * Stands a group down, or brings it back.
+   *
+   * Inactive is not deletion: the group keeps its members and its history and
+   * simply takes no new applications. A Samaaj that ran a seva group for one
+   * monsoon should still be able to see who was in it.
+   */
+  setGroupStatus(id: string, status: GroupStatus): Observable<VolunteerGroup> {
+    return this.http.patch<VolunteerGroup>(
+      `/v1/volunteer-groups/groups/${id}/status`,
+      { status },
+    );
+  }
+
+  // ---- Social issues -----------------------------------------------------
+
+  /** What a reviewer has to decide about, oldest first. */
+  issueApprovalQueue(): Observable<SocialIssue[]> {
+    return this.http.get<SocialIssue[]>('/v1/social-issues/approval-queue');
+  }
+
+  /**
+   * Moves an issue along its workflow.
+   *
+   * The target comes from the issue's own `availableTransitions` rather than
+   * from anything the panel decides. `reason` is required on the refusing moves
+   * and ignored on the rest — the service decides which, so it is always sent.
+   */
+  moveIssue(id: string, status: IssueStatus, reason: string | null): Observable<SocialIssue> {
+    return this.http.post<SocialIssue>(`/v1/social-issues/${id}/status`, { status, reason });
   }
 
   // ---- Celebrity voting --------------------------------------------------

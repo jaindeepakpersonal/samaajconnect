@@ -57,6 +57,13 @@ import { isNotFound } from '../../core/http-status';
         }
       </p>
 
+      @if (school.status !== 'Active') {
+        <p class="notice">
+          This Pathshala has been stood down. Its records are kept and it takes no new
+          enrolments.
+        </p>
+      }
+
       <!-- Sessions ------------------------------------------------------- -->
       <div class="card">
         <h3>Academic sessions</h3>
@@ -248,6 +255,39 @@ import { isNotFound } from '../../core/http-status';
           </div>
         }
       </div>
+
+      <!-- Standing it down ----------------------------------------------- -->
+      @if (school.status === 'Active') {
+        <div class="card spaced">
+          <h3>Stand this Pathshala down</h3>
+
+          @if (deactivating()) {
+            <p class="notice">
+              <b>{{ school.name }}</b> will stop taking enrolments. Every session, class,
+              register and exam result is kept — a Pathshala that closed still taught the
+              children who attended it, and a Samaaj asked what its attendance was that year has
+              to be able to answer. This cannot be undone from this panel.
+            </p>
+            <div class="row-actions">
+              <button class="btn" type="button" [disabled]="busy()" (click)="deactivate()">
+                Stand it down
+              </button>
+              <button class="btn alt" type="button" (click)="deactivating.set(false)">
+                Keep it running
+              </button>
+            </div>
+          } @else {
+            <p class="small">
+              Records are kept and enrolments stop. Use this when a Samaaj closes a Pathshala
+              rather than when a session ends — a session ending is just the next one opening.
+            </p>
+            <button class="btn alt" type="button" [disabled]="busy()"
+              (click)="deactivating.set(true)">
+              Stand down…
+            </button>
+          }
+        </div>
+      }
     }
   `,
   styles: `
@@ -301,6 +341,9 @@ export class PathshalaDetailComponent implements OnInit {
   readonly currentSession = computed(
     () => this.pathshala()?.sessions.find((s) => s.isCurrent) ?? null,
   );
+
+  /** Whether the stand-down confirmation is showing. It is not reversible here. */
+  readonly deactivating = signal(false);
 
   sessionLabel = '';
   sessionStart = '';
@@ -420,6 +463,17 @@ export class PathshalaDetailComponent implements OnInit {
         this.className = '';
         this.roomLabel = '';
       },
+    );
+  }
+
+  deactivate(): void {
+    const name = this.pathshala()?.name ?? 'The Pathshala';
+
+    this.deactivating.set(false);
+
+    this.act(
+      this.api.deactivatePathshala(this.id),
+      `${name} is stood down. Its records are kept.`,
     );
   }
 

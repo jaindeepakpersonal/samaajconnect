@@ -246,4 +246,41 @@ describe('PathshalaDetailComponent', () => {
     http.expectOne(`/v1/pathshala/pathshalas/${PATHSHALA_ID}/enrollments/requests`).flush(requests);
     fixture.detectChanges();
   }
-});
+
+  it('offers to stand a Pathshala down, behind a confirmation', () => {
+    // Records are kept and enrolments stop, and it cannot be undone from this
+    // panel — so the button opens a warning rather than firing.
+    load();
+
+    expect(text()).toContain('Stand down');
+    http.expectNone(`/v1/pathshala/pathshalas/${PATHSHALA_ID}`);
+
+    component.deactivating.set(true);
+    fixture.detectChanges();
+
+    expect(text()).toContain('cannot be undone');
+    expect(text()).toContain('register and exam result is kept');
+  });
+
+  it('stands it down once confirmed', () => {
+    load();
+
+    component.deactivate();
+
+    const call = http.expectOne(`/v1/pathshala/pathshalas/${PATHSHALA_ID}`);
+
+    expect(call.request.method).toBe('DELETE');
+
+    call.flush({});
+    reload();
+
+    expect(text()).toContain('Its records are kept');
+  });
+
+  it('offers nothing to stand down on one already stood down', () => {
+    load(detail({ status: 'Inactive' }));
+
+    expect(text()).toContain('has been stood down');
+    expect(text()).not.toContain('Stand down…');
+  });
+}); 

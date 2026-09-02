@@ -572,3 +572,56 @@ export interface CampaignResult {
   readonly publishedBy: string;
   readonly publishedAt: string;
 }
+
+// ---- Volunteer groups ----------------------------------------------------
+
+/** Inactive keeps its members and its history; it takes no new applications. */
+export type GroupStatus = 'Active' | 'Inactive';
+
+/** Mirrors volunteer-groups-service's `GroupResponse`. */
+export interface VolunteerGroup {
+  readonly id: string;
+  readonly name: string;
+  readonly description: string | null;
+  readonly focusArea: string | null;
+
+  /** An id. Names live in member-family-service and are resolved here. */
+  readonly presidentMemberId: string;
+  readonly status: GroupStatus;
+  readonly memberCount: number;
+}
+
+// ---- Social issues -------------------------------------------------------
+
+export type IssueStatus =
+  | 'Draft'
+  | 'Submitted'
+  | 'UnderReview'
+  | 'Approved'
+  | 'Published'
+  | 'Rejected'
+  | 'ChangesRequested'
+  | 'Resolved';
+
+/**
+ * Mirrors `IssueResponse`.
+ *
+ * `availableTransitions` comes from the domain's transition table, given this
+ * caller's permission. The screen renders exactly those and derives nothing
+ * from the status — the same rule the moderation queue follows, and for the
+ * same reason: a second copy of the workflow in the panel is a copy that can
+ * drift.
+ */
+export interface SocialIssue {
+  readonly id: string;
+  readonly title: string;
+  readonly description: string;
+  readonly category: string;
+  readonly locality: string | null;
+  readonly submittedByMemberId: string;
+  readonly status: IssueStatus;
+  readonly isMine: boolean;
+  readonly availableTransitions: readonly IssueStatus[];
+  readonly createdAt: string;
+  readonly publishedAt: string | null;
+}

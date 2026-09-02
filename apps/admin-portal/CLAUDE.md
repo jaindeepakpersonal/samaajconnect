@@ -29,7 +29,9 @@ screen. The spec is `docs/product/wireframes/admin-panel-wireframes.html`.
 | Event detail | `/events/:id` | — | built; no wireframe covers one. Who is going, who is waiting, and in what order |
 | Celebrities / Voting | `/voting` | `#celebrity` | built. Campaigns and setting one up |
 | Campaign detail | `/voting/:id` | — | built; no wireframe covers running one. Stage, ballot, nominations, tally, result |
-| Members, Groups, Issues, Reports, Settings | — | various | not built. Every one of those services exists and the member portal has screens for them; what is missing is the administrative view |
+| Volunteer Groups | `/groups` | `#groups` (member-facing) | built. Create with a president, and stand one down |
+| Social Issues | `/issues` | `#issues` | built. The reviewer's approval queue |
+| Members, Reports, Settings | — | various | not built. Member administration is done from the Samaaj screen and the role matrix; reporting is a later phase |
 
 The unbuilt screens appear in the nav, disabled, each saying why. That is
 deliberate: the wireframe promised them, and an administrator who cannot see
@@ -173,6 +175,39 @@ exactly those rows. Two tests hold it.
 `DELETE /enrollments/{id}` a placement decision does not use, and the screen says
 what it does: the child comes off the roll and their attendance and results
 stay. A child who left in March still attended from June.
+
+**Creating a Pathshala is now offered, to Super Admins only — and this file was
+wrong about it for several cycles.** It said a create form "would be a control
+that always answers 403", which is true of a Samaaj administrator and false
+about this panel: a Super Admin uses it too, scoped into a Samaaj. The endpoint
+was left with no caller at all as a result. The form appears when the caller
+holds `SuperAdmin` **and** a Samaaj is selected — the command creates the record
+inside whichever Samaaj the request is scoped to, so offering it with no scope
+would be offering to create one nowhere in particular.
+
+Worth generalising: a control that one role may use is not a control the panel
+should omit. The role matrix screen has always got this right by rendering what
+the server says the caller may do.
+
+**Standing a Pathshala down is confirmed and not reversible here.** Every
+session, class, register and exam result is kept — a Pathshala that closed still
+taught the children who attended it. The screen says which of those two things
+is happening, because "deactivate" alone reads like deletion.
+
+**A volunteer group is created with its president, not after it.** The command
+takes the president's member id and installs them, because a group with nobody
+able to decide its applications is a group whose join requests go nowhere — the
+same dead end as a Pathshala enrolment nobody could place. Standing one down
+keeps its members and history and is reversible, so the screen offers "Bring
+back" rather than leaving it looking deleted.
+
+**The social issues queue is the mildest gap of the set, and the screen does not
+overstate it.** A reviewer was not stuck: the member portal's issue detail
+already renders `availableTransitions`, so somebody holding an issue's id could
+decide it. What was missing was any way to find out something was waiting. The
+buttons come from `availableTransitions` and nothing here derives them — that
+service has the one workflow on the platform with real branches, so a second
+copy in the panel would be the copy that drifts.
 
 **Nominating somebody was a dead end until the decide endpoint had a screen.**
 A member puts a name forward and it sits as `Nominated` — never on the ballot,

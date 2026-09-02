@@ -1,4 +1,5 @@
 import { Component, OnInit, computed, inject, signal } from '@angular/core';
+import { FormsModule } from '@angular/forms';
 import { RouterLink } from '@angular/router';
 import { AuthService, describeError } from '@samaajconnect/shared';
 import { AdminApi } from '../../core/admin-api';
@@ -15,14 +16,19 @@ import { Pathshala } from '../../core/admin.models';
  * child, mark a register or record an exam. This screen and the detail beside it
  * cover the first half — setting the Pathshala up, and answering the parents.
  *
- * **Creating a Pathshala is not here.** `CreatePathshalaCommand` is Super Admin
- * only (`DATA-MODEL.md` §9): the master record is the platform operator's, and
- * everything about *running* it is the Samaaj's. A create form on a Samaaj
- * administrator's screen would be a control that always answers 403.
+ * **Creating a Pathshala is offered to a Super Admin and to nobody else.**
+ * `CreatePathshalaCommand` is Super Admin only (`DATA-MODEL.md` §9): the master
+ * record is the platform operator's, and everything about *running* it is the
+ * Samaaj's. This screen said for several cycles that a create form "would be a
+ * control that always answers 403", which was true of a Samaaj administrator
+ * and wrong about the panel — a Super Admin uses it too, scoped into a Samaaj,
+ * and the endpoint was left with no caller at all as a result. The form appears
+ * for the role that holds the permission, which is what the role matrix screen
+ * has always done.
  */
 @Component({
   selector: 'app-pathshala-list',
-  imports: [RouterLink],
+  imports: [FormsModule, RouterLink],
   template: `
     <h1 class="title">Jain Pathshala</h1>
     <p class="sub">Sessions, classes and the children waiting for a place in {{ scope.label() }}.</p>
@@ -40,7 +46,7 @@ import { Pathshala } from '../../core/admin.models';
       </p>
     } @else if (loading()) {
       <p class="empty" role="status">Loading…</p>
-    } @else if (pathshalas().length === 0) {
+    } @else if (pathshalas().length === 0 && !canCreate()) {
       <p class="empty">
         This Samaaj has no Pathshala yet. Only the platform operator can create the master
         record; ask them to add one.
@@ -81,6 +87,39 @@ import { Pathshala } from '../../core/admin.models';
           </div>
         }
       </div>
+
+      @if (canCreate()) {
+        <div class="card spaced">
+          <h3>Create a Pathshala</h3>
+          <p class="small">
+            The master record belongs to the platform, which is why this is here and not on a
+            Samaaj administrator's screen. Everything about running it — sessions, classes,
+            placing children — is theirs.
+          </p>
+
+          @if (done(); as message) {
+            <p class="notice ok" role="status">{{ message }}</p>
+          }
+
+          <form (ngSubmit)="create()">
+            <label for="pathshala-name">Name</label>
+            <input id="pathshala-name" class="input" name="name" [(ngModel)]="name"
+              maxlength="200" placeholder="Shri Mahavir Jain Pathshala" />
+
+            <label for="pathshala-address">Address</label>
+            <input id="pathshala-address" class="input" name="address" [(ngModel)]="address"
+              maxlength="500" />
+
+            <label for="pathshala-contact">Contact person</label>
+            <input id="pathshala-contact" class="input" name="contactPerson"
+              [(ngModel)]="contactPerson" maxlength="200" />
+
+            <button class="btn" type="submit" [disabled]="busy() || !name.trim()">
+              Create for {{ scope.label() }}
+            </button>
+          </form>
+        </div>
+      }
     }
   `,
   styles: `
@@ -88,6 +127,10 @@ import { Pathshala } from '../../core/admin.models';
       display: grid;
       grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
       gap: var(--space-4);
+    }
+
+    .spaced {
+      margin-top: var(--space-4);
     }
   `,
 })
@@ -99,14 +142,64 @@ export class PathshalaListComponent implements OnInit {
 
   readonly pathshalas = signal<readonly Pathshala[]>([]);
   readonly loading = signal(true);
+  readonly busy = signal(false);
   readonly moduleOff = signal(false);
   readonly error = signal<string | null>(null);
+  readonly done = signal<string | null>(null);
+
+  name = '';
+  address = '';
+  contactPerson = '';
 
   readonly needsSamaaj = computed(
     () => this.auth.roles().includes('SuperAdmin') && this.scope.tenantId() === null,
   );
 
+  /**
+   * Whether to offer the create form.
+   *
+   * The role *and* a chosen Samaaj: the command creates the record inside
+   * whichever Samaaj the request is scoped to, so offering it with no scope
+   * would be offering to create one nowhere in particular.
+   */
+  readonly canCreate = computed(
+    () => this.auth.roles().includes('SuperAdmin') && this.scope.tenantId() !== null,
+  );
+
   ngOnInit(): void {
+    this.load();
+  }
+
+  create(): void {
+    const name = this.name.trim();
+
+    if (name.length === 0) {
+      return;
+    }
+
+    this.busy.set(true);
+    this.error.set(null);
+    this.done.set(null);
+
+    this.api
+      .createPathshala(name, blankToNull(this.address), blankToNull(this.contactPerson))
+      .subscribe({
+        next: () => {
+          this.done.set(`${name} created. Open a session to start teaching.`);
+          this.busy.set(false);
+          this.name = '';
+          this.address = '';
+          this.contactPerson = '';
+          this.load();
+        },
+        error: (failure: unknown) => {
+          this.error.set(describeError(failure));
+          this.busy.set(false);
+        },
+      });
+  }
+
+  private load(): void {
     if (this.needsSamaaj()) {
       this.loading.set(false);
       return;
@@ -132,4 +225,10 @@ export class PathshalaListComponent implements OnInit {
       },
     });
   }
+}
+
+function blankToNull(value: string): string | null {
+  const trimmed = value.trim();
+
+  return trimmed.length === 0 ? null : trimmed;
 }

@@ -8,41 +8,42 @@ version of the plan; the reasoning behind the ordering lives in
 ## Current Status
 
 - **Stage:** every module has a service and member screens; Phase 5 hardening under way
-- **Last updated:** 2026-09-02 - **celebrity voting administration**. A member
-  could put a name forward and nothing could ever put it on the ballot.
+- **Last updated:** 2026-09-02 - **the last five endpoints**. Every endpoint
+  this platform maps is now reachable from an app.
 
-  Creating a campaign, moving it between stages, deciding a nomination and
-  freezing the result were four complete, tested, curl-only endpoints. Deciding
-  a nomination is the one that made the rest matter: without it a nomination sat
-  as `Nominated` forever, and because the service refuses `VotingOpen` on an
-  empty ballot, a campaign could be started and then simply not run. Two admin
-  screens now cover all four.
+  Volunteer groups (create with a president, stand one down), the social issues
+  approval queue, and the two Pathshala ones. 126 of 127; the odd one out is
+  `GET /v1/identity/tenants/by-id/{id}`, which is the gateway's and was never
+  meant for an app.
 
-  **The second cycle running that needed no backend work**, and voting already
-  had full gateway smoke coverage, so this is frontend only - and no smoke run,
-  since nothing backend changed.
+  **One of the five was hidden by this repository's own documentation.**
+  `apps/admin-portal/CLAUDE.md` said a Pathshala create form "would be a control
+  that always answers 403" - true of a Samaaj administrator and wrong about the
+  panel, which a Super Admin also uses, scoped into a Samaaj. A note explaining
+  why an endpoint has no caller is a note that stops anybody asking again; this
+  one was wrong for several cycles and the sweep only surfaced it once it
+  learned about verbs.
 
-  **Three rules are worth the tests that hold them**, each proved by breaking
-  it. Removing a candidate stops being offered once voting opens, because
-  removing them would discard the votes already cast for them. The form refuses
-  a voting window starting before nominations close, exactly as the service
-  does, so members who vote early see the same ballot as members who vote late.
-  And the frozen result is only asked for once a campaign is published - a 404
-  before then is the normal state rather than an error, so the request is not
-  made at all rather than made and forgiven.
+  **The other four were the ordinary shape.** A group without a president has
+  nowhere for its join requests to go, so the president is part of creating one
+  rather than a later step. Standing a group down keeps its members and history
+  and is reversible; standing a Pathshala down keeps every register and exam
+  result and is not. And the issues queue is the mildest gap of the whole run,
+  which the screen says: a reviewer holding an issue's id could already decide
+  it - what was missing was any way to learn that something was waiting.
 
-  **A count of zero and a count you may not see are drawn differently.** `votes`
-  is null when the tally is hidden, and the screen says "Not visible" rather
-  than "0" - zero is a claim, and the wrong one.
+  **Six cycles of the sweep, and it found all of it.** 27 → 20 → 21 (when it
+  stopped undercounting) → 14 → 10 → 6 → 1. Not one of these gaps was reported
+  by a person or caught by a test; every service's own suite was green
+  throughout.
 
-  1,435 tests green (985 backend across 21 suites, 450 frontend). No smoke run
+  1,460 tests green (985 backend across 21 suites, 475 frontend). No smoke run
   this cycle: nothing backend changed, so there was nothing new for it to prove.
-- **Blocking item:** none. **Every module the platform has now has both a
-  service and member screens**, and the role matrix is editable per Samaaj. What
-  is left that needs nothing from outside is the 6 unreachable endpoints listed
-  in Phase 5 - volunteer-group administration, the social issues approval queue,
-  and the two Pathshala endpoints. Beyond those, what is left needs things this repository cannot supply on its own: TLS and a backup
-  drill need a deployed environment, platform-hosted images need storage,
+- **Blocking item:** none. **Every module has a service, member screens and an
+  administrative view**, the role matrix is editable per Samaaj, and nothing the
+  platform exposes is unreachable. What is left needs things this repository
+  cannot supply on its own: TLS and a backup drill need a deployed environment,
+  platform-hosted images need storage,
   the two remaining DPDP obligations - breach notification and the right to
   nominate - are no longer blocked on a channel but still need a real provider
   and, for s.8(6), a detection process and the Board form; and a screen-reader
@@ -489,9 +490,12 @@ unit tested.
       `services/member-family-service/CLAUDE.md`. The handler keeps its explicit
       tenant check as belt and braces for a read whose ids come from another
       service, not as a workaround
-- [ ] **6 endpoints nobody can reach from either app.** One is not a gap:
-      `GET /v1/identity/tenants/by-id/{id}` is the gateway's. The other 5 are
-      screens nobody has built, and they cluster:
+- [x] **Every endpoint the platform maps is now reachable from an app**, bar
+      one that is not a gap: `GET /v1/identity/tenants/by-id/{id}` is the
+      gateway's, not an app's. 126 of 127. The sweep went 27 → 20 → 21 (when it
+      learned about verbs and stopped undercounting) → 14 → 10 → 6 → 1 over six
+      cycles, and every cluster below was found by running it rather than by
+      anybody noticing:
   - [x] **Pathshala administration, setting it up (5 of 13).** The Pathshala
         detail, opening a session, adding a class, the enrolment request queue
         and placing a child. A parent asking for a place now has somebody who
@@ -500,9 +504,12 @@ unit tested.
         teachers, timetable, roll, register, exams, results and withdrawing a
         student. Deactivating a Pathshala is the one left, and is now visible in
         the sweep for the first time — see below
-  - [ ] **Deactivating a Pathshala (1).** `DELETE /v1/pathshala/pathshalas/{id}`.
-        It shared a path with the detail screen's `GET`, so the sweep called it
-        reached until the sweep learned about verbs
+  - [x] **The two Pathshala endpoints (2).** Standing one down, behind a
+        confirmation on the detail screen, and creating one - which this panel
+        had documented as deliberately absent because it "would always answer
+        403". True of a Samaaj administrator and wrong about the panel: a Super
+        Admin uses it too. The form now appears for that role with a Samaaj
+        selected
   - [x] **Boli administration (7).** Two screens: occasions with the
         publication queue, and an occasion's types, Boli, closing and recording.
         Needed one new endpoint — `GET /v1/boli/results/pending`, the middle of
@@ -521,11 +528,14 @@ unit tested.
         since the service refuses `VotingOpen` on an empty ballot, a campaign
         could be started and then not run. No new endpoints, and the service
         already had full gateway smoke coverage
-  - [ ] **Volunteer groups (2).** Creating a group, and deactivating one
-  - [ ] **Social issues (1).** The reviewer's approval queue. The one item here
-        that is a convenience rather than a dead end: the member portal's issue
-        detail already renders `availableTransitions`, so a reviewer can decide
-        without it
+  - [x] **Volunteer groups (2).** One screen: create with a president named
+        from the directory, and stand a group down or bring it back. The
+        president is part of creating a group because one without them has
+        nowhere for its join requests to go
+  - [x] **Social issues (1).** The reviewer's approval queue - the mildest of
+        these, and the screen says so: a reviewer holding an issue's id could
+        already decide it from the member portal. What was missing was any way
+        to learn something was waiting
 - [ ] A smoke run that fails loudly when an id extraction goes wrong. The
       session-id bug was invisible for a reason worth fixing properly: every
       downstream check reported someone else's service returning 404, and

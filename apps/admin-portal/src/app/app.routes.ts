@@ -140,6 +140,18 @@ export const routes: Routes = [
           ),
       },
       {
+        path: 'groups',
+        title: 'Volunteer groups - samaajconnect admin',
+        loadComponent: () =>
+          import('./features/groups/groups-list.component').then((m) => m.GroupsListComponent),
+      },
+      {
+        path: 'issues',
+        title: 'Social issues - samaajconnect admin',
+        loadComponent: () =>
+          import('./features/issues/issue-queue.component').then((m) => m.IssueQueueComponent),
+      },
+      {
         path: 'moderation',
         title: 'Content moderation - samaajconnect admin',
         loadComponent: () =>
