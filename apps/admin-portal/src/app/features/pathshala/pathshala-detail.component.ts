@@ -140,7 +140,11 @@ import { isNotFound } from './pathshala-list.component';
               <tbody>
                 @for (klass of school.classes; track klass.id) {
                   <tr>
-                    <td><b>{{ klass.name }}</b></td>
+                    <td>
+                      <a class="btn link" [routerLink]="['/pathshala', school.id, 'classes', klass.id]">
+                        <b>{{ klass.name }}</b>
+                      </a>
+                    </td>
                     <td>{{ klass.sessionLabel }}</td>
                     <td>{{ klass.roomLabel ?? '—' }}</td>
                     <td>{{ klass.studentCount }}</td>

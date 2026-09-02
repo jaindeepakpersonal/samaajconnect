@@ -51,11 +51,84 @@ for file in services/*/src/*/Endpoints/*.cs; do
       done
 done | sed 's/{[a-zA-Z]*:guid}/{id}/g; s/{[a-zA-Z]*}/{id}/g; s|/$||' | sort -u > "$routes"
 
-# Every /v1 path literal either app contains, in a quoted or templated string,
-# with the query string and any interpolation flattened the same way.
-grep -rhoE "'/v1/[^']*'|\`/v1/[^\`]*\`" apps/*/src libs --include=*.ts \
-  | tr -d "'\`" \
-  | sed 's/?.*//; s|\${[^}]*}|{id}|g; s|/$||' \
+# Every /v1 path literal either app contains, with the HTTP verb it is called
+# with, the query string dropped and any interpolation flattened the same way.
+#
+# **The verb matters, and leaving it out made this sweep quietly lie.** The first
+# version matched on the path alone, so `DELETE /v1/pathshala/pathshalas/{id}`
+# counted as reached because a screen loads `GET` on that same path - the
+# endpoint that stops a Pathshala operating looked built for as long as any
+# screen could read one. Every REST path that carries more than one verb had the
+# same hole, which is most of the interesting ones.
+#
+# The verb is the nearest `.get(`/`.post(`/... within three lines either side of
+# the literal, searched per file so one file's last call cannot lend its verb to
+# the next file's first path. Both directions are needed, because the call is
+# written both ways round:
+#
+#     return this.http.get<RegisterEntry[]>(          <- verb first
+#       `/v1/pathshala/classes/${classId}/register`,
+#     );
+#
+#     const path = `/v1/identity/roles/${roleId}/...`; <- path first
+#     return this.http.put<RoleMatrix>(path, { granted });
+#
+# A `/v1` literal with no call within three lines is a path handed to a helper -
+# `this.one('/v1/audit/me/data-export', …)` in the member portal's DPDP export -
+# and is recorded with a wildcard verb, counting as reached for every method.
+# That is deliberately the *lenient* direction, and it is only safe because
+# comments and specs are excluded first: what is left is real code passing a real
+# path somewhere. Guessing a verb for it would be worse, and refusing to count it
+# would report a screen that plainly exists as missing.
+#
+# Specs are excluded. `http.expectOne('/v1/…')` in a test is not a person
+# clicking anything, and counting one as a caller is how an endpoint with a test
+# and no screen - exactly what this sweep is for - would report as reached.
+for file in $(find apps/*/src libs -name '*.ts' -not -name '*.spec.ts' -not -path '*/node_modules/*'); do
+  awk '
+      { line[NR] = $0 }
+      END {
+        for (n = 1; n <= NR; n++) {
+          if (line[n] !~ /\/v1\//) continue
+
+          # Comments are not callers, and this repo documents endpoints in prose
+          # constantly. A doc comment in the Boli client mentioning
+          # `/v1/pathshala/pathshalas` in passing was enough to make the endpoint
+          # that stops a Pathshala operating look reached - the second time the
+          # same endpoint slipped through this sweep for a different reason.
+          if (line[n] ~ /^[[:space:]]*(\/\/|\/\*|\*)/) continue
+
+          verb = ""
+
+          for (d = 0; d <= 3 && verb == ""; d++) {
+            for (s = -1; s <= 1 && verb == ""; s += 2) {
+              m = n + (d * s)
+
+              if (m < 1 || m > NR) continue
+
+              if (match(line[m], /\.(get|post|put|patch|delete)[<(]/)) {
+                verb = substr(line[m], RSTART + 1, RLENGTH - 2)
+              }
+            }
+          }
+
+          # No call within three lines: the path is reached by something this
+          # script cannot see the verb of - a helper taking the path as an
+          # argument, most often. Emitted with a wildcard verb so it counts as
+          # reached for every method rather than as a gap for all of them.
+          if (verb == "") verb = "*"
+
+          rest = line[n]
+
+          while (match(rest, /\/v1\/[^"'"'"'`?,)]*/)) {
+            print toupper(verb) " " substr(rest, RSTART, RLENGTH)
+            rest = substr(rest, RSTART + RLENGTH)
+          }
+        }
+      }
+    ' "$file"
+done \
+  | sed 's|\${[^}]*}|{id}|g; s|/$||' \
   | sort -u > "$called"
 
 echo "== endpoints no app calls =="
@@ -66,8 +139,9 @@ while read -r verb path; do
   # The route with {id} turned into a path-segment wildcard, and every regex
   # metacharacter in the literal part escaped.
   pattern=$(printf '%s' "$path" | sed 's/[.[\*^$]/\\&/g; s/{id}/[^\/]*/g')
+  upper=$(printf '%s' "$verb" | tr '[:lower:]' '[:upper:]')
 
-  if ! grep -qE "^${pattern}$" "$called"; then
+  if ! grep -qE "^(${upper}|\*) ${pattern}$" "$called"; then
     printf '  %s %s\n' "$verb" "$path"
     unreached=$((unreached + 1))
   fi

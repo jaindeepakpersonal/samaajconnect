@@ -52,6 +52,8 @@ Two entities in DATA-MODEL.md §9 are deliberately absent. See "Decisions".
 | `GetPathshalaQuery` | `Members.Read` | Sessions and classes |
 | `ListEnrolmentRequestsQuery` | `Pathshala.Manage` | The placement queue |
 | `GetClassRollQuery` | `Members.Read` + teaching this class | A list of somebody's children |
+| `GetClassRegisterQuery` | `Members.Read` + teaching this class | One date's marks, so amending is not a guess |
+| `ListClassExamsQuery` | `Pathshala.Exams.Write` + teaching this class | The class's exams with their marks |
 | `ListMyEnrolmentsQuery` | `Members.Read` | What this member asked for, or holds |
 | `GetMyClassQuery` | `Members.Read` + owns this enrolment | |
 | `GetMyAttendanceQuery` | `Members.Read` + owns this enrolment | |
@@ -131,6 +133,34 @@ up recorded.
 
 **Re-marking amends.** Correcting Present to Excused after a parent explains is
 the ordinary case, not an error.
+
+**And because it amends, it has to be readable — which for a long time it was
+not.** Every mark not named in a submission is left exactly as it was, so a
+teacher fixing one child had no way to see the other twenty-four. There was no
+read for a class's register at all: the only attendance query was per enrolment,
+which answers for one child and is gated on owning that enrolment.
+
+That is a gap you could not see from either side on its own. The write path was
+complete and correct; the read path for a *parent* was complete and correct; the
+teacher's read simply did not exist, and nothing failed to point it out because
+no screen had ever tried. `GetClassRegisterQuery` closes it, and the admin class
+screen loads it before showing the form rather than after.
+
+A date nobody has marked answers with an empty list, not 404. "Not marked yet"
+is a normal state of a register, and a teacher opening next Sunday's should get
+a blank form rather than an error.
+
+**A class's exams had the same shape of hole.** `ScheduleExamCommand` answered
+with the new exam's id and nothing ever listed them again, so recording a result
+meant still holding the response that created the exam. An exam set last week
+could not be marked this week by any route the platform offered.
+`ListClassExamsQuery` answers with the exams and the marks already in them
+together — a teacher entering results needs to know who has one, because
+re-recording amends silently.
+
+It is gated on `Pathshala.Exams.Write` rather than on reading records, because
+it answers for the whole class at once. A parent entitled to their own child's
+marks reads them through the progress view, which is scoped to one enrolment.
 
 **The whole register — read, amend and insert — happens on one connection of
 the repository's own, outside the request's transaction.** Two mistakes were

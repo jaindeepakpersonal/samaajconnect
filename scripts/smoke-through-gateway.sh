@@ -2026,6 +2026,41 @@ else
   fail=$((fail + 1))
 fi
 
+# Reading it back is what makes the amend above safe to offer on a screen:
+# anything not re-sent stays as it was, so a form that could not see the
+# existing marks would be asking a teacher to remember them.
+READ_BACK=$(curl -s -H "Authorization: Bearer $TEACHER_TOKEN" \
+  "$GATEWAY/v1/pathshala/classes/$CLASS_ID/register?date=$CLASS_DATE")
+
+if printf '%s' "$READ_BACK" | grep -q '"status":"Excused"'; then
+  echo "  ok    and the register reads back with the correction in it"
+  pass=$((pass + 1))
+else
+  echo "  FAIL  the register did not read back (got '$READ_BACK')"
+  fail=$((fail + 1))
+fi
+
+# Empty, not 404 - a day nobody has marked is a normal state of a register.
+EMPTY_DAY=$(curl -s -H "Authorization: Bearer $TEACHER_TOKEN" \
+  "$GATEWAY/v1/pathshala/classes/$CLASS_ID/register?date=$(date -u -d '-14 days' +%Y-%m-%d)")
+
+if [ "$EMPTY_DAY" = "[]" ]; then
+  echo "  ok    an unmarked date is an empty register rather than an error"
+  pass=$((pass + 1))
+else
+  echo "  FAIL  an unmarked date did not come back empty (got '$EMPTY_DAY')"
+  fail=$((fail + 1))
+fi
+
+# CHILD_TOKEN, not MEMBER_TOKEN. The member in this script is granted the
+# PathshalaTeacher role and assigned to this very class a few checks above, so
+# asking them would be asking the teacher - and 200 would be the right answer.
+# The same shape of mistake as keying a check on a name the script grants a role
+# to further down: the caller changes under the check without the check saying so.
+check "a member who does not teach this class cannot read its register" 404 \
+  "$(status -H "Authorization: Bearer $CHILD_TOKEN" \
+     "$GATEWAY/v1/pathshala/classes/$CLASS_ID/register?date=$CLASS_DATE")"
+
 # The permission gate, before any per-class check: this member is not a
 # teacher anywhere.
 check "a member with no teacher permission cannot mark it" 403 \
@@ -2062,6 +2097,23 @@ check "and a mark within it is recorded" 200 \
   "$(status -X POST "$GATEWAY/v1/pathshala/exams/$EXAM_ID/results" \
      -H 'Content-Type: application/json' -H "Authorization: Bearer $TEACHER_TOKEN" \
      -d "{\"enrolmentId\":\"$ENROLMENT_ID\",\"score\":44,\"grade\":\"A\"}")"
+
+# Scheduling answered with an id and nothing listed them again, so an exam set
+# last week could not be marked this week by any route the platform offered.
+CLASS_EXAMS=$(curl -s -H "Authorization: Bearer $TEACHER_TOKEN" \
+  "$GATEWAY/v1/pathshala/classes/$CLASS_ID/exams")
+
+if printf '%s' "$CLASS_EXAMS" | grep -q '"score":44'; then
+  echo "  ok    the class lists its exams with the marks already recorded"
+  pass=$((pass + 1))
+else
+  echo "  FAIL  the class exam list did not carry the mark (got '$CLASS_EXAMS')"
+  fail=$((fail + 1))
+fi
+
+check "and cannot list its exam marks either" 404 \
+  "$(status -H "Authorization: Bearer $CHILD_TOKEN" \
+     "$GATEWAY/v1/pathshala/classes/$CLASS_ID/exams")"
 
 # ---- What the parent sees --------------------------------------------------
 

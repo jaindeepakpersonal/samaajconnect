@@ -299,6 +299,20 @@ public sealed class EnrolmentRepository(
     public Task<Exam?> GetExamAsync(Guid examId, CancellationToken cancellationToken = default) =>
         dbContext.Exams.FirstOrDefaultAsync(e => e.Id == examId, cancellationToken);
 
+    public async Task<IReadOnlyList<AttendanceEntry>> ListRegisterAsync(
+        Guid classId, DateOnly classDate, CancellationToken cancellationToken = default) =>
+        await dbContext.Attendance
+            .AsNoTracking()
+            .Where(a => a.ClassId == classId && a.ClassDate == classDate)
+            .ToListAsync(cancellationToken);
+
+    public async Task<IReadOnlyList<ExamResult>> ListResultsForClassAsync(
+        Guid classId, CancellationToken cancellationToken = default) =>
+        await dbContext.ExamResults
+            .AsNoTracking()
+            .Where(r => dbContext.Exams.Any(e => e.Id == r.ExamId && e.ClassId == classId))
+            .ToListAsync(cancellationToken);
+
     public async Task<IReadOnlyList<Exam>> ListExamsForClassAsync(
         Guid classId, CancellationToken cancellationToken = default) =>
         await dbContext.Exams

@@ -90,6 +90,14 @@ export const routes: Routes = [
           ),
       },
       {
+        path: 'pathshala/:id/classes/:classId',
+        title: 'Class - samaajconnect admin',
+        loadComponent: () =>
+          import('./features/pathshala/class-detail.component').then(
+            (m) => m.ClassDetailComponent,
+          ),
+      },
+      {
         path: 'moderation',
         title: 'Content moderation - samaajconnect admin',
         loadComponent: () =>

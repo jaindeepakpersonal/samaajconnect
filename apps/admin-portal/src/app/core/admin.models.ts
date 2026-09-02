@@ -288,6 +288,41 @@ export interface PathshalaDetail {
   readonly classes: readonly PathshalaClass[];
 }
 
+/** `AttendanceStatus` in the domain. Excused is not counted against a student. */
+export type AttendanceStatus = 'Present' | 'Absent' | 'Excused';
+
+/**
+ * Mirrors `RegisterEntryResponse` — one mark in one class's register.
+ *
+ * Read before the register is edited, because re-marking a date amends what is
+ * already there and leaves anything not re-sent alone. Without this the screen
+ * would be asking a teacher to re-enter the whole class from memory to correct
+ * one child.
+ */
+export interface RegisterEntry {
+  readonly enrolmentId: string;
+  readonly status: AttendanceStatus;
+  readonly markedAt: string;
+}
+
+/** Mirrors `RecordedResultResponse`. */
+export interface RecordedResult {
+  readonly enrolmentId: string;
+  readonly score: number;
+  readonly grade: string | null;
+  readonly recordedAt: string;
+}
+
+/** Mirrors `ClassExamResponse` — an exam with the marks recorded in it. */
+export interface ClassExam {
+  readonly id: string;
+  readonly classId: string;
+  readonly title: string;
+  readonly examDate: string;
+  readonly maxScore: number;
+  readonly results: readonly RecordedResult[];
+}
+
 /** `EnrolmentStatus` in the domain. */
 export type EnrolmentStatus = 'Requested' | 'Active' | 'Withdrawn';
 

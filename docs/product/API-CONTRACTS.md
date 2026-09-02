@@ -192,7 +192,9 @@ enforced by `TenantAuthorizationBehavior`, not just UI hiding.
 | POST | `/classes/{id}/teachers` | `Pathshala.Manage` | Assign or remove a teacher |
 | GET | `/classes/{id}/roll` | `Members.Read` + teaches this class | Who is on the roll |
 | POST | `/classes/{id}/attendance` | `Pathshala.Attendance.Write` + teaches this class | Mark the whole register for one date |
+| GET | `/classes/{id}/register?date=` | `Members.Read` + teaches this class | The register as it stands for that date; empty if unmarked |
 | POST | `/classes/{id}/exams` | `Pathshala.Exams.Write` + teaches this class | Set an exam |
+| GET | `/classes/{id}/exams` | `Pathshala.Exams.Write` + teaches this class | This class's exams, each with its recorded marks |
 | POST | `/exams/{id}/results` | `Pathshala.Exams.Write` + teaches this class | Record or correct one mark |
 | POST | `/pathshalas/{id}/enrollments` | `Members.Read` | Ask for a place for a child |
 | GET | `/pathshalas/{id}/enrollments/requests` | `Pathshala.Manage` | The placement queue |

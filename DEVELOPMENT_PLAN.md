@@ -8,30 +8,41 @@ version of the plan; the reasoning behind the ordering lives in
 ## Current Status
 
 - **Stage:** every module has a service and member screens; Phase 5 hardening under way
-- **Last updated:** 2026-09-02 - **Pathshala administration**, the half that
-  left a parent's request going nowhere. A parent asks for a place from the
-  member portal and until now nothing on the platform could answer: no screen
-  could open a session, create a class or place a child. The admin panel has
-  those now, and the sweep is down from 27 unreachable endpoints to 20.
+- **Last updated:** 2026-09-02 - **the Pathshala class screen**, and a
+  correction to the tool that has been choosing this work.
 
-  The placement queue needed a new endpoint. pathshala-service stores a child by
-  id and nothing else, so the queue is a list of GUIDs;
-  `GET /v1/children/names` resolves exactly the ids on screen. Names only, never
-  the child record - that carries a date of birth and the parental-consent
-  record, and a queue printing a name has no business receiving them.
+  A Samaaj could enrol a child and then had no way to teach them. Teachers,
+  timetable, roll, register, exams and results were six complete, tested,
+  curl-only endpoints; the admin panel now has a class screen for all of them,
+  plus withdrawing a student.
 
-  That endpoint was reported here as having turned up a tenant-filter bug. **It
-  had not.** The filter is correct; the failure came from reading results off a
-  build that still contained a deliberately broken repository from a
-  fault-injection experiment. Closed under Phase 5 with what verified it, and
-  the habit that would have caught it sooner is written into
-  `services/member-family-service/CLAUDE.md`. 1,333 tests green (974 backend
-  across 21 suites, 359 frontend) plus 265 smoke checks against empty volumes.
+  **Two endpoints had to be built first, and both absences were the same shape.**
+  Marking a register *amends*: anything not re-sent stays as it was. Nothing
+  could read a class's register back, so a form correcting one child would have
+  been asking a teacher to re-enter the other twenty-four from memory - and a
+  half-remembered resubmission does not fail, it just leaves the register
+  quietly wrong. Likewise, scheduling an exam answered with its id and nothing
+  ever listed them again, so an exam set last week could not be marked this
+  week. Neither gap was visible from either side alone: the write paths were
+  correct and the parents' read paths were correct. It took a screen using them
+  together.
+
+  **The unreachable-endpoint sweep was undercounting, and the count went up from
+  20 to 21 in the cycle that built seven screens.** It compared paths without
+  verbs, so `DELETE /pathshalas/{id}` hid behind the detail screen's `GET`, and
+  creating an event, a Boli occasion, a voting campaign and a volunteer group
+  each hid behind its own list. It also treated a path named in a doc comment,
+  or in a spec file, as a caller - and an endpoint with a test and no screen is
+  precisely what the sweep is for. All three are fixed.
+
+  1,353 tests green (981 backend across 21 suites, 372 frontend) plus 270 smoke
+  checks against empty volumes.
 - **Blocking item:** none. **Every module the platform has now has both a
   service and member screens**, and the role matrix is editable per Samaaj. What
-  is left that needs nothing from outside is the 25 unreachable endpoints listed
-  in Phase 5 - screens for Pathshala, Boli, events, voting and volunteer-group
-  administration. Beyond those, what is left needs things this repository cannot
+  is left that needs nothing from outside is the 21 unreachable endpoints listed
+  in Phase 5 - Boli, events, voting and volunteer-group administration, plus
+  deactivating a Pathshala. Beyond those, what is left needs things this
+  repository cannot
   supply on its own: TLS and a
   backup drill need a deployed environment, platform-hosted images need storage,
   the two remaining DPDP obligations - breach notification and the right to
@@ -451,6 +462,20 @@ unit tested.
       approved, and redeeming an activation code, which three admin screens told
       people to do "in the member portal" while the member portal had nowhere to
       do it. All three were complete, tested, and reachable only by curl
+- [x] **The sweep was itself undercounting, in three ways, and now is not.** It
+      matched on the path alone and printed the verb without ever comparing it,
+      so any endpoint sharing a path with a called one of a different method
+      looked reached — `DELETE /v1/pathshala/pathshalas/{id}` hid behind the
+      detail screen's `GET`, and creating an event, a Boli occasion, a voting
+      campaign or a volunteer group each hid behind its own list. It also counted
+      a path mentioned in a **doc comment** as a caller, which this repo writes
+      constantly, and a path in a **spec file** — an endpoint with a test and no
+      screen is the exact thing the sweep exists to find, so a test must not
+      count as a caller. Fixed together: verbs are matched, comments and specs
+      are excluded, and a path whose verb genuinely cannot be determined (a
+      helper taking it as an argument) is recorded as reached by every method
+      rather than as a gap for all of them. The count went from a reported 20 to
+      a true 21 in the same cycle that built seven screens
 - [x] **Closed, and it was not a bug: the "tenant filter that did not exclude
       another Samaaj's row".** Reported here on 2026-09-02 as unexplained and
       security-relevant. It was wrong. The filter is correct, verified four ways:
@@ -466,26 +491,30 @@ unit tested.
       `services/member-family-service/CLAUDE.md`. The handler keeps its explicit
       tenant check as belt and braces for a read whose ids come from another
       service, not as a workaround
-- [ ] **20 endpoints nobody can reach from either app**, down from 27 when the
-      sweep was written. One is not a gap: `GET /v1/identity/tenants/by-id/{id}`
-      is the gateway's. The other 19 are screens nobody has built, and they
-      cluster:
+- [ ] **21 endpoints nobody can reach from either app.** The number went *up*
+      while seven of them were being built, because the sweep itself was
+      undercounting — see the entry below. One is not a gap:
+      `GET /v1/identity/tenants/by-id/{id}` is the gateway's. The other 20 are
+      screens nobody has built, and they cluster:
   - [x] **Pathshala administration, setting it up (5 of 13).** The Pathshala
         detail, opening a session, adding a class, the enrolment request queue
         and placing a child. A parent asking for a place now has somebody who
         can answer, which was the dead end
-  - [ ] **Pathshala administration, teaching (8 of 13).** Assigning teachers,
-        setting a timetable, marking the register, setting an exam, recording
-        results, the class roll, and the two deletes (deactivating a Pathshala,
-        withdrawing a student). All still curl-only
-  - [ ] **Boli administration (5).** Members can bid; nobody can run an
-        auction. Occasion status, Boli types, opening a Boli, closing one,
-        publishing a result
-  - [ ] **Events administration (3).** Members can register; nobody can publish
-        or cancel an event, or see who is coming
-  - [ ] **Celebrity voting administration (2).** Deciding a nomination, and
-        moving a campaign between stages
-  - [ ] **Volunteer groups (1).** Deactivating a group
+  - [x] **Pathshala administration, teaching (7 of 8).** The class screen:
+        teachers, timetable, roll, register, exams, results and withdrawing a
+        student. Deactivating a Pathshala is the one left, and is now visible in
+        the sweep for the first time — see below
+  - [ ] **Deactivating a Pathshala (1).** `DELETE /v1/pathshala/pathshalas/{id}`.
+        It shared a path with the detail screen's `GET`, so the sweep called it
+        reached until the sweep learned about verbs
+  - [ ] **Boli administration (7).** Members can bid; nobody can run an
+        auction. Creating an occasion, occasion status, Boli types, opening a
+        Boli, closing one, recording a result and publishing it
+  - [ ] **Events administration (4).** Members can register; nobody can create,
+        publish or cancel an event, or see who is coming
+  - [ ] **Celebrity voting administration (4).** Creating a campaign, deciding a
+        nomination, moving a campaign between stages, and recording results
+  - [ ] **Volunteer groups (2).** Creating a group, and deactivating one
   - [ ] **Social issues (1).** The reviewer's approval queue. The one item here
         that is a convenience rather than a dead end: the member portal's issue
         detail already renders `availableTransitions`, so a reviewer can decide

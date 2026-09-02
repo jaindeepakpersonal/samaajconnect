@@ -3,9 +3,11 @@ import { Injectable, inject } from '@angular/core';
 import { Observable } from 'rxjs';
 import {
   ActivationCode,
+  AttendanceStatus,
   AdminUser,
   AssignRoleResult,
   AuditLogEntry,
+  ClassExam,
   ModerationDecision,
   ModerationQueueEntry,
   Enrolment,
@@ -20,6 +22,7 @@ import {
   InviteAdminResult,
   ModuleDescriptor,
   PendingActivation,
+  RegisterEntry,
   RoleMatrix,
   Tenant,
   TenantStatus,
@@ -288,6 +291,92 @@ export class AdminApi {
       classId,
       place,
     });
+  }
+
+  /** Who is on a class's roll. Teachers of that class, and administrators. */
+  classRoll(classId: string): Observable<Enrolment[]> {
+    return this.http.get<Enrolment[]>(`/v1/pathshala/classes/${classId}/roll`);
+  }
+
+  /** Assigns a teacher to a class, or takes one off it. */
+  assignTeacher(
+    classId: string,
+    teacherMemberId: string,
+    assign: boolean,
+  ): Observable<PathshalaClass> {
+    return this.http.post<PathshalaClass>(`/v1/pathshala/classes/${classId}/teachers`, {
+      teacherMemberId,
+      assign,
+    });
+  }
+
+  /** Adds a weekly slot. The service refuses one that overlaps another that day. */
+  addClassSlot(
+    classId: string,
+    dayOfWeek: string,
+    startTime: string,
+    endTime: string,
+  ): Observable<PathshalaClass> {
+    return this.http.post<PathshalaClass>(`/v1/pathshala/classes/${classId}/schedule`, {
+      dayOfWeek,
+      startTime,
+      endTime,
+    });
+  }
+
+  /**
+   * The register as it currently stands for one date.
+   *
+   * Read before the form is shown, never after: submitting amends what is there
+   * and leaves anything not re-sent as it was, so a form that started blank
+   * would quietly turn a correction into a half-recorded register.
+   */
+  classRegister(classId: string, date: string): Observable<RegisterEntry[]> {
+    return this.http.get<RegisterEntry[]>(
+      `/v1/pathshala/classes/${classId}/register?date=${date}`,
+    );
+  }
+
+  /** The whole register in one submission — one command, one transaction, one answer. */
+  markAttendance(
+    classId: string,
+    classDate: string,
+    marks: readonly { enrolmentId: string; status: AttendanceStatus }[],
+  ): Observable<unknown> {
+    return this.http.post(`/v1/pathshala/classes/${classId}/attendance`, { classDate, marks });
+  }
+
+  /** This class's exams, each with the marks already recorded in it. */
+  classExams(classId: string): Observable<ClassExam[]> {
+    return this.http.get<ClassExam[]>(`/v1/pathshala/classes/${classId}/exams`);
+  }
+
+  scheduleExam(
+    classId: string,
+    title: string,
+    examDate: string,
+    maxScore: number,
+  ): Observable<unknown> {
+    return this.http.post(`/v1/pathshala/classes/${classId}/exams`, {
+      title,
+      examDate,
+      maxScore,
+    });
+  }
+
+  /** Records a mark, or amends one already recorded. */
+  recordExamResult(
+    examId: string,
+    enrolmentId: string,
+    score: number,
+    grade: string | null,
+  ): Observable<unknown> {
+    return this.http.post(`/v1/pathshala/exams/${examId}/results`, { enrolmentId, score, grade });
+  }
+
+  /** Takes a student off the roll. Their attendance and results are kept. */
+  withdrawStudent(enrolmentId: string): Observable<Enrolment> {
+    return this.http.delete<Enrolment>(`/v1/pathshala/enrollments/${enrolmentId}`);
   }
 
   /**

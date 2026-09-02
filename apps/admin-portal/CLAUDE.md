@@ -21,6 +21,7 @@ screen. The spec is `docs/product/wireframes/admin-panel-wireframes.html`.
 | Timeline / Moderation | `/moderation` | `#content` | built |
 | Jain Pathshala | `/pathshala` | `#pathshala` | built — the list |
 | Pathshala detail | `/pathshala/:id` | — | built; no wireframe covers running one. Sessions, classes and the placement queue |
+| Class detail | `/pathshala/:id/classes/:classId` | — | built. Teachers, timetable, roll, register, exams and results |
 | Notifications | `/notifications` | `#notifications` | built — compose and recent, without the Audience and Channel dropdowns |
 | Members, Groups, Events, Issues, Celebrity, Boli, Reports, Settings | — | various | not built. Every one of those services exists and the member portal has screens for them; what is missing is the administrative view |
 
@@ -137,9 +138,35 @@ server refused is the one thing this screen must never do.
 **Running a Pathshala was a curl-only activity.** Thirteen of the twenty-seven
 endpoints the sweep found were this module: a parent could ask for a place and
 nobody could open a session, create a class, place a child, mark a register or
-record an exam. The two screens here cover the first half - setting it up, and
-answering the parents. The teaching half (teachers, timetable, the register,
-exams and results) is still unbuilt and tracked in `DEVELOPMENT_PLAN.md`.
+record an exam. Three screens now cover it — the list and the detail screen set
+a school up and answer the parents, and the class screen teaches it.
+
+**The class screen needed two endpoints that did not exist, and both absences
+were the same shape.** Marking a register *amends*: every mark not named in the
+submission is left as it was. A form that could not read the existing marks
+would therefore ask a teacher correcting one child to re-enter the other
+twenty-four from memory — and a half-remembered resubmission does not fail, it
+just leaves the register quietly wrong. Nothing could read a class's register
+back. Likewise, scheduling an exam answered with its id and nothing listed them
+again, so an exam set last week could not be marked this week.
+
+Both were invisible from either side alone: the write paths were complete and
+correct, and the parent's read paths were complete and correct. It took a screen
+trying to use them together for the gap to show. `GET /classes/{id}/register` and
+`GET /classes/{id}/exams` were added for this, with the marks arriving alongside
+the exams because recording a result also amends silently.
+
+**An unmarked child is not sent, and this is the rule on that screen most worth
+protecting.** The mark control's third state is "Not marked", it is where every
+child starts, and those rows are left out of the submission entirely. Defaulting
+them to Present would invent attendance for a child nobody saw — and every
+attendance number this platform reports, on every screen, is a count over
+exactly those rows. Two tests hold it.
+
+**Withdrawing is on the roll, not the placement queue.** It is the same
+`DELETE /enrollments/{id}` a placement decision does not use, and the screen says
+what it does: the child comes off the roll and their attendance and results
+stay. A child who left in March still attended from June.
 
 **Creating a Pathshala is deliberately not on these screens.**
 `CreatePathshalaCommand` is Super Admin only (`DATA-MODEL.md` §9): the master

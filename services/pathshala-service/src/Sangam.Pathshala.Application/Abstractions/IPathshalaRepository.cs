@@ -122,6 +122,18 @@ public interface IEnrolmentRepository
     Task<AttendanceTally> TallyAttendanceAsync(
         Guid enrolmentId, CancellationToken cancellationToken = default);
 
+    /// <summary>One class's register for one date, as it currently stands.</summary>
+    /// <remarks>
+    /// <b>The register was writable and not readable, which made amending it a
+    /// guess.</b> Re-marking a date amends what is already there, so a teacher
+    /// correcting one child's mark had no way to see the other twenty-four -
+    /// they had to be re-entered from memory, or left to be overwritten with
+    /// whatever a blank form defaulted to. Reading the marks back is what makes
+    /// the amend path safe to offer at all.
+    /// </remarks>
+    Task<IReadOnlyList<AttendanceEntry>> ListRegisterAsync(
+        Guid classId, DateOnly classDate, CancellationToken cancellationToken = default);
+
     // ---- Exams ------------------------------------------------------------
 
     Task<Exam?> GetExamAsync(Guid examId, CancellationToken cancellationToken = default);
@@ -136,6 +148,15 @@ public interface IEnrolmentRepository
 
     Task<IReadOnlyList<ExamResult>> ListResultsForEnrolmentAsync(
         Guid enrolmentId, CancellationToken cancellationToken = default);
+
+    /// <summary>Every mark recorded in any of one class's exams.</summary>
+    /// <remarks>
+    /// Read for the whole class rather than per exam: a class has a handful of
+    /// exams and a handful of students, and one round trip beats one per exam
+    /// for a screen that shows them together.
+    /// </remarks>
+    Task<IReadOnlyList<ExamResult>> ListResultsForClassAsync(
+        Guid classId, CancellationToken cancellationToken = default);
 
     void AddResult(ExamResult result);
 }

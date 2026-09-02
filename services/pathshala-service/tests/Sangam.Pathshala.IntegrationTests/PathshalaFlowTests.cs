@@ -533,4 +533,174 @@ public sealed class PathshalaFlowTests(PathshalaApiFactory factory)
         (await Parent().GetAsync($"/v1/pathshala/enrollments/{enrolmentId}/my-class"))
             .StatusCode.Should().Be(HttpStatusCode.Conflict);
     }
+
+    // ---- Reading a register and a class's exams ----------------------------
+
+    [Fact]
+    public async Task The_register_can_be_read_back_so_amending_it_is_not_a_guess()
+    {
+        // The write path amends silently: a mark not re-sent stays as it was.
+        // Without this read a teacher correcting one child re-enters the class
+        // from memory, and a wrong recollection does not fail - it just leaves
+        // the register wrong. This is the read that makes the amend path safe.
+        var fixture = await AClassAsync();
+        var present = await APlacedStudentAsync(fixture);
+        var absent = await APlacedStudentAsync(fixture);
+
+        await Teacher().PostAsJsonAsync(
+            $"/v1/pathshala/classes/{fixture.ClassId}/attendance",
+            new
+            {
+                classDate = "2026-03-01",
+                marks = new[]
+                {
+                    new { enrolmentId = present, status = "Present" },
+                    new { enrolmentId = absent, status = "Absent" },
+                },
+            });
+
+        var register = await Teacher().GetFromJsonAsync<JsonElement>(
+            $"/v1/pathshala/classes/{fixture.ClassId}/register?date=2026-03-01");
+
+        var marks = register.EnumerateArray()
+            .ToDictionary(m => m.GetProperty("enrolmentId").GetGuid(),
+                          m => m.GetProperty("status").GetString());
+
+        marks.Should().HaveCount(2);
+        marks[present].Should().Be("Present");
+        marks[absent].Should().Be("Absent");
+    }
+
+    [Fact]
+    public async Task A_register_answers_for_the_date_asked_for_and_no_other()
+    {
+        var fixture = await AClassAsync();
+        var enrolmentId = await APlacedStudentAsync(fixture);
+
+        await Teacher().PostAsJsonAsync(
+            $"/v1/pathshala/classes/{fixture.ClassId}/attendance",
+            new
+            {
+                classDate = "2026-03-01",
+                marks = new[] { new { enrolmentId, status = "Present" } },
+            });
+
+        var other = await Teacher().GetFromJsonAsync<JsonElement>(
+            $"/v1/pathshala/classes/{fixture.ClassId}/register?date=2026-03-08");
+
+        // Empty, not 404. A day nobody has marked yet is a normal state of a
+        // register, and a teacher opening next Sunday's should see a blank form
+        // rather than an error.
+        other.GetArrayLength().Should().Be(0);
+    }
+
+    [Fact]
+    public async Task A_parent_cannot_read_the_whole_class_register()
+    {
+        // Their own child's attendance, yes - through the enrolment. The class's
+        // is a record of other people's children.
+        var fixture = await AClassAsync();
+        var enrolmentId = await APlacedStudentAsync(fixture);
+
+        await Teacher().PostAsJsonAsync(
+            $"/v1/pathshala/classes/{fixture.ClassId}/attendance",
+            new
+            {
+                classDate = "2026-03-01",
+                marks = new[] { new { enrolmentId, status = "Present" } },
+            });
+
+        (await Parent().GetAsync(
+                $"/v1/pathshala/classes/{fixture.ClassId}/register?date=2026-03-01"))
+            .StatusCode.Should().Be(HttpStatusCode.NotFound);
+    }
+
+    [Fact]
+    public async Task A_teacher_of_another_class_cannot_read_this_register()
+    {
+        // Holding the attendance permission is necessary and not sufficient -
+        // the same rule the roll follows.
+        var fixture = await AClassAsync();
+
+        (await Teacher(Guid.NewGuid()).GetAsync(
+                $"/v1/pathshala/classes/{fixture.ClassId}/register?date=2026-03-01"))
+            .StatusCode.Should().Be(HttpStatusCode.NotFound);
+    }
+
+    [Fact]
+    public async Task A_class_lists_its_exams_with_the_marks_already_recorded()
+    {
+        // Scheduling answered with an id and nothing listed them again, so an
+        // exam set last week could not be marked this week by any route the
+        // platform offered.
+        var fixture = await AClassAsync();
+        var marked = await APlacedStudentAsync(fixture);
+        var unmarked = await APlacedStudentAsync(fixture);
+
+        var scheduled = await Teacher().PostAsJsonAsync(
+            $"/v1/pathshala/classes/{fixture.ClassId}/exams",
+            new { title = "Half-yearly", examDate = "2026-09-06", maxScore = 50 });
+
+        var examId = (await scheduled.Content.ReadFromJsonAsync<JsonElement>())
+            .GetProperty("id").GetGuid();
+
+        (await Teacher().PostAsJsonAsync(
+                $"/v1/pathshala/exams/{examId}/results",
+                new { enrolmentId = marked, score = 41, grade = "A" }))
+            .StatusCode.Should().Be(HttpStatusCode.OK);
+
+        var exams = await Teacher().GetFromJsonAsync<JsonElement>(
+            $"/v1/pathshala/classes/{fixture.ClassId}/exams");
+
+        exams.GetArrayLength().Should().Be(1);
+
+        var exam = exams.EnumerateArray().First();
+
+        exam.GetProperty("id").GetGuid().Should().Be(examId);
+        exam.GetProperty("title").GetString().Should().Be("Half-yearly");
+        exam.GetProperty("maxScore").GetInt32().Should().Be(50);
+
+        var results = exam.GetProperty("results").EnumerateArray().ToList();
+
+        // Only the child who has a mark. Who is still unmarked is the roll's
+        // answer, not the exam's - and a teacher entering results needs to know
+        // which of the two this is, because re-recording amends silently.
+        results.Should().HaveCount(1);
+        results[0].GetProperty("enrolmentId").GetGuid().Should().Be(marked);
+        results[0].GetProperty("score").GetInt32().Should().Be(41);
+        results[0].GetProperty("grade").GetString().Should().Be("A");
+
+        results.Should().NotContain(r => r.GetProperty("enrolmentId").GetGuid() == unmarked);
+    }
+
+    [Fact]
+    public async Task One_class_s_exams_do_not_leak_into_another_s()
+    {
+        var fixture = await AClassAsync();
+
+        var otherCreated = await Admin().PostAsJsonAsync(
+            $"/v1/pathshala/pathshalas/{fixture.PathshalaId}/classes",
+            new { sessionId = fixture.SessionId, name = "Class 9", roomLabel = (string?)null });
+
+        var otherClassId = (await otherCreated.Content.ReadFromJsonAsync<JsonElement>())
+            .GetProperty("id").GetGuid();
+
+        await Admin().PostAsJsonAsync(
+            $"/v1/pathshala/classes/{fixture.ClassId}/exams",
+            new { title = "Class 8 half-yearly", examDate = "2026-09-06", maxScore = 50 });
+
+        var exams = await Admin().GetFromJsonAsync<JsonElement>(
+            $"/v1/pathshala/classes/{otherClassId}/exams");
+
+        exams.GetArrayLength().Should().Be(0);
+    }
+
+    [Fact]
+    public async Task A_parent_cannot_list_a_class_s_exam_marks()
+    {
+        var fixture = await AClassAsync();
+
+        (await Parent().GetAsync($"/v1/pathshala/classes/{fixture.ClassId}/exams"))
+            .StatusCode.Should().Be(HttpStatusCode.NotFound);
+    }
 }

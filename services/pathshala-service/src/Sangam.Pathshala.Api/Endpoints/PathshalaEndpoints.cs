@@ -186,6 +186,38 @@ public static class PathshalaEndpoints
             .ProducesProblem(StatusCodes.Status401Unauthorized)
             .ProducesProblem(StatusCodes.Status404NotFound);
 
+        group.MapGet("/classes/{classId:guid}/register", async (
+                Guid classId,
+                DateOnly date,
+                ISender sender,
+                CancellationToken cancellationToken) =>
+            {
+                var result = await sender.Send(
+                    new GetClassRegisterQuery(classId, date), cancellationToken);
+
+                return result.ToApiResult();
+            })
+            .RequireAuthorization()
+            .WithName("GetClassRegister")
+            .WithSummary("The register already marked for one date, so amending it is not a guess.")
+            .Produces<IReadOnlyList<RegisterEntryResponse>>()
+            .ProducesProblem(StatusCodes.Status401Unauthorized)
+            .ProducesProblem(StatusCodes.Status404NotFound);
+
+        group.MapGet("/classes/{classId:guid}/exams", async (
+                Guid classId, ISender sender, CancellationToken cancellationToken) =>
+            {
+                var result = await sender.Send(new ListClassExamsQuery(classId), cancellationToken);
+
+                return result.ToApiResult();
+            })
+            .RequireAuthorization()
+            .WithName("ListClassExams")
+            .WithSummary("This class's exams and the marks recorded in each.")
+            .Produces<IReadOnlyList<ClassExamResponse>>()
+            .ProducesProblem(StatusCodes.Status401Unauthorized)
+            .ProducesProblem(StatusCodes.Status404NotFound);
+
         group.MapPost("/classes/{classId:guid}/attendance", async (
                 Guid classId, MarkAttendanceRequest request, ISender sender,
                 CancellationToken cancellationToken) =>
