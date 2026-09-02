@@ -8,7 +8,30 @@ version of the plan; the reasoning behind the ordering lives in
 ## Current Status
 
 - **Stage:** every module has a service and member screens; Phase 5 hardening under way
-- **Last updated:** 2026-09-02 - **tests for the gateway's two untested files**,
+- **Last updated:** 2026-09-02 - **the function that decides who wins an
+  election had no tests.**
+
+  Applying the gateway audit to the ten services put celebrity-voting bottom by
+  a distance: 59 source files, 22 tests. Its aggregate was well covered - the
+  windows, the forward-only sequence, who may see a running count - and its
+  concurrency tests are the strongest on the platform. What nothing touched was
+  `RankBy`, which lives in the application layer rather than the aggregate, and
+  which `PublishResultsCommand` calls to produce the ranking it then freezes
+  forever. 33 tests now.
+
+  **One of the new tests passed for the wrong reason and was rewritten.** The
+  tie-break is held by two mechanisms that agree: `Ballot` returns candidates in
+  nomination order, and `RankBy` adds `ThenBy(NominatedAt)` on top of a sort
+  LINQ already performs stably. Deleting either alone changes nothing - so the
+  first version of the test, which created its candidates in order, passed
+  whichever one was removed. It creates them out of order now, which
+  distinguishes "one of the two is working" from "neither is". That is the most
+  a test at this level can honestly claim, and the claim is written down rather
+  than implied.
+
+  1,518 tests green (1,017 backend across 21 suites, 501 frontend). No smoke
+  run: nothing changed but tests.
+- **Previously:** 2026-09-02 - **tests for the gateway's two untested files**,
   the last unexamined part of the request path.
 
   25 tests covered three of the gateway's nine source files. The two with none
@@ -512,6 +535,14 @@ unit tested.
       block. The palette was measured rather than assumed and passes AA
       everywhere — tightest pair 4.56:1. What each app's `CLAUDE.md` now records
       is what was checked, so the next pass does not start over
+- [x] **`RankBy` has tests, 2026-09-02.** The same audit applied to the ten
+      services put celebrity-voting bottom by a distance — 59 source files, 22
+      tests — and the gap was the function that decides who is named the
+      celebrity of a Samaaj. It sits in the application layer rather than the
+      aggregate, which is how it escaped a test file named for the campaign.
+      Ordering, ties, candidates nobody voted for, nominations that are not on
+      the ballot, and the null-versus-zero rule the admin panel draws off. The
+      other nine services' ratios are all reasonable; this was the outlier
 - [x] **The gateway's two untested files have tests, 2026-09-02.** 25 covered
       three of nine; `RedisTenantCache` and `RateLimiting` had none. Both hold a
       promise that only stands if something checks it — a cache failure must

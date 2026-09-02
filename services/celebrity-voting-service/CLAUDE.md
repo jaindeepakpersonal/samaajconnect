@@ -161,7 +161,23 @@ Null rather than zero: zero is a claim, and the wrong one.
 
 - `Sangam.CelebrityVoting.UnitTests` — the campaign as a thing that runs
   over time: windows, the forward-only sequence, one candidacy per
-  member, who may see the running count.
+  member, who may see the running count. Plus `CampaignMappingsTests`,
+  which covers **`RankBy` — the function that decides who is named the
+  celebrity of a Samaaj, and which had no tests at all** until
+  2026-09-02. It lives in the application layer rather than the
+  aggregate, which is how it escaped a file named for the campaign.
+
+**The tie-break is held by two mechanisms that agree, and a test can only
+see that.** `Ballot` returns approved candidates ordered by
+`NominatedAt`, and `RankBy` then adds `ThenBy(NominatedAt)` on top of a
+sort LINQ already performs stably. Delete either one on its own and
+nothing changes; delete both and an announced ranking can reshuffle
+between two reads of the same numbers. So the test creates its
+candidates *out of* chronological order — which distinguishes "one of
+the two is working" from "neither is", and is the most a test at this
+level can honestly claim. A test built on candidates created in order
+passes whichever one you delete, which is what the first version of it
+did.
 - `Sangam.CelebrityVoting.IntegrationTests` — Testcontainers against a
   real Postgres. `VoteIndexTests` names the mechanism; the concurrency
   tests prove the behaviour.
