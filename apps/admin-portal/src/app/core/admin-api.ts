@@ -3,6 +3,7 @@ import { Injectable, inject } from '@angular/core';
 import { Observable } from 'rxjs';
 import {
   ActivationCode,
+  Attendee,
   AttendanceStatus,
   AdminUser,
   AssignRoleResult,
@@ -23,6 +24,8 @@ import {
   InviteAdminRequest,
   InviteAdminResult,
   ModuleDescriptor,
+  OrganizerGroup,
+  OrganizerType,
   Occasion,
   OccasionDetail,
   OccasionStatus,
@@ -30,6 +33,7 @@ import {
   PendingResult,
   RegisterEntry,
   RoleMatrix,
+  SamaajEvent,
   Tenant,
   TenantStatus,
 } from './admin.models';
@@ -297,6 +301,85 @@ export class AdminApi {
       classId,
       place,
     });
+  }
+
+  // ---- Events ------------------------------------------------------------
+
+  /**
+   * This Samaaj's events.
+   *
+   * `includeDrafts` is honoured for a caller holding `Events.Publish` and
+   * quietly ignored for anyone else — the service answers with the published
+   * list rather than a 403, because refusing would tell a member that drafts
+   * exist at all.
+   */
+  listEvents(includeDrafts: boolean, includePast: boolean): Observable<SamaajEvent[]> {
+    const params = new HttpParams()
+      .set('includeDrafts', includeDrafts)
+      .set('includePast', includePast);
+
+    return this.http.get<SamaajEvent[]>('/v1/events', { params });
+  }
+
+  /**
+   * One event.
+   *
+   * A draft is visible to whoever holds `Events.Publish` and answers 404 to
+   * everyone else — a member reaching one has guessed its id, and confirming it
+   * exists is the leak.
+   */
+  event(id: string): Observable<SamaajEvent> {
+    return this.http.get<SamaajEvent>(`/v1/events/${id}`);
+  }
+
+  /**
+   * Creates an event. It starts as a draft and announces nothing.
+   *
+   * `capacity` null means no limit; the service refuses zero, which would be an
+   * event nobody can attend.
+   */
+  createEvent(event: {
+    title: string;
+    description: string | null;
+    startAt: string;
+    endAt: string | null;
+    venue: string | null;
+    organizerType: OrganizerType;
+    organizerId: string | null;
+    registrationEnabled: boolean;
+    capacity: number | null;
+  }): Observable<SamaajEvent> {
+    return this.http.post<SamaajEvent>('/v1/events', event);
+  }
+
+  /** Tells the Samaaj. Separate from creating, because it is a separate decision. */
+  publishEvent(id: string): Observable<SamaajEvent> {
+    return this.http.post<SamaajEvent>(`/v1/events/${id}/publish`, {});
+  }
+
+  /**
+   * Calls an event off. The reason is required — people who rearranged their
+   * day are told it — and a cancelled event cannot be republished.
+   */
+  cancelEvent(id: string, reason: string): Observable<SamaajEvent> {
+    return this.http.post<SamaajEvent>(`/v1/events/${id}/cancel`, { reason });
+  }
+
+  /** Who is going, and who is waiting. Needs `Events.Publish`. */
+  attendees(id: string): Observable<Attendee[]> {
+    return this.http.get<Attendee[]>(`/v1/events/${id}/attendees`);
+  }
+
+  /**
+   * The Samaaj's volunteer groups, used only to name an event's organiser.
+   *
+   * events-service stores an organiser as a type and an id; the group's name
+   * lives in volunteer-groups-service. One call for the whole table rather than
+   * one per row, the same approach every other cross-service name on this panel
+   * takes.
+   */
+  organizerGroups(): Observable<OrganizerGroup[]> {
+    return this.http.get<OrganizerGroup[]>('/v1/volunteer-groups/groups');
   }
 
   // ---- Boli --------------------------------------------------------------

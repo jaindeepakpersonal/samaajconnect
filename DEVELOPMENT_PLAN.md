@@ -8,42 +8,40 @@ version of the plan; the reasoning behind the ordering lives in
 ## Current Status
 
 - **Stage:** every module has a service and member screens; Phase 5 hardening under way
-- **Last updated:** 2026-09-02 - **Boli administration**. Members could bid on
-  nothing.
+- **Last updated:** 2026-09-02 - **events administration**. Members could
+  register for events nobody could create.
 
-  Every endpoint an organiser needs - announcing an occasion, moving its status,
-  defining a Boli type, opening a Boli, closing it, recording who won,
-  announcing the result - was complete, tested and reachable only by curl, while
-  the member portal's bidding screens had been shipped for cycles against
-  auctions nobody could open. Two admin screens now cover all seven.
+  Creating, publishing, cancelling and reading the attendee list were four
+  complete, tested, curl-only endpoints, while the member portal's events
+  screens - the capacity pill, the waitlist, the promotion when a place is given
+  up - had been shipped against events that could only be conjured with curl.
+  Two admin screens now cover all four.
 
-  **The publication queue needed an endpoint that did not exist.** Recording a
-  result and announcing it are deliberately two acts, so a result sits between
-  them - and the only read that reached one needed the Boli id you were already
-  looking for. The middle state of the platform's most careful workflow was
-  unlistable, which means a result was announced only if somebody remembered it.
-  `GET /v1/boli/results/pending` is the wireframe's "Results Awaiting
-  Publication" card, drawn a long time ago and never answerable until now. It
-  carries the amount and never a winner: boli-service names the winner in one
-  shape only, and only after publication.
+  **The first of these clusters in three cycles that needed nothing built
+  first.** Pathshala needed a register that could be read back and an exam list;
+  Boli needed the publication queue its own two-step workflow implied. Events
+  needed neither, and events-service already had full gateway smoke coverage, so
+  this cycle is frontend only.
 
-  **boli-service had no gateway smoke coverage at all**, which root `CLAUDE.md`
-  §9 asks for on every service. Nothing had noticed, because every Boli endpoint
-  was curl-only in the first place and the integration suite curls the service
-  directly. A full lifecycle now runs through YARP.
+  **Two rules on the screen are worth the tests that hold them.** A blank
+  capacity is sent as null, not zero - null means no limit and zero is the one
+  value the service refuses, an event nobody can attend. And the attendee list
+  is three lists: going, waiting, and gave up a place. Somebody who cancelled is
+  not in the queue, and numbering them in it would put a position against a
+  person who is not waiting for anything.
 
-  **Two things moved rather than being copied.** `formatRupees`/`parseRupees`
-  went to `libs/shared` because a second app finally needed them - which is the
-  documented rule firing, not an exception to it - and `isNotFound`, which had
-  reached three copies, now lives in `core/http-status.ts` beside `isForbidden`.
+  **One test was passing for the wrong reason and now is not.** The waitlist
+  test had no cancelled attendee in it, so "not registered" and "waitlisted"
+  picked out the same people - breaking the filter left it green. It has one
+  now, and breaking the filter fails it.
 
-  1,376 tests green (985 backend across 21 suites, 391 frontend) plus 294 smoke
-  checks through the gateway against empty volumes.
+  1,399 tests green (985 backend across 21 suites, 414 frontend). No smoke run
+  this cycle: nothing backend changed, so there was nothing new for it to prove.
 - **Blocking item:** none. **Every module the platform has now has both a
   service and member screens**, and the role matrix is editable per Samaaj. What
-  is left that needs nothing from outside is the 14 unreachable endpoints listed
-  in Phase 5 - events, voting and volunteer-group administration, the social
-  issues approval queue, and deactivating a Pathshala. Beyond those, what is
+  is left that needs nothing from outside is the 10 unreachable endpoints listed
+  in Phase 5 - voting and volunteer-group administration, the social issues
+  approval queue, and the two Pathshala endpoints. Beyond those, what is
   left needs things this repository cannot supply on its own: TLS and a backup
   drill need a deployed environment, platform-hosted images need storage,
   the two remaining DPDP obligations - breach notification and the right to
@@ -492,8 +490,8 @@ unit tested.
       `services/member-family-service/CLAUDE.md`. The handler keeps its explicit
       tenant check as belt and braces for a read whose ids come from another
       service, not as a workaround
-- [ ] **14 endpoints nobody can reach from either app.** One is not a gap:
-      `GET /v1/identity/tenants/by-id/{id}` is the gateway's. The other 13 are
+- [ ] **10 endpoints nobody can reach from either app.** One is not a gap:
+      `GET /v1/identity/tenants/by-id/{id}` is the gateway's. The other 9 are
       screens nobody has built, and they cluster:
   - [x] **Pathshala administration, setting it up (5 of 13).** The Pathshala
         detail, opening a session, adding a class, the enrolment request queue
@@ -512,8 +510,11 @@ unit tested.
         the deliberately two-step record-then-publish workflow, which nothing
         could list. boli-service also had no gateway smoke coverage at all,
         which root `CLAUDE.md` §9 asks for on every service
-  - [ ] **Events administration (4).** Members can register; nobody can create,
-        publish or cancel an event, or see who is coming
+  - [x] **Events administration (4).** Two screens: the list with drafts,
+        create, publish and cancel; and an event's attendees split into going,
+        waiting and gave up a place. The first cluster in three cycles that
+        needed no new endpoint — all four existed and simply had no caller, and
+        events-service already had full gateway smoke coverage
   - [ ] **Celebrity voting administration (4).** Creating a campaign, deciding a
         nomination, moving a campaign between stages, and recording results
   - [ ] **Volunteer groups (2).** Creating a group, and deactivating one

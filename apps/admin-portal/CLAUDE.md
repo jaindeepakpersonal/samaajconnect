@@ -25,7 +25,9 @@ screen. The spec is `docs/product/wireframes/admin-panel-wireframes.html`.
 | Notifications | `/notifications` | `#notifications` | built — compose and recent, without the Audience and Channel dropdowns |
 | Auctions / Boli | `/boli` | `#boli` + `#publishboli` | built. Occasions, and the publication queue with its confirmation |
 | Occasion detail | `/boli/:id` | — | built; no wireframe covers running an auction. Types, opening a Boli, closing, recording |
-| Members, Groups, Events, Issues, Celebrity, Reports, Settings | — | various | not built. Every one of those services exists and the member portal has screens for them; what is missing is the administrative view |
+| Events | `/events` | `#events` | built. Drafts and published together, create, publish, cancel |
+| Event detail | `/events/:id` | — | built; no wireframe covers one. Who is going, who is waiting, and in what order |
+| Members, Groups, Issues, Celebrity, Reports, Settings | — | various | not built. Every one of those services exists and the member portal has screens for them; what is missing is the administrative view |
 
 The unbuilt screens appear in the nav, disabled, each saying why. That is
 deliberate: the wireframe promised them, and an administrator who cannot see
@@ -169,6 +171,37 @@ exactly those rows. Two tests hold it.
 `DELETE /enrollments/{id}` a placement decision does not use, and the screen says
 what it does: the child comes off the roll and their attendance and results
 stay. A child who left in March still attended from June.
+
+**Members could register for events nobody could create.** The member portal's
+events screens — the capacity pill, the waitlist, the promotion when a place is
+given up — had been shipped against events that could only be conjured with
+curl. Unlike the Boli and Pathshala gaps, this one needed no new endpoint: all
+four were there and simply had no caller.
+
+**The events screen shows drafts, and that is what it is for.** Creating and
+publishing are separate commands because an event exists in somebody's head long
+before the Samaaj should be told about it. `includeDrafts` is honoured for a
+caller holding `Events.Publish` and quietly ignored for anyone else — the service
+answers with the published list rather than 403, since refusing would tell a
+member drafts exist at all — so the screen asks for them unconditionally.
+
+**No denominator is the unlimited case, not a missing number.** The RSVP column
+reads "186 / 200" with a capacity and "94" without, exactly as the wireframe drew
+it. Capacity is nullable and the service refuses zero, so a blank box is sent as
+null: `capacity || null` rather than `capacity ?? 0`, which would turn "no limit"
+into the one value that means an event nobody can attend.
+
+**Cancelling asks for a reason, and the reason is not a formality.** The service
+requires one because everybody registered is told it, and a cancelled event
+cannot be republished. The registrations survive on purpose — an attendee list
+that vanished with the event is one nobody can notify — so the detail screen
+keeps showing them.
+
+**The attendee list is three lists.** Going, waiting, and gave up a place. The
+waitlist is rendered in arrival order because that order is the substance: the
+longest wait comes off the queue first, and a promoted member keeps the position
+they had. Somebody who cancelled is not in the queue at all, and numbering them
+in it would put a position against a person who is not waiting for anything.
 
 **Members could bid on nothing.** Every Boli endpoint an organiser needs —
 announcing an occasion, moving its status, defining a type, opening a Boli,

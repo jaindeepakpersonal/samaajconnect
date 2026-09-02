@@ -429,3 +429,59 @@ export interface PendingResult {
   readonly recordedBy: string;
   readonly recordedAt: string;
 }
+
+// ---- Events --------------------------------------------------------------
+
+/** Draft until published; cancelled is terminal and cannot be republished. */
+export type EventStatus = 'Draft' | 'Published' | 'Cancelled';
+
+/** A Samaaj's own event, or one a volunteer group is holding. */
+export type OrganizerType = 'Samaaj' | 'VolunteerGroup';
+
+/** Mirrors `EventResponse`. */
+export interface SamaajEvent {
+  readonly id: string;
+  readonly title: string;
+  readonly description: string | null;
+  readonly startAt: string;
+  readonly endAt: string | null;
+  readonly venue: string | null;
+  readonly organizerType: OrganizerType;
+
+  /** The group's id when the organiser is one. Names live in another service. */
+  readonly organizerId: string | null;
+  readonly status: EventStatus;
+  readonly registrationEnabled: boolean;
+
+  /** Null means no limit, which is a different thing from a limit of zero. */
+  readonly capacity: number | null;
+  readonly registeredCount: number;
+  readonly waitlistedCount: number;
+
+  /** True only when there is a capacity and it has been reached. */
+  readonly isFull: boolean;
+  readonly myRegistrationStatus: string | null;
+  readonly cancelledAt: string | null;
+  readonly cancellationReason: string | null;
+  readonly createdAt: string;
+}
+
+/**
+ * Mirrors `AttendeeResponse` — an id and a status, no name.
+ *
+ * events-service holds no names, and an attendee list is a list of who is going
+ * somewhere: not a thing it should hand out more of than it has to. The panel
+ * resolves the ids against the directory it already loads, as it does for post
+ * authors and Pathshala teachers.
+ */
+export interface Attendee {
+  readonly memberId: string;
+  readonly status: 'Registered' | 'Waitlisted' | 'Cancelled';
+  readonly registeredAt: string;
+}
+
+/** The subset of a volunteer group this panel needs, to name an organiser. */
+export interface OrganizerGroup {
+  readonly id: string;
+  readonly name: string;
+}

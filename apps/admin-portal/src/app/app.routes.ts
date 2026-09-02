@@ -112,6 +112,18 @@ export const routes: Routes = [
           ),
       },
       {
+        path: 'events',
+        title: 'Events - samaajconnect admin',
+        loadComponent: () =>
+          import('./features/events/events-list.component').then((m) => m.EventsListComponent),
+      },
+      {
+        path: 'events/:id',
+        title: 'Event - samaajconnect admin',
+        loadComponent: () =>
+          import('./features/events/event-detail.component').then((m) => m.EventDetailComponent),
+      },
+      {
         path: 'moderation',
         title: 'Content moderation - samaajconnect admin',
         loadComponent: () =>

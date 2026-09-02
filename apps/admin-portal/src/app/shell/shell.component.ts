@@ -236,7 +236,7 @@ const NAV: readonly NavGroup[] = [
       { label: 'Families & Children', route: '/conversions' },
       { label: 'Timeline / Moderation', route: '/moderation' },
       { label: 'Volunteer Groups', pending: 'The group administration screen is not built yet.' },
-      { label: 'Events', pending: 'The event administration screen is not built yet.' },
+      { label: 'Events', route: '/events' },
       { label: 'Social Issues', pending: 'The review queue screen is not built yet.' },
       { label: 'Celebrities / Voting', pending: 'The campaign administration screen is not built yet.' },
     ],
