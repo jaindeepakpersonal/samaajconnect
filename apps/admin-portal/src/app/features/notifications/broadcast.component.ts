@@ -55,7 +55,7 @@ import { Broadcast } from '../../core/admin.models';
       </p>
     } @else {
       <form class="card" (ngSubmit)="send()">
-        <h3>Compose announcement</h3>
+        <h2>Compose announcement</h2>
 
         <label for="broadcast-title">Title</label>
         <input
@@ -93,7 +93,7 @@ import { Broadcast } from '../../core/admin.models';
       </form>
 
       <div class="card recent">
-        <h3>Recent announcements</h3>
+        <h2>Recent announcements</h2>
 
         @if (loading()) {
           <p class="empty" role="status">Loading…</p>
@@ -102,6 +102,7 @@ import { Broadcast } from '../../core/admin.models';
         } @else {
           <div class="table-wrap">
             <table>
+              <caption class="sr-only">Recent announcements and how many members opened them</caption>
               <thead>
                 <tr>
                   <th>Title</th>

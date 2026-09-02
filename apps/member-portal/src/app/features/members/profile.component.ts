@@ -61,7 +61,7 @@ import { Gender, MyProfile, PrivacyLevel } from './members.models';
         <form class="grid2" (ngSubmit)="save()">
           <!-- Basic information ------------------------------------------- -->
           <div class="card">
-            <h3>Basic information</h3>
+            <h2>Basic information</h2>
 
             <label for="full-name">Full name</label>
             <input
@@ -165,7 +165,7 @@ import { Gender, MyProfile, PrivacyLevel } from './members.models';
 
           <!-- Privacy ------------------------------------------------------ -->
           <div class="card">
-            <h3>Privacy settings</h3>
+            <h2>Privacy settings</h2>
             <p class="small">Choose who can see each field in the member directory.</p>
 
             @for (field of privacyFields; track field.key) {

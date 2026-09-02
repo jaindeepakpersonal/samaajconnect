@@ -53,13 +53,14 @@ import { isNotFound } from '../../core/http-status';
       <p class="empty" role="status">Loading…</p>
     } @else {
       <div class="card">
-        <h3>Groups</h3>
+        <h2>Groups</h2>
 
         @if (groups().length === 0) {
           <p class="empty">None yet.</p>
         } @else {
           <div class="table-wrap">
             <table>
+              <caption class="sr-only">Volunteer groups</caption>
               <thead>
                 <tr>
                   <th>Group</th><th>Focus</th><th>President</th>
@@ -111,7 +112,7 @@ import { isNotFound } from '../../core/http-status';
 
       <!-- Create --------------------------------------------------------- -->
       <div class="card spaced">
-        <h3>Set up a group</h3>
+        <h2>Set up a group</h2>
 
         <form (ngSubmit)="create()">
           <label for="group-name">Name</label>

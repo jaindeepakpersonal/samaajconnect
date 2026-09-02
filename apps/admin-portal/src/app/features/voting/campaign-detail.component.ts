@@ -62,7 +62,7 @@ import { isNotFound } from '../../core/http-status';
 
       <!-- Stage ---------------------------------------------------------- -->
       <div class="card">
-        <h3>Stage</h3>
+        <h2>Stage</h2>
 
         <p class="small">
           Nominations {{ subject.nominationStartAt | date: 'd MMM' }} —
@@ -94,8 +94,23 @@ import { isNotFound } from '../../core/http-status';
             nothing to point at.
           </p>
 
+          <!--
+            The trigger stays and stays enabled while the confirmation is open:
+            replacing or disabling it destroys the focused element and drops a
+            keyboard user to the body (WCAG 2.4.3).
+          -->
+          <button
+            class="btn"
+            type="button"
+            [disabled]="busy()"
+            [attr.aria-expanded]="confirmingPublish()"
+            (click)="confirmingPublish.set(true)"
+          >
+            Publish the result
+          </button>
+
           @if (confirmingPublish()) {
-            <div class="notice">
+            <div class="notice" role="status">
               <p>
                 This freezes the Top {{ subject.topN }} as it stands and announces it. It cannot
                 be undone or recomputed.
@@ -109,11 +124,6 @@ import { isNotFound } from '../../core/http-status';
                 </button>
               </div>
             </div>
-          } @else {
-            <button class="btn" type="button" [disabled]="busy()"
-              (click)="confirmingPublish.set(true)">
-              Publish the result
-            </button>
           }
         } @else {
           <p class="empty">Published. This campaign is finished.</p>
@@ -123,7 +133,7 @@ import { isNotFound } from '../../core/http-status';
       <!-- Result --------------------------------------------------------- -->
       @if (result(); as ranking) {
         <div class="card spaced">
-          <h3>The result</h3>
+          <h2>The result</h2>
           <p class="small">
             Announced {{ ranking.publishedAt | date: 'd MMM y, h:mm a' }}. Stored as it was
             computed and never recalculated — a result that moved after it was announced would
@@ -132,6 +142,7 @@ import { isNotFound } from '../../core/http-status';
 
           <div class="table-wrap">
             <table>
+              <caption class="sr-only">The published result, in rank order</caption>
               <thead>
                 <tr><th>#</th><th>Member</th><th>Votes</th></tr>
               </thead>
@@ -151,7 +162,7 @@ import { isNotFound } from '../../core/http-status';
 
       <!-- Ballot --------------------------------------------------------- -->
       <div class="card spaced">
-        <h3>On the ballot</h3>
+        <h2>On the ballot</h2>
 
         @if (approved().length === 0) {
           <p class="empty">Nobody yet. Approve a nomination below to put somebody on it.</p>
@@ -167,6 +178,7 @@ import { isNotFound } from '../../core/http-status';
 
           <div class="table-wrap">
             <table>
+              <caption class="sr-only">Candidates on the ballot</caption>
               <thead>
                 <tr><th>Member</th><th>Category</th><th>Votes</th><th></th></tr>
               </thead>
@@ -202,7 +214,7 @@ import { isNotFound } from '../../core/http-status';
 
       <!-- Nominations ---------------------------------------------------- -->
       <div class="card spaced">
-        <h3>Waiting for a decision</h3>
+        <h2>Waiting for a decision</h2>
 
         @if (nominated().length === 0) {
           <p class="empty">
@@ -217,6 +229,7 @@ import { isNotFound } from '../../core/http-status';
 
           <div class="table-wrap">
             <table>
+              <caption class="sr-only">Nominations waiting for a decision</caption>
               <thead>
                 <tr><th>Member</th><th>Category</th><th>Nominated by</th><th></th></tr>
               </thead>

@@ -56,7 +56,7 @@ import { isNotFound } from '../../core/http-status';
       <p class="empty" role="status">Loading…</p>
     } @else {
       <div class="card">
-        <h3>All events</h3>
+        <h2>All events</h2>
 
         <label class="inline-check">
           <input type="checkbox" name="includePast" [ngModel]="includePast()"
@@ -72,6 +72,7 @@ import { isNotFound } from '../../core/http-status';
         } @else {
           <div class="table-wrap">
             <table>
+              <caption class="sr-only">Events, drafts and published together</caption>
               <thead>
                 <tr>
                   <th>Event</th><th>Organiser</th><th>Date</th><th>RSVP</th>
@@ -113,15 +114,20 @@ import { isNotFound } from '../../core/http-status';
                         }
 
                         @if (event.status !== 'Cancelled') {
-                          <button class="btn small alt" type="button" [disabled]="busy()"
-                            (click)="startCancelling(event)">
+                          <button
+                            class="btn small alt"
+                            type="button"
+                            [disabled]="busy()"
+                            [attr.aria-expanded]="cancelling() === event.id"
+                            (click)="startCancelling(event)"
+                          >
                             Cancel
                           </button>
                         }
                       </div>
 
                       @if (cancelling() === event.id) {
-                        <div class="notice">
+                        <div class="notice" role="status">
                           <label [attr.for]="'reason-' + event.id">
                             Why is <b>{{ event.title }}</b> off?
                           </label>
@@ -159,7 +165,7 @@ import { isNotFound } from '../../core/http-status';
 
       <!-- Create --------------------------------------------------------- -->
       <div class="card spaced">
-        <h3>Create an event</h3>
+        <h2>Create an event</h2>
 
         <form (ngSubmit)="create()">
           <label for="event-title">Title</label>

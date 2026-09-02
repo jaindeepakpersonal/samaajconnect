@@ -95,7 +95,7 @@ interface ModuleTile {
         <div class="grid">
           @for (tile of tiles(); track tile.title) {
             <div class="card">
-              <h3>{{ tile.title }}</h3>
+              <h2>{{ tile.title }}</h2>
               <p>{{ tile.description }}</p>
 
               <div class="actions">

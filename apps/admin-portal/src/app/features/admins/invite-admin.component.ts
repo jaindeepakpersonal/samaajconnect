@@ -42,7 +42,7 @@ import { InviteAdminResult, Role } from '../../core/admin.models';
           <b>{{ result.fullName }}</b> has been invited to {{ scope.label() }}.
         </p>
 
-        <h3>Their one-time code</h3>
+        <h2>Their one-time code</h2>
         <p class="code">{{ result.activationCode }}</p>
 
         <p class="notice">

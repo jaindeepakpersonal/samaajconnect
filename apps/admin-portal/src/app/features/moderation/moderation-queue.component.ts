@@ -63,7 +63,7 @@ import { ModerationDecision, ModerationQueueEntry } from '../../core/admin.model
         <div class="card post">
           <div class="post-head">
             <div>
-              <h3>{{ entry.post.title }}</h3>
+              <h2>{{ entry.post.title }}</h2>
               <p class="muted">
                 {{ authorName(entry.post.authorMemberId) }}
                 · {{ entry.post.createdAt | date: 'd MMM y, HH:mm' }}

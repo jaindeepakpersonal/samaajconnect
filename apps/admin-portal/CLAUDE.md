@@ -417,6 +417,39 @@ reason in a `title` attribute, which becomes the element's accessible name and
 exist yet" with no way to tell which item that was. The reason is now a
 visually-hidden span after the label.
 
+**A second pass was done on 2026-09-02**, because the first one predated the
+eight screens built after it — Pathshala classes, Boli, events, voting, groups
+and social issues had never been looked at. Four things came out of it, and all
+four were also true of screens the first audit *had* covered.
+
+**A confirmation that replaces its own trigger drops keyboard focus to the
+body.** Three screens did this: Boli publication, campaign publication and
+standing a Pathshala down all rendered the panel in an `@else` branch, so the
+button the user had just activated left the DOM and took the focus point with it
+(WCAG 2.4.3). Disabling the trigger instead is the same bug wearing a hat — a
+disabled control is blurred and removed from the tab order. The trigger now
+stays, and stays enabled, with `aria-expanded` saying what it did; pressing it
+again re-opens what is already open, which is harmless. The events screen had
+got this right by accident and is now explicit about it.
+
+**Those panels are `role="status"`.** New content appearing after a click is
+seen and not heard otherwise, and what appears here is the warning that the
+action cannot be undone (WCAG 4.1.3).
+
+**Every table has a `<caption class="sr-only">`.** There are 23 of them and none
+had an accessible name; five screens draw three apiece, so a screen reader user
+listing the tables on the class screen got "table, table, table". The caption is
+1×1px rather than `display: none`, which is what keeps it in the accessibility
+tree.
+
+**Card titles are `h2`, not `h3`.** Every screen in both apps went `h1` straight
+to `h3`, which leaves the outline with a level missing (WCAG 1.3.1). Sub-headings
+inside a card stay `h3` and now sit correctly under the card's `h2`. Both
+stylesheets give the two the size an `h3` rendered at before, so nothing moved on
+screen — verified in a browser against the built CSS, at 18.72px in both apps.
+The member portal had the same defect in six screens and was fixed with it: a
+finding that applies to both apps is not an admin-panel finding.
+
 **The audit was done on 2026-09-01**, alongside member-portal's — see that app's
 `CLAUDE.md` for what was checked and what the palette measured. Two things
 changed here.

@@ -60,7 +60,7 @@ import { isNotFound } from '../../core/http-status';
     } @else {
       @for (issue of issues(); track issue.id) {
         <div class="card spaced">
-          <h3>{{ issue.title }}</h3>
+          <h2>{{ issue.title }}</h2>
           <p class="sub">
             {{ issue.category }}
             @if (issue.locality) { · {{ issue.locality }} }

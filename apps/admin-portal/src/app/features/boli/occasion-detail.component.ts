@@ -61,7 +61,7 @@ import { isNotFound } from '../../core/http-status';
 
       <!-- Status --------------------------------------------------------- -->
       <div class="card">
-        <h3>Status</h3>
+        <h2>Status</h2>
 
         @if (nextStatus(); as next) {
           <p class="small">
@@ -79,7 +79,7 @@ import { isNotFound } from '../../core/http-status';
 
       <!-- Boli types ----------------------------------------------------- -->
       <div class="card spaced">
-        <h3>Boli types</h3>
+        <h2>Boli types</h2>
 
         @if (event.types.length === 0) {
           <p class="empty">
@@ -118,13 +118,14 @@ import { isNotFound } from '../../core/http-status';
 
       <!-- The Boli ------------------------------------------------------- -->
       <div class="card spaced">
-        <h3>Boli</h3>
+        <h2>Boli</h2>
 
         @if (event.boli.length === 0) {
           <p class="empty">None opened yet.</p>
         } @else {
           <div class="table-wrap">
             <table>
+              <caption class="sr-only">Boli in this occasion</caption>
               <thead>
                 <tr>
                   <th>Boli</th><th>Window</th><th>Highest</th><th>Bids</th>

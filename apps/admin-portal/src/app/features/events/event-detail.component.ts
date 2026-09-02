@@ -64,7 +64,7 @@ import { isNotFound } from '../../core/http-status';
 
       <!-- Going ---------------------------------------------------------- -->
       <div class="card">
-        <h3>Going</h3>
+        <h2>Going</h2>
 
         @if (!subject.registrationEnabled) {
           <p class="empty">This event does not take registrations.</p>
@@ -83,6 +83,7 @@ import { isNotFound } from '../../core/http-status';
           } @else {
             <div class="table-wrap">
               <table>
+                <caption class="sr-only">Members going to this event</caption>
                 <thead>
                   <tr><th>Member</th><th>Registered</th></tr>
                 </thead>
@@ -103,7 +104,7 @@ import { isNotFound } from '../../core/http-status';
       <!-- Waiting -------------------------------------------------------- -->
       @if (subject.registrationEnabled) {
         <div class="card spaced">
-          <h3>Waiting</h3>
+          <h2>Waiting</h2>
 
           @if (waitlisted().length === 0) {
             <p class="empty">Nobody is waiting.</p>
@@ -116,6 +117,7 @@ import { isNotFound } from '../../core/http-status';
 
             <div class="table-wrap">
               <table>
+                <caption class="sr-only">Members waiting, in the order they joined the queue</caption>
                 <thead>
                   <tr><th>#</th><th>Member</th><th>Joined the queue</th></tr>
                 </thead>
@@ -136,7 +138,7 @@ import { isNotFound } from '../../core/http-status';
 
       @if (cancelled().length > 0) {
         <div class="card spaced">
-          <h3>Gave up a place</h3>
+          <h2>Gave up a place</h2>
           <p class="small">
             Kept because a place given up is what promotes somebody off the waitlist, and an
             organiser asked why the numbers moved should be able to see it.
@@ -144,6 +146,7 @@ import { isNotFound } from '../../core/http-status';
 
           <div class="table-wrap">
             <table>
+              <caption class="sr-only">Members who gave up a place</caption>
               <thead>
                 <tr><th>Member</th><th>Had registered</th></tr>
               </thead>

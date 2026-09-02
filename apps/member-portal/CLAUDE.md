@@ -393,6 +393,14 @@ The requirements call for WCAG 2.1 AA. **The audit was done on 2026-09-01**;
 what it checked and what it found are below, so the next pass knows what has
 already been looked at rather than starting over.
 
+**Card titles became `h2` on 2026-09-02.** Six screens here went `h1` straight to
+`h3`, leaving a level missing from the outline (WCAG 1.3.1) — the first audit
+looked at labels, focus and live regions and did not check heading structure.
+It was found while auditing the admin panel, and fixed in both apps at once,
+because a finding that applies to both is not one app's finding. `.card h2` and
+`.card h3` are given the size an `h3` rendered at before, so nothing moved on
+screen; the one spec that selected on `.card h3` now selects `.card h2`.
+
 **Already in place, and confirmed:** labelled form controls — every one of the
 57 across both apps, including the checkboxes that are wrapped in a `<label>`
 rather than pointing at one by id; `aria-invalid` on failed fields;

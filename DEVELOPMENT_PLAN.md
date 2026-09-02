@@ -8,7 +8,38 @@ version of the plan; the reasoning behind the ordering lives in
 ## Current Status
 
 - **Stage:** every module has a service and member screens; Phase 5 hardening under way
-- **Last updated:** 2026-09-02 - **the last five endpoints**. Every endpoint
+- **Last updated:** 2026-09-02 - **a second accessibility pass**, because the
+  first one had gone stale in a week.
+
+  The 2026-09-01 audit predated the eight admin screens built after it, so those
+  had never been looked at. Four findings came out of it, and every one of them
+  also applied to screens the first pass *had* covered - which is the part worth
+  remembering: an audit is a snapshot of the code on the day, and this
+  repository was adding screens faster than that.
+
+  **A confirmation panel that replaces its own trigger drops keyboard focus to
+  the body** (WCAG 2.4.3). Three screens did it - publishing a Boli result,
+  publishing a campaign result, standing a Pathshala down - by rendering the
+  panel in an `@else`, so the button the user had just pressed left the DOM.
+  Disabling the trigger instead is the same bug wearing a hat, since a disabled
+  control is blurred and taken out of the tab order. Those panels were also
+  silent to a screen reader and are now `role="status"`.
+
+  **All 23 tables were unnamed**, and five screens draw three apiece. Each now
+  has an `sr-only` caption.
+
+  **Every screen in both apps went `h1` straight to `h3`.** Card titles are `h2`
+  now, sub-headings inside a card stay `h3`, and both are given the size an `h3`
+  rendered at before - checked in a browser against the built CSS at 18.72px, so
+  nothing moved on screen. The member portal had the same defect and was fixed
+  with it: a finding that applies to both apps is not one app's finding.
+
+  Five tests hold the focus and caption fixes; breaking either fails exactly the
+  test that claims it.
+
+  1,450 tests green (985 backend across 21 suites, 465 frontend). No smoke run:
+  nothing backend changed.
+- **Previously:** 2026-09-02 - **the last five endpoints**. Every endpoint
   this platform maps is now reachable from an app.
 
   Volunteer groups (create with a president, stand one down), the social issues
@@ -421,6 +452,17 @@ unit tested.
       block. The palette was measured rather than assumed and passes AA
       everywhere — tightest pair 4.56:1. What each app's `CLAUDE.md` now records
       is what was checked, so the next pass does not start over
+- [x] **Second accessibility pass, 2026-09-02**, because the first predated the
+      eight admin screens built after it. Four findings, all of which also
+      applied to screens the first pass *had* covered - which is the point worth
+      keeping: an audit is a snapshot, and this one had gone stale in a week.
+      A confirmation panel that replaced its own trigger dropped keyboard focus
+      to the body on three screens (2.4.3), and disabling the trigger instead is
+      the same bug; those panels were also silent to a screen reader and are now
+      `role="status"` (4.1.3); all 23 tables were unnamed and now carry an
+      `sr-only` caption (1.3.1); and every screen in **both** apps skipped from
+      `h1` to `h3`, so card titles are now `h2` with no visible change - checked
+      in a browser against the built CSS. Five tests hold the first two
 - [ ] Accessibility: a pass with a real screen reader, and keyboard-only
       walkthroughs of the longer workflows (the Boli bid form, the issue
       transitions, the role matrix). Those need a person, not a script

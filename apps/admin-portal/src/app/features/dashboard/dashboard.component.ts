@@ -58,7 +58,7 @@ import { AdminScope } from '../../core/admin-scope';
 
     <div class="grid2 next">
       <div class="card">
-        <h3>Where to start</h3>
+        <h2>Where to start</h2>
         @if (isSuperAdmin()) {
           <p class="muted">Create a Samaaj, activate it, and invite its first administrator.</p>
           <div class="actions">
@@ -75,7 +75,7 @@ import { AdminScope } from '../../core/admin-scope';
       </div>
 
       <div class="card">
-        <h3>Not built yet</h3>
+        <h2>Not built yet</h2>
         <p class="muted">
           The wireframe's dashboard also counts events, Pathshala students and auctions. Those
           services exist now, but each count is a call into a different one, and this panel does

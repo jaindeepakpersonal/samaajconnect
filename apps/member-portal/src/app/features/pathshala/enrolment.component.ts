@@ -131,7 +131,7 @@ import {
 
             <div class="grid">
               <div class="card">
-                <h3>Overall</h3>
+                <h2>Overall</h2>
                 @if (marks.percentage === null) {
                   <!-- Null, not zero. Nothing has been marked yet. -->
                   <p class="stat unknown">Not yet</p>
@@ -145,13 +145,13 @@ import {
               </div>
 
               <div class="card">
-                <h3>Present</h3>
+                <h2>Present</h2>
                 <p class="stat">{{ marks.present }}</p>
                 <p class="small">Classes attended</p>
               </div>
 
               <div class="card">
-                <h3>Absent</h3>
+                <h2>Absent</h2>
                 <p class="stat">{{ marks.absent }}</p>
                 <!-- One expression rather than text with an @if inside it: the
                      block's own indentation becomes a space, which put a gap
@@ -216,7 +216,7 @@ import {
 
             <div class="grid">
               <div class="card">
-                <h3>Average score</h3>
+                <h2>Average score</h2>
                 @if (summary.averageScorePercentage === null) {
                   <p class="stat unknown">Not yet</p>
                   <p class="small">
@@ -236,7 +236,7 @@ import {
               </div>
 
               <div class="card">
-                <h3>Attendance</h3>
+                <h2>Attendance</h2>
                 @if (summary.attendancePercentage === null) {
                   <p class="stat unknown">Not yet</p>
                 } @else {

@@ -157,6 +157,46 @@ describe('BoliListComponent', () => {
     http.expectNone('/v1/boli/boli/b1/result/publish');
   });
 
+  it('keeps the button that opened the confirmation, and announces the panel', () => {
+    // The confirmation used to replace its own trigger. Removing the focused
+    // element drops keyboard focus to the body, so a keyboard user loses their
+    // place the moment they ask to confirm something (WCAG 2.4.3) - and
+    // disabling it instead does the same, because a disabled control is blurred.
+    // The panel is a live region so a screen reader hears the warning at all.
+    load([occasion()], [pending()]);
+
+    const trigger = () =>
+      [...fixture.nativeElement.querySelectorAll('tbody button')].find(
+        (b) => (b as HTMLElement).textContent?.trim() === 'Review and publish',
+      ) as HTMLButtonElement | undefined;
+
+    expect(trigger()).toBeTruthy();
+    expect(trigger()!.getAttribute('aria-expanded')).toBe('false');
+
+    component.confirming.set('b1');
+    fixture.detectChanges();
+
+    expect(trigger()).toBeTruthy();
+    expect(trigger()!.disabled).toBe(false);
+    expect(trigger()!.getAttribute('aria-expanded')).toBe('true');
+    expect(fixture.nativeElement.querySelector('.notice[role="status"]')).toBeTruthy();
+  });
+
+  it('names every table it draws', () => {
+    // Two tables on this screen, and a screen reader listing them gets the
+    // caption rather than "table, table".
+    load([occasion()], [pending()]);
+
+    const captions = [...fixture.nativeElement.querySelectorAll('table caption')].map((c) =>
+      (c as HTMLElement).textContent?.trim(),
+    );
+
+    expect(captions).toEqual([
+      'Results recorded and waiting to be announced',
+      'Boli occasions',
+    ]);
+  });
+
   it('publishes once confirmed', () => {
     load([occasion()], [pending()]);
 

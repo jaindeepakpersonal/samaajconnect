@@ -75,7 +75,7 @@ import {
         <div class="grid2">
           <!-- The issue ------------------------------------------------- -->
           <div class="card">
-            <h3>The issue</h3>
+            <h2>The issue</h2>
 
             @if (editing()) {
               <form (ngSubmit)="saveEdit()">
@@ -138,7 +138,7 @@ import {
 
           <!-- What happens next ----------------------------------------- -->
           <div class="card">
-            <h3>What happens next</h3>
+            <h2>What happens next</h2>
 
             @if (found.issue.availableTransitions.length === 0) {
               <p class="small">

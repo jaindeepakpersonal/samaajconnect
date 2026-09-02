@@ -56,7 +56,7 @@ import { Enrolment, EnrolmentStatusLabels, Pathshala } from './pathshala.models'
           <div class="grid">
             @for (enrolment of enrolments(); track enrolment.id) {
               <div class="card">
-                <h3>{{ childName(enrolment) }}</h3>
+                <h2>{{ childName(enrolment) }}</h2>
                 <p>{{ pathshalaName(enrolment.pathshalaId) }}</p>
 
                 <div class="badges">
@@ -90,7 +90,7 @@ import { Enrolment, EnrolmentStatusLabels, Pathshala } from './pathshala.models'
           <div class="grid">
             @for (pathshala of pathshalas(); track pathshala.id) {
               <div class="card">
-                <h3>{{ pathshala.name }}</h3>
+                <h2>{{ pathshala.name }}</h2>
 
                 @if (pathshala.address; as address) {
                   <p class="small">{{ address }}</p>

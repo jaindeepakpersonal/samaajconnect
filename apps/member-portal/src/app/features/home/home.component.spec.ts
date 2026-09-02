@@ -85,7 +85,7 @@ describe('HomeComponent', () => {
   }
 
   function tileTitles(): string[] {
-    return Array.from((fixture.nativeElement as HTMLElement).querySelectorAll('.card h3')).map(
+    return Array.from((fixture.nativeElement as HTMLElement).querySelectorAll('.card h2')).map(
       (heading) => heading.textContent?.trim() ?? '',
     );
   }
@@ -218,7 +218,7 @@ describe('HomeComponent', () => {
 
     for (const card of cards) {
       const link = card.querySelector('a[href]');
-      const title = card.querySelector('h3')?.textContent?.trim() ?? '';
+      const title = card.querySelector('h2')?.textContent?.trim() ?? '';
 
       expect(link).not.toBeNull();
       expect(link?.textContent).toContain(title);

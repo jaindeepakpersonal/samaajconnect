@@ -54,6 +54,7 @@ import { ConversionRequest } from '../../core/admin.models';
     } @else {
       <div class="table-wrap">
         <table>
+          <caption class="sr-only">Adult-child conversion requests</caption>
           <thead>
             <tr>
               <th>Child</th>

@@ -75,6 +75,7 @@ import { ModuleDescriptor, Tenant, TenantStatus } from '../../core/admin.models'
     } @else {
       <div class="table-wrap">
         <table>
+          <caption class="sr-only">Samaaj on this platform</caption>
           <thead>
             <tr>
               <th>Samaaj</th>

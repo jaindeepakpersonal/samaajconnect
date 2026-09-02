@@ -47,7 +47,7 @@ import {
       <div class="grid2">
         <!-- Raise one ---------------------------------------------------- -->
         <form class="card" (ngSubmit)="submit(true)">
-          <h3>Raise a social issue</h3>
+          <h2>Raise a social issue</h2>
 
           <label for="issue-title">Title</label>
           <input
@@ -126,7 +126,7 @@ import {
 
         <!-- Published ---------------------------------------------------- -->
         <div class="card">
-          <h3>Published issues</h3>
+          <h2>Published issues</h2>
 
           <label for="filter-category">Filter by category</label>
           <select
@@ -162,7 +162,7 @@ import {
 
       <!-- Mine ------------------------------------------------------------ -->
       <div class="card mine">
-        <h3>My submissions</h3>
+        <h2>My submissions</h2>
 
         @if (error(); as message) {
           <div class="notice error" role="alert">

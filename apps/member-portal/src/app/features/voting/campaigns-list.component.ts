@@ -54,7 +54,7 @@ import { Campaign, stageLabel } from './voting.models';
           <div class="grid">
             @for (campaign of current(); track campaign.id) {
               <div class="card">
-                <h3>{{ campaign.title }}</h3>
+                <h2>{{ campaign.title }}</h2>
 
                 @if (campaign.description; as description) {
                   <p>{{ description }}</p>
@@ -88,7 +88,7 @@ import { Campaign, stageLabel } from './voting.models';
           <div class="grid">
             @for (campaign of past(); track campaign.id) {
               <div class="card">
-                <h3>{{ campaign.title }}</h3>
+                <h2>{{ campaign.title }}</h2>
                 <div class="badges">
                   <span class="pill" [class]="pillClass(campaign)">{{ stage(campaign) }}</span>
                 </div>

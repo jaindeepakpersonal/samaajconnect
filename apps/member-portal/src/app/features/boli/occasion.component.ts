@@ -46,7 +46,7 @@ import { Boli, OccasionDetail, OccasionStatusLabels } from './boli.models';
           <div class="grid">
             @for (lot of found.boli; track lot.id) {
               <div class="card" [class.mine]="leading(lot)">
-                <h3>{{ lot.title }}</h3>
+                <h2>{{ lot.title }}</h2>
                 <p class="small">{{ lot.boliTypeName }}</p>
 
                 @if (lot.highestAmount === null) {

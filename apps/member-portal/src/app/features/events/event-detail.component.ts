@@ -57,7 +57,7 @@ import { SamaajEvent } from './events.models';
         <div class="grid2">
           <!-- Details --------------------------------------------------- -->
           <div class="card">
-            <h3>Details</h3>
+            <h2>Details</h2>
 
             @if (found.description; as description) {
               <p class="event-body">{{ description }}</p>
@@ -129,7 +129,7 @@ import { SamaajEvent } from './events.models';
 
           <!-- Your status ----------------------------------------------- -->
           <div class="card">
-            <h3>Your status</h3>
+            <h2>Your status</h2>
 
             <p>
               <span class="pill" [class]="statusClass(found)">{{ statusLabel(found) }}</span>

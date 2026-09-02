@@ -65,7 +65,7 @@ import { VolunteerGroup } from './groups.models';
         <div class="grid">
           @for (group of groups(); track group.id) {
             <div class="card">
-              <h3>{{ group.name }}</h3>
+              <h2>{{ group.name }}</h2>
 
               <p>
                 {{ group.memberCount }}

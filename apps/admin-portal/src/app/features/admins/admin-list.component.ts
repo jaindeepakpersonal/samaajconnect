@@ -49,6 +49,7 @@ import { AdminUser, Role } from '../../core/admin.models';
     } @else {
       <div class="table-wrap">
         <table>
+          <caption class="sr-only">Administrators, their roles and when they last signed in</caption>
           <thead>
             <tr>
               <th>Admin</th>

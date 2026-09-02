@@ -58,7 +58,7 @@ import {
         <div class="grid2">
           <!-- The household ---------------------------------------------- -->
           <div class="card">
-            <h3>Your household</h3>
+            <h2>Your household</h2>
 
             <div class="badges">
               @if (household.viewerIsHead) {
@@ -93,7 +93,7 @@ import {
           <!-- The code, or the queue ------------------------------------- -->
           <div class="card">
             @if (household.viewerIsHead) {
-              <h3>Invite someone</h3>
+              <h2>Invite someone</h2>
 
               <!-- Present only for the head: it is the token anyone needs to
                    request to join, so handing it to every member would let any
@@ -111,7 +111,7 @@ import {
                 channel - so the code is passed on in person.
               </p>
 
-              <h3>Requests to join</h3>
+              <h2>Requests to join</h2>
 
               @if (pendingRequests(household).length === 0) {
                 <p class="small">Nobody is waiting.</p>
@@ -149,7 +149,7 @@ import {
                 }
               }
             } @else {
-              <h3>Your household</h3>
+              <h2>Your household</h2>
               <p class="small">
                 Only the family head can invite people or decide requests to join.
               </p>
@@ -164,7 +164,7 @@ import {
         <div class="grid">
           @for (child of children(); track child.id) {
             <div class="card">
-              <h3>{{ child.fullName }}</h3>
+              <h2>{{ child.fullName }}</h2>
               <p>{{ date(child.dateOfBirth) }} • Age {{ child.age }}</p>
 
               @if (child.status === 'Converted') {
@@ -222,7 +222,7 @@ import {
           <!-- Add a child ------------------------------------------------ -->
           @if (household.viewerIsHead) {
             <div class="card">
-              <h3>Add a child</h3>
+              <h2>Add a child</h2>
 
               @if (!addingChild()) {
                 <p class="small">Create a child profile linked to this household.</p>
@@ -300,7 +300,7 @@ import {
         <!-- No household yet ------------------------------------------- -->
         <div class="grid2">
           <div class="card">
-            <h3>Start a household</h3>
+            <h2>Start a household</h2>
             <p class="small">
               You become its head, and get a code to give to the rest of your family.
             </p>
@@ -317,7 +317,7 @@ import {
           </div>
 
           <div class="card">
-            <h3>Join a household</h3>
+            <h2>Join a household</h2>
             <form (ngSubmit)="join()">
               <label for="family-code">Family code</label>
               <input

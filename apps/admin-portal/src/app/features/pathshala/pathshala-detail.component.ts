@@ -66,13 +66,14 @@ import { isNotFound } from '../../core/http-status';
 
       <!-- Sessions ------------------------------------------------------- -->
       <div class="card">
-        <h3>Academic sessions</h3>
+        <h2>Academic sessions</h2>
 
         @if (school.sessions.length === 0) {
           <p class="empty">None yet. Open one to start creating classes.</p>
         } @else {
           <div class="table-wrap">
             <table>
+              <caption class="sr-only">Academic sessions</caption>
               <thead>
                 <tr><th>Session</th><th>Runs</th><th></th></tr>
               </thead>
@@ -134,13 +135,14 @@ import { isNotFound } from '../../core/http-status';
 
       <!-- Classes -------------------------------------------------------- -->
       <div class="card spaced">
-        <h3>Classes</h3>
+        <h2>Classes</h2>
 
         @if (school.classes.length === 0) {
           <p class="empty">No classes yet.</p>
         } @else {
           <div class="table-wrap">
             <table>
+              <caption class="sr-only">Classes in this Pathshala</caption>
               <thead>
                 <tr><th>Class</th><th>Session</th><th>Room</th><th>Students</th><th>Teachers</th></tr>
               </thead>
@@ -188,7 +190,7 @@ import { isNotFound } from '../../core/http-status';
 
       <!-- Placement queue ------------------------------------------------ -->
       <div class="card spaced">
-        <h3>Waiting for a place</h3>
+        <h2>Waiting for a place</h2>
 
         @if (requests().length === 0) {
           <p class="empty">
@@ -202,6 +204,7 @@ import { isNotFound } from '../../core/http-status';
 
           <div class="table-wrap">
             <table>
+              <caption class="sr-only">Children waiting for a place</caption>
               <thead>
                 <tr><th>Child</th><th>Asked</th><th>Class</th><th></th></tr>
               </thead>
@@ -259,32 +262,45 @@ import { isNotFound } from '../../core/http-status';
       <!-- Standing it down ----------------------------------------------- -->
       @if (school.status === 'Active') {
         <div class="card spaced">
-          <h3>Stand this Pathshala down</h3>
+          <h2>Stand this Pathshala down</h2>
+
+          <p class="small">
+            Records are kept and enrolments stop. Use this when a Samaaj closes a Pathshala
+            rather than when a session ends — a session ending is just the next one opening.
+          </p>
+
+          <!--
+            The trigger stays, and stays enabled, while the confirmation is
+            open. Replacing or disabling it destroys the focused element and
+            drops a keyboard user to the body (WCAG 2.4.3).
+          -->
+          <button
+            class="btn alt"
+            type="button"
+            [disabled]="busy()"
+            [attr.aria-expanded]="deactivating()"
+            (click)="deactivating.set(true)"
+          >
+            Stand down…
+          </button>
 
           @if (deactivating()) {
-            <p class="notice">
-              <b>{{ school.name }}</b> will stop taking enrolments. Every session, class,
-              register and exam result is kept — a Pathshala that closed still taught the
-              children who attended it, and a Samaaj asked what its attendance was that year has
-              to be able to answer. This cannot be undone from this panel.
-            </p>
-            <div class="row-actions">
-              <button class="btn" type="button" [disabled]="busy()" (click)="deactivate()">
-                Stand it down
-              </button>
-              <button class="btn alt" type="button" (click)="deactivating.set(false)">
-                Keep it running
-              </button>
+            <div class="notice" role="status">
+              <p>
+                <b>{{ school.name }}</b> will stop taking enrolments. Every session, class,
+                register and exam result is kept — a Pathshala that closed still taught the
+                children who attended it, and a Samaaj asked what its attendance was that year
+                has to be able to answer. This cannot be undone from this panel.
+              </p>
+              <div class="row-actions">
+                <button class="btn" type="button" [disabled]="busy()" (click)="deactivate()">
+                  Stand it down
+                </button>
+                <button class="btn alt" type="button" (click)="deactivating.set(false)">
+                  Keep it running
+                </button>
+              </div>
             </div>
-          } @else {
-            <p class="small">
-              Records are kept and enrolments stop. Use this when a Samaaj closes a Pathshala
-              rather than when a session ends — a session ending is just the next one opening.
-            </p>
-            <button class="btn alt" type="button" [disabled]="busy()"
-              (click)="deactivating.set(true)">
-              Stand down…
-            </button>
           }
         </div>
       }

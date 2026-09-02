@@ -70,7 +70,7 @@ type Mark = AttendanceStatus | '';
 
       <!-- Teachers -------------------------------------------------------- -->
       <div class="card spaced">
-        <h3>Teachers</h3>
+        <h2>Teachers</h2>
 
         @if (subject.teacherMemberIds.length === 0) {
           <p class="empty">
@@ -114,7 +114,7 @@ type Mark = AttendanceStatus | '';
 
       <!-- Timetable ------------------------------------------------------- -->
       <div class="card spaced">
-        <h3>Timetable</h3>
+        <h2>Timetable</h2>
 
         @if (subject.schedule.length === 0) {
           <p class="empty">No weekly slots yet.</p>
@@ -159,7 +159,7 @@ type Mark = AttendanceStatus | '';
 
       <!-- Register -------------------------------------------------------- -->
       <div class="card spaced">
-        <h3>Register</h3>
+        <h2>Register</h2>
 
         @if (roll().length === 0) {
           <p class="empty">Nobody is on the roll, so there is no register to mark.</p>
@@ -188,6 +188,7 @@ type Mark = AttendanceStatus | '';
 
             <div class="table-wrap">
               <table>
+                <caption class="sr-only">The register for the chosen date</caption>
                 <thead>
                   <tr><th>Child</th><th>Mark</th></tr>
                 </thead>
@@ -231,7 +232,7 @@ type Mark = AttendanceStatus | '';
 
       <!-- Roll ------------------------------------------------------------ -->
       <div class="card spaced">
-        <h3>Roll</h3>
+        <h2>Roll</h2>
 
         @if (roll().length === 0) {
           <p class="empty">
@@ -241,6 +242,7 @@ type Mark = AttendanceStatus | '';
         } @else {
           <div class="table-wrap">
             <table>
+              <caption class="sr-only">Children on this class's roll</caption>
               <thead>
                 <tr><th>Child</th><th>Status</th><th></th></tr>
               </thead>
@@ -274,7 +276,7 @@ type Mark = AttendanceStatus | '';
 
       <!-- Exams ----------------------------------------------------------- -->
       <div class="card spaced">
-        <h3>Exams</h3>
+        <h2>Exams</h2>
 
         @if (exams().length === 0) {
           <p class="empty">No exams set for this class.</p>
@@ -287,6 +289,7 @@ type Mark = AttendanceStatus | '';
 
               <div class="table-wrap">
                 <table>
+                  <caption class="sr-only">Exam results</caption>
                   <thead>
                     <tr><th>Child</th><th>Score</th><th>Grade</th><th></th></tr>
                   </thead>

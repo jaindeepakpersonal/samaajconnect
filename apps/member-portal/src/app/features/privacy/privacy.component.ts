@@ -68,7 +68,7 @@ import {
 
         <div class="grid2">
           <div class="card">
-            <h3>What was erased</h3>
+            <h2>What was erased</h2>
             <ul>
               @for (item of done.whatWasErased; track item) {
                 <li>{{ item }}</li>
@@ -77,7 +77,7 @@ import {
           </div>
 
           <div class="card">
-            <h3>What is kept, and why</h3>
+            <h2>What is kept, and why</h2>
             <ul>
               @for (item of done.whatIsKeptAndWhy; track item) {
                 <li>{{ item }}</li>
@@ -109,7 +109,7 @@ import {
         <div class="grid">
           @for (item of purposes(); track item.purpose) {
             <div class="card">
-              <h3>{{ item.title }}</h3>
+              <h2>{{ item.title }}</h2>
               <p class="small">{{ item.description }}</p>
 
               <div class="badges">
@@ -170,7 +170,7 @@ import {
 
         @if (identity(); as held)  {
           <div class="card">
-            <h3>What is done with it</h3>
+            <h2>What is done with it</h2>
             <ul>
               @for (purpose of held.processingPurposes; track purpose.purpose) {
                 <li><b>{{ purpose.title }}</b> — {{ purpose.description }}</li>
@@ -225,7 +225,7 @@ import {
           </div>
         } @else {
           <div class="card">
-            <h3>Confirm with your password</h3>
+            <h2>Confirm with your password</h2>
             <p class="small">
               We ask so that an irreversible action is a deliberate one, and so that it is
               you making it.

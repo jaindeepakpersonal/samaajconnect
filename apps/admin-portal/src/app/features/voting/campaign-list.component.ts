@@ -61,7 +61,7 @@ import { isNotFound } from '../../core/http-status';
       <p class="empty" role="status">Loading…</p>
     } @else {
       <div class="card">
-        <h3>Campaigns</h3>
+        <h2>Campaigns</h2>
 
         @if (campaigns().length === 0) {
           <p class="empty">
@@ -71,6 +71,7 @@ import { isNotFound } from '../../core/http-status';
         } @else {
           <div class="table-wrap">
             <table>
+              <caption class="sr-only">Voting campaigns</caption>
               <thead>
                 <tr>
                   <th>Campaign</th><th>Nominations</th><th>Voting</th>
@@ -122,7 +123,7 @@ import { isNotFound } from '../../core/http-status';
 
       <!-- Create --------------------------------------------------------- -->
       <div class="card spaced">
-        <h3>Set up a campaign</h3>
+        <h2>Set up a campaign</h2>
 
         <form (ngSubmit)="create()">
           <label for="campaign-title">Title</label>

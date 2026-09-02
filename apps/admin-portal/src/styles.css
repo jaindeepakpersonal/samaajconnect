@@ -115,8 +115,14 @@ h3 {
   padding: var(--space-4);
 }
 
+/* Card titles are h2 (the page h1 is the screen). A sub-heading inside a card
+   stays an h3, which is why both are styled the same here: the level says where
+   it sits in the document, not how big it is - so both are given the size an h3
+   rendered at before, and this change is invisible on screen. */
+.card h2,
 .card h3 {
   margin: 0 0 var(--space-2);
+  font-size: 1.17em;
 }
 
 .grid {

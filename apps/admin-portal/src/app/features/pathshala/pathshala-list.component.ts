@@ -55,7 +55,7 @@ import { Pathshala } from '../../core/admin.models';
       <div class="grid">
         @for (item of pathshalas(); track item.id) {
           <div class="card">
-            <h3>{{ item.name }}</h3>
+            <h2>{{ item.name }}</h2>
 
             @if (item.address) {
               <p class="muted">{{ item.address }}</p>
@@ -90,7 +90,7 @@ import { Pathshala } from '../../core/admin.models';
 
       @if (canCreate()) {
         <div class="card spaced">
-          <h3>Create a Pathshala</h3>
+          <h2>Create a Pathshala</h2>
           <p class="small">
             The master record belongs to the platform, which is why this is here and not on a
             Samaaj administrator's screen. Everything about running it — sessions, classes,

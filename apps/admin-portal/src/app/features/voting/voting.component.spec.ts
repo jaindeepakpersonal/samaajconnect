@@ -366,6 +366,49 @@ describe('CampaignDetailComponent', () => {
     http.expectNone(`/v1/celebrity-voting/campaigns/${CAMPAIGN_ID}/results`);
   });
 
+  it('keeps the button that opened the confirmation, and announces the panel', () => {
+    // Replacing the trigger destroys the focused element and drops a keyboard
+    // user to the body (WCAG 2.4.3); disabling it does the same. The panel is a
+    // live region so the warning is heard rather than only seen.
+    load(detail({ campaign: campaign({ status: 'Closed' }) }));
+
+    const trigger = () =>
+      [...fixture.nativeElement.querySelectorAll('button')].find(
+        (b) => (b as HTMLElement).textContent?.trim() === 'Publish the result',
+      ) as HTMLButtonElement | undefined;
+
+    expect(trigger()!.getAttribute('aria-expanded')).toBe('false');
+
+    component.confirmingPublish.set(true);
+    fixture.detectChanges();
+
+    expect(trigger()).toBeTruthy();
+    expect(trigger()!.disabled).toBe(false);
+    expect(trigger()!.getAttribute('aria-expanded')).toBe('true');
+    expect(fixture.nativeElement.querySelector('.notice[role="status"]')).toBeTruthy();
+  });
+
+  it('names the three tables it can draw', () => {
+    load(
+      detail({
+        campaign: campaign({ status: 'NominationsOpen' }),
+        candidates: [
+          candidate({ id: 'cand1', status: 'Approved' }),
+          candidate({ id: 'cand2', memberId: 'm3', status: 'Nominated' }),
+        ],
+      }),
+    );
+
+    const captions = [...fixture.nativeElement.querySelectorAll('table caption')].map((c) =>
+      (c as HTMLElement).textContent?.trim(),
+    );
+
+    expect(captions).toEqual([
+      'Candidates on the ballot',
+      'Nominations waiting for a decision',
+    ]);
+  });
+
   it('publishes once confirmed', () => {
     load(detail({ campaign: campaign({ status: 'Closed' }) }));
 

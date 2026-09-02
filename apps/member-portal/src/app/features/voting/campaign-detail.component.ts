@@ -159,7 +159,7 @@ import { Campaign, CampaignDetail, CampaignResult, Candidate, stageLabel } from 
           <div class="grid">
             @for (candidate of ballot(found); track candidate.id) {
               <div class="card" [class.mine]="isMyVote(candidate, found.campaign)">
-                <h3>{{ nameFor(candidate.memberId) }}</h3>
+                <h2>{{ nameFor(candidate.memberId) }}</h2>
                 <p>{{ candidate.category ?? 'No category given' }}</p>
 
                 @if (found.tallyVisible && candidate.votes !== null) {

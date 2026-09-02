@@ -59,7 +59,7 @@ import { GroupApplication, GroupDetail } from './groups.models';
         <div class="grid2">
           <!-- About ----------------------------------------------------- -->
           <div class="card">
-            <h3>About</h3>
+            <h2>About</h2>
 
             @if (found.group.description; as description) {
               <p class="group-body">{{ description }}</p>
@@ -106,7 +106,7 @@ import { GroupApplication, GroupDetail } from './groups.models';
 
           <!-- My application status ------------------------------------- -->
           <div class="card">
-            <h3>My application status</h3>
+            <h2>My application status</h2>
 
             <p>
               <span class="pill" [class]="standingClass(found)">{{ standing(found) }}</span>

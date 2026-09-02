@@ -68,7 +68,7 @@ import { Bid, Boli, BoliResult, BoliStatusLabels } from './boli.models';
         <div class="grid2">
           <!-- Current highest, and the form -------------------------------- -->
           <div class="card">
-            <h3>Current highest bid</h3>
+            <h2>Current highest bid</h2>
 
             @if (lot.highestAmount === null) {
               <p class="stat unknown">No bids yet</p>
@@ -137,7 +137,7 @@ import { Bid, Boli, BoliResult, BoliStatusLabels } from './boli.models';
 
           <!-- Bid history ------------------------------------------------- -->
           <div class="card">
-            <h3>Bid history</h3>
+            <h2>Bid history</h2>
 
             @if (bids().length === 0) {
               <p class="small">Nobody has bid yet.</p>

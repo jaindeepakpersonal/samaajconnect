@@ -57,7 +57,7 @@ import { Occasion, PendingResult } from '../../core/admin.models';
     } @else {
       <!-- Awaiting publication ------------------------------------------- -->
       <div class="card">
-        <h3>Results awaiting publication</h3>
+        <h2>Results awaiting publication</h2>
 
         @if (pendingUnavailable()) {
           <p class="empty">
@@ -74,6 +74,7 @@ import { Occasion, PendingResult } from '../../core/admin.models';
 
           <div class="table-wrap">
             <table>
+              <caption class="sr-only">Results recorded and waiting to be announced</caption>
               <thead>
                 <tr><th>Boli</th><th>Winning bid</th><th>Recorded</th><th></th></tr>
               </thead>
@@ -86,8 +87,28 @@ import { Occasion, PendingResult } from '../../core/admin.models';
                     <td>{{ rupees(result.amount) }}</td>
                     <td>{{ result.recordedAt | date: 'd MMM y, h:mm a' }}</td>
                     <td>
+                      <!--
+                        The trigger stays in the DOM, and enabled, when the
+                        confirmation opens. Swapping it out destroyed the focused
+                        element, which drops keyboard focus to the body and loses
+                        a keyboard user's place entirely (WCAG 2.4.3) - and
+                        disabling it instead does the same thing, because a
+                        disabled control is blurred and taken out of the tab
+                        order. Pressing it again simply re-opens what is already
+                        open.
+                      -->
+                      <button
+                        class="btn"
+                        type="button"
+                        [disabled]="busy()"
+                        [attr.aria-expanded]="confirming() === result.boliId"
+                        (click)="confirming.set(result.boliId)"
+                      >
+                        Review and publish
+                      </button>
+
                       @if (confirming() === result.boliId) {
-                        <div class="notice">
+                        <div class="notice" role="status">
                           <p>
                             Publishing {{ rupees(result.amount) }} for
                             <b>{{ result.boliTitle }}</b> announces the highest bidder as the
@@ -103,11 +124,6 @@ import { Occasion, PendingResult } from '../../core/admin.models';
                             </button>
                           </div>
                         </div>
-                      } @else {
-                        <button class="btn" type="button" [disabled]="busy()"
-                          (click)="confirming.set(result.boliId)">
-                          Review and publish
-                        </button>
                       }
                     </td>
                   </tr>
@@ -120,7 +136,7 @@ import { Occasion, PendingResult } from '../../core/admin.models';
 
       <!-- Occasions ------------------------------------------------------ -->
       <div class="card spaced">
-        <h3>Occasions</h3>
+        <h2>Occasions</h2>
 
         @if (occasions().length === 0) {
           <p class="empty">
@@ -130,6 +146,7 @@ import { Occasion, PendingResult } from '../../core/admin.models';
         } @else {
           <div class="table-wrap">
             <table>
+              <caption class="sr-only">Boli occasions</caption>
               <thead>
                 <tr><th>Occasion</th><th>Date</th><th>Status</th><th>Types</th><th>Boli</th></tr>
               </thead>

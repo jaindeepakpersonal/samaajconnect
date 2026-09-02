@@ -47,7 +47,7 @@ import { Boli, BoliResult, Occasion, OccasionStatusLabels } from './boli.models'
           <div class="grid">
             @for (lot of active(); track lot.id) {
               <div class="card" [class.mine]="lot.highestBidderIsMe">
-                <h3>{{ lot.title }}</h3>
+                <h2>{{ lot.title }}</h2>
                 <p class="small">{{ lot.boliTypeName }}</p>
 
                 @if (lot.highestAmount === null) {
@@ -91,7 +91,7 @@ import { Boli, BoliResult, Occasion, OccasionStatusLabels } from './boli.models'
           <div class="grid">
             @for (occasion of occasions(); track occasion.id) {
               <div class="card">
-                <h3>{{ occasion.title }}</h3>
+                <h2>{{ occasion.title }}</h2>
 
                 @if (occasion.description; as description) {
                   <p class="small">{{ description }}</p>

@@ -71,6 +71,7 @@ import { AuditLogEntry } from '../../core/admin.models';
     } @else {
       <div class="table-wrap">
         <table>
+          <caption class="sr-only">Audit log entries</caption>
           <thead>
             <tr>
               <th>When</th>

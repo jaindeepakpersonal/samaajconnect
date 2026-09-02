@@ -262,6 +262,27 @@ describe('PathshalaDetailComponent', () => {
     expect(text()).toContain('register and exam result is kept');
   });
 
+  it('keeps the button that opened the confirmation, and announces the panel', () => {
+    // Replacing the trigger destroys the focused element and drops a keyboard
+    // user to the body (WCAG 2.4.3); disabling it does the same.
+    load();
+
+    const trigger = () =>
+      [...fixture.nativeElement.querySelectorAll('button')].find(
+        (b) => (b as HTMLElement).textContent?.trim() === 'Stand down…',
+      ) as HTMLButtonElement | undefined;
+
+    expect(trigger()!.getAttribute('aria-expanded')).toBe('false');
+
+    component.deactivating.set(true);
+    fixture.detectChanges();
+
+    expect(trigger()).toBeTruthy();
+    expect(trigger()!.disabled).toBe(false);
+    expect(trigger()!.getAttribute('aria-expanded')).toBe('true');
+    expect(fixture.nativeElement.querySelector('.notice[role="status"]')).toBeTruthy();
+  });
+
   it('stands it down once confirmed', () => {
     load();
 

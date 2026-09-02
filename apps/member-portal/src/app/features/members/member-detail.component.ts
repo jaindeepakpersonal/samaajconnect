@@ -48,7 +48,7 @@ import { Member } from './members.models';
 
         <div class="grid2">
           <div class="card">
-            <h3>Profile</h3>
+            <h2>Profile</h2>
 
             <dl class="profile">
               <dt>Locality</dt>
@@ -72,7 +72,7 @@ import { Member } from './members.models';
           </div>
 
           <div class="card">
-            <h3>Community</h3>
+            <h2>Community</h2>
 
             <!-- The wireframe shows "Family: Shah Family" and "Volunteer
                  Group: Seva Group (President)". Neither is fetchable per
