@@ -50,5 +50,9 @@ Desktop.ini
 # is redirected; it names real members and tokens from the run.
 .smoke.log
 
+# The tenant-isolation probe writes here. Same reason as .smoke.log: it is a
+# run of a check against a local stack, not a fact about the repository.
+.probe.log
+
 # Backend test-suite output from a full run across every solution.
 .backend-tests.log
