@@ -6,7 +6,7 @@ import { describeError } from '@samaajconnect/shared';
 import { AdminApi } from '../../core/admin-api';
 import { AdminScope } from '../../core/admin-scope';
 import { Enrolment, PathshalaDetail } from '../../core/admin.models';
-import { isNotFound } from './pathshala-list.component';
+import { isNotFound } from '../../core/http-status';
 
 /**
  * One Pathshala: its sessions, its classes, and the children waiting for a

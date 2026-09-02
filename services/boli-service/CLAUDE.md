@@ -47,6 +47,7 @@ highest". Read "The guarantee" before changing anything under `Bid`.
 | `GetBidHistoryQuery` | `Members.Read` | Amounts and times. Never who bid |
 | `GetBoliResultQuery` | `Members.Read` | 404 until recorded; no winner named until published |
 | `GetPublishedResultsQuery` | `Members.Read` | Everything announced, newest first |
+| `ListPendingResultsQuery` | `Boli.PublishResults` | Recorded and not yet announced, oldest first |
 
 ## Events published
 
@@ -137,6 +138,29 @@ Boli id and reads the highest bid. Accepting a winner would let a
 recorded result name somebody who never made the highest bid, with the
 append-only bid history sitting beside it contradicting it.
 
+**The middle of the two-step workflow was unlistable, and that is the
+same bug as having no workflow.** Recording and publishing are separate
+acts, so a result sits between them — and until `ListPendingResultsQuery`
+existed, the only read that reached one was `GetBoliResultQuery`, which
+needs the Boli id you are looking for. Finding what was waiting meant
+walking every occasion, then every Boli under it, asking each for a
+result. Nothing was going to do that, so nothing did, and a result
+recorded on the day was announced only if somebody remembered it.
+
+The queue is oldest first, unlike the published list. It is a work queue,
+and the one that has been waiting longest is the one most likely to have
+been forgotten.
+
+**The pending queue names an amount and never a winner**, and its shape
+is separate from `BoliResultResponse` for exactly that reason. Adding
+`WinningMemberId` "but only for the publisher" would replace one
+invariant that is easy to keep — *one record names the winner, and only
+after publication* — with one that is not. Nothing is lost: the winner is
+read from the highest bid and is not something the publisher chooses, so
+the amount is what identifies it. It does carry `RecordedBy`, which the
+member-facing shape must not: who recorded a result is the second pair of
+eyes' business and nobody else's.
+
 **Publishing has its own permission.** `Boli.PublishResults`, separate
 from `Boli.Manage`, which the platform's authorization catalogue already
 anticipated. Both are currently granted to the same two roles, so it
@@ -188,3 +212,10 @@ path that must stay fast exactly when it is busiest. The highest is a
   Postgres. `BidIndexTests` names the mechanism; `ConcurrentBiddingTests`
   proves the behaviour; `BoliLifecycleTests` walks a Boli from announced
   to announced.
+- `scripts/smoke-through-gateway.sh` runs the same walk through YARP.
+  **This service had no gateway coverage at all until the admin screens
+  were built**, which root `CLAUDE.md` §9 asks for on every service — the
+  module key was toggled on and off around it but no Boli endpoint was
+  ever called through the gateway. Nothing had noticed, because every
+  Boli endpoint was reachable only by curl in the first place, and the
+  suite above curls the service directly.

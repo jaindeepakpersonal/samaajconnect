@@ -98,6 +98,20 @@ export const routes: Routes = [
           ),
       },
       {
+        path: 'boli',
+        title: 'Auctions / Boli - samaajconnect admin',
+        loadComponent: () =>
+          import('./features/boli/boli-list.component').then((m) => m.BoliListComponent),
+      },
+      {
+        path: 'boli/:id',
+        title: 'Occasion - samaajconnect admin',
+        loadComponent: () =>
+          import('./features/boli/occasion-detail.component').then(
+            (m) => m.OccasionDetailComponent,
+          ),
+      },
+      {
         path: 'moderation',
         title: 'Content moderation - samaajconnect admin',
         loadComponent: () =>

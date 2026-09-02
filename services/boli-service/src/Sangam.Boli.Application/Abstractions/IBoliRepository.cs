@@ -74,5 +74,24 @@ public interface IBoliRepository
     Task<IReadOnlyList<BoliResult>> ListPublishedResultsAsync(
         CancellationToken cancellationToken = default);
 
+    /// <summary>
+    /// Results recorded and not yet announced, oldest first.
+    /// </summary>
+    /// <remarks>
+    /// <b>The queue the two-step workflow implies and nothing could answer.</b>
+    /// Recording and publishing are deliberately separate acts, which means a
+    /// result can sit between them - and until now the only way to find one was
+    /// to already know its Boli id and ask for that Boli's result. A workflow
+    /// whose middle state is unlistable is a workflow that quietly loses things:
+    /// a Boli closed and recorded on the day is announced only if somebody
+    /// remembers it.
+    ///
+    /// Oldest first, unlike the published list. This is a work queue, and the
+    /// one that has been waiting longest is the one most likely to have been
+    /// forgotten.
+    /// </remarks>
+    Task<IReadOnlyList<BoliResult>> ListUnpublishedResultsAsync(
+        CancellationToken cancellationToken = default);
+
     void AddResult(BoliResult result);
 }

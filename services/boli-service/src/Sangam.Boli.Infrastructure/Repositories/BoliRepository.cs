@@ -119,5 +119,12 @@ public sealed class BoliRepository(BoliDbContext context) : IBoliRepository
             .OrderByDescending(r => r.PublishedAt)
             .ToListAsync(cancellationToken);
 
+    public async Task<IReadOnlyList<BoliResult>> ListUnpublishedResultsAsync(
+        CancellationToken cancellationToken = default) =>
+        await context.Results
+            .Where(r => r.PublishedAt == null)
+            .OrderBy(r => r.RecordedAt)
+            .ToListAsync(cancellationToken);
+
     public void AddResult(BoliResult result) => context.Results.Add(result);
 }

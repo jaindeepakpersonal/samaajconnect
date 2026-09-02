@@ -8,43 +8,44 @@ version of the plan; the reasoning behind the ordering lives in
 ## Current Status
 
 - **Stage:** every module has a service and member screens; Phase 5 hardening under way
-- **Last updated:** 2026-09-02 - **the Pathshala class screen**, and a
-  correction to the tool that has been choosing this work.
+- **Last updated:** 2026-09-02 - **Boli administration**. Members could bid on
+  nothing.
 
-  A Samaaj could enrol a child and then had no way to teach them. Teachers,
-  timetable, roll, register, exams and results were six complete, tested,
-  curl-only endpoints; the admin panel now has a class screen for all of them,
-  plus withdrawing a student.
+  Every endpoint an organiser needs - announcing an occasion, moving its status,
+  defining a Boli type, opening a Boli, closing it, recording who won,
+  announcing the result - was complete, tested and reachable only by curl, while
+  the member portal's bidding screens had been shipped for cycles against
+  auctions nobody could open. Two admin screens now cover all seven.
 
-  **Two endpoints had to be built first, and both absences were the same shape.**
-  Marking a register *amends*: anything not re-sent stays as it was. Nothing
-  could read a class's register back, so a form correcting one child would have
-  been asking a teacher to re-enter the other twenty-four from memory - and a
-  half-remembered resubmission does not fail, it just leaves the register
-  quietly wrong. Likewise, scheduling an exam answered with its id and nothing
-  ever listed them again, so an exam set last week could not be marked this
-  week. Neither gap was visible from either side alone: the write paths were
-  correct and the parents' read paths were correct. It took a screen using them
-  together.
+  **The publication queue needed an endpoint that did not exist.** Recording a
+  result and announcing it are deliberately two acts, so a result sits between
+  them - and the only read that reached one needed the Boli id you were already
+  looking for. The middle state of the platform's most careful workflow was
+  unlistable, which means a result was announced only if somebody remembered it.
+  `GET /v1/boli/results/pending` is the wireframe's "Results Awaiting
+  Publication" card, drawn a long time ago and never answerable until now. It
+  carries the amount and never a winner: boli-service names the winner in one
+  shape only, and only after publication.
 
-  **The unreachable-endpoint sweep was undercounting, and the count went up from
-  20 to 21 in the cycle that built seven screens.** It compared paths without
-  verbs, so `DELETE /pathshalas/{id}` hid behind the detail screen's `GET`, and
-  creating an event, a Boli occasion, a voting campaign and a volunteer group
-  each hid behind its own list. It also treated a path named in a doc comment,
-  or in a spec file, as a caller - and an endpoint with a test and no screen is
-  precisely what the sweep is for. All three are fixed.
+  **boli-service had no gateway smoke coverage at all**, which root `CLAUDE.md`
+  §9 asks for on every service. Nothing had noticed, because every Boli endpoint
+  was curl-only in the first place and the integration suite curls the service
+  directly. A full lifecycle now runs through YARP.
 
-  1,353 tests green (981 backend across 21 suites, 372 frontend) plus 270 smoke
-  checks against empty volumes.
+  **Two things moved rather than being copied.** `formatRupees`/`parseRupees`
+  went to `libs/shared` because a second app finally needed them - which is the
+  documented rule firing, not an exception to it - and `isNotFound`, which had
+  reached three copies, now lives in `core/http-status.ts` beside `isForbidden`.
+
+  1,376 tests green (985 backend across 21 suites, 391 frontend) plus 294 smoke
+  checks through the gateway against empty volumes.
 - **Blocking item:** none. **Every module the platform has now has both a
   service and member screens**, and the role matrix is editable per Samaaj. What
-  is left that needs nothing from outside is the 21 unreachable endpoints listed
-  in Phase 5 - Boli, events, voting and volunteer-group administration, plus
-  deactivating a Pathshala. Beyond those, what is left needs things this
-  repository cannot
-  supply on its own: TLS and a
-  backup drill need a deployed environment, platform-hosted images need storage,
+  is left that needs nothing from outside is the 14 unreachable endpoints listed
+  in Phase 5 - events, voting and volunteer-group administration, the social
+  issues approval queue, and deactivating a Pathshala. Beyond those, what is
+  left needs things this repository cannot supply on its own: TLS and a backup
+  drill need a deployed environment, platform-hosted images need storage,
   the two remaining DPDP obligations - breach notification and the right to
   nominate - are no longer blocked on a channel but still need a real provider
   and, for s.8(6), a detection process and the Board form; and a screen-reader
@@ -491,10 +492,8 @@ unit tested.
       `services/member-family-service/CLAUDE.md`. The handler keeps its explicit
       tenant check as belt and braces for a read whose ids come from another
       service, not as a workaround
-- [ ] **21 endpoints nobody can reach from either app.** The number went *up*
-      while seven of them were being built, because the sweep itself was
-      undercounting — see the entry below. One is not a gap:
-      `GET /v1/identity/tenants/by-id/{id}` is the gateway's. The other 20 are
+- [ ] **14 endpoints nobody can reach from either app.** One is not a gap:
+      `GET /v1/identity/tenants/by-id/{id}` is the gateway's. The other 13 are
       screens nobody has built, and they cluster:
   - [x] **Pathshala administration, setting it up (5 of 13).** The Pathshala
         detail, opening a session, adding a class, the enrolment request queue
@@ -507,9 +506,12 @@ unit tested.
   - [ ] **Deactivating a Pathshala (1).** `DELETE /v1/pathshala/pathshalas/{id}`.
         It shared a path with the detail screen's `GET`, so the sweep called it
         reached until the sweep learned about verbs
-  - [ ] **Boli administration (7).** Members can bid; nobody can run an
-        auction. Creating an occasion, occasion status, Boli types, opening a
-        Boli, closing one, recording a result and publishing it
+  - [x] **Boli administration (7).** Two screens: occasions with the
+        publication queue, and an occasion's types, Boli, closing and recording.
+        Needed one new endpoint — `GET /v1/boli/results/pending`, the middle of
+        the deliberately two-step record-then-publish workflow, which nothing
+        could list. boli-service also had no gateway smoke coverage at all,
+        which root `CLAUDE.md` §9 asks for on every service
   - [ ] **Events administration (4).** Members can register; nobody can create,
         publish or cancel an event, or see who is coming
   - [ ] **Celebrity voting administration (4).** Creating a campaign, deciding a

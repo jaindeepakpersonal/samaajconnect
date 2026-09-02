@@ -7,6 +7,8 @@ import {
   AdminUser,
   AssignRoleResult,
   AuditLogEntry,
+  Boli,
+  BoliType,
   ClassExam,
   ModerationDecision,
   ModerationQueueEntry,
@@ -21,7 +23,11 @@ import {
   InviteAdminRequest,
   InviteAdminResult,
   ModuleDescriptor,
+  Occasion,
+  OccasionDetail,
+  OccasionStatus,
   PendingActivation,
+  PendingResult,
   RegisterEntry,
   RoleMatrix,
   Tenant,
@@ -291,6 +297,93 @@ export class AdminApi {
       classId,
       place,
     });
+  }
+
+  // ---- Boli --------------------------------------------------------------
+
+  listOccasions(): Observable<Occasion[]> {
+    return this.http.get<Occasion[]>('/v1/boli/occasions');
+  }
+
+  occasion(id: string): Observable<OccasionDetail> {
+    return this.http.get<OccasionDetail>(`/v1/boli/occasions/${id}`);
+  }
+
+  createOccasion(
+    title: string,
+    description: string | null,
+    occasionDate: string,
+  ): Observable<Occasion> {
+    return this.http.post<Occasion>('/v1/boli/occasions', {
+      title,
+      description,
+      occasionDate,
+    });
+  }
+
+  /** Forward only: Upcoming → Active → Closed. The service refuses backwards. */
+  moveOccasion(id: string, status: OccasionStatus): Observable<Occasion> {
+    return this.http.post<Occasion>(`/v1/boli/occasions/${id}/status`, { status });
+  }
+
+  /** A label the Samaaj reuses. One name per occasion, case-insensitively. */
+  defineBoliType(
+    occasionId: string,
+    name: string,
+    description: string | null,
+  ): Observable<BoliType> {
+    return this.http.post<BoliType>(`/v1/boli/occasions/${occasionId}/boli-types`, {
+      name,
+      description,
+    });
+  }
+
+  /**
+   * Opens a Boli for bidding.
+   *
+   * `startingAmount` and `minIncrement` are **paise**, as integers — see the
+   * note on the Boli models. Sending rupees here would be off by a factor of a
+   * hundred in a number the Samaaj collects against.
+   */
+  openBoli(
+    occasionId: string,
+    boli: {
+      boliTypeId: string;
+      title: string;
+      startAt: string;
+      endAt: string;
+      startingAmount: number;
+      minIncrement: number;
+      eligibilityRule: string | null;
+    },
+  ): Observable<Boli> {
+    return this.http.post<Boli>(`/v1/boli/occasions/${occasionId}/boli`, boli);
+  }
+
+  /** Idempotent, and it takes the bidding lock — closing races the last bids. */
+  closeBoli(boliId: string): Observable<Boli> {
+    return this.http.post<Boli>(`/v1/boli/boli/${boliId}/close`, {});
+  }
+
+  /**
+   * Records who won, from the highest bid. Not yet announced.
+   *
+   * There is no winner parameter and there must not be: the service reads the
+   * highest bid, so a recorded result cannot name somebody the append-only bid
+   * history contradicts.
+   */
+  recordBoliResult(boliId: string): Observable<unknown> {
+    return this.http.post(`/v1/boli/boli/${boliId}/result`, {});
+  }
+
+  /** Recorded and not yet announced. Needs `Boli.PublishResults`. */
+  pendingBoliResults(): Observable<PendingResult[]> {
+    return this.http.get<PendingResult[]>('/v1/boli/results/pending');
+  }
+
+  /** Announces a result. Irreversible through this API; publishing twice is safe. */
+  publishBoliResult(boliId: string): Observable<unknown> {
+    return this.http.post(`/v1/boli/boli/${boliId}/result/publish`, {});
   }
 
   /** Who is on a class's roll. Teachers of that class, and administrators. */

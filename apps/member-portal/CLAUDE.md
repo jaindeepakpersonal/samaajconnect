@@ -225,7 +225,10 @@ field the API has.
 
 **Money is integer paise on the wire and converted in exactly one place.**
 boli-service holds every amount as a `long` because a Boli is money the Samaaj
-announces and collects against. `boli.format.ts` is the only file that divides
+announces and collects against. `libs/shared`'s `money.ts` — which lived here as
+`features/boli/boli.format.ts` until the admin panel grew a screen that opens a
+Boli, and moved when a second app needed it rather than in anticipation of one
+(root `CLAUDE.md` §7) — is the only file that divides
 or multiplies by 100, and it rounds rather than truncating: `15600.07` parsed as
 a float and multiplied by 100 is `1560006.9999999998`, which truncates to a
 paisa less than the member typed. It also refuses input `parseFloat` would

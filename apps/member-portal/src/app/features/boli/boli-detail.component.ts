@@ -1,11 +1,10 @@
 import { Component, OnInit, inject, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { ActivatedRoute, RouterLink } from '@angular/router';
-import { describeError } from '@samaajconnect/shared';
+import { closesIn, describeError, formatRupees, parseRupees, toInputValue } from '@samaajconnect/shared';
 import { forkJoin, of } from 'rxjs';
 import { catchError } from 'rxjs/operators';
 import { BoliApi } from './boli.api';
-import { closesIn, formatRupees, parseRupees, toInputValue } from './boli.format';
 import { Bid, Boli, BoliResult, BoliStatusLabels } from './boli.models';
 
 /**

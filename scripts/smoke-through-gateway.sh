@@ -118,6 +118,41 @@ sign_in_super_admin() {
 
 ADMIN_TOKEN=$(sign_in_super_admin)
 
+sign_in_as() {
+  curl -s -X POST "$GATEWAY/v1/identity/login" \
+    -H 'Content-Type: application/json' \
+    -d "{\"mobileOrEmail\":\"$1\",\"password\":\"$2\"}" \
+    | json_field accessToken
+}
+
+# Re-mints every token this script holds.
+#
+# **Access tokens live fifteen minutes and this run takes longer than that.**
+# Several sections wait 62 seconds for the gateway's tenant-module cache to
+# expire, so the wall-clock cost grows every time somebody adds a module-gated
+# section - and the failure that produces is the worst kind to read: the section
+# that tipped the run past the boundary passes, and every check after it fails
+# with a 401, a 403, or a cascade of 404s that look like bugs in whichever
+# service they happened to land on. Adding the Boli section cost twenty-one such
+# failures, none of them about Boli.
+#
+# Called before the late sections rather than between every check, because a
+# token that has just been minted is not the thing under test anywhere in
+# between - the expiry behaviour itself is covered by unit tests, not here.
+refresh_tokens() {
+  ADMIN_TOKEN=$(sign_in_super_admin)
+  MEMBER_TOKEN=$(sign_in_as "$MEMBER" "$MEMBER_PASSWORD")
+
+  # These two exist only once the sections that create their accounts have run.
+  if [ -n "${INVITE_EMAIL:-}" ]; then
+    SAMAAJ_ADMIN_TOKEN=$(sign_in_as "$INVITE_EMAIL" "$MEMBER_PASSWORD")
+  fi
+
+  if [ -n "${CHILD_EMAIL:-}" ]; then
+    CHILD_TOKEN=$(sign_in_as "$CHILD_EMAIL" "$CHILD_PASSWORD")
+  fi
+}
+
 # The rate-limit section at the end of this script deliberately exhausts the
 # credential window, so a re-run inside the following minute starts against a
 # 429. Waiting it out beats failing on a condition the previous run created.
@@ -2163,6 +2198,262 @@ check "the pathshala route answers 404" 404 \
 
 check "while the timeline, on a different module, is untouched" 200 \
   "$(status -H "Authorization: Bearer $MEMBER_TOKEN" "$GATEWAY/v1/timeline/posts")"
+
+echo
+echo "Boli: an occasion, a Boli, a bid, a close, a result, an announcement"
+
+# Wrapped in a function so a missing id can `return` instead of `exit`.
+# Aborting the run here would take the three sections after it with it, and
+# they have nothing to do with Boli - but carrying on past an id that came
+# back empty is how one broken extraction turns into forty checks blaming
+# somebody else's service, which is the failure this script already has an
+# open item about.
+boli_checks() {
+  refresh_tokens
+
+
+  # boli-service had no gateway coverage at all until now, which root CLAUDE.md
+  # section 9 asks for on every service - a route that works in isolation but is
+  # not wired into the gateway is the failure mode this whole script exists for.
+  #
+  # SAMAAJ_ADMIN_TOKEN throughout, not ADMIN_TOKEN. The platform Super Admin holds
+  # no Samaaj, so a module-gated route refuses their request before it reaches any
+  # service - "reached without a resolved Samaaj". Only the two module toggles are
+  # theirs, and those carry the override header.
+  #
+  # This block sits here rather than at the end of the file, which was tried and
+  # does not work: by the time the rate-limiting section has finished, MEMBER_TOKEN
+  # and ADMIN_TOKEN have expired and eleven checks fail with 401 for a reason that
+  # has nothing to do with Boli.
+  check "switching the boli module on" 200 \
+    "$(status -X PUT "$GATEWAY/v1/identity/tenants/$TENANT_ID/modules" \
+       -H 'Content-Type: application/json' -H "Authorization: Bearer $ADMIN_TOKEN" -H "$ADMIN_TENANT_HEADER" \
+       -d '{"enabledModules":["community","boli"]}')"
+
+  sleep 62
+
+  OCCASION=$(curl -s -X POST "$GATEWAY/v1/boli/occasions" \
+    -H 'Content-Type: application/json' -H "Authorization: Bearer $SAMAAJ_ADMIN_TOKEN" \
+    -d '{"title":"Paryushan 2026","description":null,"occasionDate":"2026-09-10"}')
+
+  OCCASION_ID=$(printf '%s' "$OCCASION" | json_field id)
+
+  if [ -n "$OCCASION_ID" ]; then
+    echo "  ok    a Samaaj Admin announces an occasion"
+    pass=$((pass + 1))
+  else
+    echo "  FAIL  announcing an occasion (got '$OCCASION')"
+    fail=$((fail + 1))
+    return 1
+  fi
+
+  check "a member cannot announce one" 403 \
+    "$(status -X POST "$GATEWAY/v1/boli/occasions" -H 'Content-Type: application/json' \
+       -H "Authorization: Bearer $MEMBER_TOKEN" \
+       -d '{"title":"Mine","description":null,"occasionDate":"2026-09-10"}')"
+
+  BOLI_TYPE=$(curl -s -X POST "$GATEWAY/v1/boli/occasions/$OCCASION_ID/boli-types" \
+    -H 'Content-Type: application/json' -H "Authorization: Bearer $SAMAAJ_ADMIN_TOKEN" \
+    -d '{"name":"Mangal Deep","description":null}')
+
+  BOLI_TYPE_ID=$(printf '%s' "$BOLI_TYPE" | json_field id)
+
+  if [ -n "$BOLI_TYPE_ID" ] && [ "$BOLI_TYPE_ID" != "$OCCASION_ID" ]; then
+    echo "  ok    and defines a Boli type with an id of its own"
+    pass=$((pass + 1))
+  else
+    echo "  FAIL  the Boli type id is wrong (got '$BOLI_TYPE_ID')"
+    fail=$((fail + 1))
+    return 1
+  fi
+
+  check "the same name twice is refused, whatever the capitalisation" 409 \
+    "$(status -X POST "$GATEWAY/v1/boli/occasions/$OCCASION_ID/boli-types" \
+       -H 'Content-Type: application/json' -H "Authorization: Bearer $SAMAAJ_ADMIN_TOKEN" \
+       -d '{"name":"mangal deep","description":null}')"
+
+  # Amounts are paise. Rs 1,000 floor and a Rs 500 increment.
+  BOLI=$(curl -s -X POST "$GATEWAY/v1/boli/occasions/$OCCASION_ID/boli" \
+    -H 'Content-Type: application/json' -H "Authorization: Bearer $SAMAAJ_ADMIN_TOKEN" \
+    -d "{\"boliTypeId\":\"$BOLI_TYPE_ID\",\"title\":\"Mangal Deep - first day\",
+         \"startAt\":\"$(date -u -d '-5 minutes' +%Y-%m-%dT%H:%M:%SZ)\",
+         \"endAt\":\"$(date -u -d '+2 hours' +%Y-%m-%dT%H:%M:%SZ)\",
+         \"startingAmount\":100000,\"minIncrement\":50000,
+         \"eligibilityRule\":\"One per family.\"}")
+
+  BOLI_ID=$(printf '%s' "$BOLI" | json_field id)
+
+  if [ -n "$BOLI_ID" ] && [ "$BOLI_ID" != "$OCCASION_ID" ]; then
+    echo "  ok    and opens a Boli against it"
+    pass=$((pass + 1))
+  else
+    echo "  FAIL  opening a Boli (got '$BOLI')"
+    fail=$((fail + 1))
+    return 1
+  fi
+
+  # 200 with accepted:false, not a 409, and this check originally got that
+  # wrong. Not clearing the bar is the same case as being outbid - the floor is
+  # simply what the bar is before anyone has bid - and boli-service answers both
+  # as success carrying the amount now needed. A 409 would be telling a bidder
+  # off for offering too little, which is a thing bidders do.
+  LOW_BID=$(curl -s -X POST "$GATEWAY/v1/boli/boli/$BOLI_ID/bids" \
+    -H 'Content-Type: application/json' -H "Authorization: Bearer $MEMBER_TOKEN" \
+    -d '{"amount":50000}')
+
+  if printf '%s' "$LOW_BID" | grep -q '"accepted":false' \
+     && printf '%s' "$LOW_BID" | grep -q '"minimumNextBid":100000'; then
+    echo "  ok    a bid below the floor is answered with the floor, not refused"
+    pass=$((pass + 1))
+  else
+    echo "  FAIL  a below-floor bid was not answered properly (got '$LOW_BID')"
+    fail=$((fail + 1))
+  fi
+
+  FIRST_BID=$(curl -s -X POST "$GATEWAY/v1/boli/boli/$BOLI_ID/bids" \
+    -H 'Content-Type: application/json' -H "Authorization: Bearer $MEMBER_TOKEN" \
+    -d '{"amount":100000}')
+
+  if printf '%s' "$FIRST_BID" | grep -q '"accepted":true'; then
+    echo "  ok    a member bids the floor"
+    pass=$((pass + 1))
+  else
+    echo "  FAIL  the first bid was not accepted (got '$FIRST_BID')"
+    fail=$((fail + 1))
+  fi
+
+  # Being outbid is success with accepted:false, not a 409. Somebody whose form
+  # was open while another bid landed has not done anything wrong.
+  OUTBID=$(curl -s -X POST "$GATEWAY/v1/boli/boli/$BOLI_ID/bids" \
+    -H 'Content-Type: application/json' -H "Authorization: Bearer $CHILD_TOKEN" \
+    -d '{"amount":120000}')
+
+  if printf '%s' "$OUTBID" | grep -q '"accepted":false'; then
+    echo "  ok    and a bid under the next increment is answered, not refused"
+    pass=$((pass + 1))
+  else
+    echo "  FAIL  an under-increment bid was not reported as unaccepted (got '$OUTBID')"
+    fail=$((fail + 1))
+  fi
+
+  WINNING=$(curl -s -X POST "$GATEWAY/v1/boli/boli/$BOLI_ID/bids" \
+    -H 'Content-Type: application/json' -H "Authorization: Bearer $CHILD_TOKEN" \
+    -d '{"amount":150000}')
+
+  if printf '%s' "$WINNING" | grep -q '"accepted":true'; then
+    echo "  ok    a clearing bid takes the lead"
+    pass=$((pass + 1))
+  else
+    echo "  FAIL  the clearing bid was not accepted (got '$WINNING')"
+    fail=$((fail + 1))
+  fi
+
+  # The history is amounts and times. Who bid what, while a Boli is open, turns an
+  # auction into a statement about people's means.
+  HISTORY=$(curl -s -H "Authorization: Bearer $MEMBER_TOKEN" \
+    "$GATEWAY/v1/boli/boli/$BOLI_ID/bids")
+
+  if printf '%s' "$HISTORY" | grep -q '"amount":150000' \
+     && ! printf '%s' "$HISTORY" | grep -q 'memberId'; then
+    echo "  ok    the bid history carries amounts and never a bidder"
+    pass=$((pass + 1))
+  else
+    echo "  FAIL  the bid history is the wrong shape (got '$HISTORY')"
+    fail=$((fail + 1))
+  fi
+
+  check "a result cannot be recorded while bidding is open" 409 \
+    "$(status -X POST "$GATEWAY/v1/boli/boli/$BOLI_ID/result" \
+       -H "Authorization: Bearer $SAMAAJ_ADMIN_TOKEN")"
+
+  check "the Samaaj Admin closes the Boli" 200 \
+    "$(status -X POST "$GATEWAY/v1/boli/boli/$BOLI_ID/close" \
+       -H "Authorization: Bearer $SAMAAJ_ADMIN_TOKEN")"
+
+  check "and closing again is safe rather than an error" 200 \
+    "$(status -X POST "$GATEWAY/v1/boli/boli/$BOLI_ID/close" \
+       -H "Authorization: Bearer $SAMAAJ_ADMIN_TOKEN")"
+
+  RECORDED=$(curl -s -X POST "$GATEWAY/v1/boli/boli/$BOLI_ID/result" \
+    -H "Authorization: Bearer $SAMAAJ_ADMIN_TOKEN")
+
+  # The amount is the highest bid, and the winner is absent - for everybody,
+  # including the manager who just recorded it.
+  if printf '%s' "$RECORDED" | grep -q '"amount":150000' \
+     && printf '%s' "$RECORDED" | grep -q '"winningMemberId":null'; then
+    echo "  ok    the result is recorded from the highest bid, naming nobody"
+    pass=$((pass + 1))
+  else
+    echo "  FAIL  the recorded result is the wrong shape (got '$RECORDED')"
+    fail=$((fail + 1))
+  fi
+
+  # The queue that had no endpoint until this cycle: the middle state of a
+  # deliberately two-step workflow, which nothing could list.
+  PENDING=$(curl -s -H "Authorization: Bearer $SAMAAJ_ADMIN_TOKEN" "$GATEWAY/v1/boli/results/pending")
+
+  if printf '%s' "$PENDING" | grep -q "$BOLI_ID"; then
+    echo "  ok    and it appears in the publication queue"
+    pass=$((pass + 1))
+  else
+    echo "  FAIL  the recorded result is not in the queue (got '$PENDING')"
+    fail=$((fail + 1))
+  fi
+
+  check "which a member may not read" 403 \
+    "$(status -H "Authorization: Bearer $MEMBER_TOKEN" "$GATEWAY/v1/boli/results/pending")"
+
+  check "the result is announced" 200 \
+    "$(status -X POST "$GATEWAY/v1/boli/boli/$BOLI_ID/result/publish" \
+       -H "Authorization: Bearer $SAMAAJ_ADMIN_TOKEN")"
+
+  check "and announcing twice is safe" 200 \
+    "$(status -X POST "$GATEWAY/v1/boli/boli/$BOLI_ID/result/publish" \
+       -H "Authorization: Bearer $SAMAAJ_ADMIN_TOKEN")"
+
+  PUBLISHED=$(curl -s -H "Authorization: Bearer $MEMBER_TOKEN" \
+    "$GATEWAY/v1/boli/boli/$BOLI_ID/result")
+
+  if printf '%s' "$PUBLISHED" | grep -q '"isPublished":true' \
+     && ! printf '%s' "$PUBLISHED" | grep -q '"winningMemberId":null'; then
+    echo "  ok    only now does the result name its winner"
+    pass=$((pass + 1))
+  else
+    echo "  FAIL  the published result did not name a winner (got '$PUBLISHED')"
+    fail=$((fail + 1))
+  fi
+
+  AFTER=$(curl -s -H "Authorization: Bearer $SAMAAJ_ADMIN_TOKEN" "$GATEWAY/v1/boli/results/pending")
+
+  if [ "$AFTER" = "[]" ]; then
+    echo "  ok    and the queue is empty again"
+    pass=$((pass + 1))
+  else
+    echo "  FAIL  the announced result is still queued (got '$AFTER')"
+    fail=$((fail + 1))
+  fi
+
+  # A correction after publication is a distinct audited workflow, not a second
+  # record.
+  check "re-recording after publication is refused" 409 \
+    "$(status -X POST "$GATEWAY/v1/boli/boli/$BOLI_ID/result" \
+       -H "Authorization: Bearer $SAMAAJ_ADMIN_TOKEN")"
+
+  check "switching the boli module off" 200 \
+    "$(status -X PUT "$GATEWAY/v1/identity/tenants/$TENANT_ID/modules" \
+       -H 'Content-Type: application/json' -H "Authorization: Bearer $ADMIN_TOKEN" -H "$ADMIN_TENANT_HEADER" \
+       -d '{"enabledModules":["community"]}')"
+
+  sleep 62
+
+  check "the boli route then answers 404" 404 \
+    "$(status -H "Authorization: Bearer $MEMBER_TOKEN" "$GATEWAY/v1/boli/occasions")"
+}
+
+boli_checks || echo "  ..    the rest of the Boli checks were skipped"
+
+# The section above spends two minutes waiting out the module cache twice over.
+refresh_tokens
 
 echo
 echo "Step-up: taking a Samaaj out of service re-asks for the password"

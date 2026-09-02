@@ -4,6 +4,7 @@ import { FormsModule } from '@angular/forms';
 import { AuthService, describeError } from '@samaajconnect/shared';
 import { AdminApi } from '../../core/admin-api';
 import { AdminScope } from '../../core/admin-scope';
+import { isNotFound } from '../../core/http-status';
 import { ModerationDecision, ModerationQueueEntry } from '../../core/admin.models';
 
 /**
@@ -330,9 +331,4 @@ export class ModerationQueueComponent implements OnInit {
       },
     });
   }
-}
-
-function isNotFound(failure: unknown): boolean {
-  return typeof failure === 'object' && failure !== null && 'status' in failure
-    && (failure as { status: unknown }).status === 404;
 }

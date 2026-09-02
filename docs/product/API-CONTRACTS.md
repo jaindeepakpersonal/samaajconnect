@@ -254,6 +254,7 @@ the resource under it, the same shape as `/v1/pathshala/pathshalas`.
 | GET | `/boli/{id}/result` | `Members.Read` | 404 until recorded; names no winner until published |
 | POST | `/boli/{id}/result/publish` | `Boli.PublishResults` | Publish. Idempotent, and irreversible here |
 | GET | `/results` | `Members.Read` | Everything announced, newest first |
+| GET | `/results/pending` | `Boli.PublishResults` | Recorded and not yet announced, oldest first. Carries the amount and `recordedBy`, never a winner |
 
 Amounts are integers in paise. A Boli is money, and a floating-point
 field accumulates error that shows up as a winning bid a rupee off what

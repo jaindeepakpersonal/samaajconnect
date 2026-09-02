@@ -345,3 +345,87 @@ export interface Enrolment {
   readonly requestedAt: string;
   readonly enrolledAt: string | null;
 }
+
+// ---- Boli ----------------------------------------------------------------
+
+/**
+ * Amounts below are in **paise**, as integers, exactly as boli-service holds
+ * them. `formatRupees` and `parseRupees` in `libs/shared` are the only place
+ * this app converts — a Boli is money the Samaaj announces and collects
+ * against, and a floating-point rupee accumulates error that shows up as a
+ * winning bid a rupee off what somebody actually offered.
+ */
+
+/** Forward-only: Upcoming → Active → Closed. The service refuses backwards. */
+export type OccasionStatus = 'Upcoming' | 'Active' | 'Closed';
+
+export type BoliStatus = 'Scheduled' | 'Open' | 'Closed' | 'ResultPublished';
+
+/** Mirrors `OccasionResponse` — the list card. */
+export interface Occasion {
+  readonly id: string;
+  readonly title: string;
+  readonly description: string | null;
+  readonly occasionDate: string;
+  readonly status: OccasionStatus;
+  readonly typeCount: number;
+  readonly boliCount: number;
+}
+
+/** Mirrors `BoliTypeResponse`. Nobody bids on a type; it is a label reused. */
+export interface BoliType {
+  readonly id: string;
+  readonly name: string;
+  readonly description: string | null;
+}
+
+/** Mirrors `BoliResponse` — one item being bid for. */
+export interface Boli {
+  readonly id: string;
+  readonly occasionId: string;
+  readonly boliTypeId: string;
+  readonly boliTypeName: string;
+  readonly title: string;
+  readonly startAt: string;
+  readonly endAt: string;
+  readonly startingAmount: number;
+  readonly minIncrement: number;
+  readonly eligibilityRule: string | null;
+  readonly status: BoliStatus;
+
+  /** Taking bids right now: the status says so *and* the clock agrees. */
+  readonly acceptsBids: boolean;
+  readonly highestAmount: number | null;
+  readonly minimumNextBid: number;
+  readonly highestBidderIsMe: boolean;
+  readonly bidCount: number;
+}
+
+/** Mirrors `OccasionDetailResponse`. */
+export interface OccasionDetail {
+  readonly id: string;
+  readonly title: string;
+  readonly description: string | null;
+  readonly occasionDate: string;
+  readonly status: OccasionStatus;
+  readonly types: readonly BoliType[];
+  readonly boli: readonly Boli[];
+}
+
+/**
+ * Mirrors `PendingResultResponse` — a result recorded and not yet announced.
+ *
+ * **No winner, deliberately.** boli-service names the winner in exactly one
+ * shape and only once `publishedAt` is set, for everybody including the manager
+ * who recorded it. The amount is what identifies the winning bid, and the
+ * winner is not something the publisher chooses — `RecordResultCommand` reads
+ * the highest bid and takes no winner parameter.
+ */
+export interface PendingResult {
+  readonly boliId: string;
+  readonly boliTitle: string;
+  readonly occasionId: string;
+  readonly amount: number;
+  readonly recordedBy: string;
+  readonly recordedAt: string;
+}

@@ -11,7 +11,7 @@ import {
   PathshalaClass,
   RegisterEntry,
 } from '../../core/admin.models';
-import { isNotFound } from './pathshala-list.component';
+import { isNotFound } from '../../core/http-status';
 
 /** What the register form holds for one child: a mark, or no mark at all. */
 type Mark = AttendanceStatus | '';

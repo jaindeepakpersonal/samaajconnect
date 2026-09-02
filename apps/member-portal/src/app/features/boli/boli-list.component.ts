@@ -1,10 +1,9 @@
 import { Component, OnInit, computed, inject, signal } from '@angular/core';
 import { RouterLink } from '@angular/router';
-import { describeError } from '@samaajconnect/shared';
+import { closesIn, describeError, formatRupees } from '@samaajconnect/shared';
 import { forkJoin, of } from 'rxjs';
 import { catchError } from 'rxjs/operators';
 import { BoliApi } from './boli.api';
-import { closesIn, formatRupees } from './boli.format';
 import { Boli, BoliResult, Occasion, OccasionStatusLabels } from './boli.models';
 
 /**

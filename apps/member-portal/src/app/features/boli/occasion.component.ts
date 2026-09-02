@@ -1,8 +1,7 @@
 import { Component, OnInit, inject, signal } from '@angular/core';
 import { ActivatedRoute, RouterLink } from '@angular/router';
-import { describeError } from '@samaajconnect/shared';
+import { closesIn, describeError, formatRupees } from '@samaajconnect/shared';
 import { BoliApi } from './boli.api';
-import { closesIn, formatRupees } from './boli.format';
 import { Boli, OccasionDetail, OccasionStatusLabels } from './boli.models';
 
 /**

@@ -3,6 +3,7 @@ using System.Net.Http.Json;
 using FluentAssertions;
 using Microsoft.EntityFrameworkCore;
 using Sangam.Boli.Application.Auctions;
+using Sangam.Boli.Application.Auctions.Queries;
 using Sangam.Boli.Application.Security;
 using Xunit;
 
@@ -236,5 +237,114 @@ public sealed class BoliLifecycleTests(BoliApiFactory factory)
 
         // Not 403: a 403 would confirm that this Boli id is real.
         response.StatusCode.Should().Be(HttpStatusCode.NotFound);
+    }
+
+    // ---- The publisher's queue ---------------------------------------------
+
+    [Fact]
+    public async Task A_recorded_result_waits_in_the_publication_queue()
+    {
+        // The middle state of the platform's most deliberate two-step workflow,
+        // which nothing could list until now. A result that cannot be found is
+        // a result that is announced only if somebody remembers it.
+        var boliId = await OpenBoliAsync();
+        var manager = Manager();
+
+        await Member(Guid.NewGuid())
+            .PostAsJsonAsync($"/v1/boli/boli/{boliId}/bids", new { amount = 5_000_00L });
+        await manager.PostAsync($"/v1/boli/boli/{boliId}/close", null);
+
+        (await manager.GetFromJsonAsync<List<PendingResultResponse>>("/v1/boli/results/pending"))
+            .Should().BeEmpty("nothing is waiting until a result has been recorded");
+
+        await manager.PostAsync($"/v1/boli/boli/{boliId}/result", null);
+
+        var pending = await manager
+            .GetFromJsonAsync<List<PendingResultResponse>>("/v1/boli/results/pending");
+
+        pending.Should().ContainSingle();
+        pending![0].BoliId.Should().Be(boliId);
+        pending[0].BoliTitle.Should().Be("Mangal Deep");
+        pending[0].Amount.Should().Be(5_000_00L);
+        pending[0].RecordedBy.Should().Be(ManagerId);
+
+        await manager.PostAsync($"/v1/boli/boli/{boliId}/result/publish", null);
+
+        (await manager.GetFromJsonAsync<List<PendingResultResponse>>("/v1/boli/results/pending"))
+            .Should().BeEmpty("announcing it takes it out of the queue");
+    }
+
+    [Fact]
+    public async Task The_queue_names_the_amount_and_not_the_winner()
+    {
+        // The wireframe's publish screen draws "Winning Bid: Rs 18,400 - Member
+        // ID 1042". The winner is not here, on purpose: one record names the
+        // winner and only after publication, which is a far easier invariant to
+        // keep than two records naming them, one of which only to the right
+        // caller. Nothing is lost - the winner is read from the highest bid and
+        // is not something the publisher chooses.
+        var boliId = await OpenBoliAsync();
+        var winner = Guid.NewGuid();
+        var manager = Manager();
+
+        await Member(winner)
+            .PostAsJsonAsync($"/v1/boli/boli/{boliId}/bids", new { amount = 7_500_00L });
+        await manager.PostAsync($"/v1/boli/boli/{boliId}/close", null);
+        await manager.PostAsync($"/v1/boli/boli/{boliId}/result", null);
+
+        var body = await manager.GetStringAsync("/v1/boli/results/pending");
+
+        body.Should().Contain("750000");
+        body.Should().NotContain(winner.ToString());
+    }
+
+    [Fact]
+    public async Task The_queue_belongs_to_whoever_may_publish()
+    {
+        // Boli.PublishResults, not Boli.Manage. The two currently separate
+        // nobody, but a Samaaj that wants a second pair of eyes on
+        // announcements should get a queue that belongs to the eyes.
+        var boliId = await OpenBoliAsync();
+        var manager = Manager();
+
+        await Member(Guid.NewGuid())
+            .PostAsJsonAsync($"/v1/boli/boli/{boliId}/bids", new { amount = 5_000_00L });
+        await manager.PostAsync($"/v1/boli/boli/{boliId}/close", null);
+        await manager.PostAsync($"/v1/boli/boli/{boliId}/result", null);
+
+        (await ManagerWhoCannotPublish().GetAsync("/v1/boli/results/pending"))
+            .StatusCode.Should().Be(HttpStatusCode.Forbidden);
+
+        (await Member(Guid.NewGuid()).GetAsync("/v1/boli/results/pending"))
+            .StatusCode.Should().Be(HttpStatusCode.Forbidden);
+    }
+
+    [Fact]
+    public async Task The_queue_puts_the_longest_waiting_result_first()
+    {
+        // Oldest first, unlike the published list. This is a work queue, and the
+        // one waiting longest is the one most likely to have been forgotten.
+        var manager = Manager();
+        var first = await OpenBoliAsync();
+
+        await Member(Guid.NewGuid())
+            .PostAsJsonAsync($"/v1/boli/boli/{first}/bids", new { amount = 5_000_00L });
+        await manager.PostAsync($"/v1/boli/boli/{first}/close", null);
+        await manager.PostAsync($"/v1/boli/boli/{first}/result", null);
+
+        factory.Clock.Advance(TimeSpan.FromHours(1));
+
+        var second = await OpenBoliAsync();
+
+        await Member(Guid.NewGuid())
+            .PostAsJsonAsync($"/v1/boli/boli/{second}/bids", new { amount = 9_000_00L });
+        await manager.PostAsync($"/v1/boli/boli/{second}/close", null);
+        await manager.PostAsync($"/v1/boli/boli/{second}/result", null);
+
+        var pending = await manager
+            .GetFromJsonAsync<List<PendingResultResponse>>("/v1/boli/results/pending");
+
+        pending.Should().HaveCount(2);
+        pending![0].BoliId.Should().Be(first);
     }
 }

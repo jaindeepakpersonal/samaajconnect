@@ -2,10 +2,9 @@ import { provideHttpClient } from '@angular/common/http';
 import { HttpTestingController, provideHttpClientTesting } from '@angular/common/http/testing';
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { ActivatedRoute, provideRouter } from '@angular/router';
-import { API_CONFIG } from '@samaajconnect/shared';
+import { API_CONFIG, closesIn, formatRupees, parseRupees, toInputValue } from '@samaajconnect/shared';
 import { BoliDetailComponent } from './boli-detail.component';
 import { BoliListComponent } from './boli-list.component';
-import { closesIn, formatRupees, parseRupees, toInputValue } from './boli.format';
 import { Bid, Boli, BoliResult, Occasion, OccasionDetail } from './boli.models';
 import { OccasionComponent } from './occasion.component';
 

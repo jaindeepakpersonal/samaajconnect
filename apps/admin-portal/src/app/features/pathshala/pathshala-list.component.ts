@@ -3,6 +3,7 @@ import { RouterLink } from '@angular/router';
 import { AuthService, describeError } from '@samaajconnect/shared';
 import { AdminApi } from '../../core/admin-api';
 import { AdminScope } from '../../core/admin-scope';
+import { isNotFound } from '../../core/http-status';
 import { Pathshala } from '../../core/admin.models';
 
 /**
@@ -131,9 +132,4 @@ export class PathshalaListComponent implements OnInit {
       },
     });
   }
-}
-
-export function isNotFound(failure: unknown): boolean {
-  return typeof failure === 'object' && failure !== null && 'status' in failure
-    && (failure as { status: unknown }).status === 404;
 }

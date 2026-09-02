@@ -4,7 +4,7 @@
  * **Every amount on this wire is an integer number of paise.** A Boli is money
  * the Samaaj collects against, and the service holds it as a `long` for that
  * reason; the portal must not turn it into a float on the way past. See
- * `boli.format.ts` for the one place the conversion happens.
+ * `libs/shared`'s `money.ts` for the one place the conversion happens.
  */
 
 /** `OccasionStatus` in the domain. */

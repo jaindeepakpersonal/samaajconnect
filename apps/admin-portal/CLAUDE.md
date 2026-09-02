@@ -23,7 +23,9 @@ screen. The spec is `docs/product/wireframes/admin-panel-wireframes.html`.
 | Pathshala detail | `/pathshala/:id` | — | built; no wireframe covers running one. Sessions, classes and the placement queue |
 | Class detail | `/pathshala/:id/classes/:classId` | — | built. Teachers, timetable, roll, register, exams and results |
 | Notifications | `/notifications` | `#notifications` | built — compose and recent, without the Audience and Channel dropdowns |
-| Members, Groups, Events, Issues, Celebrity, Boli, Reports, Settings | — | various | not built. Every one of those services exists and the member portal has screens for them; what is missing is the administrative view |
+| Auctions / Boli | `/boli` | `#boli` + `#publishboli` | built. Occasions, and the publication queue with its confirmation |
+| Occasion detail | `/boli/:id` | — | built; no wireframe covers running an auction. Types, opening a Boli, closing, recording |
+| Members, Groups, Events, Issues, Celebrity, Reports, Settings | — | various | not built. Every one of those services exists and the member portal has screens for them; what is missing is the administrative view |
 
 The unbuilt screens appear in the nav, disabled, each saying why. That is
 deliberate: the wireframe promised them, and an administrator who cannot see
@@ -167,6 +169,53 @@ exactly those rows. Two tests hold it.
 `DELETE /enrollments/{id}` a placement decision does not use, and the screen says
 what it does: the child comes off the roll and their attendance and results
 stay. A child who left in March still attended from June.
+
+**Members could bid on nothing.** Every Boli endpoint an organiser needs —
+announcing an occasion, moving its status, defining a type, opening a Boli,
+closing it, recording a result, announcing it — was complete, tested and
+curl-only. The member portal's bidding screens had been shipped for cycles
+against auctions nobody could open.
+
+**The publication queue needed an endpoint that did not exist, and its absence
+was invisible from both sides.** Recording a result and announcing it are two
+acts on purpose, so a result sits between them; the only read that reached one
+needed the Boli id you were already looking for. `GET /v1/boli/results/pending`
+is that queue, and it is the wireframe's "Results Awaiting Publication" card,
+which had been drawn but never answerable.
+
+**The queue names an amount and never a winner, and the wireframe drew a
+winner** ("₹18,400 — Member ID 1042"). boli-service names the winner in exactly
+one shape and only once it is published, for everybody including the manager who
+recorded it. Nothing is lost by the omission: the winner is read from the
+highest bid and is not something the publisher chooses, so the amount is what
+identifies it. Faking the wireframe's line here would have meant a second shape
+carrying the winner early — replacing an invariant that is easy to keep with one
+that is not.
+
+**Publishing is confirmed inline rather than on its own screen.** The wireframe
+made `#publishboli` a separate screen for the irreversibility warning and the
+deliberate second click. Both are here; the screen is not, because the queue row
+already carries everything that screen showed and there is no endpoint that
+reads a single pending result — so a separate route would have had to fetch the
+whole queue to draw one row of it.
+
+**A 403 from the queue is not an empty queue.** `Boli.PublishResults` is a
+separate permission from `Boli.Manage`, so a manager who may run an auction but
+not announce its result gets told the queue belongs to somebody else. Telling
+them nothing was waiting would be telling them something false about their own
+Samaaj.
+
+**Money conversion moved to `libs/shared`, and that is the rule working rather
+than an exception to it.** `formatRupees`/`parseRupees` lived in the member
+portal's Boli feature until this screen needed to type an amount; a type or a
+function moves to the shared library when a second app needs it, not in
+anticipation. Amounts are integer paise on the wire, and `parseRupees` rounds
+rather than truncating — a detail that is worth exactly one implementation.
+
+**`isNotFound` had three copies before it had one home.** It now lives in
+`core/http-status.ts` alongside `isForbidden`. A duplicated predicate is
+harmless until it is the one deciding whether a screen says "the module is off"
+or shows a red error banner.
 
 **Creating a Pathshala is deliberately not on these screens.**
 `CreatePathshalaCommand` is Super Admin only (`DATA-MODEL.md` §9): the master

@@ -247,7 +247,7 @@ const NAV: readonly NavGroup[] = [
   },
   {
     heading: 'Boli',
-    items: [{ label: 'Auctions / Boli', pending: 'The Boli administration screen is not built yet.' }],
+    items: [{ label: 'Auctions / Boli', route: '/boli' }],
   },
   {
     heading: 'Operations',

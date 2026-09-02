@@ -238,6 +238,19 @@ public static class BoliEndpoints
             .Produces<IReadOnlyList<BoliResultResponse>>()
             .ProducesProblem(StatusCodes.Status401Unauthorized);
 
+        group.MapGet("/results/pending", async (ISender sender, CancellationToken cancellationToken) =>
+            {
+                var result = await sender.Send(new ListPendingResultsQuery(), cancellationToken);
+
+                return result.ToApiResult();
+            })
+            .RequireAuthorization()
+            .WithName("ListPendingBoliResults")
+            .WithSummary("Recorded and not yet announced. The publisher's queue.")
+            .Produces<IReadOnlyList<PendingResultResponse>>()
+            .ProducesProblem(StatusCodes.Status401Unauthorized)
+            .ProducesProblem(StatusCodes.Status403Forbidden);
+
         group.MapPost("/boli/{id:guid}/result", async (
                 Guid id, ISender sender, CancellationToken cancellationToken) =>
             {
