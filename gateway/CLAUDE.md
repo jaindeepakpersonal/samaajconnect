@@ -194,7 +194,32 @@ Those three routes are declared above the identity catch-all with a lower
 
 `dotnet test gateway/Sangam.Gateway.sln` covers cache behaviour, the middleware
 pipeline against a terminal endpoint that echoes what a downstream service would
-receive, and the module gate.
+receive, the module gate, the Redis tenant cache, and the rate-limit policies.
+
+**Two of those had no tests until 2026-09-02**, and both hold a promise that
+only stands if something checks it.
+
+`RedisTenantCache` says a cache failure "degrades to a cache miss, never to a
+failed request". Every request through this gateway resolves a tenant, so a
+throw there is a platform outage caused by an optimisation — Redis becoming the
+second thing that can take everything down is exactly what the null-object
+implementation beside it exists to prevent. There are now tests for a read that
+throws, a write that throws, content that will not deserialise, and a
+disconnected multiplexer.
+
+`RateLimiting` is exercised end to end by the smoke script, which fires four
+hundred sign-in attempts and proves *something* eventually refuses. What that
+cannot show is whether the right caller was refused. The unit tests cover the
+partitioning instead: one source cannot spend another's budget, sign-in cannot
+spend the registration budget, an unlimited route is unaffected by a burst
+against a limited one, and a refusal carries no body and no `Retry-After` —
+telling a caller how long to wait is telling a script how to pace itself.
+
+One trap worth knowing before writing another test here: **`ResolvedTenant` is a
+record whose `EnabledModules` is an `IReadOnlyCollection<string>`**, so the
+generated equality compares that member by reference. A tenant that has been
+through JSON is never `Be`-equal to the one it was serialised from, however
+identical it looks. Use `BeEquivalentTo`.
 
 The through-the-gateway coverage CLAUDE.md §9 asks for lives in
 `scripts/smoke-through-gateway.sh`, which drives the real compose stack:

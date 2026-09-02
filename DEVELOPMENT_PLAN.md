@@ -8,7 +8,36 @@ version of the plan; the reasoning behind the ordering lives in
 ## Current Status
 
 - **Stage:** every module has a service and member screens; Phase 5 hardening under way
-- **Last updated:** 2026-09-02 - **tests for `libs/shared`**, the code both apps
+- **Last updated:** 2026-09-02 - **tests for the gateway's two untested files**,
+  the last unexamined part of the request path.
+
+  25 tests covered three of the gateway's nine source files. The two with none
+  were `RedisTenantCache` and `RateLimiting`, and both hold a promise that only
+  stands if something checks it. 46 now.
+
+  **"A cache failure degrades to a cache miss, never to a failed request"** is a
+  comment in `ITenantCache.cs`, and every request through the gateway resolves a
+  tenant - so a throw there turns a Redis blip into a platform outage caused by
+  an optimisation. Tested now for a read that throws, a write that throws,
+  content that will not deserialise, and a disconnected multiplexer.
+
+  **The smoke script proves the rate limit fires; it cannot prove it refuses the
+  right caller.** Four hundred sign-in attempts show that *something* eventually
+  says no. The unit tests cover the partitioning: one source cannot spend
+  another's budget - a global bucket would hand an attacker a platform-wide
+  denial of service rather than take one from them - sign-in cannot spend the
+  registration budget, an unlimited route survives a burst against a limited
+  one, and a refusal carries no body and no `Retry-After`.
+
+  **One trap found while writing them.** `ResolvedTenant` is a record whose
+  `EnabledModules` is a collection, so its generated equality compares that by
+  reference: a tenant that has been through JSON is never `Be`-equal to the one
+  it was serialised from. The first round-trip test failed for that reason and
+  not for a real one. Written into `gateway/CLAUDE.md`.
+
+  1,507 tests green (1,006 backend across 21 suites, 501 frontend). No smoke
+  run: the gateway's own behaviour is unchanged, only its tests.
+- **Previously:** 2026-09-02 - **tests for `libs/shared`**, the code both apps
   run on.
 
   The intent was to test the member portal's oldest screens, and that turned out
@@ -483,6 +512,13 @@ unit tested.
       block. The palette was measured rather than assumed and passes AA
       everywhere — tightest pair 4.56:1. What each app's `CLAUDE.md` now records
       is what was checked, so the next pass does not start over
+- [x] **The gateway's two untested files have tests, 2026-09-02.** 25 covered
+      three of nine; `RedisTenantCache` and `RateLimiting` had none. Both hold a
+      promise that only stands if something checks it — a cache failure must
+      degrade to a miss rather than fail a request, and the rate limit must
+      partition per source rather than globally. 46 tests now. The smoke
+      script's four-hundred-attempt burst proves the limit fires; it cannot
+      prove it refuses the right caller, which is what these add
 - [x] **`libs/shared` has its own tests, 2026-09-02.** It had 17 across two of
       ten files; the tenant interceptor, which rewrites the URL of every request
       either app makes, and the token store, which holds the session, had none.
