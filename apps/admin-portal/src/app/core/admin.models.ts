@@ -227,3 +227,86 @@ export interface ModerationQueueEntry {
   readonly history: readonly ModerationAction[];
   readonly availableDecisions: readonly ModerationDecision[];
 }
+
+// ---- Pathshala ----------------------------------------------------------
+
+/** Mirrors `SessionResponse`. */
+export interface AcademicSession {
+  readonly id: string;
+  readonly label: string;
+  readonly startDate: string;
+  readonly endDate: string;
+  readonly isCurrent: boolean;
+}
+
+/** Mirrors `ScheduleSlotResponse`. */
+export interface ScheduleSlot {
+  readonly dayOfWeek: string;
+  readonly startTime: string;
+  readonly endTime: string;
+}
+
+/**
+ * Mirrors `ClassResponse`. `teacherMemberIds` are ids: names live in
+ * member-family-service, and the panel resolves them from the directory it
+ * already loads rather than asking per row.
+ */
+export interface PathshalaClass {
+  readonly id: string;
+  readonly sessionId: string;
+  readonly sessionLabel: string;
+  readonly name: string;
+  readonly roomLabel: string | null;
+  readonly schedule: readonly ScheduleSlot[];
+  readonly teacherMemberIds: readonly string[];
+  readonly studentCount: number;
+}
+
+/** Mirrors `PathshalaResponse` — the directory card, counts rather than rosters. */
+export interface Pathshala {
+  readonly id: string;
+  readonly name: string;
+  readonly address: string | null;
+  readonly contactPerson: string | null;
+  readonly status: string;
+  readonly currentSessionLabel: string | null;
+  readonly currentSessionId: string | null;
+  readonly classCount: number;
+  readonly teacherCount: number;
+  readonly acceptsEnrolments: boolean;
+}
+
+/** Mirrors `PathshalaDetailResponse`. */
+export interface PathshalaDetail {
+  readonly id: string;
+  readonly name: string;
+  readonly address: string | null;
+  readonly contactPerson: string | null;
+  readonly status: string;
+  readonly acceptsEnrolments: boolean;
+  readonly sessions: readonly AcademicSession[];
+  readonly classes: readonly PathshalaClass[];
+}
+
+/** `EnrolmentStatus` in the domain. */
+export type EnrolmentStatus = 'Requested' | 'Active' | 'Withdrawn';
+
+/**
+ * Mirrors `EnrolmentResponse`.
+ *
+ * `childProfileId` is an id and pathshala-service holds no names — it stores a
+ * child by id and nothing else. `GET /v1/children/names` resolves the ones on
+ * screen, which is why the placement queue makes two calls rather than one.
+ */
+export interface Enrolment {
+  readonly id: string;
+  readonly pathshalaId: string;
+  readonly childProfileId: string;
+  readonly classId: string | null;
+  readonly className: string | null;
+  readonly sessionId: string | null;
+  readonly sessionLabel: string | null;
+  readonly status: EnrolmentStatus;
+  readonly requestedAt: string;
+  readonly enrolledAt: string | null;
+}

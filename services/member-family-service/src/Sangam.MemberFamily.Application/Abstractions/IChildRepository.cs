@@ -24,6 +24,14 @@ public interface IChildRepository
     /// <summary>Every child in this Samaaj, for the admin's eligibility list.</summary>
     Task<IReadOnlyList<ChildProfile>> ListAllAsync(CancellationToken cancellationToken = default);
 
+    /// <summary>
+    /// The named children, tenant-filtered, for resolving ids another service
+    /// holds. An id belonging to a different Samaaj comes back missing rather
+    /// than refused.
+    /// </summary>
+    Task<IReadOnlyList<ChildProfile>> ListByIdsAsync(
+        IReadOnlyList<Guid> ids, CancellationToken cancellationToken = default);
+
     /// <summary>Bypasses the tenant filter, for consumers.</summary>
     Task<IReadOnlyList<ChildProfile>> ListForConsumerAsync(
         Guid familyId, CancellationToken cancellationToken = default);

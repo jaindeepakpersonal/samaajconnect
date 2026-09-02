@@ -8,6 +8,10 @@ import {
   AuditLogEntry,
   ModerationDecision,
   ModerationQueueEntry,
+  Enrolment,
+  Pathshala,
+  PathshalaClass,
+  PathshalaDetail,
   Broadcast,
   BroadcastResult,
   ConversionRequest,
@@ -217,5 +221,86 @@ export class AdminApi {
    */
   listMembers(): Observable<{ id: string; fullName: string }[]> {
     return this.http.get<{ id: string; fullName: string }[]>('/v1/members?limit=100');
+  }
+
+  // ---- Pathshala ---------------------------------------------------------
+
+  listPathshalas(): Observable<Pathshala[]> {
+    return this.http.get<Pathshala[]>('/v1/pathshala/pathshalas');
+  }
+
+  pathshala(id: string): Observable<PathshalaDetail> {
+    return this.http.get<PathshalaDetail>(`/v1/pathshala/pathshalas/${id}`);
+  }
+
+  /**
+   * Opens an academic session, which becomes the current one.
+   *
+   * Answers with the whole Pathshala rather than the session, which is why the
+   * screen never has to guess what opening one did to the session that was
+   * current a moment ago.
+   */
+  openSession(
+    pathshalaId: string,
+    label: string,
+    startDate: string,
+    endDate: string,
+  ): Observable<PathshalaDetail> {
+    return this.http.post<PathshalaDetail>(`/v1/pathshala/pathshalas/${pathshalaId}/sessions`, {
+      label,
+      startDate,
+      endDate,
+    });
+  }
+
+  createClass(
+    pathshalaId: string,
+    sessionId: string,
+    name: string,
+    roomLabel: string | null,
+  ): Observable<PathshalaClass> {
+    return this.http.post<PathshalaClass>(`/v1/pathshala/pathshalas/${pathshalaId}/classes`, {
+      sessionId,
+      name,
+      roomLabel,
+    });
+  }
+
+  /** Children a parent has asked to enrol, waiting for somebody to place them. */
+  enrolmentRequests(pathshalaId: string): Observable<Enrolment[]> {
+    return this.http.get<Enrolment[]>(
+      `/v1/pathshala/pathshalas/${pathshalaId}/enrollments/requests`,
+    );
+  }
+
+  /**
+   * Places a requested child in a class, or turns the request down.
+   *
+   * `place: false` needs no class, and the service refuses a `place: true` with
+   * no class — a placement into nothing is not a placement.
+   */
+  placeStudent(
+    enrolmentId: string,
+    classId: string | null,
+    place: boolean,
+  ): Observable<Enrolment> {
+    return this.http.post<Enrolment>(`/v1/pathshala/enrollments/${enrolmentId}/placement`, {
+      classId,
+      place,
+    });
+  }
+
+  /**
+   * Names for children this panel already holds the ids of.
+   *
+   * Names only, and by id: pathshala-service stores a child by id and nothing
+   * else, and the full child record carries a date of birth, a gender and the
+   * parental-consent record that a queue printing a name has no business
+   * receiving.
+   */
+  childNames(ids: readonly string[]): Observable<{ id: string; fullName: string }[]> {
+    return this.http.get<{ id: string; fullName: string }[]>(
+      `/v1/children/names?ids=${ids.join(',')}`,
+    );
   }
 }

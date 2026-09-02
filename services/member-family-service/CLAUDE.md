@@ -45,6 +45,7 @@ worked example of a cross-service flow with no synchronous call.
 | `ListConversionRequestsQuery` | `SamaajAdmin` + `Family.ApproveConversion` | built |
 | `GetChildDataNoticeQuery` | any member | built |
 | `GetMyDataQuery` | any authenticated role | built |
+| `GetChildNamesQuery` | `SamaajAdmin`/`SuperAdmin` + `Members.Read` | built |
 
 ## Events published
 
@@ -85,6 +86,7 @@ here, which looks exactly like a broker problem and is not one.
 | POST | `/v1/children/{id}/conversion` | head of that family + `Family.Write` |
 | GET | `/v1/children/conversion-requests` | `SamaajAdmin` + `Family.ApproveConversion` |
 | POST | `/v1/children/conversion-requests/{requestId}/decide` | `SamaajAdmin` + `Family.ApproveConversion` |
+| GET | `/v1/children/names` | `SamaajAdmin`, `SuperAdmin` + `Members.Read` |
 | GET | `/v1/children/data-notice` | any member |
 | GET | `/v1/members/me/data-export` | any authenticated role |
 | GET | `/health` | anonymous |
@@ -97,6 +99,18 @@ a person without either owning the other's table, and a profile can be found
 from a token's `sub` claim with no lookup in between. It also makes "have I
 already created this profile?" a primary-key check rather than a dedupe table,
 which is what makes the consumer idempotent.
+
+**A cross-service read re-checks the tenant itself, and that check is not
+belt-and-braces.** `GetChildNamesQuery` answers another service's ids with
+names, and its handler compares every row's `TenantId` against
+`ITenantContext` rather than trusting the global query filter. That is there
+because a test caught the filter *not* excluding another Samaaj's child -
+reproducibly, with the generated SQL showing a correct
+`WHERE tenant_id = ...` and the same query returning nothing when
+no tenant is resolved. The cause is not known and is written up as an open item
+in `DEVELOPMENT_PLAN.md`. Remove the explicit check and
+`ChildNamesTests.A_child_in_another_Samaaj_is_simply_absent` fails, so do not
+remove it because the filter "should" be enough.
 
 **Being unlisted is not a privacy level, and could not be one.** Per-field
 privacy cannot remove a member from the directory: someone who marks every

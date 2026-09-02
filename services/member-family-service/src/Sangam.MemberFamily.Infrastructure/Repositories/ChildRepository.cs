@@ -25,6 +25,17 @@ public sealed class ChildRepository(MemberFamilyDbContext dbContext) : IChildRep
         CancellationToken cancellationToken = default) =>
         await dbContext.ChildProfiles.AsNoTracking().ToListAsync(cancellationToken);
 
+    public async Task<IReadOnlyList<ChildProfile>> ListByIdsAsync(
+        IReadOnlyList<Guid> ids,
+        CancellationToken cancellationToken = default) =>
+        // Tenant-filtered, deliberately not IgnoreQueryFilters: the ids come
+        // from another service and a caller must not be able to name a child in
+        // a Samaaj they do not administer by handing over the right GUID.
+        await dbContext.ChildProfiles
+            .AsNoTracking()
+            .Where(c => ids.Contains(c.Id))
+            .ToListAsync(cancellationToken);
+
     public async Task<IReadOnlyList<ChildProfile>> ListForConsumerAsync(
         Guid familyId, CancellationToken cancellationToken = default) =>
         await dbContext.ChildProfiles

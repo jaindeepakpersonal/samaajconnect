@@ -6,6 +6,7 @@ using Sangam.MemberFamily.Application.Children.Commands.DecideChildConversion;
 using Sangam.MemberFamily.Application.Children.Commands.RequestChildConversion;
 using Sangam.MemberFamily.Application.Children.Queries.GetChildDataNotice;
 using Sangam.MemberFamily.Application.Children.Queries.ListConversionRequests;
+using Sangam.MemberFamily.Application.Children.Queries.GetChildNames;
 using Sangam.MemberFamily.Application.Children.Queries.ListFamilyChildren;
 
 namespace Sangam.MemberFamily.Api.Endpoints;
@@ -25,6 +26,28 @@ public static class ChildEndpoints
             .WithName("ListFamilyChildren")
             .WithSummary("Children in your household, with whether each is old enough to convert.")
             .Produces<IReadOnlyList<ChildResponse>>();
+
+        group.MapGet("/names", async (
+                string? ids, ISender sender, CancellationToken cancellationToken) =>
+            {
+                var parsed = (ids ?? string.Empty)
+                    .Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
+                    .Select(value => Guid.TryParse(value, out var id) ? id : Guid.Empty)
+                    .Where(id => id != Guid.Empty)
+                    .Distinct()
+                    .ToArray();
+
+                var result = await sender.Send(new GetChildNamesQuery(parsed), cancellationToken);
+
+                return result.ToApiResult();
+            })
+            .WithName("GetChildNames")
+            .WithSummary(
+                "Names for children an administrator already holds the ids of - the Pathshala "
+                + "placement queue. Names only, deliberately.")
+            .Produces<IReadOnlyList<ChildNameResponse>>()
+            .ProducesValidationProblem()
+            .ProducesProblem(StatusCodes.Status403Forbidden);
 
         group.MapGet("/data-notice", async (ISender sender, CancellationToken cancellationToken) =>
             {

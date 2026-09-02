@@ -74,6 +74,22 @@ export const routes: Routes = [
           import('./features/audit/audit-log.component').then((m) => m.AuditLogComponent),
       },
       {
+        path: 'pathshala',
+        title: 'Jain Pathshala - samaajconnect admin',
+        loadComponent: () =>
+          import('./features/pathshala/pathshala-list.component').then(
+            (m) => m.PathshalaListComponent,
+          ),
+      },
+      {
+        path: 'pathshala/:id',
+        title: 'Jain Pathshala - samaajconnect admin',
+        loadComponent: () =>
+          import('./features/pathshala/pathshala-detail.component').then(
+            (m) => m.PathshalaDetailComponent,
+          ),
+      },
+      {
         path: 'moderation',
         title: 'Content moderation - samaajconnect admin',
         loadComponent: () =>

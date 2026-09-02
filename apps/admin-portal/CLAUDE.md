@@ -19,8 +19,10 @@ screen. The spec is `docs/product/wireframes/admin-panel-wireframes.html`.
 | Adult Child Conversion Queue | `/conversions` | `#conversionqueue` | built |
 | Audit Logs | `/audit` | `#audit` | built |
 | Timeline / Moderation | `/moderation` | `#content` | built |
+| Jain Pathshala | `/pathshala` | `#pathshala` | built — the list |
+| Pathshala detail | `/pathshala/:id` | — | built; no wireframe covers running one. Sessions, classes and the placement queue |
 | Notifications | `/notifications` | `#notifications` | built — compose and recent, without the Audience and Channel dropdowns |
-| Members, Groups, Events, Issues, Celebrity, Pathshala, Boli, Reports, Settings | — | various | not built. Every one of those services exists and the member portal has screens for them; what is missing is the administrative view |
+| Members, Groups, Events, Issues, Celebrity, Boli, Reports, Settings | — | various | not built. Every one of those services exists and the member portal has screens for them; what is missing is the administrative view |
 
 The unbuilt screens appear in the nav, disabled, each saying why. That is
 deliberate: the wireframe promised them, and an administrator who cannot see
@@ -131,6 +133,27 @@ that was never there.
 **A refused change re-reads the matrix.** A checkbox has already flipped itself
 in the DOM by the time the request fails, and leaving it showing a change the
 server refused is the one thing this screen must never do.
+
+**Running a Pathshala was a curl-only activity.** Thirteen of the twenty-seven
+endpoints the sweep found were this module: a parent could ask for a place and
+nobody could open a session, create a class, place a child, mark a register or
+record an exam. The two screens here cover the first half - setting it up, and
+answering the parents. The teaching half (teachers, timetable, the register,
+exams and results) is still unbuilt and tracked in `DEVELOPMENT_PLAN.md`.
+
+**Creating a Pathshala is deliberately not on these screens.**
+`CreatePathshalaCommand` is Super Admin only (`DATA-MODEL.md` §9): the master
+record belongs to the platform operator and everything about *running* it
+belongs to the Samaaj. A create form on a Samaaj administrator's screen would be
+a control that always answers 403.
+
+**The placement queue makes two calls, and the second one is the point.**
+pathshala-service stores a child by id and nothing else, so the queue is a list
+of GUIDs. `GET /v1/children/names` resolves exactly the ids on screen - names
+only, because the full child record carries a date of birth and the
+parental-consent record. Rather than have one service reach into another per
+row, the panel does what it does for post authors and member names: it is the
+party already authenticated to both.
 
 **Nothing on the platform could approve a post before the moderation screen.**
 A member writes one, it lands `PendingReview`, and the only way it ever reached

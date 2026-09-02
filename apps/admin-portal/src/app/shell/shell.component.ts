@@ -243,7 +243,7 @@ const NAV: readonly NavGroup[] = [
   },
   {
     heading: 'Education',
-    items: [{ label: 'Jain Pathshala', pending: 'The Pathshala administration screen is not built yet.' }],
+    items: [{ label: 'Jain Pathshala', route: '/pathshala' }],
   },
   {
     heading: 'Boli',

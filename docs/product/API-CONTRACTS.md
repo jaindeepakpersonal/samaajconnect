@@ -81,6 +81,7 @@ enforced by `TenantAuthorizationBehavior`, not just UI hiding.
 | POST | `/families/join-requests/{id}/decide` | FamilyHead | Accept/reject |
 | GET | `/children` | Member | Children in your own household |
 | POST | `/children` | FamilyHead | Add child profile |
+| GET | `/children/names?ids=…` | SamaajAdmin, SuperAdmin + `Members.Read` | Names for children the caller already holds the ids of — the Pathshala placement queue. **Names only**, never the child record: that carries a date of birth and the parental-consent record. Ids from another Samaaj are absent rather than refused, and at most 200 per call |
 | GET | `/children/data-notice` | Member | What a parent is shown before adding a child (DPDP s.9) |
 | GET | `/members/me/data-export` | Authenticated | Profile, family and children (DPDP s.11) |
 | POST | `/children/{id}/conversion` | FamilyHead | Start adult-child conversion |

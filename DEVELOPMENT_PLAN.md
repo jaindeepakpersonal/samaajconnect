@@ -8,21 +8,26 @@ version of the plan; the reasoning behind the ordering lives in
 ## Current Status
 
 - **Stage:** every module has a service and member screens; Phase 5 hardening under way
-- **Last updated:** 2026-09-01 - **redeeming an activation code**, and the sweep
-  that found it. Three screens in the admin panel told people to redeem their
-  one-time code "in the member portal", and the member portal had nowhere to do
-  it - so no invited administrator could ever sign in, and no adult child whose
-  conversion was approved could ever get an account. Both flows were complete,
-  tested, and reachable only by curl.
+- **Last updated:** 2026-09-02 - **Pathshala administration**, the half that
+  left a parent's request going nowhere. A parent asks for a place from the
+  member portal and until now nothing on the platform could answer: no screen
+  could open a session, create a class or place a child. The admin panel has
+  those now, and the sweep is down from 27 unreachable endpoints to 20.
 
-  That was the third cycle running where the gap worth filling was an endpoint
-  with no caller, so it is a script now:
-  `scripts/unreachable-endpoints.sh` reads the source and lists every endpoint
-  neither app calls. It found 27; this cycle closed one. The remaining 26 are
-  listed under Phase 5 - one belongs to the gateway and is not a gap, and the
-  other 25 cluster hard, thirteen of them Pathshala administration, which is a
-  whole module that can only be operated with curl. 1,314 tests green (967
-  backend across 21 suites, 347 frontend) plus 262 smoke checks against empty
+  The placement queue needed a new endpoint. pathshala-service stores a child by
+  id and nothing else, so the queue is a list of GUIDs;
+  `GET /v1/children/names` resolves exactly the ids on screen. Names only, never
+  the child record - that carries a date of birth and the parental-consent
+  record, and a queue printing a name has no business receiving them.
+
+  **That endpoint turned up something unresolved and security-relevant**, listed
+  under Phase 5: a test seeding one child in each of two Samaajs and asking as
+  an administrator of the first got **both** back, with the generated SQL
+  showing a correct tenant filter and the same query returning nothing when no
+  tenant is resolved. The handler now re-checks every row's tenant itself and
+  the test fails without that line, so the endpoint is safe - but the cause is
+  not known and is written up rather than guessed at. 1,333 tests green (974
+  backend across 21 suites, 359 frontend) plus 265 smoke checks against empty
   volumes.
 - **Blocking item:** none. **Every module the platform has now has both a
   service and member screens**, and the role matrix is editable per Samaaj. What
@@ -295,7 +300,8 @@ unit tested.
       unplaced. The wireframe's "Events: 7 participated" tile is dropped —
       nothing records Pathshala event participation, so it would be a number
       the app made up
-- [ ] **Member portal: the rest.** Boli has neither a service nor screens
+- [x] **Member portal: the rest.** Boli shipped as the tenth service with its
+      list, detail and occasion screens
 
 ## Phase 3 — Celebrity Voting
 
@@ -319,8 +325,8 @@ unit tested.
       rather than on the `PathshalaStudent` role, which nothing grants.
       Progress is computed rather than stored, so a corrected mark
       cannot leave it quietly wrong
-- [ ] The Angular screens for both, from the wireframes' `#myclass`,
-      `#attendance`, `#exams` and `#progress`
+- [x] The Angular screens for both, from the wireframes' `#myclass`,
+      `#attendance`, `#exams` and `#progress` - built as one enrolment screen
 
 ## Phase 5 — Boli + Hardening
 
@@ -447,16 +453,46 @@ unit tested.
       approved, and redeeming an activation code, which three admin screens told
       people to do "in the member portal" while the member portal had nowhere to
       do it. All three were complete, tested, and reachable only by curl
-- [ ] **26 endpoints nobody can reach from either app.** One is not a gap:
-      `GET /v1/identity/tenants/by-id/{id}` is the gateway's. The other 25 are
-      screens nobody has built, and they cluster:
-  - [ ] **Pathshala administration (13).** The largest by far, and a whole
-        module that can only be operated with curl. A parent can ask for a
-        place; nobody can open a session, create a class, assign a teacher, set
-        a timetable, place a child, mark a register, set an exam or record a
-        result. Sessions, classes, teachers, schedule, placement, attendance,
-        exams, results, the class roll, the Pathshala detail, the enrolment
-        request queue, and the two deletes
+- [ ] **Open, security-relevant: a tenant query filter that did not exclude
+      another Samaaj's row.** `ChildNamesTests.A_child_in_another_Samaaj_is_simply_absent`
+      seeds one child in each of two Samaajs, asks as an administrator of the
+      first, and got **both** back — reproducibly, on a clean build. What is
+      established:
+  - the rows really are in different tenants (read back with
+    `IgnoreQueryFilters`)
+  - `ChildProfile` implements `ITenantScopedEntity` and the model does carry a
+    filter for it (`FindEntityType(...).GetQueryFilter()` is not null)
+  - `ToQueryString()` shows a correctly parameterised
+    `WHERE c.tenant_id = @__ef_filter__CurrentTenantId_0 AND c.id = ANY(@__ids_0)`
+  - the same query in a scope with no resolved tenant returns 0 rows, so the
+    filter does run
+  - the repository method under test really is the one executing (forcing it to
+    return nothing breaks the other tests in the class)
+  - `MemberProfile`, queried the same way and seeded the same way, does **not**
+    leak — `MemberEndpointsTests.The_directory_shows_only_this_Samaaj` covers it
+      Those facts do not reconcile and the cause is not yet known. The endpoint
+      is safe: `GetChildNamesQueryHandler` re-checks every row's `TenantId`
+      against `ITenantContext` and the test fails without that line. **What is
+      not known is whether anything else on the platform relies on the filter
+      alone for a read.** `scripts/tenant-isolation-probe.sh` passes its 36
+      cross-tenant probes against the running stack, so this is not known to
+      affect deployed behaviour — but "not known to" is the accurate phrase.
+      Next step: find why one entity behaves differently from another. The one
+      structural difference found so far is that `ChildProfile` has an owned
+      entity (`ParentalConsent`) and `MemberProfile`'s `FieldPrivacy` is owned
+      too, so that is not obviously it either
+- [ ] **20 endpoints nobody can reach from either app**, down from 27 when the
+      sweep was written. One is not a gap: `GET /v1/identity/tenants/by-id/{id}`
+      is the gateway's. The other 19 are screens nobody has built, and they
+      cluster:
+  - [x] **Pathshala administration, setting it up (5 of 13).** The Pathshala
+        detail, opening a session, adding a class, the enrolment request queue
+        and placing a child. A parent asking for a place now has somebody who
+        can answer, which was the dead end
+  - [ ] **Pathshala administration, teaching (8 of 13).** Assigning teachers,
+        setting a timetable, marking the register, setting an exam, recording
+        results, the class roll, and the two deletes (deactivating a Pathshala,
+        withdrawing a student). All still curl-only
   - [ ] **Boli administration (5).** Members can bid; nobody can run an
         auction. Occasion status, Boli types, opening a Boli, closing one,
         publishing a result

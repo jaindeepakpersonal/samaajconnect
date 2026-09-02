@@ -358,6 +358,31 @@ else
   fail=$((fail + 1))
 fi
 
+# The Pathshala placement queue holds child ids and no names, so an
+# administrator resolves them here. Names only: the full child record carries a
+# date of birth and the parental-consent record, and a queue printing a name has
+# no business receiving those.
+if curl -s -H "Authorization: Bearer $ADMIN_TOKEN" -H "$ADMIN_TENANT_HEADER" \
+   "$GATEWAY/v1/children/names?ids=$CHILD_ID" | grep -q '"fullName":"Aarav Jain"'; then
+  echo "  ok    an administrator can put a name to a child id"
+  pass=$((pass + 1))
+else
+  echo "  FAIL  the child-name lookup did not answer"
+  fail=$((fail + 1))
+fi
+
+if curl -s -H "Authorization: Bearer $ADMIN_TOKEN" -H "$ADMIN_TENANT_HEADER" \
+   "$GATEWAY/v1/children/names?ids=$CHILD_ID" | grep -qE '"dateOfBirth"|"parentalConsent"'; then
+  echo "  FAIL  the child-name lookup returned more than a name"
+  fail=$((fail + 1))
+else
+  echo "  ok    and gets a name and nothing else"
+  pass=$((pass + 1))
+fi
+
+check "a member cannot name children by id" 403 \
+  "$(status -H "Authorization: Bearer $MEMBER_TOKEN" "$GATEWAY/v1/children/names?ids=$CHILD_ID")"
+
 REQUEST_ID=$(curl -s -X POST "$GATEWAY/v1/children/$CHILD_ID/conversion" \
   -H 'Content-Type: application/json' -H "Authorization: Bearer $MEMBER_TOKEN" \
   -d "{\"mobileOrEmail\":\"$CHILD_EMAIL\"}" | json_field id)
