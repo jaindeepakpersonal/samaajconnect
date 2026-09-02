@@ -104,6 +104,12 @@ access. Validation runs before the transaction opens so an invalid
 request never holds a DB transaction open. Do not reorder these
 without updating this file and every service's `Program.cs` together.
 
+**`scripts/pipeline-order.sh` checks that, and CI runs it.** The list
+above is what it reads as the expected order — so this section is the
+single source of truth, and the check fails whichever side moves. Until
+2026-09-02 the rule was stated here and enforced by nothing, across ten
+copies of one file.
+
 ### 4.5 Domain aggregates
 
 ```csharp
@@ -268,6 +274,7 @@ Neither uses `*service-defaults` — they need no database and no broker.
 | Capacity and a waitlist that moves | `services/events-service/CLAUDE.md` |
 | A multi-state workflow as a transition table | `services/social-issues-service/CLAUDE.md` |
 | Which endpoints no screen can reach | `scripts/unreachable-endpoints.sh` |
+| Whether every service still agrees with §4.4 | `scripts/pipeline-order.sh` |
 | Scaffold a new bounded-context service | `.claude/skills/new-microservice/SKILL.md` |
 | Add a command/query to an existing service | `.claude/skills/add-service-feature/SKILL.md` |
 | Turn a wireframe screen into a real component | `.claude/skills/wireframe-to-angular/SKILL.md` |

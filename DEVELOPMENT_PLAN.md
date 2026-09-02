@@ -8,7 +8,37 @@ version of the plan; the reasoning behind the ordering lives in
 ## Current Status
 
 - **Stage:** every module has a service and member screens; Phase 5 hardening under way
-- **Last updated:** 2026-09-02 - **the function that decides who wins an
+- **Last updated:** 2026-09-02 - **a rule stated in prose, duplicated ten
+  times, and enforced by nothing.**
+
+  The plan was to audit boli-service, the next-lowest test ratio. It turned out
+  not to need it: 57 source files against 38 tests looks thin until you notice
+  most of those files are `Result`, `Error`, `ICommand` and the five behaviours
+  copied verbatim into every service. Its domain - the window, the floor, the
+  increment, idempotent closing, the two-step publish - is covered properly, and
+  manufacturing tests to move a ratio would have been the wrong work.
+
+  What the audit did turn up sits one level above any single service. Root
+  `CLAUDE.md` §4.4 calls the MediatR pipeline order "fixed, load-bearing" and
+  ends "Do not reorder these without updating this file and every service's
+  `Program.cs` together" - a rule written in prose, duplicated across ten copies
+  of one file, and checked by nothing at all.
+
+  **`scripts/pipeline-order.sh` checks it now, and CI runs it.** The expected
+  order is read out of §4.4 rather than hard-coded, so the documentation is the
+  single source of truth and the check fails whichever side moves - verified
+  both ways by breaking each in turn. All ten services agree today, so this
+  finds no current bug; it is a guard on a security property, which is that
+  tenant authorization runs before validation so an unauthorized caller never
+  learns the validation rules for data they cannot see.
+
+  **CI also now runs `scripts/unreachable-endpoints.sh`**, reported rather than
+  failed - a listed endpoint is not automatically a bug. That sweep drove six
+  cycles of work and was only ever run by hand.
+
+  1,518 tests green, unchanged: this cycle added no tests, which is the honest
+  outcome when the thing that was missing was a check rather than a test.
+- **Previously:** 2026-09-02 - **the function that decides who wins an
   election had no tests.**
 
   Applying the gateway audit to the ten services put celebrity-voting bottom by
@@ -535,6 +565,15 @@ unit tested.
       block. The palette was measured rather than assumed and passes AA
       everywhere — tightest pair 4.56:1. What each app's `CLAUDE.md` now records
       is what was checked, so the next pass does not start over
+- [x] **`scripts/pipeline-order.sh`, 2026-09-02**, and CI runs it alongside the
+      endpoint sweep. Root `CLAUDE.md` §4.4 calls the pipeline order "fixed,
+      load-bearing" and asks that it be changed in eleven places at once; until
+      now nothing checked that it had been. The expected order is read out of
+      §4.4, so the doc is the source of truth and drift on either side fails.
+      All ten services agree today — this is a guard, not a fix. Auditing
+      boli-service, which prompted it, found nothing worth adding: its ratio is
+      thin only because most of its files are the `Result`/`Error`/behaviour
+      boilerplate every service copies
 - [x] **`RankBy` has tests, 2026-09-02.** The same audit applied to the ten
       services put celebrity-voting bottom by a distance — 59 source files, 22
       tests — and the gap was the function that decides who is named the

@@ -116,6 +116,29 @@ jobs:
       - name: Build admin portal
         run: npm run build:admin
 
+  conventions:
+    name: Cross-service conventions
+    runs-on: ubuntu-latest
+
+    # Rules the repository states in prose and no compiler enforces. Both of
+    # these read source rather than running anything, so they are seconds.
+    steps:
+      - uses: actions/checkout@v4
+
+      # Root CLAUDE.md §4.4 calls the pipeline order "fixed, load-bearing" and
+      # it is duplicated across ten copies of one file. The expected order is
+      # read out of CLAUDE.md, so this fails whichever side moves.
+      - name: Pipeline behavior order matches CLAUDE.md §4.4
+        run: bash scripts/pipeline-order.sh
+
+      # Reported, never failed: a listed endpoint is not automatically a bug -
+      # `GET /v1/identity/tenants/by-id/{id}` is the gateway's and belongs to no
+      # app. This is here so the list is in front of somebody on every change
+      # rather than only when a person remembers to run it, which is how six
+      # cycles of gaps went unnoticed.
+      - name: Endpoints no app can reach
+        run: bash scripts/unreachable-endpoints.sh
+
   migrations:
     name: EF migrations are up to date
     runs-on: ubuntu-latest
