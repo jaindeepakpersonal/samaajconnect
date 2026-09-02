@@ -2,7 +2,7 @@ import { provideHttpClient } from '@angular/common/http';
 import { HttpTestingController, provideHttpClientTesting } from '@angular/common/http/testing';
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { ActivatedRoute, provideRouter } from '@angular/router';
-import { API_CONFIG, closesIn, formatRupees, parseRupees, toInputValue } from '@samaajconnect/shared';
+import { API_CONFIG } from '@samaajconnect/shared';
 import { BoliDetailComponent } from './boli-detail.component';
 import { BoliListComponent } from './boli-list.component';
 import { Bid, Boli, BoliResult, Occasion, OccasionDetail } from './boli.models';
@@ -70,56 +70,6 @@ function bid(overrides: Partial<Bid> = {}): Bid {
     ...overrides,
   };
 }
-
-describe('money', () => {
-  it('formats paise as rupees, grouped the Indian way', () => {
-    // A lakh groups as 1,00,000 and not as 100,000.
-    expect(formatRupees(1_510_000)).toContain('15,100');
-    expect(formatRupees(15_000_000)).toContain('1,50,000');
-  });
-
-  it('does not print paise on a round amount', () => {
-    expect(formatRupees(1_510_000)).not.toContain('.00');
-  });
-
-  it('prints paise when there are any', () => {
-    expect(formatRupees(1_510_050)).toContain('15,100.50');
-  });
-
-  it('rounds rather than truncating on the way in', () => {
-    // 15600.07 * 100 is 1560006.9999999998 in binary floating point. Truncating
-    // would bid a paisa less than the member typed.
-    expect(parseRupees('15600.07')).toBe(1_560_007);
-    expect(parseRupees('15600.50')).toBe(1_560_050);
-  });
-
-  it('accepts what people actually type', () => {
-    expect(parseRupees('  15600 ')).toBe(1_560_000);
-    expect(parseRupees('₹15,600')).toBe(1_560_000);
-  });
-
-  it('refuses anything that is not an amount', () => {
-    // parseFloat would read "12abc" as 12 and bid a number nobody typed.
-    expect(parseRupees('12abc')).toBeNull();
-    expect(parseRupees('')).toBeNull();
-    expect(parseRupees('-500')).toBeNull();
-    expect(parseRupees('15600.123')).toBeNull();
-  });
-
-  it('round-trips an amount through the input and back', () => {
-    expect(parseRupees(toInputValue(1_560_050))).toBe(1_560_050);
-    expect(parseRupees(toInputValue(1_560_000))).toBe(1_560_000);
-  });
-
-  it('says how long is left rather than only when it ends', () => {
-    const now = new Date('2026-09-01T05:00:00Z');
-
-    expect(closesIn('2026-09-01T05:30:00Z', now)).toBe('Closes in 30 minutes');
-    expect(closesIn('2026-09-01T08:00:00Z', now)).toBe('Closes in 3 hours');
-    expect(closesIn('2026-09-04T05:00:00Z', now)).toBe('Closes in 3 days');
-    expect(closesIn('2026-09-01T04:00:00Z', now)).toBe('Bidding has closed');
-  });
-});
 
 describe('BoliListComponent', () => {
   let fixture: ComponentFixture<BoliListComponent>;

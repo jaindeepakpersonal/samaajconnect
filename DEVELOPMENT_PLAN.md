@@ -8,7 +8,38 @@ version of the plan; the reasoning behind the ordering lives in
 ## Current Status
 
 - **Stage:** every module has a service and member screens; Phase 5 hardening under way
-- **Last updated:** 2026-09-02 - **a second accessibility pass**, because the
+- **Last updated:** 2026-09-02 - **tests for `libs/shared`**, the code both apps
+  run on.
+
+  The intent was to test the member portal's oldest screens, and that turned out
+  to be unnecessary: every component in both apps is already covered. The gap
+  was underneath them. `libs/shared` had 17 tests across two of its ten files,
+  and the two with none at all were `tenant.interceptor` - which rewrites the
+  URL of every request either app makes - and `token.store`, which holds the
+  session. 61 tests now, and each new guarantee was checked by breaking it.
+
+  **One of them is a check nothing else in the repository could make.**
+  `module-keys.spec.ts` reads the gateway's `appsettings.json` and asserts that
+  the client's module keys are exactly the ones the gateway gates routes on. A
+  wrong key does nothing visible - the filter never matches, so a feature is
+  missing from the portal for every Samaaj with nothing logged - and that has
+  already happened once here, to the Events and Volunteer tiles on Home.
+
+  **`money.ts` moved to `libs/shared` last week and its tests did not.** They
+  were still in the member portal's Boli spec, describing a shared module from
+  inside one of the two apps that use it. They live beside the code now, with
+  the edge cases the move was a good moment to add: `1e5`, `.5` and `0` all
+  parse the way they should.
+
+  **A spec here is type-checked twice, and more strictly the second time.** Both
+  app builds compile this library including its specs, so a `PLATFORM_ID`
+  provider typed `object` satisfied vitest and then failed `ng test
+  member-portal`. Written into `libs/shared/CLAUDE.md`, which this cycle also
+  added - the library had none.
+
+  1,486 tests green (985 backend across 21 suites, 501 frontend). No smoke run:
+  nothing backend changed.
+- **Previously:** 2026-09-02 - **a second accessibility pass**, because the
   first one had gone stale in a week.
 
   The 2026-09-01 audit predated the eight admin screens built after it, so those
@@ -452,6 +483,16 @@ unit tested.
       block. The palette was measured rather than assumed and passes AA
       everywhere — tightest pair 4.56:1. What each app's `CLAUDE.md` now records
       is what was checked, so the next pass does not start over
+- [x] **`libs/shared` has its own tests, 2026-09-02.** It had 17 across two of
+      ten files; the tenant interceptor, which rewrites the URL of every request
+      either app makes, and the token store, which holds the session, had none.
+      61 now. The one worth naming is `module-keys.spec.ts`, which reads the
+      gateway's `appsettings.json` and asserts the client's module keys are the
+      ones the gateway gates routes on — the only check here that can fail when
+      those drift, and a drift that is otherwise silent. `money.ts`'s tests
+      moved from the member portal's Boli spec to sit beside the code, where
+      they should have gone when the module did. The library also got a
+      `CLAUDE.md`, which it had never had
 - [x] **Second accessibility pass, 2026-09-02**, because the first predated the
       eight admin screens built after it. Four findings, all of which also
       applied to screens the first pass *had* covered - which is the point worth

@@ -42,7 +42,8 @@ samaajconnect/
 ├── apps/
 │   ├── member-portal/            (Angular, SSR; Dockerfile; served by the gateway)
 │   └── admin-portal/             (Angular, SPA; Dockerfile + nginx.conf; own origin)
-├── libs/                         (shared Angular components, HTTP interceptors)
+├── libs/
+│   └── shared/                   (CLAUDE.md; code both apps use - interceptors, tokens, money, module keys)
 └── .claude/
     └── skills/
         ├── new-microservice/     (scaffold a new bounded-context service)
@@ -256,6 +257,7 @@ Neither uses `*service-defaults` — they need no database and no broker.
 | Phased plan (why) / live tracker (what's done) | `docs/product/ROADMAP.md` / `DEVELOPMENT_PLAN.md` |
 | UI reference | `docs/product/wireframes/*.html` |
 | Member-facing app conventions | `apps/member-portal/CLAUDE.md` |
+| Code both apps share, and why it is shared | `libs/shared/CLAUDE.md` |
 | Admin panel conventions | `apps/admin-portal/CLAUDE.md` |
 | Module-gated service, worked example | `services/timeline-service/CLAUDE.md` |
 | A correctness guarantee that is a database index | `services/celebrity-voting-service/CLAUDE.md` |
