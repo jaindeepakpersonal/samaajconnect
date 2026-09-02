@@ -57,6 +57,22 @@ refuses() {
       echo "  LEAK    $label -> 403 (refused, but confirms the id is real)"
       leaked=$((leaked + 1))
       ;;
+    400)
+      # Not an isolation failure, and worth saying so in the output rather than
+      # leaving the next person to work it out.
+      #
+      # ValidationBehavior runs *before* the handler that checks the tenant
+      # (root CLAUDE.md §4.4), so a body the validator refuses never reaches the
+      # check this script exists to make. The endpoint is then not probed at
+      # all - which is why this counts as a failure rather than a pass, even
+      # though nothing leaked.
+      #
+      # It happens when a command gains a required field and the body below is
+      # not updated with it. `UpdateProfileCommand` gaining
+      # `IsListedInDirectory` did exactly that, and this line is what said so.
+      echo "  STALE   $label -> 400 (body no longer satisfies the validator; NOT probed)"
+      fail=$((fail + 1))
+      ;;
     *)
       echo "  FAIL    $label -> $actual (expected 404)"
       fail=$((fail + 1))
@@ -132,13 +148,33 @@ SUPER=$(login "$SUPERADMIN" "$SUPERADMIN_PASSWORD")
 NOTICE=$(curl -s "$GATEWAY/v1/identity/consent-notice" | json_field version)
 
 echo "== making sure both Samaaj exist, with every module on =="
-A_ID=$(curl -s "$GATEWAY/v1/identity/tenants/$A_SLUG" | json_field id)
 
-curl -s -o /dev/null -X POST "$GATEWAY/v1/identity/tenants" \
-  -H "Authorization: Bearer $SUPER" -H 'Content-Type: application/json' \
-  -d "{\"name\":\"Probe Samaaj\",\"slug\":\"$B_SLUG\"}" || true
+# Both are created, not just B.
+#
+# A used to be looked up and never created, on the assumption that
+# `smoke-through-gateway.sh` had already made `smoke-samaj`. Against empty
+# volumes that lookup returns nothing, `A_ID` is empty, and the script gets as
+# far as "could not sign in both members" before stopping - which is at least
+# loud, but it made a security check quietly dependent on another script having
+# been run first, in the right order, in the same session. Creating both means
+# this one stands on its own.
+ensure_tenant() {
+  local slug="$1" name="$2"
 
-B_ID=$(curl -s "$GATEWAY/v1/identity/tenants/$B_SLUG" | json_field id)
+  curl -s -o /dev/null -X POST "$GATEWAY/v1/identity/tenants" \
+    -H "Authorization: Bearer $SUPER" -H 'Content-Type: application/json' \
+    -d "{\"name\":\"$name\",\"slug\":\"$slug\"}" || true
+
+  curl -s "$GATEWAY/v1/identity/tenants/$slug" | json_field id
+}
+
+A_ID=$(ensure_tenant "$A_SLUG" "Probe Samaaj A")
+B_ID=$(ensure_tenant "$B_SLUG" "Probe Samaaj B")
+
+[ -n "$A_ID" ] && [ -n "$B_ID" ] || {
+  echo "  BROKEN  could not create or find both Samaaj (A='$A_ID' B='$B_ID')"
+  exit 1
+}
 
 for t in "$A_ID" "$B_ID"; do
   curl -s -o /dev/null -X PUT "$GATEWAY/v1/identity/tenants/$t/modules" \
@@ -192,6 +228,26 @@ CAMPAIGN_ID=$(curl -s "${SA[@]}" -X POST "$GATEWAY/v1/celebrity-voting/campaigns
 PATHSHALA_ID=$(curl -s "${SA[@]}" -X POST "$GATEWAY/v1/pathshala/pathshalas" \
   -d '{"name":"Probe Pathshala","address":"A","contactPerson":"A"}' | json_field id)
 
+# A Pathshala with a class, a placed child and an exam, so the teaching half is
+# probeable at all. Those endpoints - the register, the roll, the timetable,
+# exam results - were added long after this script was written, and until now
+# nothing here touched them.
+SESSION_ID=$(curl -s "${SA[@]}" -X POST "$GATEWAY/v1/pathshala/pathshalas/$PATHSHALA_ID/sessions" \
+  -d '{"label":"probe-2026","startDate":"2020-01-01","endDate":"2099-01-01"}' \
+  | grep -oE '"sessions":\[\{"id":"[^"]*"' | cut -d'"' -f6)
+
+CLASS_ID=$(curl -s "${SA[@]}" -X POST "$GATEWAY/v1/pathshala/pathshalas/$PATHSHALA_ID/classes" \
+  -d "{\"sessionId\":\"$SESSION_ID\",\"name\":\"Probe class\",\"roomLabel\":null}" | json_field id)
+
+ENROLMENT_ID=$(curl -s "${SA[@]}" -X POST "$GATEWAY/v1/pathshala/pathshalas/$PATHSHALA_ID/enrollments" \
+  -d '{"childProfileId":"00000000-0000-0000-0000-0000000000aa"}' | json_field id)
+
+curl -s -o /dev/null "${SA[@]}" -X POST "$GATEWAY/v1/pathshala/enrollments/$ENROLMENT_ID/placement" \
+  -d "{\"classId\":\"$CLASS_ID\",\"place\":true}"
+
+EXAM_ID=$(curl -s "${SA[@]}" -X POST "$GATEWAY/v1/pathshala/classes/$CLASS_ID/exams" \
+  -d '{"title":"Probe exam","examDate":"2026-01-01","maxScore":50}' | json_field id)
+
 OCCASION_ID=$(curl -s "${SA[@]}" -X POST "$GATEWAY/v1/boli/occasions" \
   -d '{"title":"Probe occasion","description":"A","occasionDate":"2099-01-01"}' | json_field id)
 
@@ -213,7 +269,8 @@ BOLI_ID=$(curl -s "${SA[@]}" -X POST "$GATEWAY/v1/boli/occasions/$OCCASION_ID/bo
 missing=0
 
 for pair in "post:$POST_ID" "issue:$ISSUE_ID" "group:$GROUP_ID" "event:$EVENT_ID" \
-            "campaign:$CAMPAIGN_ID" "pathshala:$PATHSHALA_ID" "occasion:$OCCASION_ID" "boli:$BOLI_ID"; do
+            "campaign:$CAMPAIGN_ID" "pathshala:$PATHSHALA_ID" "occasion:$OCCASION_ID" "boli:$BOLI_ID" \
+            "session:$SESSION_ID" "class:$CLASS_ID" "enrolment:$ENROLMENT_ID" "exam:$EXAM_ID"; do
   name=${pair%%:*}; id=${pair##*:}
 
   if [ -z "$id" ]; then
@@ -241,6 +298,9 @@ control "voting    campaign"  "/v1/celebrity-voting/campaigns/$CAMPAIGN_ID"  "$A
 control "boli      Boli"      "/v1/boli/boli/$BOLI_ID"                       "$A_TOKEN"
 control "boli      occasion"  "/v1/boli/occasions/$OCCASION_ID"              "$A_TOKEN"
 control "pathshala Pathshala" "/v1/pathshala/pathshalas/$PATHSHALA_ID"       "$A_TOKEN"
+control "pathshala class roll" "/v1/pathshala/classes/$CLASS_ID/roll"        "$SUPER" "$A_ID"
+control "pathshala register"   "/v1/pathshala/classes/$CLASS_ID/register?date=2026-01-01" "$SUPER" "$A_ID"
+control "pathshala class exams" "/v1/pathshala/classes/$CLASS_ID/exams"      "$SUPER" "$A_ID"
 control "members   member"    "/v1/members/$A_MEMBER_ID"                     "$A_TOKEN"
 
 echo
@@ -273,7 +333,14 @@ probe "pathshala read A's Pathshala"     GET  "/v1/pathshala/pathshalas/$PATHSHA
 probe "members   read A's member"        GET  "/v1/members/$A_MEMBER_ID"             "$B_TOKEN"
 # A full, valid body - otherwise ValidationBehavior answers 400 before the
 # handler reaches the tenant check, the same trap as the issues move above.
-probe "members   correct A's member"     PATCH "/v1/members/$A_MEMBER_ID"            "$B_TOKEN" "" '{"fullName":"probe","privacy":{"mobile":"Private","email":"Private","address":"Private","profession":"Private","dateOfBirth":"Private"}}'
+#
+# `isListedInDirectory` was added to this body on 2026-09-02, and its absence is
+# the second time this one endpoint has caught the probe out. `UpdateProfile`
+# replaces the whole profile, so every required field has to be here; when the
+# command gained that one, this body stopped reaching the handler at all and the
+# endpoint quietly stopped being probed. `refuses` now says STALE rather than
+# FAIL for a 400, so the next time it is obvious what happened.
+probe "members   correct A's member"     PATCH "/v1/members/$A_MEMBER_ID"            "$B_TOKEN" "" '{"fullName":"probe","privacy":{"mobile":"Private","email":"Private","address":"Private","profession":"Private","dateOfBirth":"Private"},"isListedInDirectory":true}'
 
 echo
 echo "== Samaaj B's ADMINISTRATOR attempts to act on Samaaj A's entities =="
@@ -289,6 +356,28 @@ probe "voting    publish A's results"     POST "/v1/celebrity-voting/campaigns/$
 probe "pathshala open a session in A's"   POST "/v1/pathshala/pathshalas/$PATHSHALA_ID/sessions" "$SUPER" "$B_ID" '{"label":"probe","startDate":"2099-01-01","endDate":"2099-06-01"}'
 probe "pathshala add a class to A's"      POST "/v1/pathshala/pathshalas/$PATHSHALA_ID/classes" "$SUPER" "$B_ID" '{"sessionId":"00000000-0000-0000-0000-000000000001","name":"probe","roomLabel":null}'
 probe "pathshala deactivate A's"          DELETE "/v1/pathshala/pathshalas/$PATHSHALA_ID" "$SUPER" "$B_ID"
+
+# The teaching half. These take a class, an enrolment or an exam id rather than
+# the Pathshala's, so they are a separate reach across the boundary: the caller
+# never names the Samaaj at all, and the handler has to find it from the id it
+# was given and check that against the request's tenant.
+probe "pathshala read A's roll"           GET  "/v1/pathshala/classes/$CLASS_ID/roll"     "$SUPER" "$B_ID"
+probe "pathshala read A's register"       GET  "/v1/pathshala/classes/$CLASS_ID/register?date=2026-01-01" "$SUPER" "$B_ID"
+probe "pathshala read A's class exams"    GET  "/v1/pathshala/classes/$CLASS_ID/exams"    "$SUPER" "$B_ID"
+probe "pathshala teach A's class"         POST "/v1/pathshala/classes/$CLASS_ID/teachers" "$SUPER" "$B_ID" "{\"teacherMemberId\":\"$A_MEMBER_ID\",\"assign\":true}"
+probe "pathshala timetable A's class"     POST "/v1/pathshala/classes/$CLASS_ID/schedule" "$SUPER" "$B_ID" '{"dayOfWeek":"Sunday","startTime":"09:00:00","endTime":"10:00:00"}'
+probe "pathshala mark A's register"       POST "/v1/pathshala/classes/$CLASS_ID/attendance" "$SUPER" "$B_ID" "{\"classDate\":\"2026-01-01\",\"marks\":[{\"enrolmentId\":\"$ENROLMENT_ID\",\"status\":\"Present\"}]}"
+probe "pathshala set an exam in A's class" POST "/v1/pathshala/classes/$CLASS_ID/exams"   "$SUPER" "$B_ID" '{"title":"probe","examDate":"2026-01-01","maxScore":10}'
+probe "pathshala mark A's exam"           POST "/v1/pathshala/exams/$EXAM_ID/results"     "$SUPER" "$B_ID" "{\"enrolmentId\":\"$ENROLMENT_ID\",\"score\":1,\"grade\":null}"
+probe "pathshala place A's child"         POST "/v1/pathshala/enrollments/$ENROLMENT_ID/placement" "$SUPER" "$B_ID" "{\"classId\":\"$CLASS_ID\",\"place\":true}"
+probe "pathshala withdraw A's child"      DELETE "/v1/pathshala/enrollments/$ENROLMENT_ID" "$SUPER" "$B_ID"
+probe "pathshala read A's placement queue" GET "/v1/pathshala/pathshalas/$PATHSHALA_ID/enrollments/requests" "$SUPER" "$B_ID"
+
+# A child's own records, which are the most sensitive thing the platform holds.
+probe "pathshala read A's child's class"  GET  "/v1/pathshala/enrollments/$ENROLMENT_ID/my-class"   "$SUPER" "$B_ID"
+probe "pathshala read A's child's marks"  GET  "/v1/pathshala/enrollments/$ENROLMENT_ID/attendance" "$SUPER" "$B_ID"
+probe "pathshala read A's child's exams"  GET  "/v1/pathshala/enrollments/$ENROLMENT_ID/exams"      "$SUPER" "$B_ID"
+probe "pathshala read A's child's progress" GET "/v1/pathshala/enrollments/$ENROLMENT_ID/progress"  "$SUPER" "$B_ID"
 probe "boli      add a type to A's"       POST "/v1/boli/occasions/$OCCASION_ID/boli-types" "$SUPER" "$B_ID" '{"name":"probe","description":null}'
 probe "boli      move A's occasion"       POST "/v1/boli/occasions/$OCCASION_ID/status" "$SUPER" "$B_ID" '{"status":"Closed"}'
 probe "boli      close A's Boli"          POST "/v1/boli/boli/$BOLI_ID/close"         "$SUPER" "$B_ID" '{}'

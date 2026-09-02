@@ -8,7 +8,35 @@ version of the plan; the reasoning behind the ordering lives in
 ## Current Status
 
 - **Stage:** every module has a service and member screens; Phase 5 hardening under way
-- **Last updated:** 2026-09-02 - **a rule stated in prose, duplicated ten
+- **Last updated:** 2026-09-02 - **the tenant-isolation probe had gone stale,
+  and one endpoint had stopped being probed without saying so.**
+
+  Same pattern as the accessibility audit two cycles ago: a check written at a
+  point in time, and a platform that grew past it. 29 of the 73 id-taking
+  endpoints were never touched by it - most of them the Pathshala teaching
+  cluster, added months after the probe and never covered. 36 probes are 51 now,
+  and all 51 refuse a cross-tenant attempt with 404.
+
+  **Two faults in the probe itself, both of the kind that make a check useless
+  while it still prints a summary.**
+
+  It could not run on its own: it looked Samaaj A up and never created it,
+  assuming `smoke-through-gateway.sh` had already made `smoke-samaj`. Against
+  empty volumes it stopped at "could not sign in both members". A security check
+  that silently depends on another script having been run first is one that gets
+  skipped.
+
+  And the body for `PATCH /v1/members/{id}` had gone stale - it omitted
+  `isListedInDirectory`, which the command gained afterwards. Validation runs
+  before the handler, so the request answered 400 and never reached the tenant
+  check; the endpoint had stopped being probed. **Isolation was intact**,
+  verified three ways with curl before drawing any conclusion: stale body 400,
+  complete body cross-tenant 404, complete body on its own Samaaj 200. A 400
+  now reports as `STALE ... NOT probed`, because a command will gain a required
+  field again.
+
+  1,518 tests green, unchanged. This cycle ran a check rather than adding one.
+- **Previously:** 2026-09-02 - **a rule stated in prose, duplicated ten
   times, and enforced by nothing.**
 
   The plan was to audit boli-service, the next-lowest test ratio. It turned out
@@ -544,11 +572,34 @@ unit tested.
       unguessable URL
 - [x] Tenant-isolation penetration testing (attempt cross-tenant IDOR
       on every write endpoint) — `scripts/tenant-isolation-probe.sh`. Two real
-      Samaaj; B's member and B's administrator attempt 36 reads and writes
-      against A's ids through the gateway, across all ten services. All 36
+      Samaaj; B's member and B's administrator attempt reads and writes
+      against A's ids through the gateway, across all ten services. All
       refused with 404, none with 403. The script proves its own paths first,
       after a first run scored three false passes against endpoints that did
       not exist at the path it used
+- [x] **Re-run and extended on 2026-09-02, because it had gone stale.** 36
+      probes had become 51: the Pathshala teaching endpoints — the register,
+      the roll, the timetable, exam results, placing and withdrawing a child,
+      and a child's own attendance and progress — were added months after the
+      probe was written and it had never touched any of them. 29 of the
+      platform's 73 id-taking endpoints were unprobed. All 51 now refuse with
+      404, including every new one
+- [x] **Fixed: the probe could not run on its own.** It looked Samaaj A up and
+      never created it, on the assumption that `smoke-through-gateway.sh` had
+      already made `smoke-samaj` — so against empty volumes it stopped at "could
+      not sign in both members". A security check that depends on another script
+      having been run first, in the right order, is one that will be skipped. It
+      creates both Samaaj now
+- [x] **Fixed: one endpoint had silently stopped being probed.** The body for
+      `PATCH /v1/members/{id}` omitted `isListedInDirectory`, which
+      `UpdateProfileCommand` gained after the probe was written. Validation runs
+      before the handler (§4.4), so the request answered 400 and never reached
+      the tenant check at all. Verified three ways with curl before concluding
+      anything: stale body 400, complete body cross-tenant 404, complete body on
+      its own Samaaj 200. **Isolation was intact** — the probe was not. A 400 now
+      reports as `STALE ... NOT probed` rather than as an ambiguous failure,
+      because the same thing will happen again the next time a command gains a
+      required field
 - [x] **Fixed: `PATCH /v1/members/{id}` answered 500 when `privacy` was
       omitted.** `PrivacySettings Privacy` is a non-nullable reference type,
       which is a compile-time claim only — the JSON deserialiser leaves it null,
