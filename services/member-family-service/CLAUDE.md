@@ -100,17 +100,27 @@ from a token's `sub` claim with no lookup in between. It also makes "have I
 already created this profile?" a primary-key check rather than a dedupe table,
 which is what makes the consumer idempotent.
 
-**A cross-service read re-checks the tenant itself, and that check is not
-belt-and-braces.** `GetChildNamesQuery` answers another service's ids with
-names, and its handler compares every row's `TenantId` against
-`ITenantContext` rather than trusting the global query filter. That is there
-because a test caught the filter *not* excluding another Samaaj's child -
-reproducibly, with the generated SQL showing a correct
-`WHERE tenant_id = ...` and the same query returning nothing when
-no tenant is resolved. The cause is not known and is written up as an open item
-in `DEVELOPMENT_PLAN.md`. Remove the explicit check and
-`ChildNamesTests.A_child_in_another_Samaaj_is_simply_absent` fails, so do not
-remove it because the filter "should" be enough.
+**A cross-service read re-checks the tenant itself, as belt and braces.**
+`GetChildNamesQuery` answers another service's ids with names, and its handler
+compares every row's `TenantId` against `ITenantContext` as well as relying on
+the global query filter. The filter is not broken - that was claimed here for a
+day and it was wrong, see the note below. The check stays because this read has
+the IDOR shape SECURITY-CHECKLIST.md is about: the ids come from another
+service, and the answer is children's data.
+
+**A fault-injection experiment left a broken build, and it cost most of a
+cycle.** The way this repo checks that a test really tests something is to break
+the thing and watch it fail. That is sound, and it has caught real problems - but
+the restore has to be verified before anything is concluded from the next run.
+It was not, once: `ListByIdsAsync` was deliberately given `IgnoreQueryFilters()`,
+and results read afterwards were attributed to the restored code. That produced a
+confident, written-up, security-flagged report of a tenant-filter bug that does
+not exist.
+
+The cheap habit that would have caught it: after restoring, re-run the
+*unmodified* case and confirm it passes before drawing any conclusion from a
+failure. And treat "this contradicts how EF demonstrably works" as evidence about
+the build, not about EF.
 
 **Being unlisted is not a privacy level, and could not be one.** Per-field
 privacy cannot remove a member from the directory: someone who marks every

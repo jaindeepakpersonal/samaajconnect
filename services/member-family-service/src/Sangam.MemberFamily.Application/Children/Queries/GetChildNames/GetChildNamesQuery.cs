@@ -65,23 +65,22 @@ public sealed class GetChildNamesQueryHandler(
 
         var found = await children.ListByIdsAsync(query.Ids, cancellationToken);
 
-        // **Re-checked here, not left to the query filter.**
+        // Belt and braces, and honestly labelled as such.
         //
-        // SECURITY-CHECKLIST.md asks write paths to re-validate the target's
-        // tenant rather than trust the filter, on the grounds that a missing
-        // check is invisible. This is a read, and it gets the same treatment for
-        // a sharper reason: an integration test seeded one child in each of two
-        // Samaajs, asked as an administrator of the first, and got both back -
-        // reproducibly, on a clean build, with `ToQueryString()` showing a
-        // correctly parameterised `WHERE tenant_id = @__ef_filter__...` and the
-        // same query returning nothing when no tenant is resolved. Those facts
-        // do not reconcile, and the cause is written up as an open item in
-        // DEVELOPMENT_PLAN.md rather than guessed at.
+        // The global query filter already does this correctly - verified four
+        // ways after an earlier claim in this file that it did not: against the
+        // deployed stack with this line removed, against a three-tenant probe in
+        // the test host with this line removed, and by the tests below passing
+        // with it removed. There is no filter bug. The claim that there was one
+        // came from reading results off a build that still had a deliberately
+        // broken repository from a fault-injection experiment.
         //
-        // Whatever that turns out to be, this line is the guarantee: names cross
-        // a service boundary here, and children's data is the most sensitive
-        // thing this platform holds (DPDP s.9). An explicit check costs one
-        // comparison per row and does not depend on being right about EF.
+        // The line stays because this read is shaped like the IDOR case
+        // SECURITY-CHECKLIST.md is about: the ids come from another service
+        // rather than from anything this one issued, and the answer is
+        // children's data, which is the most sensitive thing the platform holds
+        // (DPDP s.9). One comparison per row is a fair price there. It is not
+        // compensating for anything.
         IReadOnlyList<ChildNameResponse> results =
         [
             .. found

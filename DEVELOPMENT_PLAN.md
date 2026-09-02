@@ -20,15 +20,13 @@ version of the plan; the reasoning behind the ordering lives in
   the child record - that carries a date of birth and the parental-consent
   record, and a queue printing a name has no business receiving them.
 
-  **That endpoint turned up something unresolved and security-relevant**, listed
-  under Phase 5: a test seeding one child in each of two Samaajs and asking as
-  an administrator of the first got **both** back, with the generated SQL
-  showing a correct tenant filter and the same query returning nothing when no
-  tenant is resolved. The handler now re-checks every row's tenant itself and
-  the test fails without that line, so the endpoint is safe - but the cause is
-  not known and is written up rather than guessed at. 1,333 tests green (974
-  backend across 21 suites, 359 frontend) plus 265 smoke checks against empty
-  volumes.
+  That endpoint was reported here as having turned up a tenant-filter bug. **It
+  had not.** The filter is correct; the failure came from reading results off a
+  build that still contained a deliberately broken repository from a
+  fault-injection experiment. Closed under Phase 5 with what verified it, and
+  the habit that would have caught it sooner is written into
+  `services/member-family-service/CLAUDE.md`. 1,333 tests green (974 backend
+  across 21 suites, 359 frontend) plus 265 smoke checks against empty volumes.
 - **Blocking item:** none. **Every module the platform has now has both a
   service and member screens**, and the role matrix is editable per Samaaj. What
   is left that needs nothing from outside is the 25 unreachable endpoints listed
@@ -453,34 +451,21 @@ unit tested.
       approved, and redeeming an activation code, which three admin screens told
       people to do "in the member portal" while the member portal had nowhere to
       do it. All three were complete, tested, and reachable only by curl
-- [ ] **Open, security-relevant: a tenant query filter that did not exclude
-      another Samaaj's row.** `ChildNamesTests.A_child_in_another_Samaaj_is_simply_absent`
-      seeds one child in each of two Samaajs, asks as an administrator of the
-      first, and got **both** back — reproducibly, on a clean build. What is
-      established:
-  - the rows really are in different tenants (read back with
-    `IgnoreQueryFilters`)
-  - `ChildProfile` implements `ITenantScopedEntity` and the model does carry a
-    filter for it (`FindEntityType(...).GetQueryFilter()` is not null)
-  - `ToQueryString()` shows a correctly parameterised
-    `WHERE c.tenant_id = @__ef_filter__CurrentTenantId_0 AND c.id = ANY(@__ids_0)`
-  - the same query in a scope with no resolved tenant returns 0 rows, so the
-    filter does run
-  - the repository method under test really is the one executing (forcing it to
-    return nothing breaks the other tests in the class)
-  - `MemberProfile`, queried the same way and seeded the same way, does **not**
-    leak — `MemberEndpointsTests.The_directory_shows_only_this_Samaaj` covers it
-      Those facts do not reconcile and the cause is not yet known. The endpoint
-      is safe: `GetChildNamesQueryHandler` re-checks every row's `TenantId`
-      against `ITenantContext` and the test fails without that line. **What is
-      not known is whether anything else on the platform relies on the filter
-      alone for a read.** `scripts/tenant-isolation-probe.sh` passes its 36
-      cross-tenant probes against the running stack, so this is not known to
-      affect deployed behaviour — but "not known to" is the accurate phrase.
-      Next step: find why one entity behaves differently from another. The one
-      structural difference found so far is that `ChildProfile` has an owned
-      entity (`ParentalConsent`) and `MemberProfile`'s `FieldPrivacy` is owned
-      too, so that is not obviously it either
+- [x] **Closed, and it was not a bug: the "tenant filter that did not exclude
+      another Samaaj's row".** Reported here on 2026-09-02 as unexplained and
+      security-relevant. It was wrong. The filter is correct, verified four ways:
+      against the deployed stack with the handler's extra tenant check removed
+      (only the caller's own Samaaj comes back); with a three-tenant probe in the
+      test host, also with that check removed (A sees A, B sees B, an unrelated
+      Samaaj sees nothing); and by `ChildNamesTests` passing 7 of 7 with the
+      check removed. The original failure came from reading results off a build
+      that still contained a deliberately broken `ListByIdsAsync` from a
+      fault-injection experiment, and attributing them to the restored code.
+      The lesson - verify the restore, and re-run the unmodified case, before
+      concluding anything from the next failure - is written up in
+      `services/member-family-service/CLAUDE.md`. The handler keeps its explicit
+      tenant check as belt and braces for a read whose ids come from another
+      service, not as a workaround
 - [ ] **20 endpoints nobody can reach from either app**, down from 27 when the
       sweep was written. One is not a gap: `GET /v1/identity/tenants/by-id/{id}`
       is the gateway's. The other 19 are screens nobody has built, and they
