@@ -34,6 +34,11 @@ PASSWORD="a-long-enough-password"
 A_MEMBER="probe-a@example.com"
 B_MEMBER="probe-b@example.com"
 
+# A second member in Samaaj A. Somebody has to ask to join A's family and apply
+# to A's group, and A's first member is the head of one and the president of
+# the other.
+A_MEMBER2="probe-a2@example.com"
+
 pass=0
 fail=0
 leaked=0
@@ -284,6 +289,83 @@ curl -s -o /dev/null "${SA[@]}" -X POST "$GATEWAY/v1/pathshala/enrollments/$ENRO
 EXAM_ID=$(curl -s "${SA[@]}" -X POST "$GATEWAY/v1/pathshala/classes/$CLASS_ID/exams" \
   -d '{"title":"Probe exam","examDate":"2026-01-01","maxScore":50}' | json_field id)
 
+# ---- The household, the children and the memberships --------------------------
+#
+# These need a second member in Samaaj A: somebody has to ask to join A's family
+# and somebody has to apply to A's group, and A's first member is the head of
+# one and the president of the other. They are the most sensitive endpoints left
+# unprobed - a household's membership, and a child's conversion to an adult
+# account - so they are worth the setup.
+A2_TOKEN=$(register_member "$A_SLUG" "$A_MEMBER2" "Probe A2" "$NOTICE")
+AA2=(-H "Authorization: Bearer $A2_TOKEN" -H 'Content-Type: application/json')
+
+A_MEMBER2_ID=$(curl -s "${AA2[@]}" "$GATEWAY/v1/identity/me" | json_field userId)
+
+# A's family, and its code, which is what a join request quotes.
+FAMILY_ID=$(curl -s "${AA[@]}" -X POST "$GATEWAY/v1/families" | json_field id)
+
+if [ -z "$FAMILY_ID" ]; then
+  # Already the head of one from a previous run.
+  FAMILY_ID=$(curl -s "${AA[@]}" "$GATEWAY/v1/families/mine" | json_field id)
+fi
+
+FAMILY_CODE=$(curl -s "${AA[@]}" "$GATEWAY/v1/families/mine" | json_field familyCode)
+
+# Asked for once, then read back off the head's own view of the household.
+#
+# A member belongs to one household and a *pending* request counts, so a second
+# run's repeat request is refused and hands back no id - the same re-runnability
+# problem as the group name. The head sees the pending row in
+# `/families/mine`, which is where the id actually lives, so that is the source
+# rather than the response to the request.
+curl -s -o /dev/null "${AA2[@]}" -X POST "$GATEWAY/v1/families/join-requests" \
+  -d "{\"familyCode\":\"$FAMILY_CODE\",\"relationship\":\"Sibling\"}" || true
+
+JOIN_REQUEST_ID=$(curl -s "${AA[@]}" "$GATEWAY/v1/families/mine" \
+  | tr '{' '\n' | grep '"status":"PendingJoinRequest"' | json_field id)
+
+# A child old enough to be converted, so the conversion request is a real one.
+CHILD_ID=$(curl -s "${AA[@]}" -X POST "$GATEWAY/v1/children" \
+  -d "{\"fullName\":\"Probe Child\",\"dateOfBirth\":\"$(date -u -d '-19 years' +%Y-%m-%d)\",\"gender\":\"Female\",\"photoUrl\":null,\"parentalConsentGiven\":true,\"noticeVersion\":\"$NOTICE\"}" \
+  | json_field id)
+
+CONVERSION_ID=$(curl -s "${AA[@]}" -X POST "$GATEWAY/v1/children/$CHILD_ID/conversion" \
+  -d "{\"mobileOrEmail\":\"probe-child-$(date +%s)@example.com\"}" | json_field id)
+
+# An application to A's group, from A's second member.
+#
+# The id comes from the president's list, not from the response: applying
+# answers `{groupId, applied, status}` and deliberately does not hand back an
+# application id - which is reasonable, and meant `json_field id` came back
+# empty and the fixture guard below stopped the run. Reading it from the list is
+# also what makes this re-runnable, since a second apply is an idempotent no-op.
+curl -s -o /dev/null "${AA2[@]}" -X POST "$GATEWAY/v1/volunteer-groups/groups/$GROUP_ID/applications" \
+  -d '{"note":"probe"}'
+
+APPLICATION_ID=$(curl -s "${AA[@]}" "$GATEWAY/v1/volunteer-groups/groups/$GROUP_ID/applications" \
+  | tr '{' '\n' | grep '"note":"probe"' | json_field id)
+
+# A notification belonging to an A member. Every member gets a welcome one when
+# audit-notification-service consumes their registration, so this is a read.
+NOTIFICATION_ID=$(curl -s "${AA[@]}" "$GATEWAY/v1/notifications" | json_field id)
+
+# A campaign whose nomination window is open now, so there is a real nomination
+# to decide. The one above deliberately sits in 2099; nominations and voting are
+# never open at the same moment, so the voting window here starts after
+# nominations close.
+OPEN_CAMPAIGN_ID=$(curl -s "${SA[@]}" -X POST "$GATEWAY/v1/celebrity-voting/campaigns" \
+  -d '{"title":"Probe open campaign","description":"A","nominationStartAt":"2020-01-01T00:00:00Z","nominationEndAt":"2098-01-01T00:00:00Z","votingStartAt":"2098-01-02T00:00:00Z","votingEndAt":"2099-01-01T00:00:00Z","topN":3,"resultsVisibility":"Live"}' \
+  | json_field id)
+
+curl -s -o /dev/null "${SA[@]}" -X POST "$GATEWAY/v1/celebrity-voting/campaigns/$OPEN_CAMPAIGN_ID/status" \
+  -d '{"status":"NominationsOpen"}'
+
+# `candidateId`, not `id`: nominating answers with the campaign, the candidate
+# and whether anything was added, since a repeat nomination is a no-op reported
+# as success. Reaching for `id` here got nothing.
+NOMINATION_ID=$(curl -s "${AA[@]}" -X POST "$GATEWAY/v1/celebrity-voting/campaigns/$OPEN_CAMPAIGN_ID/candidates" \
+  -d "{\"memberId\":\"$A_MEMBER2_ID\",\"category\":null}" | json_field candidateId)
+
 OCCASION_ID=$(curl -s "${SA[@]}" -X POST "$GATEWAY/v1/boli/occasions" \
   -d '{"title":"Probe occasion","description":"A","occasionDate":"2099-01-01"}' | json_field id)
 
@@ -306,7 +388,10 @@ missing=0
 
 for pair in "post:$POST_ID" "issue:$ISSUE_ID" "group:$GROUP_ID" "event:$EVENT_ID" \
             "campaign:$CAMPAIGN_ID" "pathshala:$PATHSHALA_ID" "occasion:$OCCASION_ID" "boli:$BOLI_ID" \
-            "session:$SESSION_ID" "class:$CLASS_ID" "enrolment:$ENROLMENT_ID" "exam:$EXAM_ID"; do
+            "session:$SESSION_ID" "class:$CLASS_ID" "enrolment:$ENROLMENT_ID" "exam:$EXAM_ID" \
+            "family:$FAMILY_ID" "join-request:$JOIN_REQUEST_ID" "child:$CHILD_ID" \
+            "conversion:$CONVERSION_ID" "application:$APPLICATION_ID" \
+            "notification:$NOTIFICATION_ID" "nomination:$NOMINATION_ID"; do
   name=${pair%%:*}; id=${pair##*:}
 
   if [ -z "$id" ]; then
@@ -430,6 +515,17 @@ probe "voting    read A's campaign result" GET "/v1/celebrity-voting/campaigns/$
 probe "events    read A's attendees"      GET  "/v1/events/$EVENT_ID/attendees"        "$SUPER" "$B_ID"
 probe "groups    read A's applications"   GET  "/v1/volunteer-groups/groups/$GROUP_ID/applications" "$SUPER" "$B_ID"
 probe "events    cancel A's registration" DELETE "/v1/events/$EVENT_ID/registration"   "$SUPER" "$B_ID"
+
+# The household, the children and the memberships. These are the most sensitive
+# things the platform holds - who is in whose family, and a child's conversion
+# to an adult account - and until 2026-09-03 none of them was probed at all.
+probe "family    decide A's join request" POST "/v1/families/$FAMILY_ID/join-requests/$JOIN_REQUEST_ID/decide" "$SUPER" "$B_ID" '{"accept":true}'
+probe "children  convert A's child"       POST "/v1/children/$CHILD_ID/conversion"    "$SUPER" "$B_ID" '{"mobileOrEmail":"probe-steal@example.com"}'
+probe "children  decide A's conversion"   POST "/v1/children/conversion-requests/$CONVERSION_ID/decide" "$SUPER" "$B_ID" '{"approve":true,"note":"probe"}'
+probe "groups    decide A's application"  POST "/v1/volunteer-groups/groups/$GROUP_ID/applications/$APPLICATION_ID/decide" "$SUPER" "$B_ID" '{"accept":true,"rolePosition":null}'
+probe "groups    reposition A's member"   PUT  "/v1/volunteer-groups/groups/$GROUP_ID/members/$A_MEMBER_ID/position" "$SUPER" "$B_ID" '{"rolePosition":"probe"}'
+probe "voting    decide A's nomination"   POST "/v1/celebrity-voting/campaigns/$OPEN_CAMPAIGN_ID/candidates/$NOMINATION_ID/decide" "$SUPER" "$B_ID" '{"approve":true}'
+probe "notif     read A's notification"   POST "/v1/notifications/$NOTIFICATION_ID/read" "$SUPER" "$B_ID" '{}'
 
 echo
 echo "== what this run did not probe =="

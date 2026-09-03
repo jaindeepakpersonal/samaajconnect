@@ -8,7 +8,31 @@ version of the plan; the reasoning behind the ordering lives in
 ## Current Status
 
 - **Stage:** every module has a service and member screens; Phase 5 hardening under way
-- **Last updated:** 2026-09-03 - **the probe knows what it misses now.**
+- **Last updated:** 2026-09-03 - **the isolation probe covers everything now.**
+
+  64 of the platform's 73 id-taking endpoints, 9 deliberately excluded with a
+  written reason each, and nothing left over. 65 cross-tenant attempts, every
+  one refused with 404 and none with 403. Re-run twice to confirm it is
+  repeatable rather than passing off a first run's state.
+
+  The seven closed this cycle were the most sensitive remaining: deciding who
+  joins a household, converting a child to an adult account and approving that
+  conversion, deciding a group application, repositioning a group's member,
+  deciding a nomination, and reading another Samaaj member's notification. They
+  needed a second member in Samaaj A, because A's first is the head of its
+  family and the president of its group and cannot apply to either.
+
+  **Three of the four fixtures failed first, all for the same reason: assuming a
+  response shape.** Applying to a group answers `{groupId, applied, status}` and
+  hands back no application id at all; nominating answers `candidateId`, not
+  `id`; and a repeat join request is refused, so its id has to be read off the
+  head's view of the household rather than the response. The fixture guard
+  caught all three and refused to run - which is the guard doing exactly its
+  job, since an empty id turns a probe into a request against a list endpoint
+  that answers 200 for anybody.
+
+  1,518 tests green, unchanged.
+- **Previously:** 2026-09-03 - **the probe knows what it misses now.**
 
   Three cycles running, the thing that had gone wrong was a check going stale
   rather than code regressing: the accessibility audit predated eight screens,
@@ -615,16 +639,14 @@ unit tested.
       probed, 9 deliberately excluded with a written reason each (platform
       administration, where a Super Admin acting across Samaaj is the point),
       and 7 genuinely outstanding
-- [ ] **Seven endpoints the probe still does not reach.** Each needs an entity
-      built in Samaaj A that the script does not create yet — a nomination, a
-      group application, a conversion request, a join request, a notification:
-      `POST /celebrity-voting/campaigns/{id}/candidates/{id}/decide`,
-      `POST /volunteer-groups/groups/{id}/applications/{id}/decide`,
-      `PUT /volunteer-groups/groups/{id}/members/{id}/position`,
-      `POST /children/{id}/conversion`,
-      `POST /children/conversion-requests/{id}/decide`,
-      `POST /families/{id}/join-requests/{id}/decide`,
-      `POST /notifications/{id}/read`
+- [x] **The last seven are probed too, 2026-09-03. Coverage is complete:** 64 of
+      73 id-taking endpoints, 9 deliberately excluded with a reason each, none
+      left over. 65 cross-tenant attempts, all refused with 404, no 403s. The
+      seven were the most sensitive ones remaining — deciding who joins a
+      household, converting a child to an adult account and approving that
+      conversion, deciding a group application, and reading somebody else's
+      notification — and needed a second member in Samaaj A, since A's first is
+      the head of its family and the president of its group
 - [x] **Fixed: the probe assumed the stack was ready.** It waited on nothing and
       its first request failed, reporting "could not sign in as Super Admin" —
       which reads as a wrong password rather than a gateway answering before the
