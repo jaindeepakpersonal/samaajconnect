@@ -233,6 +233,14 @@ jobs:
       - name: Smoke test
         run: bash scripts/smoke-through-gateway.sh
 
+      # Last, so the databases have real data in them: a drill against ten empty
+      # schemas proves the plumbing and nothing else. It expects some databases
+      # to be moving by now — the audit log consumes every event this job has
+      # just generated — and reports those as uncomparable rather than failing,
+      # which is the state a real deployment is always in.
+      - name: Backup and restore drill
+        run: bash scripts/backup-restore-drill.sh
+
       - name: Service logs
         if: failure()
         run: docker compose logs --tail 200

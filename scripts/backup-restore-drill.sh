@@ -36,6 +36,7 @@ PGUSER="${PGUSER:-samaajconnect}"
 OUT_DIR="${OUT_DIR:-.backup-drill}"
 
 pass=0
+moved=0
 fail=0
 
 note() { printf '  %s\n' "$*"; }
@@ -97,6 +98,51 @@ guarantee_indexes() {
     WHERE schemaname = 'public' AND indexdef LIKE 'CREATE UNIQUE INDEX%';"
 }
 
+# Compares the restored copy against the original, and distinguishes "the dump
+# lost rows" from "the original moved while we were dumping it".
+#
+# **The second is not a backup failure, and reporting it as one is how a drill
+# gets ignored.** `pg_dump` takes a consistent snapshot at the moment it runs;
+# the count it is compared against is read afterwards, off a live database. Any
+# table still being written to in between will differ by exactly the rows added
+# in that window.
+#
+# That is not hypothetical and it is not rare. audit-notification-service
+# consumes every event the platform publishes, so `audit_logs` is the one table
+# here that is never idle - and on a run taken while its consumer was still
+# catching up, this drill reported `audit_logs=26` against a restored `25` and
+# called it "a database did not come back the same as it went in". The dumps
+# were fine: re-run once the consumer had settled, all twenty checks passed. On
+# a real deployment the consumer is never settled, so that false failure would
+# have been the normal result.
+#
+# So a mismatch is re-checked. If the original's own counts moved between two
+# reads, the original is live and the difference says nothing about the dump.
+compare_rows() {
+  local db="$1" drill="$2"
+  local original restored again
+
+  original=$(row_counts "$db")
+  restored=$(row_counts "$drill")
+
+  if [ "$original" = "$restored" ]; then
+    check "$db rows" "$original" "$restored"
+    return
+  fi
+
+  again=$(row_counts "$db")
+
+  if [ "$original" != "$again" ]; then
+    printf '  ..    %s rows: the original moved while the drill ran, so the dump\n' "$db"
+    printf '        cannot be compared against it. Not a restore failure.\n'
+    moved=$((moved + 1))
+    return
+  fi
+
+  # The original held still and the copy still differs. That is the dump.
+  check "$db rows" "$original" "$restored"
+}
+
 mkdir -p "$OUT_DIR"
 
 databases=$(docker compose exec -T "$COMPOSE_SERVICE" \
@@ -153,7 +199,7 @@ for db in "${db_list[@]}"; do
   docker compose exec -T "$COMPOSE_SERVICE" \
     pg_restore -U "$PGUSER" -d "$drill" --no-owner --no-acl < "$OUT_DIR/$db.dump" >/dev/null 2>&1 || true
 
-  check "$db rows" "$(row_counts "$db")" "$(row_counts "$drill")"
+  compare_rows "$db" "$drill"
   check "$db unique indexes" "$(guarantee_indexes "$db")" "$(guarantee_indexes "$drill")"
 
   docker compose exec -T "$COMPOSE_SERVICE" \
@@ -162,13 +208,26 @@ done
 
 echo
 echo "=================================================="
-echo "  checks passed: $pass"
-echo "  checks failed: $fail"
+echo "  checks passed:          $pass"
+echo "  moved while dumping:    $moved"
+echo "  checks failed:          $fail"
 echo "=================================================="
 
 if [ "$fail" -gt 0 ]; then
   echo "A database did not come back the same as it went in."
   exit 1
+fi
+
+if [ "$moved" -gt 0 ]; then
+  # Not a failure. On a live system this is the expected outcome for any table
+  # still being written to, and `audit_logs` always is. Said out loud so nobody
+  # reads the pass below as covering a database it could not actually compare.
+  echo "$moved database(s) were being written to while the drill ran and could not"
+  echo "be compared row for row. Everything else dumped, restored, and matched."
+  echo
+  echo "To compare those too, run this against a quiet system - or accept that on"
+  echo "a live one the audit log is never quiet, which is the point of it."
+  exit 0
 fi
 
 echo "Every database dumped, restored, and came back identical."

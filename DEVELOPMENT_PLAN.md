@@ -8,7 +8,40 @@ version of the plan; the reasoning behind the ordering lives in
 ## Current Status
 
 - **Stage:** every module has a service and member screens; Phase 5 hardening under way
-- **Last updated:** 2026-09-03 - **CI runs the isolation probe now.**
+- **Last updated:** 2026-09-03 - **the backup drill failed, and the backups were
+  fine.**
+
+  It was the last of the three hand-run scripts. Unlike the isolation probe it
+  had not gone stale - it discovers its databases from `pg_database` rather than
+  a hand-written list, so a new service's database appears on its own. What it
+  had instead was a false-failure mode, and one that would fire on every run of
+  a real deployment.
+
+  It compares the restored copy against the **live** original. `pg_dump` takes a
+  consistent snapshot; the count it is compared against is read afterwards, off
+  a database that may still be moving. Nine databases were idle. The tenth was
+  `audit_notification`, which consumes every event the platform publishes and is
+  therefore never idle - it reported `audit_logs=26` against a restored `25` and
+  announced "a database did not come back the same as it went in".
+
+  Verified before concluding: the count settled at 26 once the consumer caught
+  up, and a re-run against the now-quiet system passed all twenty checks. The
+  dumps were never the problem.
+
+  A mismatch is now re-checked against the original a second time. If the
+  original itself moved between two reads, the difference says nothing about the
+  dump and is reported as such rather than as a failure. Proved three ways: a
+  quiet system still passes 20 of 20; under a real write every second, two
+  databases report as moved and the run exits 0; and a genuine row loss on a
+  static database still fails, so the fix has not simply made everything pass.
+
+  **CI runs it**, last in the smoke job so the databases have real data — a
+  drill against ten empty schemas proves the plumbing and nothing else. Verified
+  end to end in CI's order from empty volumes: probe, then smoke 294 of 294,
+  then the drill.
+
+  1,518 tests green, unchanged.
+- **Previously:** 2026-09-03 - **CI runs the isolation probe now.**
 
   It was complete and self-auditing and still only ran when somebody remembered,
   which is how it went stale in the first place. The smoke job already stands a
@@ -785,6 +818,19 @@ unit tested.
       system — a drill that can only be run somewhere safe is a drill nobody
       runs. 20 checks, all passing, and both kinds of check were shown to fail
       when a row or an index is removed from the restored copy
+- [x] **Fixed 2026-09-03: it reported a false failure on a live system, and CI
+      runs it now.** It compared the restored copy against the *live* original —
+      fine for nine databases, wrong for `audit_notification`, which consumes
+      every event the platform publishes and is never idle. A run taken while
+      its consumer was catching up reported `audit_logs=26` against a restored
+      `25` and said a database had not come back the same. The dumps were fine;
+      the original had moved. On a real deployment that would have been the
+      normal result, and a drill that cries wolf is a drill nobody reads. A
+      mismatch is now re-checked against the original: if the original itself
+      moved between two reads, it is reported as uncomparable rather than as a
+      failure. Shown to still fail on a genuine row loss from a static database,
+      so the fix did not simply make everything pass. Runs last in CI's smoke
+      job, where the databases have real data in them
 - [ ] **Backups are not deployed, only proven restorable.** The drill writes
       dumps next to the database they came from, which protects against nothing,
       and full dumps mean the recovery point is whenever the dump ran. A real

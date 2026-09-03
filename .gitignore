@@ -54,5 +54,8 @@ Desktop.ini
 # run of a check against a local stack, not a fact about the repository.
 .probe.log
 
+# The backup drill's output, when redirected. Same reason again.
+.drill.log
+
 # Backend test-suite output from a full run across every solution.
 .backend-tests.log
