@@ -1,5 +1,6 @@
 using FluentAssertions;
 using Sangam.Boli.Domain.Auctions;
+using Sangam.Boli.Domain.Auctions.Events;
 using Xunit;
 
 namespace Sangam.Boli.UnitTests;
@@ -17,7 +18,8 @@ public sealed class BoliTests
         DateTimeOffset? startAt = null,
         DateTimeOffset? endAt = null,
         long startingAmount = 1_000_00,
-        long minIncrement = 500_00)
+        long minIncrement = 500_00,
+        int autoExtendSeconds = 0)
     {
         var lot = Domain.Auctions.Boli.Open(
             Guid.NewGuid(),
@@ -29,7 +31,8 @@ public sealed class BoliTests
             startingAmount,
             minIncrement,
             eligibilityRule: null,
-            Noon.AddDays(-1));
+            Noon.AddDays(-1),
+            autoExtendSeconds);
 
         lot.Start();
 
@@ -142,6 +145,122 @@ public sealed class BoliTests
         lot.Close(Noon);
         lot.MarkPublished(Guid.NewGuid(), 1_000_00, Noon).Should().BeTrue();
         lot.MarkPublished(Guid.NewGuid(), 9_999_00, Noon).Should().BeFalse();
+    }
+
+    // ---- Anti-sniping -------------------------------------------------------
+
+    [Fact]
+    public void A_Boli_does_not_extend_unless_it_was_asked_to()
+    {
+        // Zero is off, and off is the default. Every Boli opened before this
+        // existed reads back as zero, so nothing starts behaving differently
+        // under a Samaaj that never asked for it.
+        var lot = Open(endAt: Noon.AddSeconds(1));
+
+        lot.ExtendIfClosing(Noon).Should().BeFalse();
+        lot.EndAt.Should().Be(Noon.AddSeconds(1));
+        lot.DomainEvents.Should().BeEmpty();
+    }
+
+    [Fact]
+    public void A_bid_well_before_the_close_changes_nothing()
+    {
+        // Which is almost every bid. If this moved the close, the window would
+        // never arrive and a Boli would run until somebody closed it by hand.
+        var lot = Open(endAt: Noon.AddHours(1), autoExtendSeconds: 120);
+
+        lot.ExtendIfClosing(Noon).Should().BeFalse();
+        lot.EndAt.Should().Be(Noon.AddHours(1));
+        lot.DomainEvents.Should().BeEmpty();
+    }
+
+    [Fact]
+    public void A_bid_inside_the_window_pushes_the_close_out()
+    {
+        var lot = Open(endAt: Noon.AddSeconds(30), autoExtendSeconds: 120);
+
+        lot.ExtendIfClosing(Noon).Should().BeTrue();
+        lot.EndAt.Should().Be(Noon.AddSeconds(120));
+    }
+
+    [Fact]
+    public void The_extension_is_measured_from_the_bid_and_not_from_the_old_close()
+    {
+        // The property that makes sniping pointless rather than merely harder.
+        //
+        // Extending the old EndAt by a fixed amount would still reward waiting:
+        // bid with a second to go and the room gets one second plus the window
+        // to answer, while bidding early costs the sniper nothing. Measured from
+        // the bid, every bid buys everyone the same full window - so there is no
+        // moment that is better to bid at than any other.
+        var lastSecond = Open(endAt: Noon.AddSeconds(1), autoExtendSeconds: 120);
+        var earlier = Open(endAt: Noon.AddSeconds(119), autoExtendSeconds: 120);
+
+        lastSecond.ExtendIfClosing(Noon).Should().BeTrue();
+        earlier.ExtendIfClosing(Noon).Should().BeTrue();
+
+        lastSecond.EndAt.Should().Be(Noon.AddSeconds(120));
+        earlier.EndAt.Should().Be(Noon.AddSeconds(120));
+
+        // Same answer from both, which is the whole point: waiting bought
+        // nothing.
+        lastSecond.EndAt.Should().Be(earlier.EndAt);
+    }
+
+    [Fact]
+    public void Extending_never_pulls_the_close_earlier()
+    {
+        // A bid exactly on the window boundary extends to the same instant it
+        // would already have closed at, not before it.
+        var lot = Open(endAt: Noon.AddSeconds(120), autoExtendSeconds: 120);
+        var before = lot.EndAt;
+
+        lot.ExtendIfClosing(Noon).Should().BeTrue();
+        lot.EndAt.Should().BeOnOrAfter(before);
+    }
+
+    [Fact]
+    public void Extending_says_where_the_close_moved_from_and_to()
+    {
+        // A listener told only "it moved" cannot tell anybody until when, which
+        // is the one thing a notification about this would need to say.
+        var lot = Open(endAt: Noon.AddSeconds(30), autoExtendSeconds: 120);
+
+        lot.ExtendIfClosing(Noon);
+
+        var raised = lot.DomainEvents.OfType<BoliExtendedDomainEvent>().Single();
+
+        raised.PreviousEndAt.Should().Be(Noon.AddSeconds(30));
+        raised.EndAt.Should().Be(Noon.AddSeconds(120));
+    }
+
+    [Fact]
+    public void It_keeps_extending_for_as_long_as_people_keep_bidding()
+    {
+        // No cap, deliberately. A Boli that keeps extending is a Boli people are
+        // still bidding on, and ending it on a timer while hands are still up is
+        // the thing being fixed. A Samaaj wanting a hard stop closes it.
+        var lot = Open(endAt: Noon.AddSeconds(10), autoExtendSeconds: 60);
+
+        lot.ExtendIfClosing(Noon).Should().BeTrue();
+        lot.ExtendIfClosing(Noon.AddSeconds(30)).Should().BeTrue();
+        lot.ExtendIfClosing(Noon.AddSeconds(80)).Should().BeTrue();
+
+        lot.EndAt.Should().Be(Noon.AddSeconds(140));
+    }
+
+    [Fact]
+    public void An_extended_Boli_is_still_taking_bids_at_its_old_closing_time()
+    {
+        // The point of the whole feature, stated as the caller sees it:
+        // AcceptsBids is what the handler asks, and it has to agree.
+        var lot = Open(endAt: Noon.AddSeconds(5), autoExtendSeconds: 120);
+
+        lot.AcceptsBids(Noon.AddSeconds(10)).Should().BeFalse();
+
+        lot.ExtendIfClosing(Noon);
+
+        lot.AcceptsBids(Noon.AddSeconds(10)).Should().BeTrue();
     }
 }
 

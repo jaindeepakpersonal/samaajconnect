@@ -127,7 +127,8 @@ public static class BoliEndpoints
                         request.EndAt,
                         request.StartingAmount,
                         request.MinIncrement,
-                        request.EligibilityRule),
+                        request.EligibilityRule,
+                        request.AutoExtendSeconds),
                     cancellationToken);
 
                 return result.ToApiResult();
@@ -319,7 +320,8 @@ public static class BoliEndpoints
         DateTimeOffset EndAt,
         long StartingAmount,
         long MinIncrement,
-        string? EligibilityRule);
+        string? EligibilityRule,
+        int AutoExtendSeconds = 0);
 
     public sealed record PlaceBidRequest(long Amount);
 }

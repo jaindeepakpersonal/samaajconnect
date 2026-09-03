@@ -390,6 +390,7 @@ export interface Boli {
   readonly endAt: string;
   readonly startingAmount: number;
   readonly minIncrement: number;
+  readonly autoExtendSeconds: number;
   readonly eligibilityRule: string | null;
   readonly status: BoliStatus;
 

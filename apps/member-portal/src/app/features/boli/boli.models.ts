@@ -69,6 +69,17 @@ export interface Boli {
   readonly status: BoliStatus;
 
   /**
+   * Seconds a bid arriving near the close pushes the close out by. 0 is off.
+   *
+   * The screen has to say this when it is on, because otherwise `endAt` is a
+   * time the portal states plainly and the server may move — and a bidder who
+   * does not know the close can move is exactly the bidder the window exists to
+   * protect. Telling them is also most of what makes it work: sniping is
+   * pointless once everybody knows a late bid buys the room another window.
+   */
+  readonly autoExtendSeconds: number;
+
+  /**
    * Taking bids **right now** — the status says so *and* the clock agrees.
    *
    * The screen reads this rather than the status, for the reason the voting

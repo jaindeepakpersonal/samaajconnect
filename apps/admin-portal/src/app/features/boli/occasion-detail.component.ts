@@ -145,6 +145,15 @@ import { isNotFound } from '../../core/http-status';
                       @if (lot.acceptsBids) {
                         <div class="muted">{{ closes(lot.endAt) }}</div>
                       }
+                      @if (lot.autoExtendSeconds > 0) {
+                        <!--
+                          Worth showing: a closing time that moves on its own is
+                          surprising unless the screen says it can.
+                        -->
+                        <div class="muted">
+                          A bid in the last {{ lot.autoExtendSeconds }}s pushes this out
+                        </div>
+                      }
                     </td>
                     <td>
                       @if (lot.highestAmount !== null) {
@@ -247,6 +256,17 @@ import { isNotFound } from '../../core/http-status';
               </div>
             </div>
 
+            <label for="boli-extend">If somebody bids in the last… (seconds)</label>
+            <input id="boli-extend" class="input inline" type="number" min="0" max="3600"
+              name="autoExtendSeconds" [(ngModel)]="autoExtendSeconds" />
+
+            <p class="small">
+              …then the close moves that far past the bid, and keeps moving while people keep
+              bidding. Leave it at 0 and the Boli shuts on the clock — which means it can be won
+              by whoever bids last rather than by whoever will pay most. Two minutes is a common
+              choice; the auctioneer's "going, going" is the same idea.
+            </p>
+
             <label for="boli-eligibility">Eligibility rule</label>
             <input id="boli-eligibility" class="input" name="eligibilityRule"
               [(ngModel)]="eligibilityRule" maxlength="500" placeholder="One per family." />
@@ -320,6 +340,7 @@ export class OccasionDetailComponent implements OnInit {
   startingAmount = '';
   minIncrement = '';
   eligibilityRule = '';
+  autoExtendSeconds = 0;
 
   rupees = formatRupees;
   closes = (endAt: string) => closesIn(endAt);
@@ -426,6 +447,7 @@ export class OccasionDetailComponent implements OnInit {
         startingAmount: floor,
         minIncrement: increment,
         eligibilityRule: blankToNull(this.eligibilityRule),
+        autoExtendSeconds: this.autoExtendSeconds,
       }),
       `${title} is open for bidding.`,
       () => {

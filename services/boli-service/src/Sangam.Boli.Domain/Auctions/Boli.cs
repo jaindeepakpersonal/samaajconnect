@@ -59,6 +59,32 @@ public sealed class Boli : AggregateRoot, ITenantScopedEntity
     public long MinIncrement { get; private set; }
 
     /// <summary>
+    /// How long a bid in the closing seconds pushes the close out by. Zero is
+    /// off, and is the default.
+    /// </summary>
+    /// <remarks>
+    /// <b>Without this, a Boli is won by whoever arrives last rather than by
+    /// whoever will pay most.</b> A bidder who waits until a second before the
+    /// close and puts in one increment takes it, not because they valued it more
+    /// but because nobody had time to answer. In a hall the auctioneer solves
+    /// this by saying "going, going" and waiting; this is that, written down.
+    ///
+    /// The extension is measured from the bid, not from the old closing time.
+    /// Extending <c>EndAt</c> by a fixed amount would still reward the sniper:
+    /// bid at one second to go and everyone else gets one second plus the
+    /// window, while bidding early costs you nothing. Measuring from <c>now</c>
+    /// means every bid buys the room the *same* full window to reply, which is
+    /// the property that makes sniping pointless rather than merely harder.
+    ///
+    /// There is no cap on how many times it can extend, and that is deliberate.
+    /// A Boli that keeps extending is a Boli people are still bidding on, and
+    /// ending it on a timer while hands are still up is the thing being fixed. A
+    /// Samaaj that wants a hard stop closes it, which is one click and already
+    /// exists.
+    /// </remarks>
+    public int AutoExtendSeconds { get; private set; }
+
+    /// <summary>
     /// Who may bid, in the Samaaj's own words. Not enforced here.
     /// </summary>
     /// <remarks>
@@ -88,7 +114,8 @@ public sealed class Boli : AggregateRoot, ITenantScopedEntity
         long startingAmount,
         long minIncrement,
         string? eligibilityRule,
-        DateTimeOffset now)
+        DateTimeOffset now,
+        int autoExtendSeconds = 0)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(title);
 
@@ -103,6 +130,7 @@ public sealed class Boli : AggregateRoot, ITenantScopedEntity
             EndAt = endAt,
             StartingAmount = startingAmount,
             MinIncrement = minIncrement,
+            AutoExtendSeconds = autoExtendSeconds < 0 ? 0 : autoExtendSeconds,
             EligibilityRule = string.IsNullOrWhiteSpace(eligibilityRule)
                 ? null
                 : eligibilityRule.Trim(),
@@ -136,6 +164,44 @@ public sealed class Boli : AggregateRoot, ITenantScopedEntity
     /// </summary>
     public bool IsAcceptable(long amount, long? currentHighest) =>
         amount >= MinimumNextBid(currentHighest);
+
+    /// <summary>
+    /// Pushes the close out when a bid lands inside the auto-extend window.
+    /// Returns true when the window actually moved.
+    /// </summary>
+    /// <remarks>
+    /// Called only for a bid that has already been accepted, and only under the
+    /// row lock this Boli is bid on beneath — so two bidders racing in the last
+    /// second cannot both read the old <c>EndAt</c> and write conflicting new
+    /// ones. It is the same lock that makes "one highest bid" true, doing a
+    /// second job.
+    ///
+    /// A bid outside the window leaves the close exactly where it was. Most
+    /// bids are outside it, so most bids raise no event and change no row
+    /// beyond the bid itself.
+    /// </remarks>
+    public bool ExtendIfClosing(DateTimeOffset now)
+    {
+        if (AutoExtendSeconds <= 0)
+        {
+            return false;
+        }
+
+        var window = TimeSpan.FromSeconds(AutoExtendSeconds);
+
+        if (EndAt - now > window)
+        {
+            return false;
+        }
+
+        var previous = EndAt;
+
+        EndAt = now + window;
+
+        Raise(new BoliExtendedDomainEvent(Id, TenantId, OccasionId, previous, EndAt, now));
+
+        return true;
+    }
 
     /// <summary>Starts the bidding window. False when it is not Scheduled.</summary>
     public bool Start()

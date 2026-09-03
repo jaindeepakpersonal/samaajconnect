@@ -45,6 +45,7 @@ function lot(overrides: Partial<Boli> = {}): Boli {
     endAt: '2026-09-10T12:00:00Z',
     startingAmount: 100_000,
     minIncrement: 50_000,
+    autoExtendSeconds: 0,
     eligibilityRule: 'One per family.',
     status: 'Open',
     acceptsBids: true,
@@ -347,6 +348,67 @@ describe('OccasionDetailComponent', () => {
     call.flush({});
     http.expectOne(`/v1/boli/occasions/${OCCASION_ID}`).flush(detail());
     fixture.detectChanges();
+  });
+
+  it('opens a Boli with anti-sniping off unless somebody asks for it', () => {
+    // Zero is off, and every Boli opened before the setting existed reads back
+    // as zero. Defaulting the form to anything else would switch it on under a
+    // Samaaj that never chose it.
+    load();
+
+    expect(component.autoExtendSeconds).toBe(0);
+
+    component.boliTypeId = 't1';
+    component.boliTitle = 'Mangal Deep';
+    component.startAt = '2026-09-10T09:00';
+    component.endAt = '2026-09-10T12:00';
+    component.startingAmount = '1000';
+    component.minIncrement = '500';
+    component.open();
+
+    const call = http.expectOne(`/v1/boli/occasions/${OCCASION_ID}/boli`);
+
+    expect((call.request.body as { autoExtendSeconds: number }).autoExtendSeconds).toBe(0);
+
+    call.flush({});
+    http.expectOne(`/v1/boli/occasions/${OCCASION_ID}`).flush(detail());
+    fixture.detectChanges();
+  });
+
+  it('sends the window a Samaaj chose', () => {
+    load();
+
+    component.boliTypeId = 't1';
+    component.boliTitle = 'Mangal Deep';
+    component.startAt = '2026-09-10T09:00';
+    component.endAt = '2026-09-10T12:00';
+    component.startingAmount = '1000';
+    component.minIncrement = '500';
+    component.autoExtendSeconds = 120;
+    component.open();
+
+    const call = http.expectOne(`/v1/boli/occasions/${OCCASION_ID}/boli`);
+
+    expect((call.request.body as { autoExtendSeconds: number }).autoExtendSeconds).toBe(120);
+
+    call.flush({});
+    http.expectOne(`/v1/boli/occasions/${OCCASION_ID}`).flush(detail());
+    fixture.detectChanges();
+  });
+
+  it('says on a Boli that its closing time can move', () => {
+    // A close that shifts on its own is surprising unless the screen warns that
+    // it can - the manager is watching that column to know when to expect a
+    // result.
+    load(detail({ boli: [lot({ autoExtendSeconds: 120, acceptsBids: true })] }));
+
+    expect(text()).toContain('A bid in the last 120s pushes this out');
+  });
+
+  it('says nothing about extending on a Boli that does not', () => {
+    load(detail({ boli: [lot({ autoExtendSeconds: 0 })] }));
+
+    expect(text()).not.toContain('pushes this out');
   });
 
   it('will not open a Boli on an amount it could not parse', () => {

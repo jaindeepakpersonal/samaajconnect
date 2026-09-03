@@ -1,4 +1,5 @@
 using FluentValidation;
+using Microsoft.Extensions.Logging;
 using MediatR;
 using Sangam.Boli.Application.Abstractions;
 using Sangam.Boli.Application.Common;
@@ -45,7 +46,8 @@ public sealed class PlaceBidCommandHandler(
     IUnitOfWork unitOfWork,
     ICurrentUser currentUser,
     ITenantContext tenantContext,
-    IDateTimeProvider clock)
+    IDateTimeProvider clock,
+    ILogger<PlaceBidCommandHandler> logger)
     : IRequestHandler<PlaceBidCommand, Result<PlaceBidResponse>>
 {
     public async Task<Result<PlaceBidResponse>> Handle(
@@ -95,6 +97,18 @@ public sealed class PlaceBidCommandHandler(
         var bid = Bid.Place(lot.TenantId, lot.Id, memberId, command.Amount, now);
 
         boli.AddBid(bid);
+
+        // Still under the same row lock, so two bidders racing in the last
+        // second cannot both read the old closing time and write conflicting
+        // new ones. Almost always a no-op: only a bid inside the window moves
+        // anything.
+        if (lot.ExtendIfClosing(now))
+        {
+            logger.LogInformation(
+                "Boli {BoliId} extended to {EndAt} by a bid in its closing window",
+                lot.Id,
+                lot.EndAt);
+        }
 
         await unitOfWork.SaveChangesAsync(cancellationToken);
 

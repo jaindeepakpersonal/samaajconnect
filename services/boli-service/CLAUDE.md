@@ -30,7 +30,7 @@ highest". Read "The guarantee" before changing anything under `Bid`.
 | `CreateOccasionCommand` | `Boli.Manage` | Starts `Upcoming` |
 | `DefineBoliTypeCommand` | `Boli.Manage` | One name per occasion, case-insensitively |
 | `MoveOccasionCommand` | `Boli.Manage` | Upcoming → Active → Closed. Never backwards |
-| `OpenBoliCommand` | `Boli.Manage` | Creates it `Scheduled` and starts it |
+| `OpenBoliCommand` | `Boli.Manage` | Creates it `Scheduled` and starts it. Takes the anti-sniping window |
 | `PlaceBidCommand` | `Members.Read` | Under a row lock. Being outbid is success with `accepted: false` |
 | `CloseBoliCommand` | `Boli.Manage` | Idempotent. Also takes the lock — closing races the last bids |
 | `RecordResultCommand` | `Boli.Manage` | From the highest bid. The winner is not a parameter |
@@ -54,6 +54,7 @@ highest". Read "The guarantee" before changing anything under `Bid`.
 - `OccasionClosedDomainEvent` — `boli.occasion.closed.v1`
 - `BoliClosedDomainEvent` — `boli.closed.v1`
 - `BoliResultPublishedDomainEvent` — `boli.result.published.v1`
+- `BoliExtendedDomainEvent` — `boli.extended.v1`, only when a closing bid moved the window
 
 ## Events consumed
 
@@ -111,6 +112,37 @@ their form was open has done nothing wrong, and a 409 would be telling
 them off for being slow.
 
 ## Decisions worth knowing before you change this service
+
+**A Boli should not be won by arriving last.** Without an auto-extend
+window, whoever bids a second before the close takes it — not because
+they valued it more but because nobody had time to answer, which is the
+opposite of what an auction is for. `AutoExtendSeconds` is that window,
+per Boli, chosen by the Samaaj, and 0 (off) is the default so nothing
+that existed before it behaves differently.
+
+**The extension is measured from the bid, not from the old close**, and
+this is the whole design rather than a detail. Adding a fixed amount to
+`EndAt` would still reward waiting: bid with one second to go and the
+room gets one second plus the window, while bidding early costs the
+sniper nothing. Measured from the bid, every bid buys everybody the same
+full window — so there is no moment better to bid at than any other,
+which is what makes sniping pointless rather than merely harder.
+
+**There is no cap on repeats**, deliberately. A Boli that keeps extending
+is a Boli people are still bidding on, and ending it on a timer while
+hands are still up is the thing being fixed. A Samaaj wanting a hard stop
+closes it, which is one click and already exists. The validator caps the
+*window* at an hour instead: longer than that and it extends on
+essentially every bid, which is not anti-sniping, it is an auction that
+never ends.
+
+`ExtendIfClosing` is called from `PlaceBidCommandHandler` under the same
+row lock as the bid itself, so two bidders racing in the last second
+cannot both read the old closing time and write conflicting new ones —
+the lock that makes "one highest bid" true doing a second job. It raises
+`boli.extended.v1` only when the window actually moved, because an event
+per bid on this service's busiest write path would be an outbox row each
+time for something almost never true.
 
 **Money is `long` paise, never a floating-point type.** A Boli is money,
 and floating-point error shows up as a winning bid a rupee off what

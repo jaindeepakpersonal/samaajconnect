@@ -90,6 +90,10 @@ import { Bid, Boli, BoliResult, BoliStatusLabels } from './boli.models';
             @if (lot.acceptsBids) {
               <p class="small">{{ closing(lot) }} ({{ dateTime(lot.endAt) }}).</p>
 
+              @if (extending(lot); as note) {
+                <p class="small">{{ note }}</p>
+              }
+
               <label for="amount">Your bid (₹)</label>
               <input
                 class="input"
@@ -327,6 +331,35 @@ export class BoliDetailComponent implements OnInit {
 
   closing(lot: Boli): string {
     return closesIn(lot.endAt);
+  }
+
+  /**
+   * The anti-sniping window, in the bidder's words, or null when it is off.
+   *
+   * Saying it is not decoration. Without this line the screen prints a closing
+   * time the server will quietly move, which is the portal stating something
+   * that stops being true; and the rule only does its job once bidders know it,
+   * because a late bid is a bad idea only if you know it buys everybody else
+   * another window.
+   */
+  extending(lot: Boli): string | null {
+    if (lot.autoExtendSeconds <= 0) {
+      return null;
+    }
+
+    // Minutes only when it is a whole number of them. Rounding 90 seconds to
+    // "2 minutes" would print a window a minute longer than the one the server
+    // is actually keeping, and this line exists to be relied on.
+    const minutes = lot.autoExtendSeconds / 60;
+    const window =
+      Number.isInteger(minutes) && minutes >= 1
+        ? `${minutes} minute${minutes === 1 ? '' : 's'}`
+        : `${lot.autoExtendSeconds} seconds`;
+
+    return (
+      `A bid in the last ${window} moves the close to ${window} after that bid, ` +
+      'so there is nothing to be gained by waiting until the end.'
+    );
   }
 
   /**

@@ -347,4 +347,118 @@ public sealed class BoliLifecycleTests(BoliApiFactory factory)
         pending.Should().HaveCount(2);
         pending![0].BoliId.Should().Be(first);
     }
+
+    // ---- Anti-sniping, through a real bid on a real database ----------------
+
+    [Fact]
+    public async Task A_bid_in_the_closing_seconds_moves_the_close_out()
+    {
+        // The unit tests prove the rule; this proves it survives the round trip
+        // through the handler, the row lock and the column - the extension
+        // happens inside the same transaction as the bid, so a Boli that
+        // extended but did not save the bid, or the reverse, would show up here.
+        var manager = Manager();
+        var now = factory.Clock.UtcNow;
+
+        var occasion = await (await manager.PostAsJsonAsync("/v1/boli/occasions", new
+        {
+            title = "Paryushan 2026",
+            description = (string?)null,
+            occasionDate = "2026-09-10",
+        })).Content.ReadFromJsonAsync<OccasionResponse>();
+
+        var type = await (await manager.PostAsJsonAsync(
+            $"/v1/boli/occasions/{occasion!.Id}/boli-types",
+            new { name = "Swapna", description = (string?)null }))
+            .Content.ReadFromJsonAsync<BoliTypeResponse>();
+
+        // Closing in thirty seconds, with a two-minute window: a bid now is
+        // inside it.
+        var closingSoon = now.AddSeconds(30);
+
+        var lot = await (await manager.PostAsJsonAsync($"/v1/boli/occasions/{occasion.Id}/boli", new
+        {
+            boliTypeId = type!.Id,
+            title = "Swapna",
+            startAt = now.AddMinutes(-5),
+            endAt = closingSoon,
+            startingAmount = 1_000_00L,
+            minIncrement = 500_00L,
+            eligibilityRule = (string?)null,
+            autoExtendSeconds = 120,
+        })).Content.ReadFromJsonAsync<BoliResponse>();
+
+        lot!.AutoExtendSeconds.Should().Be(120);
+        lot.EndAt.Should().Be(closingSoon);
+
+        var placed = await Member(Guid.NewGuid())
+            .PostAsJsonAsync($"/v1/boli/boli/{lot.Id}/bids", new { amount = 1_000_00L });
+
+        placed.StatusCode.Should().Be(HttpStatusCode.OK);
+
+        var after = await Manager().GetFromJsonAsync<BoliResponse>($"/v1/boli/boli/{lot.Id}");
+
+        // Measured from the bid, not from the old close.
+        after!.EndAt.Should().Be(now.AddSeconds(120));
+        after.EndAt.Should().BeAfter(closingSoon);
+
+        // And it is genuinely still open at the time it would have shut.
+        after.AcceptsBids.Should().BeTrue();
+    }
+
+    [Fact]
+    public async Task A_bid_nowhere_near_the_close_leaves_it_alone()
+    {
+        // Almost every bid. `OpenBoliAsync` closes in two hours and asks for no
+        // window at all, so this also covers the default: a Boli that never
+        // mentioned auto-extend behaves exactly as it did before the column
+        // existed.
+        var boliId = await OpenBoliAsync();
+
+        var before = await Manager().GetFromJsonAsync<BoliResponse>($"/v1/boli/boli/{boliId}");
+
+        before!.AutoExtendSeconds.Should().Be(0);
+
+        await Member(Guid.NewGuid())
+            .PostAsJsonAsync($"/v1/boli/boli/{boliId}/bids", new { amount = 1_000_00L });
+
+        var after = await Manager().GetFromJsonAsync<BoliResponse>($"/v1/boli/boli/{boliId}");
+
+        after!.EndAt.Should().Be(before.EndAt);
+    }
+
+    [Fact]
+    public async Task An_auto_extend_window_longer_than_an_hour_is_refused()
+    {
+        // A window that long extends on essentially every bid, which is not
+        // anti-sniping - it is an auction that never ends.
+        var manager = Manager();
+        var now = factory.Clock.UtcNow;
+
+        var occasion = await (await manager.PostAsJsonAsync("/v1/boli/occasions", new
+        {
+            title = "Paryushan 2026",
+            description = (string?)null,
+            occasionDate = "2026-09-10",
+        })).Content.ReadFromJsonAsync<OccasionResponse>();
+
+        var type = await (await manager.PostAsJsonAsync(
+            $"/v1/boli/occasions/{occasion!.Id}/boli-types",
+            new { name = "Aarti", description = (string?)null }))
+            .Content.ReadFromJsonAsync<BoliTypeResponse>();
+
+        var refused = await manager.PostAsJsonAsync($"/v1/boli/occasions/{occasion.Id}/boli", new
+        {
+            boliTypeId = type!.Id,
+            title = "Aarti",
+            startAt = now,
+            endAt = now.AddHours(2),
+            startingAmount = 1_000_00L,
+            minIncrement = 500_00L,
+            eligibilityRule = (string?)null,
+            autoExtendSeconds = 7200,
+        });
+
+        refused.StatusCode.Should().Be(HttpStatusCode.BadRequest);
+    }
 }

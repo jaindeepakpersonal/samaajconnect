@@ -46,6 +46,9 @@ public sealed record BoliResponse(
     DateTimeOffset EndAt,
     long StartingAmount,
     long MinIncrement,
+
+    /// <summary>Seconds a closing bid pushes the end out by. 0 is off.</summary>
+    int AutoExtendSeconds,
     string? EligibilityRule,
     string Status,
 

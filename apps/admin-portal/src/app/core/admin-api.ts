@@ -615,6 +615,7 @@ export class AdminApi {
       startingAmount: number;
       minIncrement: number;
       eligibilityRule: string | null;
+      autoExtendSeconds: number;
     },
   ): Observable<Boli> {
     return this.http.post<Boli>(`/v1/boli/occasions/${occasionId}/boli`, boli);

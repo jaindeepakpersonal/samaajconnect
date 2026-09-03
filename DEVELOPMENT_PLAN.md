@@ -8,7 +8,48 @@ version of the plan; the reasoning behind the ordering lives in
 ## Current Status
 
 - **Stage:** every module has a service and member screens; Phase 5 hardening under way
-- **Last updated:** 2026-09-03 - **the smoke run stops at a bad id instead of
+- **Last updated:** 2026-09-03 - **a Boli can no longer be won by arriving
+  last.**
+
+  The final Open Decision that needed nothing from outside. I had read it as
+  waiting on a Samaaj to choose the rule; re-reading it, the *window length* is
+  the Samaaj's choice and the mechanism was always mine to build, exactly as
+  `MinIncrement` already was. `AutoExtendSeconds` is that window, per Boli,
+  0 (off) by default so nothing that existed before it behaves differently.
+
+  **The extension is measured from the bid, not from the old close**, and that
+  is the whole design rather than a detail. Adding a fixed amount to `EndAt`
+  would still reward waiting — bid with a second to go and the room gets a
+  second plus the window, while bidding early costs the sniper nothing.
+  Measured from the bid, every bid buys everybody the same full window, so
+  there is no moment better to bid at than any other. That is what makes
+  sniping pointless rather than merely harder, and it is the one thing here
+  worth getting right.
+
+  **The member portal says so, and that is part of the rule rather than a
+  garnish.** With the window on, `endAt` is a time the server moves, so printing
+  it alone would be the portal stating something that stops being true — and
+  sniping is only pointless once the people bidding know a late bid buys
+  everybody else another window. The line quotes minutes only when the window is
+  a whole number of them, because rounding 90 seconds up to two would print a
+  longer window than the server keeps.
+
+  `ExtendIfClosing` runs inside `PlaceBidCommandHandler`, under the row lock
+  that already makes "one highest bid" true — two bidders racing in the last
+  second cannot both read the old close and write conflicting new ones. It
+  raises `boli.extended.v1` only when the window actually moved, because an
+  outbox row per bid for something almost never true sits on this service's
+  busiest write path.
+
+  Verified by injecting the sniper's-advantage bug — `EndAt = EndAt + window`
+  instead of `EndAt = now + window` — which failed 5 tests including the one
+  named for it, then restored and re-run green. The smoke run checks the pair
+  through the gateway: a Boli with a window moves when bid on in its closing
+  minutes, and the one without a window does not, because a bug that extended
+  every Boli would pass the positive check alone.
+
+  1,536 tests green, up 18.
+- **Previously:** 2026-09-03 - **the smoke run stops at a bad id instead of
   blaming ten services for it.**
 
   The last actionable item on the Phase 5 list that needed nothing from outside.
@@ -996,8 +1037,17 @@ these sit unresolved into the sprint that needs them.
 - [x] **Adult-child conversion: admin-approved.** Decided 2026-08-28. A child
       who turns 18 requests conversion; a Samaaj admin approves it before the
       login is created. Safer default and easy to relax later.
-- [ ] **Boli anti-abuse rules:** minimum bid increment + anti-sniping
-      auto-extend window. Needed before Phase 5.
+- [x] **Boli anti-abuse rules: a minimum increment, and an auto-extend window
+      measured from the bid.** Decided 2026-09-03. The increment has been
+      enforced since the service was built; `AutoExtendSeconds` is the window,
+      per Boli, chosen by the Samaaj when the Boli is opened, capped at an hour
+      and 0 (off) by default. A bid landing inside the window moves the close to
+      *the bid plus the window*, not the old close plus the window — adding to
+      the old close would still reward waiting, while measuring from the bid
+      means no moment is better to bid at than any other. There is no cap on
+      repeats: a Boli that keeps extending is one people are still bidding on,
+      and a Samaaj wanting a hard stop closes it. See
+      `services/boli-service/CLAUDE.md`.
 - [x] **Single domain, no per-Samaaj subdomain or CNAME.** Decided
       2026-08-28. A member signs in once and the system decides which Samaaj
       they belong to, because a login identifier is unique platform-wide.

@@ -244,6 +244,16 @@ an info notice, refills the field with the new minimum, and leaves the red
 comes from the server — the increment rule belongs to the Boli, and a second
 copy here would be the one that drifts.
 
+**A closing time the server can move has to say so.** A Boli with
+`autoExtendSeconds` set extends when somebody bids inside that window, so
+printing `endAt` on its own would be the portal stating a time that stops being
+true. The line under the countdown says what the window is and that a late bid
+moves the close — which is also most of what makes the rule work: sniping is
+only pointless once bidders know a late bid buys everybody else another window.
+The window is quoted in minutes only when it is a whole number of them, because
+rounding 90 seconds up to two minutes prints a longer window than the server is
+actually keeping, on the one line a bidder is being asked to rely on.
+
 **"You are leading" is only ever said while bidding is open.** It shipped
 appearing beside "Result announced", which is the wrong tense on a race that
 finished hours ago — and on a Boli closed *without* a published result it would

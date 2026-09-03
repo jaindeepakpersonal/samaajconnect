@@ -50,6 +50,7 @@ public static class BoliMappings
             lot.EndAt,
             lot.StartingAmount,
             lot.MinIncrement,
+            lot.AutoExtendSeconds,
             lot.EligibilityRule,
             lot.Status.ToString(),
             lot.AcceptsBids(now),

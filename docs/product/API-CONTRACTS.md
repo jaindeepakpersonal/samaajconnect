@@ -260,6 +260,17 @@ Amounts are integers in paise. A Boli is money, and a floating-point
 field accumulates error that shows up as a winning bid a rupee off what
 somebody actually offered.
 
+Opening a Boli takes `autoExtendSeconds` (0–3600, default 0 = off).
+A bid arriving within that many seconds of the close moves the close to
+that many seconds **after the bid** — not after the old closing time, so
+every bid buys the room the same full window to answer and bidding late
+gains nothing. `BoliResponse` carries the setting back, and `endAt` is
+whatever it currently is; a client showing a countdown should re-read
+after placing a bid, as the member portal does — and should tell bidders
+the window exists, because a closing time the server quietly moves is a
+client stating something that stops being true, and the rule only deters
+sniping once the people bidding know about it.
+
 ## audit-notification-service — `/v1/audit`, `/v1/notifications`
 
 | Method | Path | Roles | Purpose |

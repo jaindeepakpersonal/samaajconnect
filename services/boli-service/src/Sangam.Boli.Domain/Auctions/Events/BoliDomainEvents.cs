@@ -52,3 +52,26 @@ public sealed record BoliResultPublishedDomainEvent(
 {
     public string Topic => "boli.result.published.v1";
 }
+
+/// <summary>
+/// A bid in the closing seconds pushed the close out.
+/// </summary>
+/// <remarks>
+/// Carries both times, because "it moved" is not useful to a listener without
+/// knowing where from and where to — a notification saying bidding is still open
+/// has to be able to say until when.
+///
+/// Raised only when the window actually moved, not on every bid. Most bids are
+/// nowhere near the close, and an event per bid on the platform's busiest write
+/// path would be an outbox row per bid for something almost never true.
+/// </remarks>
+public sealed record BoliExtendedDomainEvent(
+    Guid BoliId,
+    Guid TenantId,
+    Guid OccasionId,
+    DateTimeOffset PreviousEndAt,
+    DateTimeOffset EndAt,
+    DateTimeOffset OccurredAt) : IDomainEvent
+{
+    public string Topic => "boli.extended.v1";
+}

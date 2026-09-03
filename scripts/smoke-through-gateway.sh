@@ -2418,6 +2418,62 @@ boli_checks() {
     fail=$((fail + 1))
   fi
 
+  # Anti-sniping, through the gateway. A second Boli, closing sooner than its
+  # own window is long, so a bid placed now is inside the closing window. What
+  # is checked here is that the close actually moved - by how much, and that it
+  # is measured from the bid rather than from the old close, is the domain
+  # suite's job. The pair matters more than either half: the Boli above has no
+  # window and must not move, and a bug that extended every Boli would pass the
+  # positive check on its own.
+  BASE_END=$(printf '%s' "$BOLI" | json_field endAt)
+
+  SNIPE=$(curl -s -X POST "$GATEWAY/v1/boli/occasions/$OCCASION_ID/boli" \
+    -H 'Content-Type: application/json' -H "Authorization: Bearer $SAMAAJ_ADMIN_TOKEN" \
+    -d "{\"boliTypeId\":\"$BOLI_TYPE_ID\",\"title\":\"Mangal Deep - closing soon\",
+         \"startAt\":\"$(date -u -d '-5 minutes' +%Y-%m-%dT%H:%M:%SZ)\",
+         \"endAt\":\"$(date -u -d '+90 seconds' +%Y-%m-%dT%H:%M:%SZ)\",
+         \"startingAmount\":100000,\"minIncrement\":50000,
+         \"eligibilityRule\":null,\"autoExtendSeconds\":300}")
+
+  SNIPE_ID=$(printf '%s' "$SNIPE" | json_field id)
+  SNIPE_END=$(printf '%s' "$SNIPE" | json_field endAt)
+
+  if [ -n "$SNIPE_ID" ] && printf '%s' "$SNIPE" | grep -q '"autoExtendSeconds":300'; then
+    echo "  ok    a Boli opens with an anti-sniping window"
+    pass=$((pass + 1))
+
+    curl -s -o /dev/null -X POST "$GATEWAY/v1/boli/boli/$SNIPE_ID/bids" \
+      -H 'Content-Type: application/json' -H "Authorization: Bearer $MEMBER_TOKEN" \
+      -d '{"amount":100000}'
+
+    SNIPE_AFTER=$(curl -s -H "Authorization: Bearer $MEMBER_TOKEN" \
+      "$GATEWAY/v1/boli/boli/$SNIPE_ID")
+    SNIPE_NEW_END=$(printf '%s' "$SNIPE_AFTER" | json_field endAt)
+
+    if [ -n "$SNIPE_NEW_END" ] && [ "$SNIPE_NEW_END" \> "$SNIPE_END" ]; then
+      echo "  ok    and a bid in its closing window pushes the close out"
+      pass=$((pass + 1))
+    else
+      echo "  FAIL  a closing bid did not extend the Boli (was '$SNIPE_END', now '$SNIPE_NEW_END')"
+      fail=$((fail + 1))
+    fi
+  else
+    echo "  FAIL  opening a Boli with an anti-sniping window (got '$SNIPE')"
+    fail=$((fail + 1))
+  fi
+
+  PLAIN_AFTER=$(curl -s -H "Authorization: Bearer $MEMBER_TOKEN" \
+    "$GATEWAY/v1/boli/boli/$BOLI_ID")
+  PLAIN_END=$(printf '%s' "$PLAIN_AFTER" | json_field endAt)
+
+  if [ -n "$BASE_END" ] && [ "$PLAIN_END" = "$BASE_END" ]; then
+    echo "  ok    while the Boli without a window closes when it always said"
+    pass=$((pass + 1))
+  else
+    echo "  FAIL  a Boli with no anti-sniping window moved (was '$BASE_END', now '$PLAIN_END')"
+    fail=$((fail + 1))
+  fi
+
   check "a result cannot be recorded while bidding is open" 409 \
     "$(status -X POST "$GATEWAY/v1/boli/boli/$BOLI_ID/result" \
        -H "Authorization: Bearer $SAMAAJ_ADMIN_TOKEN")"

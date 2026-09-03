@@ -28,7 +28,10 @@ public sealed record OpenBoliCommand(
     DateTimeOffset EndAt,
     long StartingAmount,
     long MinIncrement,
-    string? EligibilityRule) : ICommand<BoliResponse>;
+    string? EligibilityRule,
+
+    /// <summary>Seconds a closing bid pushes the end out by. 0 is off.</summary>
+    int AutoExtendSeconds = 0) : ICommand<BoliResponse>;
 
 public sealed class OpenBoliCommandValidator : AbstractValidator<OpenBoliCommand>
 {
@@ -52,6 +55,16 @@ public sealed class OpenBoliCommandValidator : AbstractValidator<OpenBoliCommand
         RuleFor(x => x.MinIncrement)
             .GreaterThan(0)
             .WithMessage("The minimum increment has to be more than nothing.");
+
+        // Zero is off, which is the default and stays valid. A negative one is
+        // a mistake rather than a way of saying off, and an hour is long enough
+        // that a Boli set to it would extend on essentially every bid - which
+        // is not anti-sniping, it is an auction that never ends.
+        RuleFor(x => x.AutoExtendSeconds)
+            .InclusiveBetween(0, 3600)
+            .WithMessage(
+                "The auto-extend window is in seconds, from 0 (off) to 3600. "
+                + "A minute or two is the usual choice.");
     }
 }
 
@@ -99,7 +112,8 @@ public sealed class OpenBoliCommandHandler(
             command.StartingAmount,
             command.MinIncrement,
             command.EligibilityRule,
-            clock.UtcNow);
+            clock.UtcNow,
+            command.AutoExtendSeconds);
 
         lot.Start();
 

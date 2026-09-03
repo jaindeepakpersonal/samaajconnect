@@ -61,6 +61,25 @@ public sealed class BoliLotConfiguration : IEntityTypeConfiguration<Domain.Aucti
         builder.Property(b => b.EligibilityRule).HasMaxLength(500);
         builder.Property(b => b.Status).HasConversion<string>().HasMaxLength(20);
 
+        // Zero is off, which is what every Boli opened before this column
+        // existed should mean - so the default backfills them as unchanged
+        // rather than switching anti-sniping on under a Samaaj that never asked
+        // for it.
+        //
+        // `ValueGeneratedNever` beside the default, for the reason
+        // member-family-service's `IsListedInDirectory` documents at length:
+        // `HasDefaultValue` alone makes the property `ValueGeneratedOnAdd`, and
+        // EF then leaves a CLR-default value out of the INSERT so the database
+        // default can apply. For an `int` the CLR default is 0 - which is
+        // exactly the value that means "off" - so a Boli deliberately opened
+        // with it off would write no column at all. Harmless here because the
+        // database default is also 0, and set anyway so it stays harmless if
+        // that default ever changes.
+        builder.Property(b => b.AutoExtendSeconds)
+            .IsRequired()
+            .HasDefaultValue(0)
+            .ValueGeneratedNever();
+
         builder.HasIndex(b => new { b.TenantId, b.Status });
         builder.HasIndex(b => b.OccasionId);
 

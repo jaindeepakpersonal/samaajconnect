@@ -25,6 +25,7 @@ function boli(overrides: Partial<Boli> = {}): Boli {
     minIncrement: 50_000,
     eligibilityRule: 'One per family.',
     status: 'Open',
+    autoExtendSeconds: 0,
     acceptsBids: true,
     highestAmount: 1_510_000,
     minimumNextBid: 1_560_000,
@@ -255,6 +256,36 @@ describe('BoliDetailComponent', () => {
     load({ lot: boli({ highestBidderIsMe: true }) });
 
     expect(text()).toContain('Yours');
+  });
+
+  // The anti-sniping window is only half a rule if bidders do not know about
+  // it: a late bid is a bad idea precisely because everybody knows it buys the
+  // room another window. It is also the screen's own honesty — with the window
+  // on, `endAt` is a time the server moves, and printing it alone would be the
+  // portal stating something that stops being true.
+  it('says nothing about extending when the Boli has no window', () => {
+    load();
+
+    expect(component.extending(boli())).toBeNull();
+    expect(text()).not.toContain('nothing to be gained by waiting');
+  });
+
+  it('tells bidders that a late bid moves the close', () => {
+    load({ lot: boli({ autoExtendSeconds: 120 }) });
+
+    expect(text()).toContain('A bid in the last 2 minutes');
+    expect(text()).toContain('nothing to be gained by waiting');
+  });
+
+  // Rounding 90 seconds up to "2 minutes" would print a longer window than the
+  // one the server keeps, on the line a bidder is being asked to rely on.
+  it('never rounds the window it quotes', () => {
+    load();
+
+    expect(component.extending(boli({ autoExtendSeconds: 45 }))).toContain('45 seconds');
+    expect(component.extending(boli({ autoExtendSeconds: 90 }))).toContain('90 seconds');
+    expect(component.extending(boli({ autoExtendSeconds: 60 }))).toContain('1 minute ');
+    expect(component.extending(boli({ autoExtendSeconds: 300 }))).toContain('5 minutes');
   });
 
   it('shows the Samaaj eligibility rule as its own words', () => {
