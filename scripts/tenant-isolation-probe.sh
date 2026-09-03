@@ -28,8 +28,16 @@ SUPERADMIN="${SUPERADMIN:-superadmin@samaajconnect.local}"
 SUPERADMIN_PASSWORD="${SUPERADMIN_PASSWORD:-change-me-immediately}"
 
 # Samaaj A holds the data. Samaaj B does the probing.
-A_SLUG="${A_SLUG:-smoke-samaj}"
-B_SLUG="${B_SLUG:-probe-samaj}"
+#
+# **Both belong to this script**, and A did not always. It defaulted to
+# `smoke-samaj`, from when this script looked A up rather than creating it and
+# relied on `smoke-through-gateway.sh` having run first. Now that it creates
+# both, sharing a Samaaj with the smoke suite buys nothing and costs something:
+# the two would write entities into the same Samaaj, and a count either asserts
+# on could be moved by the other. Owning both means they can run in either
+# order, in the same CI job, without knowing about each other.
+A_SLUG="${A_SLUG:-probe-samaj-a}"
+B_SLUG="${B_SLUG:-probe-samaj-b}"
 PASSWORD="a-long-enough-password"
 A_MEMBER="probe-a@example.com"
 B_MEMBER="probe-b@example.com"
@@ -257,7 +265,7 @@ GROUP_ID=$(curl -s "${SA[@]}" -X POST "$GATEWAY/v1/volunteer-groups/groups" \
 
 if [ -z "$GROUP_ID" ]; then
   GROUP_ID=$(curl -s "${AA[@]}" "$GATEWAY/v1/volunteer-groups/groups" \
-    | tr '{' '\n' | grep '"name":"Probe group"' | json_field id)
+    | tr '{' '\n' | { grep '"name":"Probe group"' || true; } | json_field id)
 fi
 
 EVENT_ID=$(curl -s "${SA[@]}" -X POST "$GATEWAY/v1/events" \
@@ -299,6 +307,33 @@ EXAM_ID=$(curl -s "${SA[@]}" -X POST "$GATEWAY/v1/pathshala/classes/$CLASS_ID/ex
 A2_TOKEN=$(register_member "$A_SLUG" "$A_MEMBER2" "Probe A2" "$NOTICE")
 AA2=(-H "Authorization: Bearer $A2_TOKEN" -H 'Content-Type: application/json')
 
+# A member's *profile* is created by member-family-service consuming
+# `identity.user.registered.v1`, not by the registration call - so it is not
+# there the instant registration returns, and neither is the welcome
+# notification audit-notification-service raises from the same event.
+#
+# Creating a family, a child or a conversion request before the profile arrives
+# fails, and on a clean stack that took out five fixtures at once. The smoke
+# script waits for exactly this; so does this one now. Assuming rather than
+# establishing, again.
+wait_for_profile() {
+  local token="$1" attempt=0
+
+  until [ "$(call GET /v1/members/me "$token")" = "200" ]; do
+    attempt=$((attempt + 1))
+
+    if [ "$attempt" -ge 30 ]; then
+      echo "  BROKEN  a member's profile never arrived over Kafka"
+      exit 1
+    fi
+
+    sleep 2
+  done
+}
+
+wait_for_profile "$A_TOKEN"
+wait_for_profile "$A2_TOKEN"
+
 A_MEMBER2_ID=$(curl -s "${AA2[@]}" "$GATEWAY/v1/identity/me" | json_field userId)
 
 # A's family, and its code, which is what a join request quotes.
@@ -321,8 +356,13 @@ FAMILY_CODE=$(curl -s "${AA[@]}" "$GATEWAY/v1/families/mine" | json_field family
 curl -s -o /dev/null "${AA2[@]}" -X POST "$GATEWAY/v1/families/join-requests" \
   -d "{\"familyCode\":\"$FAMILY_CODE\",\"relationship\":\"Sibling\"}" || true
 
+# `|| true` on the grep. With `set -euo pipefail` a grep that matches nothing
+# fails the pipeline and kills the script mid-setup, printing nothing after
+# "building one of everything in Samaaj A" - which is exactly what happened the
+# first time this ran, and is the third instance of the same trap in this
+# repository. `unreachable-endpoints.sh` documents it too.
 JOIN_REQUEST_ID=$(curl -s "${AA[@]}" "$GATEWAY/v1/families/mine" \
-  | tr '{' '\n' | grep '"status":"PendingJoinRequest"' | json_field id)
+  | tr '{' '\n' | { grep '"status":"PendingJoinRequest"' || true; } | json_field id)
 
 # A child old enough to be converted, so the conversion request is a real one.
 CHILD_ID=$(curl -s "${AA[@]}" -X POST "$GATEWAY/v1/children" \
@@ -343,11 +383,20 @@ curl -s -o /dev/null "${AA2[@]}" -X POST "$GATEWAY/v1/volunteer-groups/groups/$G
   -d '{"note":"probe"}'
 
 APPLICATION_ID=$(curl -s "${AA[@]}" "$GATEWAY/v1/volunteer-groups/groups/$GROUP_ID/applications" \
-  | tr '{' '\n' | grep '"note":"probe"' | json_field id)
+  | tr '{' '\n' | { grep '"note":"probe"' || true; } | json_field id)
 
 # A notification belonging to an A member. Every member gets a welcome one when
-# audit-notification-service consumes their registration, so this is a read.
-NOTIFICATION_ID=$(curl -s "${AA[@]}" "$GATEWAY/v1/notifications" | json_field id)
+# audit-notification-service consumes their registration, so this is a read -
+# but it is a *second* consumer with its own lag, and waiting for the profile
+# above does not imply it has caught up. On a clean stack the profile was there
+# and this was not.
+for attempt in $(seq 1 30); do
+  NOTIFICATION_ID=$(curl -s "${AA[@]}" "$GATEWAY/v1/notifications" | json_field id)
+
+  [ -n "$NOTIFICATION_ID" ] && break
+
+  sleep 2
+done
 
 # A campaign whose nomination window is open now, so there is a real nomination
 # to decide. The one above deliberately sits in 2099; nominations and voting are

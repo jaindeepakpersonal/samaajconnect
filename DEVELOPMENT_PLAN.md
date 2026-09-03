@@ -8,7 +8,39 @@ version of the plan; the reasoning behind the ordering lives in
 ## Current Status
 
 - **Stage:** every module has a service and member screens; Phase 5 hardening under way
-- **Last updated:** 2026-09-03 - **the isolation probe covers everything now.**
+- **Last updated:** 2026-09-03 - **CI runs the isolation probe now.**
+
+  It was complete and self-auditing and still only ran when somebody remembered,
+  which is how it went stale in the first place. The smoke job already stands a
+  stack up and tears it down, so the probe runs there, **before** the smoke
+  script rather than after: that script's last section deliberately exhausts the
+  credential rate limit with four hundred sign-in attempts, and anything signing
+  in during the following minute gets a 429.
+
+  Three things had to be true first, and none of them was.
+
+  **The probe owned only one of its two Samaaj.** A defaulted to `smoke-samaj`,
+  left over from when it looked A up rather than creating it. Sharing a Samaaj
+  with the smoke suite means each can move a count the other asserts on; it owns
+  `probe-samaj-a` and `probe-samaj-b` now, and the two scripts can run in either
+  order without knowing about each other.
+
+  **It assumed two Kafka consumers had caught up.** A member's profile is
+  created by member-family-service consuming `identity.user.registered.v1`, and
+  the welcome notification by audit-notification-service consuming the same
+  event - so neither exists the instant registration returns. Against empty
+  volumes that took out five fixtures, then one. Both are waited for now, the
+  way the smoke script has always waited for the profile.
+
+  **And three `grep`s in a pipeline could kill the script mid-setup** under
+  `set -euo pipefail`, printing nothing after "building one of everything in
+  Samaaj A". That is the third instance of that trap in this repository.
+
+  Verified end to end in CI's order on one stack from empty volumes: probe 65
+  refusals and complete coverage, then smoke 294 of 294.
+
+  1,518 tests green, unchanged.
+- **Previously:** 2026-09-03 - **the isolation probe covers everything now.**
 
   64 of the platform's 73 id-taking endpoints, 9 deliberately excluded with a
   written reason each, and nothing left over. 65 cross-tenant attempts, every
@@ -639,6 +671,13 @@ unit tested.
       probed, 9 deliberately excluded with a written reason each (platform
       administration, where a Super Admin acting across Samaaj is the point),
       and 7 genuinely outstanding
+- [x] **CI runs the probe, 2026-09-03**, in the smoke job's existing stack and
+      before the smoke script — whose last section exhausts the credential rate
+      limit, so anything signing in after it gets a 429. Needed the probe to own
+      both its Samaaj rather than borrowing `smoke-samaj`, to wait for the two
+      Kafka consumers that create a profile and a welcome notification, and to
+      stop three pipeline `grep`s killing it under `pipefail`. A check nobody
+      runs is not a check, which is how this one went stale to begin with
 - [x] **The last seven are probed too, 2026-09-03. Coverage is complete:** 64 of
       73 id-taking endpoints, 9 deliberately excluded with a reason each, none
       left over. 65 cross-tenant attempts, all refused with 404, no 403s. The

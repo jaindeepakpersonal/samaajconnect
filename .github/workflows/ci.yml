@@ -223,6 +223,13 @@ jobs:
       - name: Start the stack
         run: docker compose up -d --build --wait
 
+      # Before the smoke script, not after: its last section deliberately
+      # exhausts the credential rate limit with four hundred sign-in attempts,
+      # and anything signing in during the following minute gets a 429. The two
+      # own separate Samaaj, so neither disturbs the other's data.
+      - name: Cross-tenant isolation
+        run: bash scripts/tenant-isolation-probe.sh
+
       - name: Smoke test
         run: bash scripts/smoke-through-gateway.sh
 
