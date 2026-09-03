@@ -47,6 +47,8 @@ jobs:
             solution: services/celebrity-voting-service/Sangam.CelebrityVoting.sln
           - name: pathshala-service
             solution: services/pathshala-service/Sangam.Pathshala.sln
+          - name: boli-service
+            solution: services/boli-service/Sangam.Boli.sln
           - name: gateway
             solution: gateway/Sangam.Gateway.sln
 
@@ -120,7 +122,7 @@ jobs:
     name: Cross-service conventions
     runs-on: ubuntu-latest
 
-    # Rules the repository states in prose and no compiler enforces. All three
+    # Rules the repository states in prose and no compiler enforces. All four
     # of these read source rather than running anything, so they are seconds.
     steps:
       - uses: actions/checkout@v4
@@ -132,6 +134,16 @@ jobs:
       # whichever side moves.
       - name: Security invariants match SECURITY-CHECKLIST.md
         run: bash scripts/security-invariants.sh
+
+      # Every list of the ten services is written by hand somewhere - this
+      # matrix, the migrations job below, the gateway's routes, the smoke
+      # script's sections. Being missing from one does not fail; it is simply
+      # absent. boli-service was absent from three of them at once, so its 49
+      # tests - the ones holding "a Boli has exactly one highest bid" included -
+      # ran nowhere but a laptop. Each mapping is read from the file that owns
+      # it, so a new service fails until it is in all of them.
+      - name: No service is left out of CI or the gateway
+        run: bash scripts/service-coverage.sh
 
       # Root CLAUDE.md §4.4 calls the pipeline order "fixed, load-bearing" and
       # it is duplicated across ten copies of one file. The expected order is
@@ -216,6 +228,12 @@ jobs:
           dotnet dotnet-ef migrations has-pending-model-changes \
             --project services/pathshala-service/src/Sangam.Pathshala.Infrastructure \
             --startup-project services/pathshala-service/src/Sangam.Pathshala.Api
+
+      - name: Check boli-service
+        run: |
+          dotnet dotnet-ef migrations has-pending-model-changes \
+            --project services/boli-service/src/Sangam.Boli.Infrastructure \
+            --startup-project services/boli-service/src/Sangam.Boli.Api
 
   smoke:
     name: Through the gateway

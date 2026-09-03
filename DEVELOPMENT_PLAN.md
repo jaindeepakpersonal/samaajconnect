@@ -8,7 +8,52 @@ version of the plan; the reasoning behind the ordering lives in
 ## Current Status
 
 - **Stage:** every module has a service and member screens; Phase 5 hardening under way
-- **Last updated:** 2026-09-03 - **the security checklist checked itself, and
+- **Last updated:** 2026-09-03 - **boli-service was not in CI, and had not been
+  for eleven cycles.**
+
+  The previous cycle made the security checklist check itself, and the obvious
+  next question was which other rule this repository states in prose and
+  enforces with nobody. Root `CLAUDE.md` §9's last bullet - at least one test
+  per service **through the gateway** - was the candidate, because it had
+  already been silently false once: boli-service had no gateway coverage at all
+  while its module key was toggled on and off around it.
+
+  Writing the check found the worse thing. **Its solution was never added to
+  the CI matrix.** Forty-nine tests - the anti-sniping suite added yesterday,
+  `ConcurrentBiddingTests`, and `BidIndexTests`, which is what holds "a Boli has
+  exactly one highest bid" - had never run anywhere but a developer's machine.
+  Nor was it in the migrations job, so a model change without a migration would
+  have stayed invisible until a deployment failed against a real database.
+
+  Nothing failed, because that is not how this goes wrong. A service missing
+  from a hand-written list does not break the list; the list is simply shorter,
+  and shorter lists pass faster. boli-service happened to be absent from three
+  at once - CI matrix, migrations job, gateway smoke - and the only reason the
+  third was ever noticed is that somebody went looking for endpoints no screen
+  could reach.
+
+  `scripts/service-coverage.sh` asks the one question behind all three: **is any
+  service quietly left out?** It reads each mapping from the file that owns it -
+  the gateway's route table for prefixes and clusters, `ci.yml` for the two
+  lists, the smoke script for the calls - and checks all of them against the ten
+  directories under `services/`. A new service now fails until it is in every
+  one. CI runs it.
+
+  Verified before trusting it: boli-service builds clean in Release with
+  warnings-as-errors, its 49 tests pass, and it has no pending model changes -
+  so the CI entry was missing rather than omitted for a reason. And by four
+  injections, each caught by the check it should be: removing every Boli call
+  from the smoke script reproduces the historical gap exactly, dropping the
+  matrix entry reproduces the one found here, repointing a cluster at a service
+  that does not exist, and deleting a cluster outright.
+
+  The generalisation is now written into §9, because it is worth more than the
+  instance: **a hand-written list of the ten services is a list something will
+  fall off, and it will not fail when it does.** Every such list should be
+  derived from the directories or checked against them.
+
+  1,536 tests green - 49 of which now run somewhere other than here.
+- **Previously:** 2026-09-03 - **the security checklist checked itself, and
   found three things.**
 
   The re-pass was waiting on the erasure gap, which closed two cycles ago. Its

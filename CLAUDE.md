@@ -250,6 +250,24 @@ Neither uses `*service-defaults` — they need no database and no broker.
   works in isolation but isn't actually wired into the gateway is a
   common and easy-to-miss failure mode.
 
+  **`scripts/service-coverage.sh` checks that, and CI runs it.** It reads the
+  gateway's own route table to map each `/v1/{prefix}` to the service its
+  cluster names, so a new service that nobody added a smoke section for fails
+  on the day it lands. It also checks the two lists in `ci.yml` — the
+  build/test matrix and the migrations job — because "is this service tested at
+  all" and "is it tested through the gateway" are the same question asked twice.
+
+  Until 2026-09-03 all three were stated in prose and enforced by nothing, and
+  boli-service was missing from all three at once: no gateway coverage for
+  eleven cycles while its module key was toggled on and off around it, and no
+  CI entry, so 49 tests — including the ones holding "a Boli has exactly one
+  highest bid" — ran nowhere but a developer's machine.
+
+  The general lesson is worth more than the instance. **A hand-written list of
+  the ten services is a list something will fall off**, and it will not fail
+  when it does; it will simply be shorter. Every such list should be derived
+  from the directories, or checked against them.
+
 ## 10. Where to look for what
 
 | Need | Location |
@@ -276,6 +294,7 @@ Neither uses `*service-defaults` — they need no database and no broker.
 | Which endpoints no screen can reach | `scripts/unreachable-endpoints.sh` |
 | Whether every service still agrees with §4.4 | `scripts/pipeline-order.sh` |
 | Whether the security checklist is still true | `scripts/security-invariants.sh` |
+| Whether any service is quietly left out | `scripts/service-coverage.sh` |
 | Scaffold a new bounded-context service | `.claude/skills/new-microservice/SKILL.md` |
 | Add a command/query to an existing service | `.claude/skills/add-service-feature/SKILL.md` |
 | Turn a wireframe screen into a real component | `.claude/skills/wireframe-to-angular/SKILL.md` |
