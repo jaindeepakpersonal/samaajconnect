@@ -275,6 +275,7 @@ Neither uses `*service-defaults` — they need no database and no broker.
 | A multi-state workflow as a transition table | `services/social-issues-service/CLAUDE.md` |
 | Which endpoints no screen can reach | `scripts/unreachable-endpoints.sh` |
 | Whether every service still agrees with §4.4 | `scripts/pipeline-order.sh` |
+| Whether the security checklist is still true | `scripts/security-invariants.sh` |
 | Scaffold a new bounded-context service | `.claude/skills/new-microservice/SKILL.md` |
 | Add a command/query to an existing service | `.claude/skills/add-service-feature/SKILL.md` |
 | Turn a wireframe screen into a real component | `.claude/skills/wireframe-to-angular/SKILL.md` |

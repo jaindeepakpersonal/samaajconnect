@@ -1,3 +1,4 @@
+using System.Reflection;
 using System.Text;
 using Confluent.Kafka;
 using Microsoft.Extensions.Logging;
@@ -11,7 +12,15 @@ public sealed class KafkaOptions
 
     public string BootstrapServers { get; set; } = "localhost:9092";
 
-    public string ClientId { get; set; } = "identity-tenant-service";
+    /// <summary>
+    /// Empty on purpose. Every service names itself in its own appsettings.json,
+    /// and a default naming any one service is a default that names the *wrong*
+    /// service in the other nine - which is how eight producers came to identify
+    /// themselves to the broker as member-family-service. Empty falls back to the
+    /// running assembly, so an unconfigured service is honestly named rather than
+    /// impersonating one that is configured.
+    /// </summary>
+    public string ClientId { get; set; } = string.Empty;
 }
 
 /// <summary>
@@ -31,7 +40,9 @@ public sealed class KafkaProducer : IEventPublisher, IDisposable
         var config = new ProducerConfig
         {
             BootstrapServers = options.Value.BootstrapServers,
-            ClientId = options.Value.ClientId,
+            ClientId = string.IsNullOrWhiteSpace(options.Value.ClientId)
+                ? DefaultClientId()
+                : options.Value.ClientId,
             // The Outbox already guarantees at-least-once delivery, so the
             // producer only has to avoid silently losing an acknowledged write.
             Acks = Acks.All,
@@ -44,6 +55,15 @@ public sealed class KafkaProducer : IEventPublisher, IDisposable
                 _logger.LogError("Kafka producer error: {Reason} (code {Code})", error.Reason, error.Code))
             .Build();
     }
+
+    /// <summary>
+    /// The running assembly, when nothing configured a name. Wrong-but-plausible
+    /// beats wrong-and-confident: a broker log naming Sangam.Boli.Api points at the
+    /// service that published, where a copied constant pointed at a service that
+    /// did not.
+    /// </summary>
+    private static string DefaultClientId() =>
+        Assembly.GetEntryAssembly()?.GetName().Name ?? "sangam-service";
 
     public async Task PublishAsync(OutboxEnvelope envelope, CancellationToken cancellationToken = default)
     {

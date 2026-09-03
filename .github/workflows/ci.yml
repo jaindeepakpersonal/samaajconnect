@@ -120,10 +120,18 @@ jobs:
     name: Cross-service conventions
     runs-on: ubuntu-latest
 
-    # Rules the repository states in prose and no compiler enforces. Both of
-    # these read source rather than running anything, so they are seconds.
+    # Rules the repository states in prose and no compiler enforces. All three
+    # of these read source rather than running anything, so they are seconds.
     steps:
       - uses: actions/checkout@v4
+
+      # The mechanical half of SECURITY-CHECKLIST.md. It used to be a walk with
+      # a date on it, which is worth exactly as much as the date - the pass
+      # before the last one covered three services of ten. The two allow-lists
+      # it compares against are read out of the checklist, so this fails
+      # whichever side moves.
+      - name: Security invariants match SECURITY-CHECKLIST.md
+        run: bash scripts/security-invariants.sh
 
       # Root CLAUDE.md §4.4 calls the pipeline order "fixed, load-bearing" and
       # it is duplicated across ten copies of one file. The expected order is

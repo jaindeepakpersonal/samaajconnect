@@ -8,7 +8,56 @@ version of the plan; the reasoning behind the ordering lives in
 ## Current Status
 
 - **Stage:** every module has a service and member screens; Phase 5 hardening under way
-- **Last updated:** 2026-09-03 - **a Boli can no longer be won by arriving
+- **Last updated:** 2026-09-03 - **the security checklist checked itself, and
+  found three things.**
+
+  The re-pass was waiting on the erasure gap, which closed two cycles ago. Its
+  status block said "walked against all ten services and the gateway" with a
+  date on it - which is worth exactly as much as the date. The pass before that
+  one covered three services, and six of the seven that shipped afterwards were
+  never re-checked. This repository has now watched that same shape play out on
+  the accessibility audit, the isolation probe and the backup drill in turn.
+
+  So the parts a machine can do, `scripts/security-invariants.sh` does, in a
+  second, in CI: all 134 request types carry one of the four authorization
+  attributes; the anonymous and internal sets match the lists **written on the
+  checklist itself** and read out of it, so either side moving fails the check;
+  no route reaches an `[InternalRequest]` command; every `DbContext` filters by
+  reflection over `ITenantScopedEntity`; every service calls `TenantWriteGuard`;
+  and the eleven files meant to be identical across all ten services are.
+
+  **That last check is the one that found something.** `KafkaProducer` had
+  drifted: eight of the ten defaulted `ClientId` to `"member-family-service"`,
+  copied and never changed. It is the producer-side twin of the consumer-group
+  bug from a fortnight ago - six services sharing the group id
+  `timeline-service` - and that fix looked at consumers only. Nothing was ever
+  misattributed at the broker, because every service overrides it in its own
+  `appsettings.json`; what was there was the trap. The default is empty now and
+  falls back to the running assembly, so an unconfigured service names itself
+  rather than another one.
+
+  Two more, both the page being confidently wrong about itself. It cited
+  `PipelineBehaviorTests`, which does not exist in this repository and appears
+  never to have. And it said the isolation probe makes 36 cross-tenant
+  attempts; it makes 65 and reports its own coverage, so the number is gone
+  rather than corrected - a second copy of a count is the thing that goes
+  stale.
+
+  Verified by injecting four failures - stripping an attribute, making a Boli
+  command anonymous, naming an internal command in an endpoint file, and
+  changing one byte in one `KafkaProducer` - each caught by the check it should
+  be, each restored and re-run green. The script also refuses to pass when it
+  finds fewer than 100 request types, because a scan that reads nothing reports
+  everything it read as fine.
+
+  Its attribute scan skips comments, and that is not tidiness:
+  `RecordIntegrationEventCommand`'s own remarks say it carries `[InternalRequest]`
+  rather than `[AllowAnonymousRequest]`, and the first version read that sentence
+  and concluded the command was anonymous. A checker that reads prose can be
+  talked into anything.
+
+  1,536 tests green, unchanged.
+- **Previously:** 2026-09-03 - **a Boli can no longer be won by arriving
   last.**
 
   The final Open Decision that needed nothing from outside. I had read it as
@@ -745,7 +794,17 @@ unit tested.
       no name or contact. Two of them cannot drop it regardless — the voter id
       is the double-voting guarantee, and a bid is a financial record. Question
       6 in `DPDP-COMPLIANCE.md`
-- [ ] Full `SECURITY-CHECKLIST.md` re-pass once the erasure gap is closed
+- [x] **Full `SECURITY-CHECKLIST.md` re-pass, 2026-09-03**, the erasure gap it
+      was waiting on having closed. The mechanical half is now
+      `scripts/security-invariants.sh`, which CI runs: every request type
+      carries one of the four authorization attributes, the anonymous and
+      internal sets match the lists written on the checklist itself, no route
+      reaches an internal command, every `DbContext` filters by reflection,
+      every service calls `TenantWriteGuard`, and the eleven files meant to be
+      identical across all ten services are identical. Three findings, all
+      recorded on the checklist: a drifted `KafkaProducer` default `ClientId`,
+      a test cited by name that does not exist, and a probe count that had been
+      wrong for several cycles
 - [ ] HTTPS-only in production: TLS termination, HSTS, secure-cookie policy,
       and `ForwardedHeaders` so the gateway rate limiter partitions on the real
       caller rather than on the proxy

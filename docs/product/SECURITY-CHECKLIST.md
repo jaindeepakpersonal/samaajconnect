@@ -4,21 +4,47 @@ Derived from the cross-cutting requirements in both requirement docs.
 Treat this as a PR review checklist for anything touching a new
 endpoint, not just a one-time setup task.
 
-> **Status as of 2026-09-01.** Every box below has been walked against **all ten
-> services and the gateway** — the previous pass covered three, and six of the
-> seven that shipped after it were never re-checked. A ticked box is something a
-> test or a smoke check actually asserts, not something believed to be true; an
-> unticked one says plainly what is missing and where it is tracked. Items that
-> cannot apply yet — file uploads, for instance — say so rather than being
-> ticked by default.
+> **Status as of 2026-09-03. The mechanical half of this page is no longer a
+> walk with a date on it.** `scripts/security-invariants.sh` re-checks it from
+> the source in a second, and **CI runs it**: every request type carries one of
+> the four authorization attributes; the anonymous and internal sets are exactly
+> the ones listed under "Authorization" below; no route reaches an internal
+> command; every `DbContext` applies the tenant query filter by reflection;
+> every service calls `TenantWriteGuard`; and the eleven files that are meant to
+> be identical across all ten services are identical.
 >
-> **What that pass found.** Two things, both recorded rather than glossed:
-> a step-up password check that no lockout counted (fixed, below), and six
-> services holding member ids that never subscribed to the erasure event
-> (tracked, see "Data privacy"). The mechanical properties held everywhere:
-> all ten apply the tenant query filter by reflection, call `TenantWriteGuard`
-> at `SaveChanges`, register the five behaviors in the required order, and
-> fail closed on a request carrying no authorization attribute.
+> That last check is the reason the others are worth having. A property proven
+> by hand across ten copies of a file is a property that stops being true
+> quietly — which is what this repository has now watched happen to the
+> accessibility audit, the isolation probe and the backup drill in turn. A
+> ticked box below is something a test, a smoke check or one of the scripts
+> actually asserts; an unticked one says plainly what is missing and where it is
+> tracked. Items that cannot apply yet — file uploads, for instance — say so
+> rather than being ticked by default.
+>
+> **What the 2026-09-03 re-pass found.** Three things.
+>
+> `KafkaProducer` had drifted: eight of the ten shipped a default `ClientId` of
+> `"member-family-service"`, copied and never changed. It is the producer-side
+> twin of the consumer-group bug found in September — six services sharing the
+> group id `timeline-service` — and that fix looked at consumers only. Every
+> service overrides it in its own `appsettings.json`, so nothing was ever
+> misattributed at the broker; what was there was the trap, and the default is
+> now empty and falls back to the running assembly, so an unconfigured service
+> names itself rather than another one.
+>
+> This page cited `PipelineBehaviorTests`, which does not exist in this
+> repository and appears never to have. The pipeline order is checked by
+> `scripts/pipeline-order.sh`, which does.
+>
+> And it claimed the isolation probe makes 36 attempts, from a cycle when it
+> did; it makes 65 and reports its own coverage. The number is gone rather than
+> corrected — see "Tenant isolation".
+>
+> **What the 2026-09-01 pass found**, kept because both are still the reason
+> two items below read as they do: a step-up password check that no lockout
+> counted (fixed, below), and six services holding member ids that never
+> subscribed to the erasure event (closed since, see "Data privacy").
 
 ## Tenant isolation
 
@@ -37,12 +63,19 @@ endpoint, not just a one-time setup task.
 
       **Probed, not assumed.** `scripts/tenant-isolation-probe.sh` builds two
       real Samaaj and has Samaaj B's member *and* Samaaj B's administrator
-      attempt 36 reads and writes against Samaaj A's ids, through the gateway,
-      across all ten services. Every one is refused with **404** — not 403,
-      which would confirm the id is real. The administrator half is the one
-      that matters most: a Super Admin whose override scopes them to B is
-      exactly the caller the query filter would let through if a handler
-      forgot its own check.
+      attempt every cross-tenant read and write it can reach against Samaaj A's
+      ids, through the gateway, across all ten services. Every one is refused
+      with **404** — not 403, which would confirm the id is real. The
+      administrator half is the one that matters most: a Super Admin whose
+      override scopes them to B is exactly the caller the query filter would let
+      through if a handler forgot its own check.
+
+      **The count is deliberately not written here.** This paragraph said "36"
+      for several cycles after the probe had grown to 65 attempts, which is the
+      page going stale about the one script written so it could not. The probe
+      reports its own coverage on every run — how many of the platform's
+      id-taking endpoints it probed, and by name the ones it did not — so the
+      run is the number and this page does not hold a second copy of it.
 
       The script asserts its own validity before it believes a pass. A probe
       against a path that does not exist answers 404 and is indistinguishable
@@ -76,10 +109,58 @@ endpoint, not just a one-time setup task.
       server-side, and `scripts/smoke-through-gateway.sh` checks the negative
       cases through the gateway.
 - [x] `TenantAuthorizationBehavior` runs before `ValidationBehavior` in
-      the pipeline (see `ARCHITECTURE.md` §3) so an unauthorized caller
+      the pipeline (see root `CLAUDE.md` §4.4) so an unauthorized caller
       never learns anything about validation rules for data they can't
-      access. Registered in that order in all three services, numbered in the
-      source, and covered by `PipelineBehaviorTests`.
+      access. Registered in that order in **all ten services**, numbered in the
+      source, and checked by `scripts/pipeline-order.sh`, which CI runs and
+      which reads the expected order out of `CLAUDE.md` rather than carrying a
+      second copy of it.
+
+### The two lists below are the ones worth reading twice
+
+Everything else on this page is a property that holds or does not. These two are
+*sets*, and a set grows by one line in a pull request nobody reads twice. They
+are written here rather than in the script that checks them, so this page stays
+the source of truth and `scripts/security-invariants.sh` fails whichever side
+moves — the arrangement §4.4 already uses.
+
+**Adding a row here is the deliberate act.** The script does not warn about an
+unlisted request type; it fails. That is the point: an endpoint becoming
+anonymous should cost somebody a paragraph explaining why.
+
+#### Requests reachable without authentication
+
+All nine are in `identity-tenant-service`, and that is itself worth keeping true
+— no other service has any business answering an unauthenticated caller.
+
+| Request | Why it cannot require a token |
+|---|---|
+| `LoginCommand` | Issuing the token is what it does |
+| `RefreshSessionCommand` | The refresh token *is* the credential presented |
+| `SignOutCommand` | Ends a session that may already be unusable |
+| `RegisterMemberCommand` | No account exists yet. Takes a **slug**, resolved server-side, never a tenant id |
+| `ActivateAccountCommand` | Redeeming a first password: the person has no way to sign in yet |
+| `GetConsentNoticeQuery` | DPDP s.5 requires the notice at or before the point of consent, which is registration |
+| `ListRegisterableTenantsQuery` | The registration form asks people to pick their Samaaj before they have an account. Deliberately not the Super Admin's `ListTenantsQuery`, which carries status and contact details |
+| `GetTenantBySlugQuery` | The gateway resolves the Samaaj before any token has been validated |
+| `GetTenantByIdQuery` | Same, by id. Returns only what the gateway needs to route |
+
+#### Requests no HTTP route may reach
+
+`[InternalRequest]` says a command is raised by a Kafka consumer or another
+in-process caller and is not routed. That is a claim about the *absence* of a
+route, which nothing in the type system can hold — so the script asserts it, by
+checking no endpoint file mentions the type.
+
+| Request | Service | Raised by |
+|---|---|---|
+| `RecordIntegrationEventCommand` | audit-notification | Its consumer, for every event the platform publishes |
+| `ErasePersonalDataCommand` | audit-notification | `identity.user.erased.v1` |
+| `ConsumeIntegrationEventCommand` | pathshala, social-issues, timeline | Each service's own consumer |
+| `CreateProfileForNewUserCommand` | member-family | `identity.user.registered.v1` |
+| `EraseMemberDataCommand` | member-family | `identity.user.erased.v1` |
+| `CompleteChildConversionCommand` | member-family | The account-created event that follows an approved conversion |
+| `CreateAccountForConvertedChildCommand` | identity-tenant | An approved adult-child conversion |
 
 ## Permission key naming convention
 
