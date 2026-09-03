@@ -8,7 +8,38 @@ version of the plan; the reasoning behind the ordering lives in
 ## Current Status
 
 - **Stage:** every module has a service and member screens; Phase 5 hardening under way
-- **Last updated:** 2026-09-02 - **the tenant-isolation probe had gone stale,
+- **Last updated:** 2026-09-03 - **the probe knows what it misses now.**
+
+  Three cycles running, the thing that had gone wrong was a check going stale
+  rather than code regressing: the accessibility audit predated eight screens,
+  and the tenant-isolation probe had never touched 29 of the platform's 73
+  id-taking endpoints. Both were found by looking, which is not a mechanism.
+
+  So the probe audits its own coverage. It enumerates every id-taking route the
+  services map - the same way `unreachable-endpoints.sh` does - and names the
+  ones no probe reached. A new endpoint now shows up in that list on the next
+  run instead of being quietly absent from a report that says "every
+  cross-tenant attempt was refused".
+
+  57 of 73 probed, up from 50; 58 clean refusals, no 403s, nothing unrefused.
+  Nine are deliberately excluded and each carries a reason in the script -
+  platform administration, where a Super Admin acting across Samaaj is the
+  entire point, and the caller's own consent. **A list with permanent entries in
+  it is a list people stop reading**, which is how this went wrong in the first
+  place, so the exclusions are named rather than left to be re-argued each time.
+  Seven remain genuinely outstanding and are listed in Phase 5.
+
+  **Two more faults in the probe, both about assuming rather than
+  establishing.** It waited on nothing before its first request, so a gateway
+  that answers before the services behind it have migrated produced "could not
+  sign in as Super Admin" - which reads as a wrong password. And the coverage
+  report itself died silently on its first run: a `grep` that matches nothing
+  exits 1, and under `set -euo pipefail` that killed the script after it had
+  printed the heading and nothing else. `unreachable-endpoints.sh` carries a
+  note about that exact trap; this script now does too.
+
+  1,518 tests green, unchanged.
+- **Previously:** 2026-09-02 - **the tenant-isolation probe had gone stale,
   and one endpoint had stopped being probed without saying so.**
 
   Same pattern as the accessibility audit two cycles ago: a check written at a
@@ -577,6 +608,28 @@ unit tested.
       refused with 404, none with 403. The script proves its own paths first,
       after a first run scored three false passes against endpoints that did
       not exist at the path it used
+- [x] **The probe audits its own coverage now, 2026-09-03.** It enumerates every
+      id-taking route the services map — the same way `unreachable-endpoints.sh`
+      does — and names the ones no probe reached. It cannot silently go stale
+      again: a new endpoint appears in that list on the next run. 57 of 73
+      probed, 9 deliberately excluded with a written reason each (platform
+      administration, where a Super Admin acting across Samaaj is the point),
+      and 7 genuinely outstanding
+- [ ] **Seven endpoints the probe still does not reach.** Each needs an entity
+      built in Samaaj A that the script does not create yet — a nomination, a
+      group application, a conversion request, a join request, a notification:
+      `POST /celebrity-voting/campaigns/{id}/candidates/{id}/decide`,
+      `POST /volunteer-groups/groups/{id}/applications/{id}/decide`,
+      `PUT /volunteer-groups/groups/{id}/members/{id}/position`,
+      `POST /children/{id}/conversion`,
+      `POST /children/conversion-requests/{id}/decide`,
+      `POST /families/{id}/join-requests/{id}/decide`,
+      `POST /notifications/{id}/read`
+- [x] **Fixed: the probe assumed the stack was ready.** It waited on nothing and
+      its first request failed, reporting "could not sign in as Super Admin" —
+      which reads as a wrong password rather than a gateway answering before the
+      services behind it had migrated. It has `wait_for_stack` now, the same as
+      the smoke script, which learned this first
 - [x] **Re-run and extended on 2026-09-02, because it had gone stale.** 36
       probes had become 51: the Pathshala teaching endpoints — the register,
       the roll, the timetable, exam results, placing and withdrawing a child,

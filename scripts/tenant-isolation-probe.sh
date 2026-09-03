@@ -38,6 +38,11 @@ pass=0
 fail=0
 leaked=0
 
+# Every (method, path) this run actually probed, for the coverage audit at the
+# end. See "what this run did not probe" below for why that audit exists.
+covered=$(mktemp)
+trap 'rm -f "$covered"' EXIT
+
 json_field() {
   { grep -o "\"$1\":\"[^\"]*\"" || true; } | head -1 | cut -d'"' -f4
 }
@@ -94,6 +99,13 @@ call() {
 
 probe() {
   # probe <label> <method> <path> <token> [tenant-override] [body]
+
+  # Recorded so this script can audit its own coverage at the end. The ids are
+  # flattened back to {id} and the query string dropped, matching the shape the
+  # endpoint enumeration below produces.
+  printf '%s %s\n' "$2" "$3" \
+    | sed 's/?.*//; s|/[0-9a-fA-F]\{8\}-[0-9a-fA-F-]\{27\}|/{id}|g' >> "$covered"
+
   refuses "$1" "$(call "$2" "$3" "$4" "${5:-}" "${6:-}")"
 }
 
@@ -140,6 +152,30 @@ register_member() {
 
   login "$email" "$PASSWORD"
 }
+
+# Waiting on the gateway's own /health is not enough, and this script learned
+# that the same way `smoke-through-gateway.sh` did: the gateway answers before
+# the services behind it have finished migrating, so the first request fails and
+# the script reports "could not sign in as Super Admin" - which reads like a
+# wrong password rather than a stack that was not ready yet.
+wait_for_stack() {
+  local attempt=0
+
+  until [ "$(curl -s -o /dev/null -w '%{http_code}' "$GATEWAY/health")" = "200" ] \
+     && [ "$(curl -s -o /dev/null -w '%{http_code}' "$GATEWAY/v1/identity/tenants/directory")" = "200" ]; do
+    attempt=$((attempt + 1))
+
+    if [ "$attempt" -ge 90 ]; then
+      echo "  BROKEN  the stack did not become ready"
+      exit 1
+    fi
+
+    sleep 2
+  done
+}
+
+echo "== waiting for the stack =="
+wait_for_stack
 
 echo "== signing in as Super Admin =="
 SUPER=$(login "$SUPERADMIN" "$SUPERADMIN_PASSWORD")
@@ -383,6 +419,105 @@ probe "boli      move A's occasion"       POST "/v1/boli/occasions/$OCCASION_ID/
 probe "boli      close A's Boli"          POST "/v1/boli/boli/$BOLI_ID/close"         "$SUPER" "$B_ID" '{}'
 probe "boli      record A's result"       POST "/v1/boli/boli/$BOLI_ID/result"        "$SUPER" "$B_ID" '{}'
 probe "boli      publish A's result"      POST "/v1/boli/boli/$BOLI_ID/result/publish" "$SUPER" "$B_ID" '{}'
+probe "boli      open a Boli in A's"      POST "/v1/boli/occasions/$OCCASION_ID/boli" "$SUPER" "$B_ID" "{\"boliTypeId\":\"$BOLI_TYPE_ID\",\"title\":\"probe\",\"startAt\":\"2099-01-01T00:00:00Z\",\"endAt\":\"2099-01-02T00:00:00Z\",\"startingAmount\":100,\"minIncrement\":10,\"eligibilityRule\":null}"
+
+# Reads an administrator of another Samaaj should not get either. Who bid what,
+# who is coming to an event and who has applied to a group are all facts about
+# somebody else's members.
+probe "boli      read A's bid history"    GET  "/v1/boli/boli/$BOLI_ID/bids"           "$SUPER" "$B_ID"
+probe "boli      read A's Boli result"    GET  "/v1/boli/boli/$BOLI_ID/result"         "$SUPER" "$B_ID"
+probe "voting    read A's campaign result" GET "/v1/celebrity-voting/campaigns/$CAMPAIGN_ID/results" "$SUPER" "$B_ID"
+probe "events    read A's attendees"      GET  "/v1/events/$EVENT_ID/attendees"        "$SUPER" "$B_ID"
+probe "groups    read A's applications"   GET  "/v1/volunteer-groups/groups/$GROUP_ID/applications" "$SUPER" "$B_ID"
+probe "events    cancel A's registration" DELETE "/v1/events/$EVENT_ID/registration"   "$SUPER" "$B_ID"
+
+echo
+echo "== what this run did not probe =="
+
+# **This section exists because the script silently went stale and said nothing.**
+#
+# On 2026-09-02 it was found to be covering 36 of the platform's 73 id-taking
+# endpoints. The Pathshala teaching cluster - the register, the roll, exam
+# results, placing and withdrawing a child - had been added months earlier and
+# no probe here had ever touched it. Nothing said so: the run printed "every
+# cross-tenant attempt was refused", which was true and gave entirely the wrong
+# impression.
+#
+# So the script now works out its own coverage rather than being trusted to be
+# complete. It reads every id-taking route the services map, the same way
+# `unreachable-endpoints.sh` does, and lists the ones no `probe` call above
+# reached.
+#
+# **Listed is not the same as wrong**, which is why the ones that genuinely have
+# no cross-tenant meaning are named below rather than left in the list. A list
+# with ten permanent entries in it is a list people stop reading, and then it
+# stops working the way this one just did.
+#
+# Each exclusion needs a reason that survives being read six months later. "Not
+# got to it yet" is not one - that belongs in the list.
+excluded() {
+  cat <<'REASONS'
+GET /v1/identity/tenants/by-id/{id}|the gateway's own lookup; no app calls it
+GET /v1/identity/tenants/{id}|the public Samaaj directory, anonymous by design
+PATCH /v1/identity/tenants/{id}/status|platform administration: a Super Admin acting across Samaaj is the point
+PUT /v1/identity/tenants/{id}/modules|platform administration, as above
+PUT /v1/identity/tenants/{id}/grievance-contact|platform administration, as above
+PUT /v1/identity/admins/{id}/roles/{id}|platform administration, as above
+PUT /v1/identity/roles/{id}/permissions/{id}|platform administration, as above
+POST /v1/identity/activations/{id}/code|platform administration, as above
+POST /v1/identity/me/consents/{id}/withdraw|acts on the caller's own consent; the id names a purpose, not a Samaaj
+REASONS
+}
+
+routes=$(mktemp)
+trap 'rm -f "$covered" "$routes"' EXIT
+
+for file in "$(dirname "$0")/.."/services/*/src/*/Endpoints/*.cs; do
+  [ -e "$file" ] || continue
+
+  prefix=$({ grep -oE 'MapGroup\("[^"]*"\)' "$file" || true; } | head -1 | sed 's/MapGroup("//; s/")//')
+
+  { grep -oE 'Map(Get|Post|Put|Patch|Delete)\("[^"]*"' "$file" || true; } \
+    | sed 's/Map\([A-Za-z]*\)("/\1 /; s/"$//' \
+    | while read -r verb path; do
+        case "$path" in
+          /v1/*) echo "$(printf '%s' "$verb" | tr '[:lower:]' '[:upper:]') $path" ;;
+          *) echo "$(printf '%s' "$verb" | tr '[:lower:]' '[:upper:]') ${prefix}${path}" ;;
+        esac
+      done
+done | sed 's/{[a-zA-Z]*:guid}/{id}/g; s/{[a-zA-Z]*}/{id}/g' | grep '{id}' | sort -u > "$routes"
+
+unprobed=0
+skipped=0
+total=$(wc -l < "$routes" | tr -d ' ')
+
+while read -r verb path; do
+  grep -qxF "$verb $path" "$covered" && continue
+
+  # `|| true` because a grep that matches nothing exits 1, and with
+  # `set -euo pipefail` that kills the script mid-report - which is exactly how
+  # this section failed the first time it ran, printing its heading and then
+  # nothing at all. `unreachable-endpoints.sh` carries the same note for the
+  # same reason.
+  reason=$({ excluded | grep -F "$verb $path|" || true; } | head -1 | cut -d'|' -f2-)
+
+  if [ -n "$reason" ]; then
+    skipped=$((skipped + 1))
+  else
+    echo "  ..    $verb $path"
+    unprobed=$((unprobed + 1))
+  fi
+done < "$routes"
+
+if [ "$unprobed" -eq 0 ]; then
+  echo "  (nothing - every id-taking endpoint with a cross-tenant meaning was probed)"
+fi
+
+echo
+echo "  id-taking endpoints: $total"
+echo "  probed:              $((total - unprobed - skipped))"
+echo "  deliberately not:    $skipped   (see 'excluded' in this script for why)"
+echo "  NOT PROBED:          $unprobed"
 
 echo
 echo "=================================================="
