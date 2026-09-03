@@ -54,6 +54,49 @@ json_field() {
   { grep -o "\"$1\":\"[^\"]*\"" || true; } | head -1 | cut -d'"' -f4
 }
 
+# Stops the run the moment an id extraction comes back empty or malformed.
+#
+# **This is the check the session-id bug went without.** `json_field id` was
+# used on a response whose first `"id"` is the *Pathshala's*, not the session's,
+# so classes were created against the wrong parent - and every check after it
+# reported somebody else's service answering 404. Nothing pointed at the
+# variable. A guard was added where it bit; this is the same guard everywhere
+# the pattern appears, which is thirty-one places.
+#
+# It exits rather than counting a failure and carrying on, and that is
+# deliberate. An empty id means the script is broken or the stack is, not that
+# the product regressed - and continuing turns one fault into a screen of
+# misleading failures pointing at innocent services. One clear line beats forty
+# wrong ones.
+#
+# Called as a statement, never inside `$( )`: `exit` in a command substitution
+# kills the subshell and the script carries on regardless, which would make this
+# guard silently do nothing.
+require_id() {
+  local name="$1" value="$2"
+
+  if [ -z "$value" ]; then
+    echo
+    echo "  FAIL  nothing extracted for '$name'."
+    echo "        Every check below this point would run against an empty id -"
+    echo "        which usually means a list endpoint, answering 200 for anybody."
+    exit 1
+  fi
+
+  # A GUID, loosely: the services answer with these everywhere, and anything
+  # else here means `json_field` matched a different field than intended.
+  case "$value" in
+    [0-9a-fA-F][0-9a-fA-F][0-9a-fA-F][0-9a-fA-F][0-9a-fA-F][0-9a-fA-F][0-9a-fA-F][0-9a-fA-F]-*-*-*-*)
+      : ;;
+    *)
+      echo
+      echo "  FAIL  '$name' does not look like an id: '$value'"
+      echo "        json_field probably matched a different field than intended."
+      exit 1
+      ;;
+  esac
+}
+
 wait_for_stack() {
   # The services have no healthcheck of their own (the aspnet image ships no
   # curl), so readiness is established here rather than by compose --wait.
@@ -183,6 +226,10 @@ CREATE_BODY=$(curl -s -X POST "$GATEWAY/v1/identity/tenants" \
 
 TENANT_ID=$(printf '%s' "$CREATE_BODY" | json_field id)
 
+# Empty here is expected on a re-run - creating an existing slug answers 409
+# with a problem document that has no id - so the guard goes *after* the
+# fallback has had its go, not before it. The one place an empty id is a normal
+# state rather than a broken script.
 if [ -z "$TENANT_ID" ]; then
   echo "  note  Samaaj '$SLUG' already exists; resolving it instead"
   TENANT_ID=$(curl -s "$GATEWAY/v1/identity/tenants/$SLUG" | json_field id)
@@ -190,6 +237,8 @@ else
   echo "  ok    created Samaaj $TENANT_ID"
   pass=$((pass + 1))
 fi
+
+require_id tenant_id "$TENANT_ID"
 
 check "activate" 200 "$(status -X PATCH "$GATEWAY/v1/identity/tenants/$TENANT_ID/status" \
   -H 'Content-Type: application/json' -H "Authorization: Bearer $ADMIN_TOKEN" \
@@ -294,6 +343,7 @@ echo
 echo "The profile screen's endpoint, and taking yourself out of the directory"
 
 MEMBER_ID=$(curl -s -H "Authorization: Bearer $MEMBER_TOKEN" "$GATEWAY/v1/members/me" | json_field id)
+require_id member_id "$MEMBER_ID"
 
 profile_body() {
   # $1 is the isListedInDirectory value, or "omit" to leave it out entirely.
@@ -1106,12 +1156,14 @@ echo "Volunteer groups: applying, and the president's queue"
 # Runs while the community module is on - the timeline section above switches it
 # back on before finishing.
 MEMBER_ID=$(curl -s -H "Authorization: Bearer $MEMBER_TOKEN" "$GATEWAY/v1/identity/me"   | json_field userId)
+require_id member_id "$MEMBER_ID"
 
 # The converted child from the conversion section: a second real member, so the
 # applicant and the president are genuinely different people.
 CHILD_TOKEN=$(curl -s -X POST "$GATEWAY/v1/identity/login" -H 'Content-Type: application/json'   -d "{\"mobileOrEmail\":\"$CHILD_EMAIL\",\"password\":\"$CHILD_PASSWORD\"}"   | json_field accessToken)
 
 CHILD_USER_ID=$(curl -s -H "Authorization: Bearer $CHILD_TOKEN" "$GATEWAY/v1/identity/me"   | json_field userId)
+require_id child_user_id "$CHILD_USER_ID"
 
 # A fresh name per run: a group name is unique per Samaaj, so a fixed one
 # turns every re-run into a 409 and every check after it into a cascade.
@@ -1232,6 +1284,7 @@ EVENT=$(curl -s -X POST "$GATEWAY/v1/events" -H 'Content-Type: application/json'
   -d "{\"title\":\"$EVENT_TITLE\",\"description\":\"An evening lecture.\",\"startAt\":\"$EVENT_START\",\"endAt\":null,\"venue\":\"Community Hall\",\"organizerType\":\"Samaaj\",\"organizerId\":null,\"registrationEnabled\":true,\"capacity\":1}")
 
 EVENT_ID=$(printf '%s' "$EVENT" | json_field id)
+require_id event_id "$EVENT_ID"
 EVENT_STATUS=$(printf '%s' "$EVENT" | json_field status)
 
 if [ "$EVENT_STATUS" = "Draft" ]; then
@@ -1396,6 +1449,7 @@ ISSUE=$(curl -s -X POST "$GATEWAY/v1/social-issues" -H 'Content-Type: applicatio
   -d "{\"title\":\"$ISSUE_TITLE\",\"description\":\"Cars come through too fast at closing time.\",\"category\":\"Safety\",\"locality\":\"Hiran Magri\",\"submitNow\":true}")
 
 ISSUE_ID=$(printf '%s' "$ISSUE" | json_field id)
+require_id issue_id "$ISSUE_ID"
 ISSUE_STATUS=$(printf '%s' "$ISSUE" | json_field status)
 
 if [ "$ISSUE_STATUS" = "Submitted" ]; then
@@ -1598,6 +1652,7 @@ SELF_NOMINATION=$(curl -s -X POST "$GATEWAY/v1/celebrity-voting/campaigns/$CAMPA
   -d "{\"memberId\":\"$MEMBER_ID\",\"category\":\"Community service\"}")
 
 SELF_CANDIDATE_ID=$(printf '%s' "$SELF_NOMINATION" | json_field candidateId)
+require_id self_candidate_id "$SELF_CANDIDATE_ID"
 
 # A second nomination of the same person is a no-op, not an error: two entries
 # for one person split their vote, and the second nominator did nothing wrong.
@@ -1990,6 +2045,7 @@ ENROLMENT=$(curl -s -X POST "$GATEWAY/v1/pathshala/pathshalas/$PATHSHALA_ID/enro
   -d "{\"childProfileId\":\"$CHILD_ID\"}")
 
 ENROLMENT_ID=$(printf '%s' "$ENROLMENT" | json_field id)
+require_id enrolment_id "$ENROLMENT_ID"
 
 if printf '%s' "$ENROLMENT" | grep -q '"status":"Requested"'; then
   echo "  ok    a parent asks for a place, and it is not yet a place"

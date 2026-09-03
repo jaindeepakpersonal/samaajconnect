@@ -8,7 +8,33 @@ version of the plan; the reasoning behind the ordering lives in
 ## Current Status
 
 - **Stage:** every module has a service and member screens; Phase 5 hardening under way
-- **Last updated:** 2026-09-03 - **the backup drill failed, and the backups were
+- **Last updated:** 2026-09-03 - **the smoke run stops at a bad id instead of
+  blaming ten services for it.**
+
+  The last actionable item on the Phase 5 list that needed nothing from outside.
+  The session-id bug it was written after was invisible for a specific reason:
+  `json_field id` returned the *Pathshala's* id rather than the session's, and
+  every check below it reported somebody else's service answering 404 while
+  nothing pointed at the variable.
+
+  `require_id` now stops the run at the extraction, naming what failed.
+
+  **The item said the pattern was "everywhere in this script", and counting it
+  found otherwise.** Of 31 extractions, 21 already had a check that reported and
+  carried on - including the session id itself, which guards the subtler case by
+  asserting the id it read is not the Pathshala's. Eight had nothing at all.
+  Guarding only those is the whole change: adding a second guard to the other 21
+  would have turned a counted failure into an abort, which is worse rather than
+  louder.
+
+  Verified by breaking one extraction - the run stops with one clear line
+  instead of a screenful - and then clean from empty volumes at 294 of 294. The
+  one place an empty id is normal is creating a Samaaj that already exists,
+  which answers 409 with no id; that guard sits after the fallback that resolves
+  it, not before.
+
+  1,518 tests green, unchanged.
+- **Previously:** 2026-09-03 - **the backup drill failed, and the backups were
   fine.**
 
   It was the last of the three hand-run scripts. Unlike the isolation probe it
@@ -936,12 +962,28 @@ unit tested.
         these, and the screen says so: a reviewer holding an issue's id could
         already decide it from the member portal. What was missing was any way
         to learn something was waiting
-- [ ] A smoke run that fails loudly when an id extraction goes wrong. The
-      session-id bug was invisible for a reason worth fixing properly: every
-      downstream check reported someone else's service returning 404, and
-      nothing pointed at the empty variable. One guard was added where it bit;
-      the pattern (`json_field` returning a plausible id belonging to something
-      else) is everywhere in this script
+- [x] **A smoke run that fails loudly when an id extraction goes wrong**, done
+      2026-09-03. `require_id` stops the run at the extraction, naming the
+      variable, rather than letting every check below it report someone else's
+      service answering 404.
+
+      The item said the pattern was "everywhere in this script", and counting
+      it found otherwise: of 31 extractions, 21 already had a check that
+      reported and continued — including the session id, which guards the
+      subtler case of *a plausible id belonging to something else* by asserting
+      it differs from the Pathshala's. Eight had nothing at all, and those are
+      the ones guarded now. Doubling up on the rest would have converted a
+      counted failure into an abort, which is worse rather than louder.
+
+      It exits rather than counting, deliberately: an empty id means the script
+      or the stack is broken, not that the product regressed, and continuing
+      turns one fault into a screenful pointing at innocent services. Verified
+      by breaking one extraction — the run stops immediately with one clear
+      line — and then clean from empty volumes at 294 of 294.
+
+      The one place an empty id is normal is creating a Samaaj that already
+      exists, which answers 409 with no id and is resolved by a fallback; that
+      guard sits after the fallback rather than before it.
 
 ---
 
