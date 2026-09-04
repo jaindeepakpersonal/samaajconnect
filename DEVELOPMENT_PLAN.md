@@ -8,7 +8,80 @@ version of the plan; the reasoning behind the ordering lives in
 ## Current Status
 
 - **Stage:** every module has a service and member screens; Phase 5 hardening under way
-- **Last updated:** 2026-09-04 - **the way out of a household, and whose consent
+- **Last updated:** 2026-09-04 - **a service's own documentation is a
+  hand-written list too.**
+
+  §9 already wrote the lesson down: "a hand-written list of the ten services is
+  a list something will fall off, and it will not fail when it does; it will
+  simply be shorter." That was about the service list. It is just as true one
+  level down, and nothing was checking it.
+
+  **`scripts/service-docs.sh`** holds every service's own `CLAUDE.md` to its
+  Commands and Queries sections being a complete list rather than a sample. Root
+  `CLAUDE.md` §10 sends a developer to that file before they touch a service, so
+  a command missing from it is a command that does not exist as far as the next
+  reader is concerned. Eleven were missing across four services.
+
+  **The worst of them was mine.** member-family-service's entire photo
+  feature — seven commands and queries for uploading, serving and removing a
+  member's or a child's photograph — was built, tested, smoke-checked through
+  the gateway, given a long section of prose in that very file explaining why
+  the bytes live in Postgres, and never added to the tables above that prose.
+
+  **The one that mattered was `SetRolePermissionCommand`.** It edits the role
+  matrix: what a role may do, for everybody who holds it, now and in future. It
+  had eleven integration tests and was absent from three hand-written lists at
+  once — no row in identity-tenant-service's Commands table, no row in its
+  endpoint table, and no line in `API-CONTRACTS.md`, which still described
+  `/roles` as **"Read-only"**. It had also never been called through the
+  gateway. Eight smoke checks now cover it: granting a permission a role never
+  had, reading it back on that role's own row, a member refused, the two floors
+  a Samaaj cannot cross (403 on editing SuperAdmin, 409 on taking `Roles.Manage`
+  away from its own administrators), and the grant put back.
+
+  **What a name check cannot catch is the half that goes stale worst.** Three
+  claims in prose were simply false when this cycle read them:
+
+  - member-family-service said "a household whose head has erased can no longer
+    decide a join request. Re-heading one is a known gap and belongs in an admin
+    command" — written and contradicted by the same hand on the same day as the
+    consumer that re-heads households.
+  - timeline-service and social-issues-service both said "the platform has no
+    file storage" as the reason media and evidence attachments are not built.
+    That stopped being true on 2026-09-04. Both paragraphs now say what is
+    actually still missing — **virus scanning**, the half of the
+    `SECURITY-CHECKLIST.md` requirement storage did not answer — so the next
+    person to pick either up starts from the real blocker rather than a solved
+    one. Social issues also carries a second problem storage does nothing about:
+    an attachment can be a photograph of somebody who never consented to being
+    in it.
+
+  Verified by four injections: a documented row deleted, a command added to code
+  and left undocumented, a doc renamed to name something absent, and a service
+  doc emptied of every table row. **The fourth found a bug in the check itself.**
+  Under `set -o pipefail` a grep that matches nothing kills the script, so a
+  CLAUDE.md naming no request at all — the worst case the check exists for —
+  ended the run three services early and reported nothing rather than failing.
+  A check that dies quietly is worth less than no check, because it is on the
+  list of things believed to be running.
+
+  332 of 332 smoke checks green through the gateway, which is 324 plus exactly
+  the eight added here.
+
+  **And two smoke runs against one stack destroyed each other again, in a new
+  disguise.** Last cycle's rule was "one run at a time" and I kept it — but
+  stopping a background task kills the wrapper, not the script it started. The
+  orphan kept running and kept toggling the same Samaaj's modules, so the
+  volunteer-groups section read `community` as off immediately after its own
+  section switched it on. The tell is in the log: two identical "switching it
+  back on (200)" lines in a row. Stopping a run means killing the process, and
+  the process to look for is the one whose command line *is*
+  `bash scripts/smoke-through-gateway.sh`, not the two wrapper shells that
+  merely mention it.
+
+  1,657 tests green, unchanged: this cycle changed documentation, a CI job and
+  two scripts, and no service code at all.
+- **Previously:** 2026-09-04 - **the way out of a household, and whose consent
   a child's record is held on.**
 
   Last cycle gave a member a way to take back a request nobody had answered, and

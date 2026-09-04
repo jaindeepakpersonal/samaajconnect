@@ -34,7 +34,8 @@ enforced by `TenantAuthorizationBehavior`, not just UI hiding.
 | GET | `/tenants` | `SuperAdmin` + `Tenant.Manage` | Every Samaaj, any status; `?status=` and `?search=` narrow it |
 | GET | `/tenants/modules` | Anonymous | The closed list of module keys, with labels, for the toggles |
 | PUT | `/tenants/{id}/modules` | `SuperAdmin` + `Tenant.Manage` | Replace the whole set of modules a Samaaj runs |
-| GET | `/roles` | Authenticated | The role and permission matrix the backend enforces. Read-only |
+| GET | `/roles` | Authenticated | The role and permission matrix the backend enforces, as this Samaaj has it |
+| PUT | `/roles/{roleId}/permissions/{permissionKey}` | `Roles.Manage` | Grant or revoke one permission on one role, body `{"granted":bool}`. One key per call, for the same reason `/admins/{userId}/roles/{role}` is. Two floors a Samaaj cannot cross: editing SuperAdmin at all is **403**, and revoking `Roles.Manage` from SamaajAdmin is **409** |
 | GET | `/admins` | `SuperAdmin`, `SamaajAdmin` + `AdminUsers.Manage` | This Samaaj's administrators and their roles |
 | POST | `/admins` | `SuperAdmin`, `SamaajAdmin` + `AdminUsers.Manage` | Invite an administrator; returns a one-time activation code |
 | PUT | `/admins/{userId}/roles/{role}` | `SuperAdmin`, `SamaajAdmin` + `AdminUsers.Manage` | Grant or revoke one role, body `{"granted":bool}` |

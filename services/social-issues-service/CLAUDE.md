@@ -16,7 +16,7 @@ shown to work per-module rather than all-or-nothing.
 |---|---|---|
 | `SocialIssue` | built | Tenant-scoped. An eight-state workflow, declared as a table. |
 | `IssueStatusHistory` | built | Append-only within the aggregate. Every move, with who and why. |
-| `IssueAttachment` | not built | Waits on file storage — see below. |
+| `IssueAttachment` | not built | Waits on virus scanning, not on storage any more — see below. |
 
 ## Commands
 
@@ -25,6 +25,7 @@ shown to work per-module rather than all-or-nothing.
 | `SubmitIssueCommand` | `Members.Read` | built |
 | `ReviseIssueCommand` | `Members.Read` + is the author | built |
 | `MoveIssueCommand` | `Members.Read`, then author-or-reviewer per transition | built |
+| `ConsumeIntegrationEventCommand` | `[InternalRequest]` | built. Erases what a member wrote, from the erasure topic |
 
 ## Queries
 
@@ -158,14 +159,25 @@ member it is about.
 that only cares about publication does not have to filter every move in an
 eight-state workflow.
 
-**No attachments, and that is a decision.** The wireframe has an "Attach
-Evidence" button and `DATA-MODEL.md` has `IssueAttachment` with a `ScanStatus`.
-`SECURITY-CHECKLIST.md` requires uploads to be size- and type-restricted and
-virus-scanned before being served; the platform has no file storage; and
-evidence attached to a social issue is exactly the kind of file that would need
-it — photographs of a place, a person, a document. Accepting a link to somebody
-else's host would put an unscanned file in front of a reviewer and leak their
-address to that host. It arrives with storage, tracked in `DEVELOPMENT_PLAN.md`.
+**No attachments, and that is a decision — but the reason changed and this
+paragraph did not.** The wireframe has an "Attach Evidence" button and
+`DATA-MODEL.md` has `IssueAttachment` with a `ScanStatus`. What used to be
+written here was that "the platform has no file storage", and that stopped being
+true on 2026-09-04: member photos, children's photos and Samaaj logos are stored
+bytes now.
+
+The rest of the reasoning survives intact, and it is stronger here than in
+timeline-service. `SECURITY-CHECKLIST.md` asks for uploads to be size- and
+type-restricted **and virus-scanned**; storage answered the first half and not
+the second. Evidence attached to a social issue is exactly the file that needs
+the second — a photograph of a place, a person, a document — and it carries a
+second problem storage does nothing about: an issue can be raised about a
+person, so an attachment can be a photograph of somebody who never consented to
+being in it, retained for as long as the issue is. That is a DPDP question about
+what may be collected, not a question about where the bytes live.
+
+Accepting a link to somebody else's host remains refused outright: an unscanned
+file in front of a reviewer, and the reviewer's address leaked to that host.
 
 **`PublicStatuses` lives in the repository, not as `IsPublic` in the query.** A
 computed property cannot be translated to SQL, and the failure mode is a silent

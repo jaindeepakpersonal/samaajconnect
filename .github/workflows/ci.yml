@@ -122,7 +122,7 @@ jobs:
     name: Cross-service conventions
     runs-on: ubuntu-latest
 
-    # Rules the repository states in prose and no compiler enforces. All seven
+    # Rules the repository states in prose and no compiler enforces. All eight
     # of these read source rather than running anything, so they are seconds.
     steps:
       - uses: actions/checkout@v4
@@ -184,6 +184,17 @@ jobs:
       # resolve their own strings and never store them.
       - name: Free text with no validator
         run: bash scripts/validator-coverage.sh
+
+      # A service's own CLAUDE.md is the doc §10 sends a developer to, and its
+      # Commands and Queries sections are a claimed complete list. §9's lesson
+      # about hand-written lists applies one level down: eleven requests across
+      # four services were in no line of their own documentation when this was
+      # written, member-family-service's entire photo feature among them - built,
+      # tested and smoke-checked, with a long prose section explaining it, and
+      # absent from the tables above that prose. This one fails rather than
+      # reports: there is no second reading of a command nobody wrote down.
+      - name: Every command and query is in its service's CLAUDE.md
+        run: bash scripts/service-docs.sh
 
   migrations:
     name: EF migrations are up to date

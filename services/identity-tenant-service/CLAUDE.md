@@ -47,6 +47,7 @@ since those happen *before* a tenant is established.
 | `SetTenantModulesCommand` | `SuperAdmin` + `Tenant.Manage` | built |
 | `UploadTenantLogoCommand` | `SuperAdmin`, `SamaajAdmin` + `Tenant.Manage` | built |
 | `RemoveTenantLogoCommand` | `SuperAdmin`, `SamaajAdmin` + `Tenant.Manage` | built |
+| `SetRolePermissionCommand` | `Roles.Manage` | built |
 
 A new Samaaj is created **Inactive**. Creating the record and letting it serve
 traffic are two separately audited decisions, so activation is its own command.
@@ -125,6 +126,7 @@ offsets for messages it did nothing with.
 | GET | `/v1/identity/consent-notice` | anonymous |
 | POST | `/v1/identity/me/consents/{purpose}/withdraw` | any authenticated role |
 | GET | `/v1/identity/roles` | any authenticated role |
+| PUT | `/v1/identity/roles/{roleId}/permissions/{permissionKey}` | `Roles.Manage` |
 | GET | `/v1/identity/admins` | `SuperAdmin`, `SamaajAdmin` + `AdminUsers.Manage` |
 | POST | `/v1/identity/admins` | `SuperAdmin`, `SamaajAdmin` + `AdminUsers.Manage` |
 | PUT | `/v1/identity/admins/{userId}/roles/{role}` | `SuperAdmin`, `SamaajAdmin` + `AdminUsers.Manage` |
@@ -583,3 +585,14 @@ Samaaj, register a member, sign in as them.
 `scripts/smoke-through-gateway.sh` covers this service through the gateway
 (CLAUDE.md §9), including the whole adult-child conversion loop across three
 services and two Kafka topics.
+
+**Editing the role matrix reached the platform without any of that.** It has
+eleven integration tests in `RoleMatrixEditingTests`, and until 2026-09-04 it
+had never been called through the gateway — while also being absent from this
+file's Commands and endpoint tables and from `API-CONTRACTS.md`, which still
+described `/roles` as "Read-only". Three hand-written lists missed the same
+endpoint, and it is the one that decides what a role may do for everybody who
+holds it. `scripts/service-docs.sh` is what found it. The smoke run now grants a
+permission a role never had, reads it back on that role's own row, checks the
+two floors (403 on SuperAdmin, 409 on taking `Roles.Manage` from SamaajAdmin),
+and puts the grant back.

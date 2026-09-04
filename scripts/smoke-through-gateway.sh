@@ -857,6 +857,92 @@ else
   fail=$((fail + 1))
 fi
 
+# Editing the matrix, through the gateway.
+#
+# This is the endpoint that changes what a role may do for everybody who holds
+# it, now and in future - and it reached the platform absent from three
+# hand-written lists at once: no row in identity-tenant-service's own Commands
+# table, no line in API-CONTRACTS.md (which still described /roles as
+# "Read-only"), and no call here. It has eleven integration tests and had never
+# been through the gateway. `scripts/service-docs.sh` is what found it.
+#
+# **The Samaaj administrator, not ADMIN_TOKEN**, which is the platform Super
+# Admin. The matrix is edited per Samaaj, so a Super Admin who has not chosen
+# one is refused with `Matrix.NoSamaaj` - and the first version of this block
+# sat higher up the file using ADMIN_TOKEN and answered 403 to everything,
+# including the two floors, which happen to be 403 and 409. A block placed
+# before the identity it needs exists does not fail for the reason it looks
+# like it failed. It lives here because this is where SAMAAJ_ADMIN_TOKEN does.
+#
+# PathshalaStudent is the role used because no account in this run holds one, so
+# a change to it cannot alter what any later section is allowed to do. The grant
+# is put back at the end regardless.
+STUDENT_ROLE=a0000000-0000-0000-0000-000000000007
+SUPERADMIN_ROLE=a0000000-0000-0000-0000-000000000001
+SAMAAJADMIN_ROLE=a0000000-0000-0000-0000-000000000002
+
+check "an administrator can grant a role a permission it never had" 200 \
+  "$(status -X PUT "$GATEWAY/v1/identity/roles/$STUDENT_ROLE/permissions/Timeline.Moderate" \
+     -H 'Content-Type: application/json' -H "Authorization: Bearer $SAMAAJ_ADMIN_TOKEN" \
+     -d '{"granted":true}')"
+
+# One line per role, so a grep for a permission answers about *that* role.
+#
+# The first version of this grepped the whole document for "Timeline.Moderate",
+# which ContentModerator holds by default - so it would have reported the grant
+# as landing no matter what the endpoint did. Splitting on the role boundary is
+# what makes the check about the row it names. Permissions are plain strings in
+# this response, so a role object contains no second `{"id":`.
+student_row() {
+  curl -s -H "Authorization: Bearer $SAMAAJ_ADMIN_TOKEN" "$GATEWAY/v1/identity/roles" \
+    | sed 's/{"id":/\n{"id":/g' \
+    | { grep '"name":"PathshalaStudent"' || true; }
+}
+
+if student_row | grep -q '"Timeline.Moderate"'; then
+  echo "  ok    and the change is on the matrix the next read returns"
+  pass=$((pass + 1))
+else
+  echo "  FAIL  the change is on the matrix the next read returns"
+  fail=$((fail + 1))
+fi
+
+check "a member without Roles.Manage cannot edit it" 403 \
+  "$(status -X PUT "$GATEWAY/v1/identity/roles/$STUDENT_ROLE/permissions/Timeline.Moderate" \
+     -H 'Content-Type: application/json' -H "Authorization: Bearer $MEMBER_TOKEN" \
+     -d '{"granted":false}')"
+
+check "SuperAdmin is platform administration and no Samaaj may edit it" 403 \
+  "$(status -X PUT "$GATEWAY/v1/identity/roles/$SUPERADMIN_ROLE/permissions/Timeline.Moderate" \
+     -H 'Content-Type: application/json' -H "Authorization: Bearer $SAMAAJ_ADMIN_TOKEN" \
+     -d '{"granted":false}')"
+
+check "and a Samaaj cannot take Roles.Manage off its own administrators" 409 \
+  "$(status -X PUT "$GATEWAY/v1/identity/roles/$SAMAAJADMIN_ROLE/permissions/Roles.Manage" \
+     -H 'Content-Type: application/json' -H "Authorization: Bearer $SAMAAJ_ADMIN_TOKEN" \
+     -d '{"granted":false}')"
+
+check "granting it back is allowed, because only removal locks anybody out" 200 \
+  "$(status -X PUT "$GATEWAY/v1/identity/roles/$SAMAAJADMIN_ROLE/permissions/Roles.Manage" \
+     -H 'Content-Type: application/json' -H "Authorization: Bearer $SAMAAJ_ADMIN_TOKEN" \
+     -d '{"granted":true}')"
+
+check "and the grant this section made is put back" 200 \
+  "$(status -X PUT "$GATEWAY/v1/identity/roles/$STUDENT_ROLE/permissions/Timeline.Moderate" \
+     -H 'Content-Type: application/json' -H "Authorization: Bearer $SAMAAJ_ADMIN_TOKEN" \
+     -d '{"granted":false}')"
+
+# The other half of the read-back, and the reason the pair is worth more than
+# either alone: if `student_row` were selecting the whole document rather than
+# one role, the check above would pass and this one could not.
+if student_row | grep -q '"Timeline.Moderate"'; then
+  echo "  FAIL  the role is back to its default permissions"
+  fail=$((fail + 1))
+else
+  echo "  ok    leaving the role back at its default permissions"
+  pass=$((pass + 1))
+fi
+
 # ---- Taking back a join request ------------------------------------------------
 #
 # A pending request counts as belonging to a household, deliberately - otherwise

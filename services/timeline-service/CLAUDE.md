@@ -17,7 +17,7 @@ off gets 404 on every path here — see "The module gate" below.
 | `PostComment` | built | Owned by the post; only an approved post accepts one. |
 | `PostReaction` | built | At most one per member per post. |
 | `ModerationAction` | built | Append-only within the aggregate. Every decision, with who made it. |
-| `PostMedia` | not built | Waits on file storage — see below. |
+| `PostMedia` | not built | Waits on virus scanning, not on storage any more — see below. |
 
 ## Commands
 
@@ -28,6 +28,7 @@ off gets 404 on every path here — see "The module gate" below.
 | `AddCommentCommand` | `Timeline.Post` | built |
 | `ReactToPostCommand` | `Timeline.Post` | built |
 | `ReportPostCommand` | `Timeline.Post` | built |
+| `ConsumeIntegrationEventCommand` | `[InternalRequest]` | built. Erases what a member wrote, from the erasure topic |
 
 ## Queries
 
@@ -174,14 +175,27 @@ member is about that member, and stays out for the same reason.
 **A post nobody can see reports as "not found", not "forbidden".** Commenting on
 a pending post means the id was guessed; confirming it exists is the leak.
 
-**No media, and that is a decision.** The wireframe has an "Attach Photo" button
-and `DATA-MODEL.md` has `PostMedia` with a `ScanStatus`. Both are honest about
-what is needed: `SECURITY-CHECKLIST.md` requires uploaded files to be size- and
-type-restricted and virus-scanned before being served. The platform has no file
-storage, and accepting a link to somebody else's host would put an unscanned
-image in front of the whole Samaaj and send every viewer's address to that host —
-a much larger surface than the single profile photo that precedent came from.
-Media arrives with storage, tracked in `DEVELOPMENT_PLAN.md`.
+**No media, and that is a decision — but the reason changed and this paragraph
+did not.** The wireframe has an "Attach Photo" button and `DATA-MODEL.md` has
+`PostMedia` with a `ScanStatus`. What used to be written here was that "the
+platform has no file storage", and that stopped being true on 2026-09-04:
+member photos, children's photos and Samaaj logos are stored bytes now, with
+`ImageContent` sniffing the format out of the bytes rather than trusting the
+uploader's declared type.
+
+So the remaining blocker is the other half of what
+`SECURITY-CHECKLIST.md` asks for under "File handling", and it is the half
+storage did not solve: **uploads are size- and type-restricted, and they are not
+virus-scanned.** Sniffing proves the bytes begin like an image; it proves nothing
+about what a decoder does with the rest of them. That is an accepted risk for a
+photograph one member chose and a few people look at. A timeline attachment goes
+in front of the whole Samaaj, which is a different number of decoders and a
+different blast radius, so the same accepted risk is not automatically accepted
+here.
+
+Accepting a *link* to somebody else's host remains refused outright, for the
+reason it always was: an unscanned image in front of the whole Samaaj, and every
+viewer's address sent to whoever hosts it.
 
 **Domain-assigned keys are `ValueGeneratedNever`.** All four of them. Left as
 EF's default, a child added to a tracked parent comes back Modified rather than

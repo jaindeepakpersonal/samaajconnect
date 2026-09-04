@@ -34,14 +34,20 @@ worked example of a cross-service flow with no synchronous call.
 | `RequestChildConversionCommand` | head of that family + `Family.Write` | built |
 | `DecideChildConversionCommand` | `SamaajAdmin` + `Family.ApproveConversion` | built |
 | `EraseMemberDataCommand` | `[InternalRequest]` | built |
+| `CompleteChildConversionCommand` | `[InternalRequest]` | built |
 | `WithdrawJoinRequestCommand` | any member, their own request | built |
 | `LeaveFamilyCommand` | any member, their own membership | built |
+| `UploadMemberPhotoCommand` | `Members.Read`, then self or `Members.Write` | built |
+| `RemoveMemberPhotoCommand` | `Members.Read`, then self or `Members.Write` | built |
+| `UploadChildPhotoCommand` | `Members.Read`, then the child's household | built |
+| `RemoveChildPhotoCommand` | `Members.Read`, then the child's household | built |
 
 ## Queries
 
 | Query | Policy | Status |
 |---|---|---|
 | `SearchMembersQuery` | `Members.Read` | built |
+| `GetMemberQuery` | `Members.Read` | built |
 | `GetMyProfileQuery` | any authenticated role | built |
 | `GetMyFamilyQuery` | any member | built |
 | `ListFamilyChildrenQuery` | any member | built |
@@ -49,6 +55,8 @@ worked example of a cross-service flow with no synchronous call.
 | `GetChildDataNoticeQuery` | any member | built |
 | `GetMyDataQuery` | any authenticated role | built |
 | `GetChildNamesQuery` | `SamaajAdmin`/`SuperAdmin` + `Members.Read` | built |
+| `GetMemberPhotoQuery` | `Members.Read` | built |
+| `GetChildPhotoQuery` | `Members.Read`, then the child's household | built |
 
 ## Events published
 
@@ -412,9 +420,19 @@ personal data about the erased member, so their `FamilyMember` row is removed
 in every case. Deleting the `Family` itself was the alternative and is wrong:
 it would take the remaining members' join with it and orphan the child rows -
 other people's records restructured because one person exercised their own
-right. The cost is that a household whose head has erased can no longer decide
-a join request. Re-heading one is a known gap and belongs in an admin command,
-not in a consumer.
+right. The cost used to be that a household whose head had erased could no
+longer decide a join request, and this file said so — "re-heading one is a known
+gap and belongs in an admin command, not in a consumer" — for a full cycle after
+the consumer started re-heading households. **Headship passes to the
+longest-standing remaining member**, here and in `LeaveFamilyCommand`, by the
+same `SucceedHeadAfterRemoval` call, so the two ways out of a household cannot
+disagree about who takes over. An admin command was the wrong answer because it
+needs an administrator to notice, and nothing tells them: four things are gated
+on `IsHead`, so the household would stay frozen until somebody complained.
+
+The stale sentence is worth leaving a scar for. It was written and contradicted
+by the same hand on the same day, in the same file as the code change, and
+nothing catches that — `scripts/service-docs.sh` matches names, not claims.
 
 **Privacy levels are closed as well as the fields cleared.** A profile left
 `Public` keeps appearing in the directory as a visible row, which is not what

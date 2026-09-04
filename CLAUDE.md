@@ -54,6 +54,11 @@ samaajconnect/
 The ten services are listed with their owned entities and endpoints in
 `docs/product/SERVICES.md` — don't duplicate that list here; it drifts.
 
+A service's own `CLAUDE.md` is what §10 sends a developer to before they touch
+it, so its **Commands and Queries sections are a claimed complete list**, not a
+sample. `scripts/service-docs.sh` holds them to that, and CI runs it — this is
+§9's lesson about hand-written lists applied one level down.
+
 ## 3. Tech stack
 
 Angular v18+ (standalone components, Signals) · YARP gateway (.NET
@@ -297,6 +302,7 @@ Neither uses `*service-defaults` — they need no database and no broker.
 | Whether every service still agrees with §4.4 | `scripts/pipeline-order.sh` |
 | Whether the security checklist is still true | `scripts/security-invariants.sh` |
 | Whether any service is quietly left out | `scripts/service-coverage.sh` |
+| Whether a service documents everything it can be asked to do | `scripts/service-docs.sh` |
 | Whether the module keys still agree in all three places | `scripts/module-keys.sh` |
 | Scaffold a new bounded-context service | `.claude/skills/new-microservice/SKILL.md` |
 | Add a command/query to an existing service | `.claude/skills/add-service-feature/SKILL.md` |
