@@ -436,3 +436,32 @@ main:focus {
     scroll-behavior: auto !important;
   }
 }
+
+/* A Samaaj's logo, in the tenant table and in its upload panel.
+   Square and cropped: a Samaaj uploads whatever it has, and a table of
+   differently-shaped boxes reads as broken. Tokens checked against the ones
+   this stylesheet actually defines - `--soft` and `--surface` are not among
+   them, `--line-soft` is. */
+.tenant-logo {
+  width: 28px;
+  height: 28px;
+  border-radius: var(--radius-sm);
+  object-fit: cover;
+  background: var(--line-soft);
+  vertical-align: middle;
+  margin-right: var(--space-2);
+}
+
+.tenant-logo.large {
+  width: 96px;
+  height: 96px;
+  display: block;
+  margin: var(--space-2) 0;
+}
+
+.logo-panel {
+  margin-top: var(--space-3);
+  padding: var(--space-3);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-md);
+}

@@ -43,6 +43,17 @@ status() {
   curl -s -o /dev/null -w '%{http_code}' "$@"
 }
 
+# One scratch directory for the whole run, and exactly one trap.
+#
+# The upload sections write fixture bytes rather than shipping files, because
+# what they check is the signature the services read - a committed .png would be
+# testing that the file was still in the repository. They each had their own
+# mktemp and their own `trap ... EXIT` until the second one silently replaced
+# the first, which is what a second trap on the same signal does. One root here
+# means a third section cannot repeat that.
+SMOKE_TMP=$(mktemp -d)
+trap 'rm -rf "$SMOKE_TMP"' EXIT
+
 json_field() {
   # Deliberately grep-based: this script must run anywhere curl runs, without
   # requiring jq to be installed.
@@ -405,8 +416,8 @@ fi
 # The files here are written as raw bytes rather than shipped as fixtures,
 # because what is being checked is the signature the service reads. A committed
 # .png would be testing that the file was still in the repository.
-PHOTO_DIR=$(mktemp -d)
-trap 'rm -rf "$PHOTO_DIR"' EXIT
+PHOTO_DIR="$SMOKE_TMP/photos"
+mkdir -p "$PHOTO_DIR"
 
 printf '\211PNG\r\n\032\n\001\002\003\004\005\006\007\010' > "$PHOTO_DIR/photo.png"
 printf '<svg xmlns="http://www.w3.org/2000/svg"><script>alert(1)</script></svg>' \
@@ -669,6 +680,71 @@ check "naming the grievance contact" 200 \
 
 GRIEVANCE=$(curl -s "$GATEWAY/v1/identity/tenants/$SLUG" | json_field email)
 check "it is published to anyone, as section 13 requires" "grievances@example.com" "$GRIEVANCE"
+
+# ---- The Samaaj's logo --------------------------------------------------------
+#
+# `LogoUrl` had been on the record since the first migration with nothing able
+# to set it - no command took one - beside an "Upload Logo" control the admin
+# wireframe drew with nothing behind it.
+#
+# The logo is the one image on this platform served to anyone, and this section
+# checks that on purpose rather than by omission: the registration form asks
+# somebody to pick their Samaaj before they have a token, so a logo needing one
+# could not appear beside the name.
+LOGO_DIR="$SMOKE_TMP/logos"
+mkdir -p "$LOGO_DIR"
+
+printf '\211PNG\r\n\032\n\001\002\003\004\005\006\007\010' > "$LOGO_DIR/logo.png"
+
+check "a Super Admin uploads the Samaaj's logo" 200 \
+  "$(status -X POST "$GATEWAY/v1/identity/tenants/$TENANT_ID/logo" \
+     -H "Authorization: Bearer $ADMIN_TOKEN" -H "$ADMIN_TENANT_HEADER" \
+     -F "file=@$LOGO_DIR/logo.png")"
+
+check "and anybody at all may fetch it, with no token" 200 \
+  "$(status "$GATEWAY/v1/identity/tenants/$TENANT_ID/logo")"
+
+LOGO_TYPE=$(curl -s -o /dev/null -w '%{content_type}' \
+  "$GATEWAY/v1/identity/tenants/$TENANT_ID/logo")
+
+if [ "${LOGO_TYPE%%;*}" = "image/png" ]; then
+  echo "  ok    served as the type read from its bytes"
+  pass=$((pass + 1))
+else
+  echo "  FAIL  the logo came back as '$LOGO_TYPE'"
+  fail=$((fail + 1))
+fi
+
+# Reading is anonymous; writing is not, and the two share a path.
+check "a member cannot set it" 403 \
+  "$(status -X POST "$GATEWAY/v1/identity/tenants/$TENANT_ID/logo" \
+     -H "Authorization: Bearer $MEMBER_TOKEN" -F "file=@$LOGO_DIR/logo.png")"
+
+check "nor can an anonymous caller" 401 \
+  "$(status -X POST "$GATEWAY/v1/identity/tenants/$TENANT_ID/logo" \
+     -F "file=@$LOGO_DIR/logo.png")"
+
+# The public directory hands out a path on this platform. This is what the
+# registration form reads.
+if curl -s "$GATEWAY/v1/identity/tenants/$SLUG" \
+   | grep -q "\"logoUrl\":\"/v1/identity/tenants/$TENANT_ID/logo\""; then
+  echo "  ok    and the public Samaaj directory points at it"
+  pass=$((pass + 1))
+else
+  echo "  FAIL  the directory's logoUrl is not a path on this platform"
+  fail=$((fail + 1))
+fi
+
+check "taking it down" 200 \
+  "$(status -X DELETE "$GATEWAY/v1/identity/tenants/$TENANT_ID/logo" \
+     -H "Authorization: Bearer $ADMIN_TOKEN" -H "$ADMIN_TENANT_HEADER")"
+
+check "and doing it twice is still success" 200 \
+  "$(status -X DELETE "$GATEWAY/v1/identity/tenants/$TENANT_ID/logo" \
+     -H "Authorization: Bearer $ADMIN_TOKEN" -H "$ADMIN_TENANT_HEADER")"
+
+check "after which there is no logo to fetch" 404 \
+  "$(status "$GATEWAY/v1/identity/tenants/$TENANT_ID/logo")"
 
 echo
 

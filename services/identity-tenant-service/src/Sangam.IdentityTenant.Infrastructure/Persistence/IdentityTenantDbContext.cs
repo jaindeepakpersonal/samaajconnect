@@ -5,6 +5,7 @@ using Sangam.IdentityTenant.Application.Abstractions;
 using Sangam.IdentityTenant.Domain.Authorization;
 using Sangam.IdentityTenant.Domain.Common;
 using Sangam.IdentityTenant.Domain.Consents;
+using Sangam.IdentityTenant.Domain.Media;
 using Sangam.IdentityTenant.Domain.Tenants;
 using Sangam.IdentityTenant.Domain.Users;
 
@@ -18,6 +19,9 @@ public sealed class IdentityTenantDbContext(
     private static readonly JsonSerializerOptions PayloadSerializerOptions = new(JsonSerializerDefaults.Web);
 
     public DbSet<Tenant> Tenants => Set<Tenant>();
+
+    /// <summary>Samaaj logos the platform hosts, bytes included.</summary>
+    public DbSet<TenantLogo> TenantLogos => Set<TenantLogo>();
 
     public DbSet<User> Users => Set<User>();
 

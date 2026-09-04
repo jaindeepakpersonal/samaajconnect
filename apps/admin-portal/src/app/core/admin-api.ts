@@ -81,6 +81,26 @@ export class AdminApi {
   }
 
   /**
+   * Uploads a Samaaj's logo.
+   *
+   * Multipart, with no Content-Type set by hand: the browser writes the
+   * boundary, and one set here would have none and produce a body no server can
+   * parse. The part's declared type is sent and ignored — the service reads the
+   * format out of the bytes.
+   */
+  uploadTenantLogo(tenantId: string, file: File): Observable<void> {
+    const body = new FormData();
+    body.append('file', file);
+
+    return this.http.post<void>(`/v1/identity/tenants/${tenantId}/logo`, body);
+  }
+
+  /** Takes a logo down. Doing it twice is success. */
+  removeTenantLogo(tenantId: string): Observable<void> {
+    return this.http.delete<void>(`/v1/identity/tenants/${tenantId}/logo`);
+  }
+
+  /**
    * Deactivating and archiving re-ask for the caller’s own password; activating
    * does not. The server decides which, so `password` is always sent and is
    * simply ignored where it is not needed.

@@ -93,6 +93,16 @@ public sealed class IdentityTenantApiFactory : WebApplicationFactory<Program>, I
         return await action(dbContext);
     }
 
+    /// <summary>How many logo rows a Samaaj has, orphans included.</summary>
+    /// <remarks>
+    /// Counted against the table rather than read off the tenant row, because
+    /// the thing worth asserting is that replacing a logo leaves one set of
+    /// bytes rather than two - and a tenant pointing at the newest tells you
+    /// nothing about what was left behind.
+    /// </remarks>
+    public Task<int> CountLogosAsync(Guid tenantId) =>
+        WithDbContextAsync(db => db.TenantLogos.CountAsync(l => l.TenantId == tenantId));
+
     public async Task ResetDatabaseAsync()
     {
         await using var scope = Services.CreateAsyncScope();

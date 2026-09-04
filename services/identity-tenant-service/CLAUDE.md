@@ -20,6 +20,7 @@ a `Tenant`'s own `Id` **is** the tenant id every other service references.
 | `UserRole` | built | A null `TenantScope` is the platform-wide grant, i.e. Super Admin. |
 | `ConsentRecord` | built | Append-only. One row per decision, per purpose. |
 | `RefreshToken` | built | A session step. Hashed, single-use, rotating. Deliberately not tenant-scoped. |
+| `TenantLogo` | built | A Samaaj mark the platform hosts. Not tenant-scoped, for the reason `Tenant` is not. |
 
 `Tenant` deliberately does not implement `ITenantScopedEntity`. Applying the
 global query filter to it would make the gateway's own lookups impossible,
@@ -44,6 +45,8 @@ since those happen *before* a tenant is established.
 | `AssignRoleCommand` | `SuperAdmin`, `SamaajAdmin` + `AdminUsers.Manage` | built |
 | `InviteAdminCommand` | `SuperAdmin`, `SamaajAdmin` + `AdminUsers.Manage` | built |
 | `SetTenantModulesCommand` | `SuperAdmin` + `Tenant.Manage` | built |
+| `UploadTenantLogoCommand` | `SuperAdmin`, `SamaajAdmin` + `Tenant.Manage` | built |
+| `RemoveTenantLogoCommand` | `SuperAdmin`, `SamaajAdmin` + `Tenant.Manage` | built |
 
 A new Samaaj is created **Inactive**. Creating the record and letting it serve
 traffic are two separately audited decisions, so activation is its own command.
@@ -62,6 +65,7 @@ traffic are two separately audited decisions, so activation is its own command.
 | `ListTenantsQuery` | `SuperAdmin` + `Tenant.Manage` | built |
 | `ListAdminUsersQuery` | `SuperAdmin`, `SamaajAdmin` + `AdminUsers.Manage` | built |
 | `ListRolesQuery` | any authenticated role | built |
+| `GetTenantLogoQuery` | **anonymous** — see below | built |
 
 `GetTenantBySlugQuery` returns `TenantSummaryResponse`, not `TenantResponse`.
 The endpoint is reachable without a JWT, so it must not hand an anonymous
@@ -127,6 +131,9 @@ offsets for messages it did nothing with.
 | GET | `/v1/identity/me/data-export` | any authenticated role |
 | POST | `/v1/identity/me/erase` | any authenticated role |
 | PUT | `/v1/identity/tenants/{id}/grievance-contact` | `SuperAdmin`, `SamaajAdmin` + `AdminUsers.Manage` |
+| POST | `/v1/identity/tenants/{id}/logo` | `SuperAdmin`, `SamaajAdmin` + `Tenant.Manage` |
+| GET | `/v1/identity/tenants/{id}/logo` | anonymous |
+| DELETE | `/v1/identity/tenants/{id}/logo` | `SuperAdmin`, `SamaajAdmin` + `Tenant.Manage` |
 | GET | `/health` | anonymous |
 
 Paths are absolute, not gateway-relative, so the same URL works whether you
@@ -143,6 +150,46 @@ production. Every new command or query needs one of the three.
 ## Decisions worth knowing before you change this service
 
 Each of these looks arbitrary until you hit the problem behind it.
+
+**A Samaaj's logo is the one image on the platform served to anyone**, and that
+is a decision rather than an omission. Everywhere else — a member's photo, a
+child's — the bytes are served only to a caller who passed a check, because they
+are photographs of people. A logo is an organisation's public mark, the one on
+its letterhead, and the screen that most needs it is the registration form:
+somebody signing up picks their Samaaj before they have an account, so
+`ListRegisterableTenantsQuery` and `GetTenantBySlugQuery` are anonymous by
+necessity and a logo needing a token could not appear beside the name they
+already publish.
+
+`SECURITY-CHECKLIST.md` says so explicitly rather than letting the member-photo
+tick imply it covers this, and `GetTenantLogoQuery` is on that page's anonymous
+list. `Cache-Control` is `public` for the same reason it is `private` on a
+photo, which makes logos cheaper to serve rather than more expensive.
+
+**Reading a logo is anonymous; setting one is not, and they share a path.**
+`Tenant.Manage`, and a Samaaj Admin may set their own — the same reasoning as
+the grievance contact, since routing every change through the platform operator
+would make it stale by design. There are tests for both halves, and they are
+worth keeping: an `AllowAnonymous` on the wrong verb of one route is an easy
+mistake and an invisible one.
+
+**Nothing could set a logo until 2026-09-04.** `LogoUrl` had been on the record
+since the first migration and no command ever took one, so the column was null
+on every row the platform has ever had, while the admin wireframe's Create
+Samaaj screen drew an "Upload Logo" control with nothing behind it. The
+third-party tracking problem the field was documented as having was therefore
+entirely theoretical — which is worse than harmless, because a security note
+about something that cannot happen dilutes the ones that matter. Worth
+generalising: **a field the API can read and nothing can write is a gap of the
+same family as an endpoint with no caller**, and this repository has now found
+several of the latter and exactly one of the former.
+
+**`ImageContent` is copied verbatim from member-family-service**, namespace
+aside, and `scripts/security-invariants.sh` holds the two identical. Sniffing an
+image is the same problem in both services and a second copy that drifts is how
+one of them quietly starts accepting something the other refuses. The copy is
+deliberate rather than a shared package, matching how the pipeline behaviors and
+the outbox are handled here.
 
 **`MobileOrEmail` is unique platform-wide, not per tenant.** DATA-MODEL.md
 section 2 says per tenant. The member-portal wireframe says a member joins one

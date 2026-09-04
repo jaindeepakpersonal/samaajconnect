@@ -33,6 +33,7 @@ public static class DependencyInjection
 
         services.AddScoped<IUnitOfWork, UnitOfWork>();
         services.AddScoped<ITenantRepository, TenantRepository>();
+        services.AddScoped<ILogoStore, LogoStore>();
         services.AddScoped<IUserRepository, UserRepository>();
         services.AddScoped<IAuthorizationCatalogRepository, AuthorizationCatalogRepository>();
         services.AddScoped<IConsentRepository, ConsentRepository>();

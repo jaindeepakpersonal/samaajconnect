@@ -255,4 +255,37 @@ describe('RegisterComponent', () => {
     expect(component.canSubmit()).toBe(false);
     expect(text()).toContain('Try again');
   });
+
+  // ---- The chosen Samaaj's logo -------------------------------------------
+  //
+  // A plain <img src>, because this is the one image on the platform served
+  // without a token - and this screen is why: nobody registering has one yet.
+
+  it('shows nothing until a Samaaj is chosen', () => {
+    loadScreen();
+
+    expect(fixture.nativeElement.querySelector('.samaaj-logo')).toBeNull();
+  });
+
+  it("shows the chosen Samaaj's logo so somebody can see they picked the right one", () => {
+    loadScreen([{ ...directory[0], logoUrl: '/v1/identity/tenants/t1/logo' }]);
+
+    component.form.controls.tenantSlug.setValue('mahavir-samaj');
+    fixture.detectChanges();
+
+    const logo: HTMLImageElement = fixture.nativeElement.querySelector('.samaaj-logo');
+
+    expect(logo).not.toBeNull();
+    expect(logo.getAttribute('src')).toBe('/v1/identity/tenants/t1/logo');
+  });
+
+  it('draws no logo for a Samaaj that has none', () => {
+    loadScreen();
+
+    component.form.controls.tenantSlug.setValue('mahavir-samaj');
+    fixture.detectChanges();
+
+    expect(component.chosen()?.name).toBe('Mahavir Samaaj');
+    expect(fixture.nativeElement.querySelector('.samaaj-logo')).toBeNull();
+  });
 });

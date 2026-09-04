@@ -1,4 +1,4 @@
-namespace Sangam.MemberFamily.Domain.Media;
+namespace Sangam.IdentityTenant.Domain.Media;
 
 /// <summary>
 /// What the platform will accept as image bytes, and what it calls them.

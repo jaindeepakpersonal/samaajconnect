@@ -92,6 +92,22 @@ import {
             <p class="field-error">Choose the Samaaj you belong to.</p>
           }
 
+          <!-- The chosen Samaaj's own mark, so somebody can see they picked the
+               right community before they hand over their details. A logo
+               cannot go inside an <option>, so it sits under the control.
+
+               A plain img: this is the one image on the platform served without
+               a token, and this screen is exactly why - nobody registering has
+               one yet. -->
+          @if (chosen(); as samaaj) {
+            @if (samaaj.logoUrl; as logo) {
+              <p class="chosen-samaaj">
+                <img class="samaaj-logo" [src]="logo" alt="" />
+                <span>{{ samaaj.name }}</span>
+              </p>
+            }
+          }
+
           <label for="password">Password</label>
           <input
             id="password"
@@ -170,6 +186,22 @@ export class RegisterComponent implements OnInit {
   readonly loadingSamaaj = signal(false);
   readonly samaajError = signal<string | null>(null);
 
+  /**
+   * The Samaaj currently chosen in the dropdown, or null.
+   *
+   * Driven by a signal the form's `valueChanges` feeds rather than read from
+   * the control directly: a computed over a reactive form control does not
+   * recompute, because the control is not a signal and nothing tells Angular it
+   * changed.
+   */
+  readonly chosenSlug = signal<string>('');
+
+  readonly chosen = computed<TenantSummary | null>(() => {
+    const slug = this.chosenSlug();
+
+    return this.samaaj().find((option) => option.slug === slug) ?? null;
+  });
+
   readonly notice = signal<ConsentNotice | null>(null);
   readonly noticeError = signal<string | null>(null);
 
@@ -204,6 +236,12 @@ export class RegisterComponent implements OnInit {
   ngOnInit(): void {
     this.loadSamaaj();
     this.loadNotice();
+
+    // A reactive form control is not a signal, so a computed reading it would
+    // never recompute. This is the bridge.
+    this.form.controls.tenantSlug.valueChanges.subscribe((slug) =>
+      this.chosenSlug.set(slug ?? ''),
+    );
   }
 
   loadSamaaj(): void {

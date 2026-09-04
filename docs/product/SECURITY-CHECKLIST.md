@@ -130,7 +130,7 @@ anonymous should cost somebody a paragraph explaining why.
 
 #### Requests reachable without authentication
 
-All nine are in `identity-tenant-service`, and that is itself worth keeping true
+All ten are in `identity-tenant-service`, and that is itself worth keeping true
 — no other service has any business answering an unauthenticated caller.
 
 | Request | Why it cannot require a token |
@@ -144,6 +144,7 @@ All nine are in `identity-tenant-service`, and that is itself worth keeping true
 | `ListRegisterableTenantsQuery` | The registration form asks people to pick their Samaaj before they have an account. Deliberately not the Super Admin's `ListTenantsQuery`, which carries status and contact details |
 | `GetTenantBySlugQuery` | The gateway resolves the Samaaj before any token has been validated |
 | `GetTenantByIdQuery` | Same, by id. Returns only what the gateway needs to route |
+| `GetTenantLogoQuery` | The registration form draws the Samaaj directory, and a logo that needed a token could not appear on it. **The only image on the platform outside per-request authorization** — see the file-handling section |
 
 #### Requests no HTTP route may reach
 
@@ -351,9 +352,13 @@ is the outer gate and grants nothing on its own.
       Post media and social-issue evidence are still not uploadable at all —
       there is no endpoint for either.
 
-      A Samaaj's `LogoUrl` is still a client-supplied link, and still carries
-      the tracking problem below for anyone who opens a Samaaj page. It is the
-      remaining half of this work.
+      **A Samaaj's logo is hosted too, since 2026-09-04**, with the same size cap
+      and the same sniffing. `LogoUrl` turned out to be a field nothing could
+      ever set — no command took one, so it was null on every row the platform
+      has had, beside an "Upload Logo" control the admin wireframe drew with
+      nothing behind it. The tracking problem it was documented as having was
+      therefore theoretical, which is worse than harmless: a security note about
+      something that cannot happen dilutes the ones that matter.
 - [x] File storage access is authorization-checked per request, not
       just obscured by a random URL. **This is why the bytes are served by the
       service that owns the profile** rather than by a media service or a
@@ -376,6 +381,18 @@ is the outer gate and grants nothing on its own.
       whatever host it named — and on a `ChildProfile` that is exactly the
       third-party tracking of children DPDP s.9(3) prohibits. Nothing outside
       the Samaaj is asked for anything now.
+
+      **One exception, and it is deliberate: a Samaaj's logo is served to
+      anyone.** The registration form asks somebody to pick their Samaaj before
+      they have an account, so `ListRegisterableTenantsQuery` is anonymous by
+      necessity and a logo needing a token could not appear beside the name it
+      already publishes. It is an organisation's public mark — the one on its
+      letterhead — and reveals nothing about a person, which is the difference
+      from a member's photo that makes this acceptable where that would not be.
+      It is `Cache-Control: public` for the same reason, which makes logos
+      cheaper to serve than photos rather than more expensive. Ticking this box
+      does **not** cover that endpoint, and `GetTenantLogoQuery` is on the
+      anonymous list above with the same reasoning.
 
 ## Data privacy
 

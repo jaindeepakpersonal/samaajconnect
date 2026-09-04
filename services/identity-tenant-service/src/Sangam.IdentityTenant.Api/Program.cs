@@ -53,6 +53,7 @@ app.MapGet("/health", () => Results.Ok(new { status = "healthy" }))
     .ExcludeFromDescription();
 
 app.MapTenantEndpoints();
+app.MapTenantLogoEndpoints();
 app.MapAuthEndpoints();
 app.MapActivationEndpoints();
 app.MapAdminEndpoints();

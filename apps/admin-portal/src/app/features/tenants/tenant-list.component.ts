@@ -89,6 +89,13 @@ import { ModuleDescriptor, Tenant, TenantStatus } from '../../core/admin.models'
             @for (tenant of tenants(); track tenant.id) {
               <tr>
                 <td>
+                  <!-- A plain img, and that is the design working rather than a
+                       shortcut. A logo is served anonymously - the registration
+                       form needs it before anybody has a token - so unlike a
+                       member photo it needs no directive to attach one. -->
+                  @if (tenant.logoUrl; as logo) {
+                    <img class="tenant-logo" [src]="logo" alt="" />
+                  }
                   <b>{{ tenant.name }}</b>
                   @if (tenant.contactPerson) {
                     <div class="muted">{{ tenant.contactPerson }}</div>
@@ -147,6 +154,14 @@ import { ModuleDescriptor, Tenant, TenantStatus } from '../../core/admin.models'
                       >
                         Modules
                       </button>
+                      <button
+                        class="btn small"
+                        type="button"
+                        [attr.aria-expanded]="logoFor() === tenant.id"
+                        (click)="openLogo(tenant)"
+                      >
+                        Logo
+                      </button>
                     }
                   </div>
 
@@ -178,6 +193,54 @@ import { ModuleDescriptor, Tenant, TenantStatus } from '../../core/admin.models'
                         </button>
                       </div>
                     </form>
+                  }
+
+                  @if (logoFor() === tenant.id) {
+                    <div class="logo-panel" role="status">
+                      <p class="small">
+                        The Samaaj's own mark. It appears beside the name on the registration
+                        form, so somebody choosing their Samaaj can recognise it — which is
+                        also why it is the one image on the platform served to anyone, signed
+                        in or not. Do not put anything private in it.
+                      </p>
+
+                      @if (tenant.logoUrl; as logo) {
+                        <img class="tenant-logo large" [src]="logo" [alt]="tenant.name" />
+                      } @else {
+                        <p class="small">No logo yet.</p>
+                      }
+
+                      <label [for]="tenant.id + 'logo'">Choose a logo</label>
+                      <input
+                        class="input"
+                        [id]="tenant.id + 'logo'"
+                        type="file"
+                        accept="image/jpeg,image/png,image/webp"
+                        [disabled]="busyId() === tenant.id"
+                        (change)="chooseLogo(tenant, $event)"
+                      />
+                      <p class="small">JPEG, PNG or WebP, up to 2 MB.</p>
+
+                      @if (logoError()) {
+                        <p class="small error" role="alert">{{ logoError() }}</p>
+                      }
+
+                      <div class="actions">
+                        @if (tenant.logoUrl) {
+                          <button
+                            class="btn alt small"
+                            type="button"
+                            [disabled]="busyId() === tenant.id"
+                            (click)="removeLogo(tenant)"
+                          >
+                            Remove logo
+                          </button>
+                        }
+                        <button class="btn alt small" type="button" (click)="logoFor.set(null)">
+                          Close
+                        </button>
+                      </div>
+                    </div>
                   }
 
                   @if (editing() === tenant.id) {
@@ -299,6 +362,10 @@ export class TenantListComponent implements OnInit {
   /** Kept apart from `error` so a wrong password lands next to the field. */
   readonly confirmError = signal<string | null>(null);
 
+  /** Which Samaaj's logo panel is open, if any. */
+  readonly logoFor = signal<string | null>(null);
+  readonly logoError = signal<string | null>(null);
+
   password = '';
 
   search = '';
@@ -348,6 +415,80 @@ export class TenantListComponent implements OnInit {
   /** Switch the panel's scope to this Samaaj - the wireframe's "Open". */
   act(tenant: Tenant): void {
     this.scope.select(tenant);
+  }
+
+  // ---- The logo -----------------------------------------------------------
+  //
+  // The wireframe's Create Samaaj screen has drawn an "Upload Logo" control
+  // since the start, and `LogoUrl` has been on the record since the first
+  // migration - with nothing able to set it, because no command ever took one.
+
+  /**
+   * Opens the logo panel, or closes it if it is already this Samaaj's.
+   *
+   * The trigger stays in the DOM and stays enabled, with `aria-expanded` saying
+   * what it did. A panel rendered in an `@else` branch takes the button the
+   * user just pressed away and drops keyboard focus to the body - the finding
+   * three screens shared in the 2026-09-02 accessibility pass.
+   */
+  openLogo(tenant: Tenant): void {
+    this.logoError.set(null);
+    this.logoFor.set(this.logoFor() === tenant.id ? null : tenant.id);
+  }
+
+  /**
+   * Uploads the chosen file straight away.
+   *
+   * The size is checked here as well as by the service so that a slow
+   * connection is not spent sending something that was always going to be
+   * refused. The input is cleared afterwards, or choosing the same file twice
+   * fires no `change` event and a failed attempt could not be retried with it.
+   */
+  chooseLogo(tenant: Tenant, event: Event): void {
+    const input = event.target as HTMLInputElement;
+    const file = input.files?.[0] ?? null;
+
+    input.value = '';
+    this.logoError.set(null);
+
+    if (file === null) {
+      return;
+    }
+
+    if (file.size > MaxLogoBytes) {
+      this.logoError.set('That logo is larger than 2 MB. Choose a smaller one.');
+      return;
+    }
+
+    this.busyId.set(tenant.id);
+
+    this.api.uploadTenantLogo(tenant.id, file).subscribe({
+      next: () => {
+        this.busyId.set(null);
+        // Re-read rather than assume: the path is the server's to derive.
+        this.load();
+      },
+      error: (failure: unknown) => {
+        this.busyId.set(null);
+        this.logoError.set(describeError(failure));
+      },
+    });
+  }
+
+  removeLogo(tenant: Tenant): void {
+    this.logoError.set(null);
+    this.busyId.set(tenant.id);
+
+    this.api.removeTenantLogo(tenant.id).subscribe({
+      next: () => {
+        this.busyId.set(null);
+        this.load();
+      },
+      error: (failure: unknown) => {
+        this.busyId.set(null);
+        this.logoError.set(describeError(failure));
+      },
+    });
   }
 
   /**
@@ -437,3 +578,6 @@ export class TenantListComponent implements OnInit {
     this.busyId.set(null);
   }
 }
+
+/** 2 MB, matching `ImageContent.MaxBytes` in identity-tenant-service. */
+const MaxLogoBytes = 2 * 1024 * 1024;

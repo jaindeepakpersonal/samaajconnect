@@ -8,7 +8,58 @@ version of the plan; the reasoning behind the ordering lives in
 ## Current Status
 
 - **Stage:** every module has a service and member screens; Phase 5 hardening under way
-- **Last updated:** 2026-09-04 - **the platform hosts its own photos now.**
+- **Last updated:** 2026-09-04 - **Samaaj logos, and a field nothing could
+  write.**
+
+  The other half of the image work, and it started by finding that the problem
+  was not the one the plan described. `LogoUrl` was tracked as a client-supplied
+  link carrying the same third-party tracking risk as a member photo. It was
+  worse than that and also harmless: **no command ever took a logo**, so the
+  column was null on every row the platform has ever had, while the admin
+  wireframe's Create Samaaj screen drew an "Upload Logo" control with nothing
+  behind it. The security note was about something that could not happen, which
+  dilutes the notes that can.
+
+  Worth generalising, because this repository has spent several cycles on the
+  mirror image: **a field the API can read and nothing can write is the same
+  family of gap as an endpoint with no caller.** `scripts/unreachable-endpoints.sh`
+  finds the second and nothing looks for the first.
+
+  **The read is anonymous, and that is the one real difference from a member's
+  photo.** Somebody registering picks their Samaaj before they have an account,
+  so `ListRegisterableTenantsQuery` is anonymous by necessity and a logo needing
+  a token could not appear beside the name it already publishes. A logo is an
+  organisation's public mark - the one on its letterhead - and reveals nothing
+  about a person. So it is the only image on the platform outside per-request
+  authorization, `Cache-Control` is `public` rather than `private`, and both the
+  checklist and the service's own CLAUDE.md say so explicitly rather than
+  letting the member-photo tick imply it covers logos.
+
+  A consequence worth noticing: logos need no `scAuthedSrc`. A plain `<img src>`
+  works precisely because the endpoint is anonymous, which is the design being
+  coherent rather than a shortcut.
+
+  **`scripts/security-invariants.sh` failed on the first run of this cycle, as
+  designed.** Adding an anonymous endpoint fails until somebody writes a
+  paragraph on the checklist explaining why - the mechanism built two cycles ago
+  doing its job on the next cycle that needed it. The drift check also grew a
+  second shape: `ImageContent` is copied verbatim into identity-tenant-service,
+  and the existing loop could not express "identical wherever it appears"
+  because it fails a file for being absent.
+
+  **Two things went wrong.** An injection making the upload endpoint anonymous
+  did not fail anything, because `TenantAuthorizationBehavior` refuses on the
+  request attribute regardless - defence in depth working, but it meant the test
+  had to be re-proved by opening both layers, which failed two tests as it
+  should. And the smoke script had grown a second `trap ... EXIT` that silently
+  replaced the first; there is one scratch root and one trap now.
+
+  Nine smoke checks through the gateway, including that a member and an
+  anonymous caller both fail to set a logo that anyone may read.
+
+  1,623 tests green, up 29 — 18 in identity-tenant-service and 11 across the
+  two portals.
+- **Previously:** 2026-09-04 - **the platform hosts its own photos now.**
 
   The last Phase 5 item that needed nothing from outside. A member's or a child's
   photo was a URL a client supplied, validated as absolute `http(s)` - which
@@ -982,12 +1033,19 @@ unit tested.
       Authorization is the profile's own rule, which is why the owning service
       serves the bytes. Both portals fetch through `[scAuthedSrc]`, because an
       `<img src>` carries no token
-- [ ] **The rest of the image work.** A Samaaj's `LogoUrl` is still a
-      client-supplied link and carries the same tracking problem for anyone who
-      opens a Samaaj page — the same treatment in identity-tenant-service.
-      **Virus scanning is the other half and needs a scanner in the
-      deployment**: sniffing proves the bytes begin like an image and says
-      nothing about what a decoder does with the rest of them. Post media and
+- [x] **Samaaj logos, 2026-09-04.** `TenantLogo` in identity-tenant-service,
+      the same shape as `StoredImage` with one deliberate difference: the read
+      is **anonymous**, because the registration form asks somebody to pick
+      their Samaaj before they have an account. It is the only image on the
+      platform outside per-request authorization and
+      `SECURITY-CHECKLIST.md` says so rather than letting the member-photo tick
+      imply otherwise. `LogoUrl` turned out to be a field nothing could ever
+      set — no command took one — beside an "Upload Logo" control the wireframe
+      had drawn since the start
+- [ ] **Virus scanning**, which is what keeps the file-handling box unticked.
+      Sniffing proves the bytes begin like an image and says nothing about what
+      a decoder does with the rest of them; closing it needs a scanner in the
+      deployment rather than a check in a domain type. Post media and
       social-issue evidence remain not uploadable at all
 - [x] Tenant-isolation penetration testing (attempt cross-tenant IDOR
       on every write endpoint) — `scripts/tenant-isolation-probe.sh`. Two real

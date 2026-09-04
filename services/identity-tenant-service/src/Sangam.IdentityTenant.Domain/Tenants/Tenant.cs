@@ -20,7 +20,17 @@ public sealed class Tenant : AggregateRoot
     /// <summary>Optional custom domain (CNAME) once a Samaaj brings its own.</summary>
     public string? Domain { get; private set; }
 
-    public string? LogoUrl { get; private set; }
+    /// <summary>
+    /// The <see cref="Media.TenantLogo"/> holding this Samaaj mark, or null.
+    /// </summary>
+    /// <remarks>
+    /// This replaced a client-supplied <c>LogoUrl</c> that nothing could ever
+    /// set: no command took one, so the column was null on every row the
+    /// platform has had, while the admin wireframe drew an "Upload Logo"
+    /// control with nothing behind it.
+    /// </remarks>
+    public Guid? LogoImageId { get; private set; }
+
     public string? ContactPerson { get; private set; }
     public string? ContactEmail { get; private set; }
 
@@ -96,6 +106,34 @@ public sealed class Tenant : AggregateRoot
         GrievanceContactName = Normalize(name);
         GrievanceContactEmail = Normalize(email)?.ToLowerInvariant();
         GrievanceContactPhone = Normalize(phone);
+    }
+
+    /// <summary>
+    /// Points this Samaaj at a newly stored logo, answering the one it replaced
+    /// so the handler can delete it in the same transaction.
+    /// </summary>
+    /// <remarks>
+    /// The aggregate does not know about the logos table, so it hands the
+    /// previous id back rather than deleting anything. A method that quietly
+    /// orphaned the old row would leave bytes in the database that nothing
+    /// refers to and no path would ever find again.
+    /// </remarks>
+    public Guid? SetLogo(Guid imageId)
+    {
+        var previous = LogoImageId;
+        LogoImageId = imageId;
+        return previous;
+    }
+
+    /// <summary>
+    /// Removes the logo, answering the id to delete, or null when there was
+    /// none — which is success, not an error.
+    /// </summary>
+    public Guid? RemoveLogo()
+    {
+        var previous = LogoImageId;
+        LogoImageId = null;
+        return previous;
     }
 
     private static string? Normalize(string? value) =>

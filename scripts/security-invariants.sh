@@ -353,6 +353,58 @@ do
   fi
 done
 
+# ---- Copies that are not in every service ----------------------------------
+#
+# The list above is infrastructure every service has. These are files only some
+# services need, which must still be identical wherever they appear - the same
+# drift risk with a different shape, and one the loop above cannot express
+# because it fails a file for being absent.
+#
+# `ImageContent` is the only one so far: member-family-service sniffs member and
+# child photos, identity-tenant-service sniffs Samaaj logos, and the question
+# "are these bytes an image we will store and serve" has exactly one right
+# answer. Two copies drifting is how one service quietly starts accepting
+# something the other refuses.
+echo
+echo "-- and the copies only some services have --"
+
+for name in ImageContent; do
+  reference=""
+  differs=""
+  found=""
+
+  for service in services/*-service; do
+    file=$(find "$service/src" -name "$name.cs" ! -path '*/obj/*' ! -path '*/bin/*' | head -1)
+
+    [ -z "$file" ] && continue
+
+    found="$found $(basename "$service")"
+
+    hash=$(grep -v '^namespace \|^using ' "$file" \
+      | sed 's/Sangam\.[A-Za-z]*\./Sangam.X./g; s/[A-Za-z]*DbContext/XDbContext/g' \
+      | md5sum | cut -c1-12)
+
+    if [ -z "$reference" ]; then
+      reference="$hash"
+    elif [ "$hash" != "$reference" ]; then
+      differs="$differs $(basename "$service")"
+    fi
+  done
+
+  count=$(printf '%s' "$found" | wc -w)
+
+  if [ "$count" -lt 2 ]; then
+    # One copy cannot drift. Reported rather than passed silently, because a
+    # name on this list that only one service has is a name that should either
+    # come off it or be copied to the service that needs it.
+    ok "$name is in one service ($found) - nothing to compare"
+  elif [ -n "$differs" ]; then
+    bad "$name has drifted in:$differs"
+  else
+    ok "$name is identical in the $count services that have it:$found"
+  fi
+done
+
 echo
 echo "$pass passed, $fail failed"
 [ "$fail" -eq 0 ]
