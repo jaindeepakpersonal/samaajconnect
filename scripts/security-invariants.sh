@@ -207,6 +207,64 @@ else
   printf '%s' "$routed" | sed 's/^/          /'
 fi
 
+# ---- The permission catalogue, three ways ----------------------------------
+#
+# `AuthorizationCatalog` in identity-tenant-service is the executable copy: it
+# holds the keys with stable hand-assigned ids and says which roles carry them.
+# Each service names the keys it gates on in its own `PermissionKeys.cs`. The
+# table under "Permission key naming convention" below is the readable copy.
+#
+# All three have to agree. A service gating on a key the catalogue has never
+# heard of is an endpoint that answers 403 to everybody, and the checklist's
+# table falling behind is how `Roles.Manage` - the lock-out floor a Samaaj
+# administrator cannot lose - came to be undocumented on the page that
+# documents permissions.
+echo
+echo "-- the permission keys agree across the catalogue, the services and this page --"
+
+CATALOG=services/identity-tenant-service/src/Sangam.IdentityTenant.Domain/Authorization/AuthorizationCatalog.cs
+
+catalog_keys=$(grep -oE 'new\(PermissionIds\.[A-Za-z]+, "[A-Za-z.]+"\)' "$CATALOG" 2>/dev/null \
+  | grep -oE '"[A-Za-z.]+"' | tr -d '"' | sort -u)
+
+service_keys=$(grep -rhoE '= *"[A-Z][A-Za-z]+(\.[A-Za-z]+)+"' services --include='PermissionKeys.cs' \
+  | tr -d '= "' | sort -u)
+
+# Every backticked key in the table's first column. Some rows name two - the
+# read and the write, the post and the moderate - so this takes them all rather
+# than the first, which is a mistake worth naming: an extraction that reads one
+# key per row reported `Members.Write` and `Timeline.Moderate` as missing when
+# both were sitting in the table beside their pair.
+doc_keys=$(sed -n '/^## Permission key naming convention/,/^### A permission held/p' "$CHECKLIST" \
+  | grep '^| `' \
+  | cut -d'|' -f2 \
+  | grep -oE '`[A-Za-z][A-Za-z.]+`' | tr -d '`' | sort -u)
+
+if [ -z "$catalog_keys" ] || [ -z "$doc_keys" ]; then
+  bad "could not read the permission keys (AuthorizationCatalog or the table moved)"
+else
+  ungranted=$(comm -13 <(printf '%s\n' "$catalog_keys") <(printf '%s\n' "$service_keys"))
+  if [ -z "$ungranted" ]; then
+    ok "every key a service gates on is in AuthorizationCatalog ($(printf '%s\n' "$catalog_keys" | grep -c .))"
+  else
+    bad "a service gates on a key no role can hold - those endpoints 403 for everybody:"
+    printf '%s\n' "$ungranted" | sed 's/^/          /'
+  fi
+
+  undocumented=$(comm -23 <(printf '%s\n' "$catalog_keys") <(printf '%s\n' "$doc_keys"))
+  invented=$(comm -13 <(printf '%s\n' "$catalog_keys") <(printf '%s\n' "$doc_keys"))
+
+  if [ -z "$undocumented" ] && [ -z "$invented" ]; then
+    ok "and the table on this page names all of them, and none it does not have"
+  else
+    bad "the permission table does not match AuthorizationCatalog"
+    [ -n "$undocumented" ] && printf '%s\n' "$undocumented" \
+      | sed 's/^/          in the catalogue, not in the table: /'
+    [ -n "$invented" ] && printf '%s\n' "$invented" \
+      | sed 's/^/          in the table, not in the catalogue: /'
+  fi
+fi
+
 # ---- 4 and 5. The two persistence-level guards ------------------------------
 
 echo

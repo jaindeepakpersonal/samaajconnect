@@ -20,6 +20,14 @@ namespace Sangam.IdentityTenant.Domain.Tenants;
 ///
 /// Adding a module means adding a key here, a route block in `gateway/` with
 /// matching `Metadata.module`, and a row in the table below.
+///
+/// <c>scripts/module-keys.sh</c> checks that, and CI runs it. It reads all
+/// three lists from the files that own them, so this class stays the source of
+/// truth and the check fails whichever side moves. Until 2026-09-04 the rule
+/// was stated here, and in <c>libs/shared</c>'s own copy of it, and enforced by
+/// nothing — which is how member-portal's Home came to filter two tiles on keys
+/// the catalogue had never heard of, leaving both invisible to every Samaaj
+/// with nothing logged anywhere.
 /// </remarks>
 public static class ModuleCatalog
 {

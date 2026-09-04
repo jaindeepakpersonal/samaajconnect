@@ -15,6 +15,10 @@
  *
  * Adding a module means adding it in three places: `ModuleCatalog`, the
  * gateway route's metadata, and here.
+ *
+ * `scripts/module-keys.sh` checks that, and CI runs it — `ModuleCatalog` is
+ * the source of truth and this list is compared against it, so forgetting one
+ * of the three fails rather than going quiet.
  */
 export const ModuleKeys = {
   /** Timeline posts, volunteer groups and Samaaj events - all three. */

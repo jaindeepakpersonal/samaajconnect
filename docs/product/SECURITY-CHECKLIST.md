@@ -171,11 +171,13 @@ existing platform (`Pathshala.Attendance.Write`, `Issue.Approve`):
 |---|---|
 | `Tenant.Manage` | Create/activate/deactivate tenants |
 | `AdminUsers.Manage` | Create/invite admins, assign roles |
+| `Roles.Manage` | Edit the role/permission matrix for a Samaaj. A Samaaj administrator cannot have this one taken away — that is the lock-out floor, enforced in the service and drawn as a fixed tick rather than a checkbox in the admin panel |
 | `Members.Read` / `Members.Write` | Directory search / profile correction |
 | `Family.Write` | Family/child management |
 | `Family.ApproveConversion` | Approve adult-child conversion |
 | `Timeline.Post` / `Timeline.Moderate` | Post / moderate content |
 | `VolunteerGroups.Manage` | Create groups, decide applications |
+| `VolunteerGroups.Lead` | Run a group you are president of: decide its join requests. Granted to `Member`, deliberately — see "A permission held only by an ungranted role" below, and `volunteer-groups-service/CLAUDE.md` for why the permission is necessary and not sufficient |
 | `Events.Publish` | Create/publish events |
 | `SocialIssues.Approve` | Approve/reject/publish issues |
 | `CelebrityVoting.Configure` | Create campaign, close, publish results |

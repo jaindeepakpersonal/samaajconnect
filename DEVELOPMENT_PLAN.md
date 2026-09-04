@@ -8,7 +8,58 @@ version of the plan; the reasoning behind the ordering lives in
 ## Current Status
 
 - **Stage:** every module has a service and member screens; Phase 5 hardening under way
-- **Last updated:** 2026-09-03 - **boli-service was not in CI, and had not been
+- **Last updated:** 2026-09-04 - **acting on the lesson from yesterday: the
+  other hand-written lists.**
+
+  §9 now says a hand-written list of the ten services is a list something will
+  fall off, and it will not fail when it does. Having written that, the thing to
+  do with it was go and look. The sweep was cheap and found two more, neither of
+  them about services.
+
+  **The permission table on `SECURITY-CHECKLIST.md` had fallen two keys behind
+  `AuthorizationCatalog`.** `Roles.Manage` and `VolunteerGroups.Lead` are both
+  in the catalogue, seeded by migration and gated on in code, and neither was on
+  the page that documents permissions. `Roles.Manage` is the load-bearing one:
+  it is the lock-out floor a Samaaj administrator cannot lose, which the admin
+  panel draws as a fixed tick rather than a checkbox, and it was undocumented.
+
+  `scripts/security-invariants.sh` now checks all three copies against each
+  other - the catalogue, each service's `PermissionKeys.cs`, and the table. The
+  first pair matters more than the third: a service gating on a key no role
+  holds is an endpoint that answers 403 to everybody, which is a live bug rather
+  than a documentation one. They agree today at 21.
+
+  **The module keys are three lists in three languages and nothing held them
+  together.** `ModuleCatalog`, `libs/shared`'s `ModuleKeys`, and the gateway's
+  route metadata. Both code comments already said "adding a module means adding
+  it in three places" - a rule written where it is read only by somebody who
+  already knows it. `scripts/module-keys.sh` reads all three from the files that
+  own them. They agree today at 5.
+
+  What a mismatch does is worth restating, because none of it fails loudly. A
+  portal key the catalogue lacks never matches, so the feature is invisible to
+  every Samaaj forever with nothing logged - which is exactly what happened to
+  Home's Events and Volunteer tiles. A gateway route gated on a key nobody can
+  enable is permanently 404, indistinguishable from a Samaaj that switched the
+  module off. A catalogue key with no route is a toggle that switches nothing.
+
+  **Two checks I wrote and then removed**, both for the same reason. A
+  string-literal scan for module keys in components found four hits and all four
+  were `path: 'pathshala'` in the route tables - a URL segment spelling the same
+  word - and the real case is already a compile error, because `ModuleKey` is a
+  union type and `ModuleTile.moduleKey` is typed to it. And my first permission
+  extraction read one key per table row, which reported `Members.Write` and
+  `Timeline.Moderate` as missing when both were sitting in the table beside
+  their pair. Caught before either shipped, but they are the same trap in both
+  directions: a check that fails for the wrong reason, and a check that would
+  have passed for one.
+
+  Verified by four injections: a module dropped from `libs/shared`, a catalogue
+  key misspelled, a permission key deleted from the table, and a service gating
+  on a key no role holds. Each caught by the check it should be.
+
+  1,536 tests green, unchanged.
+- **Previously:** 2026-09-03 - **boli-service was not in CI, and had not been
   for eleven cycles.**
 
   The previous cycle made the security checklist check itself, and the obvious

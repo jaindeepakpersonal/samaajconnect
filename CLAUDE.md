@@ -295,6 +295,7 @@ Neither uses `*service-defaults` — they need no database and no broker.
 | Whether every service still agrees with §4.4 | `scripts/pipeline-order.sh` |
 | Whether the security checklist is still true | `scripts/security-invariants.sh` |
 | Whether any service is quietly left out | `scripts/service-coverage.sh` |
+| Whether the module keys still agree in all three places | `scripts/module-keys.sh` |
 | Scaffold a new bounded-context service | `.claude/skills/new-microservice/SKILL.md` |
 | Add a command/query to an existing service | `.claude/skills/add-service-feature/SKILL.md` |
 | Turn a wireframe screen into a real component | `.claude/skills/wireframe-to-angular/SKILL.md` |
