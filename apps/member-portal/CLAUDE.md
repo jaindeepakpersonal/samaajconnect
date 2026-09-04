@@ -367,11 +367,16 @@ The trigger stays in the DOM while the panel is open, carrying
 vanishes when pressed takes the focus with it, and the member is left tabbing
 from the top of the page to find what they just opened.
 
-**The one refusal here is about children.** A household with children whose last
-remaining member leaves would leave those records with nobody able to manage
-them, and nothing on this platform can delete a child record — that follows the
-consent, through erasure. So the service answers 409 and the screen says the
-household has children, rather than offering a control that will always fail.
+**The one refusal here is about children — and it stopped being absolute a
+cycle after this was written.** A household with a minor's record whose last
+remaining member leaves would leave that record with nobody able to manage it,
+so the service answers 409 and the screen says why rather than offering a
+control that will always fail. This paragraph used to say nothing on the
+platform could delete a child record at all, true when leaving shipped and
+false since: withdrawing the consent it rests on (above, on the child's own
+card) removes it, and a household that does so can then leave. The refusal is
+also narrower than "any child" now — a converted child holds their own account
+and needs nobody to stay for them, so only a minor's record counts.
 
 **A parent's own children are the one place this app does resolve names.** The
 rule below — that names the portal cannot resolve are not invented — is about

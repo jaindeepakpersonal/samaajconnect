@@ -179,14 +179,24 @@ anybody in the household including its head, and a head leaving hands it on
 exactly as a head erasing does.
 
 **Leaving is refused in one case, and it is about the children rather than about
-the member.** The last active member of a household that has children cannot
-leave. A child record exists on somebody's parental consent (s.9) and lives in a
-household; if the last member walks out, those records stay with nobody able to
-see or manage them — and **nothing on this platform can remove a child record**,
-so that state would be permanent. Refusing names the gap rather than creating an
-orphan. Withdrawing parental consent is the act that should resolve it, and it is
-described in this file and not implemented; until it is, the refusal is the
-honest answer.
+the member.** The last active member of a household that still holds a **minor's**
+record cannot leave. A child record exists on somebody's parental consent (s.9)
+and lives in a household; if the last member walks out, that record stays with
+nobody able to see or manage it, and the state would be permanent. Refusing
+names the gap rather than creating an orphan.
+
+This paragraph used to say withdrawing parental consent "is the act that should
+resolve it, and it is described in this file and not implemented" — true when
+written, and left standing for a cycle after `WithdrawParentalConsentCommand`
+shipped. `DELETE /v1/children/{id}/parental-consent` is that act, described
+under "DPDP and children's data" below. A minor's record blocking the last
+member from leaving is not a permanent state any more: withdrawing removes it,
+and leaving is then allowed.
+
+The refusal is narrower than "any child" for the same reason: a **converted**
+child holds their own account and their own consent, and needs nobody to stay
+in the household for them. Counting them made the rule stricter than its own
+reasoning, and it was narrowed on 2026-09-04.
 
 **Erasure follows the consent, not the household**, and that changed when
 leaving arrived. It used to erase the children of the family the erasing member

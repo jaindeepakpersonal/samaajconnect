@@ -8,7 +8,40 @@ version of the plan; the reasoning behind the ordering lives in
 ## Current Status
 
 - **Stage:** every module has a service and member screens; Phase 5 hardening under way
-- **Last updated:** 2026-09-04 - **the dead end moved one layer up, and the
+- **Last updated:** 2026-09-04 - **three copies of one stale claim, all
+  behind the same two facts that changed underneath them.**
+
+  Two cycles built real capability - erasure and withdrawal following the
+  consent-giver rather than the household head, and headship re-heading itself
+  automatically - and the prose describing the *reason for a refusal* was
+  never revisited to match. Found by grepping the doc tree for absolute
+  claims ("nothing on this platform can", "not implemented") the way cycle 73
+  found "the platform has no file storage" after storage arrived.
+
+  **Two files told a member the last-member-with-children refusal was
+  permanent**, in `member-family-service/CLAUDE.md` and its member-portal
+  mirror. Both said "nothing on this platform can remove a child record" and
+  one went further - "withdrawing parental consent is the act that should
+  resolve it, and it is described in this file and not implemented" -
+  written the same day `WithdrawParentalConsentCommand` did not exist yet,
+  and left standing for a full cycle after it shipped. Both now say what is
+  true: withdrawing removes a minor's record, a household that does so can
+  then leave, and the refusal itself only counts minors since last cycle's
+  narrowing - a converted child needs nobody to stay for them.
+
+  **A third copy sat in `DPDP-COMPLIANCE.md`,** duplicating the older, wronger
+  version of both facts at once: "erases the children this member headed"
+  (household-shaped, wrong since a member could leave one) and "re-heading
+  one is a known gap and belongs in an admin command" (fixed in cycle 73, and
+  wrong even at the time it was written, for the reason already on record
+  elsewhere - an admin command needs an administrator to notice, and nothing
+  told them). Doc drift duplicated inside one document, not just across two.
+
+  No code changed this cycle. `scripts/uncalled-api-methods.sh` from last
+  cycle and the eight checks before it all still pass, unmodified - this was
+  a read of what the platform actually does, corrected against what three
+  places claimed it does.
+- **Previously:** 2026-09-04 - **the dead end moved one layer up, and the
   sweep that looks for dead ends could not see it.**
 
   `scripts/unreachable-endpoints.sh` finds callers by looking for `/v1/` literals

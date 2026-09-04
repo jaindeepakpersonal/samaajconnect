@@ -214,7 +214,7 @@ because audit-notification-service records every payload verbatim.
 | Service | What it does on that event |
 |---|---|
 | identity-tenant-service | Clears name, contact, password hash, roles and any outstanding activation code; status becomes `Erased` |
-| member-family-service | Clears the profile and closes its privacy settings; erases the children this member headed; removes their household membership |
+| member-family-service | Clears the profile and closes its privacy settings; erases the children held on this member's own parental consent, wherever they now sit; removes their household membership |
 | audit-notification-service | Deletes their notifications; de-identifies the audit rows where they were the actor; records the erasure itself |
 
 Three decisions inside that are worth knowing:
@@ -224,17 +224,27 @@ keeping it would mean a person who left could never come back. It is replaced
 with a per-account value at an unroutable domain, which keeps the uniqueness
 constraint satisfiable without leaving anything to sign in as.
 
-**Children go with the head who vouched for them.** Their records exist on that
-person's parental consent (§9), and consent that no longer exists cannot keep
-justifying the data it covered. The birth year survives, shifted to 1 January,
-because age is what decides conversion eligibility and the row still has to
-behave; the exact birthday is how a child would be recognised.
+**Children go with the person who consented for them, not with the household
+they sit in.** Their records exist on that consent (§9), and consent that no
+longer exists cannot keep justifying the data it covered. This was a household-
+shaped lookup at first — every child of the erasing member's family — which was
+right only for as long as nobody could leave a household. Once a member could,
+a head who left took their headship with them and left the children they
+consented to behind, so the old lookup erased nothing for them. Erasure now
+follows the consent-giver by id, wherever the child now sits. The birth year
+survives, shifted to 1 January, because age is what decides conversion
+eligibility and the row still has to behave; the exact birthday is how a child
+would be recognised.
 
 **The household itself stays.** Deleting it would take the remaining members'
 join with it and orphan the child rows — other people's records restructured
-because one person exercised their own right. A household whose head has erased
-can no longer decide a join request; re-heading one is a known gap and belongs
-in an admin command.
+because one person exercised their own right. **Headship passes to the
+longest-standing remaining member** when the head erases, by the same rule a
+member leaving uses. This section used to say re-heading "is a known gap and
+belongs in an admin command" — that was wrong even at the time: an admin
+command needs an administrator to notice, and nothing told them, so a household
+whose head erased stayed frozen — no join request could be decided, no child
+added, no conversion started — until somebody complained.
 
 The single narrowly-scoped exception to append-only audit lives in
 `ErasePersonalDataCommandHandler` and `IErasureRepository`. Nothing else on the
