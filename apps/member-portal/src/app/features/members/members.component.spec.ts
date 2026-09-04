@@ -759,4 +759,89 @@ describe('FamilyComponent', () => {
     expect(text()).toContain('Your household');
     expect(text()).not.toContain('Waiting to join a household');
   });
+
+  // ---- Leaving a household ------------------------------------------------
+
+  it('offers leaving to an ordinary member, not only the head', () => {
+    load(family({ viewerIsHead: false }));
+
+    expect(text()).toContain('Leave this household');
+  });
+
+  /**
+   * The trigger stays and stays enabled. A confirmation that replaces its own
+   * trigger drops keyboard focus to the body - the finding three admin screens
+   * shared in the 2026-09-02 accessibility pass.
+   */
+  it('keeps the trigger and says what it did', () => {
+    load(family());
+
+    const button = Array.from<HTMLButtonElement>(
+      fixture.nativeElement.querySelectorAll('button'),
+    ).find((b) => b.textContent?.trim() === 'Leave this household')!;
+
+    expect(button.getAttribute('aria-expanded')).toBe('false');
+
+    component.askToLeave();
+    fixture.detectChanges();
+
+    expect(button.isConnected).toBe(true);
+    expect(button.disabled).toBe(false);
+    expect(button.getAttribute('aria-expanded')).toBe('true');
+  });
+
+  it('warns the head that the household passes on', () => {
+    load(family({ viewerIsHead: true }));
+
+    component.askToLeave();
+    fixture.detectChanges();
+
+    expect(text()).toContain('longest-standing member takes over');
+  });
+
+  it('does not warn an ordinary member about succession', () => {
+    load(family({ viewerIsHead: false }));
+
+    component.askToLeave();
+    fixture.detectChanges();
+
+    expect(text()).not.toContain('longest-standing member takes over');
+  });
+
+  it('leaves and re-reads', () => {
+    load(family());
+
+    component.leaveFamily();
+
+    const left = http.expectOne('/v1/families/mine/membership');
+    expect(left.request.method).toBe('DELETE');
+    left.flush({ left: true, newHeadMemberId: null });
+
+    http.expectOne('/v1/families/mine').flush({}, { status: 404, statusText: 'Not Found' });
+    fixture.detectChanges();
+
+    expect(text()).toContain('Create a household');
+  });
+
+  /**
+   * The refusal that matters: the last member of a household with children is
+   * told why rather than silently failing.
+   */
+  it('shows the refusal when leaving would strand children', () => {
+    load(family());
+
+    component.leaveFamily();
+
+    http.expectOne('/v1/families/mine/membership').flush(
+      {
+        detail:
+          'You are the only person left in this household and it has children'
+          + " records in it. Leaving would leave nobody able to manage them.",
+      },
+      { status: 409, statusText: 'Conflict' },
+    );
+    fixture.detectChanges();
+
+    expect(text()).toContain('nobody able to manage them');
+  });
 });

@@ -43,6 +43,19 @@ public sealed class ChildRepository(MemberFamilyDbContext dbContext) : IChildRep
             .Where(c => c.FamilyId == familyId)
             .ToListAsync(cancellationToken);
 
+    /// <remarks>
+    /// The consent is an owned type on the child, so this filters on
+    /// <c>ParentalConsent.GivenByMemberId</c> — the column EF maps it to on the
+    /// same row, not a join.
+    /// </remarks>
+    public async Task<IReadOnlyList<ChildProfile>> ListByConsentGiverAsync(
+        Guid memberProfileId, CancellationToken cancellationToken = default) =>
+        await dbContext.ChildProfiles
+            .IgnoreQueryFilters()
+            .Where(c => c.ParentalConsent != null
+                && c.ParentalConsent.GivenByMemberId == memberProfileId)
+            .ToListAsync(cancellationToken);
+
     public void Add(ChildProfile child) => dbContext.ChildProfiles.Add(child);
 }
 

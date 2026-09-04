@@ -931,6 +931,36 @@ check "they take the request back themselves" 200 \
 check "after which they can" 201 \
   "$(status -X POST "$GATEWAY/v1/families" -H "Authorization: Bearer $JOIN_TOKEN")"
 
+# ---- Leaving a household -------------------------------------------------------
+#
+# Joining one used to be permanent. An active membership blocks creating your own
+# or asking another, and nothing could remove it, so erasing your account was the
+# only way out - a right used as a workaround for a missing feature.
+#
+# JOIN_TOKEN heads a household of their own by this point, created by the check
+# above. They leave it, which also exercises the head case: succession finds
+# nobody, and the household is left inert rather than handed to a pending
+# request.
+check "the last member of a childless household may leave" 200 \
+  "$(status -X DELETE "$GATEWAY/v1/families/mine/membership" \
+     -H "Authorization: Bearer $JOIN_TOKEN")"
+
+check "and leaving again is success rather than an error" 200 \
+  "$(status -X DELETE "$GATEWAY/v1/families/mine/membership" \
+     -H "Authorization: Bearer $JOIN_TOKEN")"
+
+# Free again, which is what proves the membership is gone rather than hidden.
+check "after which they can start another household" 201 \
+  "$(status -X POST "$GATEWAY/v1/families" -H "Authorization: Bearer $JOIN_TOKEN")"
+
+# The head of the smoke Samaaj's main household has children in it, added
+# earlier, and is its only member. Leaving would leave those records with nobody
+# able to manage them, and nothing on this platform can remove a child - so it is
+# refused rather than allowed to orphan them.
+check "but the last member of a household with children cannot" 409 \
+  "$(status -X DELETE "$GATEWAY/v1/families/mine/membership" \
+     -H "Authorization: Bearer $MEMBER_TOKEN")"
+
 
 # The role travelled with the invitation, so this admin can do admin work
 # without anyone granting them anything after activation.

@@ -129,6 +129,19 @@ export class MembersApi {
     return this.http.delete<{ withdrawn: boolean }>('/v1/families/join-requests/mine');
   }
 
+  /**
+   * Leaves the household this member belongs to.
+   *
+   * A different call from withdrawing a request, deliberately: taking back a
+   * request nobody answered affects nobody, while leaving a household can move
+   * headship and changes what other people see.
+   */
+  leaveFamily(): Observable<{ left: boolean; newHeadMemberId: string | null }> {
+    return this.http.delete<{ left: boolean; newHeadMemberId: string | null }>(
+      '/v1/families/mine/membership',
+    );
+  }
+
   /** The head accepts or turns down a request. */
   decideJoinRequest(
     familyId: string,

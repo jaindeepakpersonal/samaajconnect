@@ -267,4 +267,117 @@ public sealed class FamilyEndpointsTests(MemberFamilyApiFactory factory)
         // Still in the household, which is the point.
         (await joiner.GetAsync("/v1/families/mine")).StatusCode.Should().Be(HttpStatusCode.OK);
     }
+
+    // ---- Leaving a household ------------------------------------------------
+    //
+    // Joining one used to be permanent. An active membership counts as
+    // belonging to a household, so a member could not create their own or ask
+    // another - and nothing could remove them. Erasing your account was the only
+    // way out, which is a right being used as a workaround for a missing
+    // feature.
+
+    /// <summary>
+    /// The dead end, end to end: join, be stuck, leave, be free.
+    /// </summary>
+    [Fact]
+    public async Task A_member_who_joined_a_household_can_leave_it_again()
+    {
+        var head = MemberClient(_head, TenantA);
+        var joiner = MemberClient(_joiner, TenantA);
+
+        var created = await head.PostAsJsonAsync("/v1/families", new { });
+        var family = await created.Content.ReadFromJsonAsync<JsonElement>();
+        var familyId = family.GetProperty("id").GetGuid();
+        var code = family.GetProperty("familyCode").GetString();
+
+        await joiner.PostAsJsonAsync(
+            "/v1/families/join-requests", new { familyCode = code, relationship = "Sibling" });
+
+        var mine = await head.GetFromJsonAsync<JsonElement>("/v1/families/mine");
+        var requestId = mine.GetProperty("members").EnumerateArray()
+            .First(m => m.GetProperty("status").GetString() == "PendingJoinRequest")
+            .GetProperty("id").GetGuid();
+
+        await head.PostAsJsonAsync(
+            $"/v1/families/{familyId}/join-requests/{requestId}/decide", new { accept = true });
+
+        // In, and therefore stuck: no second household, by design.
+        (await joiner.PostAsJsonAsync("/v1/families", new { }))
+            .StatusCode.Should().Be(HttpStatusCode.Conflict);
+
+        var left = await joiner.DeleteAsync("/v1/families/mine/membership");
+        left.StatusCode.Should().Be(HttpStatusCode.OK);
+
+        (await left.Content.ReadFromJsonAsync<JsonElement>())
+            .GetProperty("left").GetBoolean().Should().BeTrue();
+
+        // Free to have a household at all, which is what proves the membership
+        // is gone rather than hidden.
+        (await joiner.PostAsJsonAsync("/v1/families", new { }))
+            .StatusCode.Should().Be(HttpStatusCode.Created);
+    }
+
+    [Fact]
+    public async Task Leaving_when_you_are_in_no_household_is_success_and_changes_nothing()
+    {
+        var response = await MemberClient(_joiner, TenantA)
+            .DeleteAsync("/v1/families/mine/membership");
+
+        response.StatusCode.Should().Be(HttpStatusCode.OK);
+
+        (await response.Content.ReadFromJsonAsync<JsonElement>())
+            .GetProperty("left").GetBoolean().Should().BeFalse();
+    }
+
+    /// <summary>
+    /// Asking is not joining, and the two calls say different things to whoever
+    /// reads the audit log.
+    /// </summary>
+    [Fact]
+    public async Task Somebody_who_has_only_asked_is_told_to_withdraw_instead()
+    {
+        var head = MemberClient(_head, TenantA);
+        var joiner = MemberClient(_joiner, TenantA);
+
+        var created = await head.PostAsJsonAsync("/v1/families", new { });
+        var code = (await created.Content.ReadFromJsonAsync<JsonElement>())
+            .GetProperty("familyCode").GetString();
+
+        await joiner.PostAsJsonAsync(
+            "/v1/families/join-requests", new { familyCode = code, relationship = "Sibling" });
+
+        (await joiner.DeleteAsync("/v1/families/mine/membership"))
+            .StatusCode.Should().Be(HttpStatusCode.Conflict);
+    }
+
+    /// <summary>
+    /// The one refusal, and it is about the children rather than about them.
+    /// Nothing on this platform can remove a child record, so a household left
+    /// with children and no members would stay that way permanently.
+    /// </summary>
+    [Fact]
+    public async Task The_last_member_of_a_household_with_children_cannot_leave()
+    {
+        var head = MemberClient(_head, TenantA);
+
+        await head.PostAsJsonAsync("/v1/families", new { });
+
+        var notice = await head.GetFromJsonAsync<JsonElement>("/v1/children/data-notice");
+
+        var addChild = await head.PostAsJsonAsync("/v1/children", new
+        {
+            fullName = "Aarav Shah",
+            dateOfBirth = "2015-04-02",
+            gender = "Male",
+            parentalConsentGiven = true,
+            noticeVersion = notice.GetProperty("version").GetString(),
+        });
+
+        addChild.StatusCode.Should().Be(HttpStatusCode.Created);
+
+        var refused = await head.DeleteAsync("/v1/families/mine/membership");
+
+        refused.StatusCode.Should().Be(HttpStatusCode.Conflict);
+        (await refused.Content.ReadAsStringAsync()).Should().Contain("children");
+    }
 }

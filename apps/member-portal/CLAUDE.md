@@ -327,6 +327,27 @@ re-read takes the waiting card away. A message inside it would be removed by the
 same reload that made it true. A test caught that; the first version put the
 message where nobody would ever see it.
 
+**Leaving a household is a separate control from withdrawing a request, and it
+asks first.** Taking back a request nobody has answered affects nobody, so it is
+one press. Leaving affects everyone still in the household — the family code
+they share stays, but the reader is gone from it, and if the reader was the head
+somebody else becomes it — so the button opens a confirmation panel that says
+which of those applies before anything is sent. A head is told explicitly that
+"the longest-standing member takes over", because a head who thinks leaving
+dissolves the household is making a different decision than the one they are
+actually making.
+
+The trigger stays in the DOM while the panel is open, carrying
+`[attr.aria-expanded]`, rather than being swapped for the panel: a control that
+vanishes when pressed takes the focus with it, and the member is left tabbing
+from the top of the page to find what they just opened.
+
+**The one refusal here is about children.** A household with children whose last
+remaining member leaves would leave those records with nobody able to manage
+them, and nothing on this platform can delete a child record — that follows the
+consent, through erasure. So the service answers 409 and the screen says the
+household has children, rather than offering a control that will always fail.
+
 **A parent's own children are the one place this app does resolve names.** The
 rule below — that names the portal cannot resolve are not invented — is about
 ids belonging to people the reader has no particular claim on, where resolving

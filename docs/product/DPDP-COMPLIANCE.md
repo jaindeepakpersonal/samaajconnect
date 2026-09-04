@@ -350,4 +350,19 @@ These are Data Fiduciary obligations that no amount of code discharges:
    guarantee, and a bid is a financial record. See "Six services shipped
    without doing that" above.
 
+7. A member can now leave a household without erasing their account, which
+   separates two things that used to move together. If the parent who gave a
+   child's consent leaves, and the other parent goes on heading the household,
+   whose basis is that child's record held on afterwards? The platform's answer
+   today is the strictest reading: the consent is still that person's, so
+   erasing them still removes those records, wherever the child now sits
+   (`ListByConsentGiverAsync`). The alternative — that the household's
+   continuation is itself a basis — would leave the record standing, and is not
+   something the code should decide on its own.
+
+   The narrower half is already handled rather than left open: the **last**
+   member of a household with children cannot leave at all, because nothing on
+   this platform can remove a child record and those records would otherwise
+   have nobody able to manage them, permanently.
+
 Nothing in this repository should be taken as an answer to any of these.

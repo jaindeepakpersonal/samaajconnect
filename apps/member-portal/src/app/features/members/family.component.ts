@@ -196,6 +196,61 @@ import {
                 Only the family head can invite people or decide requests to join.
               </p>
             }
+
+            <!-- Leaving, for anybody in the household including its head.
+                 Joining one used to be permanent: an active membership blocks
+                 creating your own or asking another, and nothing could remove
+                 it, so erasing your account was the only way out. -->
+            <h3>Leaving</h3>
+
+            @if (leaveError(); as message) {
+              <p class="notice error" role="alert">{{ message }}</p>
+            }
+
+            @if (confirmingLeave()) {
+              <div class="notice info" role="status">
+                <p>
+                  You will no longer be in this household, and you will be free to join
+                  another or start your own. Nothing else about you changes.
+                  @if (household.viewerIsHead) {
+                    Because you are the family head, the longest-standing member takes
+                    over.
+                  }
+                </p>
+
+                <div class="actions">
+                  <button
+                    class="btn"
+                    type="button"
+                    [disabled]="busy()"
+                    (click)="leaveFamily()"
+                  >
+                    Leave this household
+                  </button>
+                  <button
+                    class="btn secondary"
+                    type="button"
+                    (click)="confirmingLeave.set(false)"
+                  >
+                    Stay
+                  </button>
+                </div>
+              </div>
+            }
+
+            <div class="actions">
+              <!-- The trigger stays and stays enabled: a confirmation that
+                   replaces its own trigger drops keyboard focus to the body,
+                   which is the finding three admin screens shared. -->
+              <button
+                class="btn secondary"
+                type="button"
+                [attr.aria-expanded]="confirmingLeave()"
+                (click)="askToLeave()"
+              >
+                Leave this household
+              </button>
+            </div>
           </div>
         </div>
 
@@ -485,6 +540,38 @@ export class FamilyComponent implements OnInit {
   private readonly me = computed(() => this.auth.user()?.userId ?? null);
 
   readonly withdrawError = signal<string | null>(null);
+
+  readonly confirmingLeave = signal(false);
+  readonly leaveError = signal<string | null>(null);
+
+  askToLeave(): void {
+    this.leaveError.set(null);
+    this.confirmingLeave.set(!this.confirmingLeave());
+  }
+
+  /**
+   * Leaves the household.
+   *
+   * Confirmed rather than immediate, because it changes what other people see:
+   * a head leaving hands the household to somebody else. It is reversible only
+   * by asking to rejoin and being accepted, which is somebody else's decision.
+   */
+  leaveFamily(): void {
+    this.leaveError.set(null);
+    this.busy.set(true);
+
+    this.api.leaveFamily().subscribe({
+      next: () => {
+        this.busy.set(false);
+        this.confirmingLeave.set(false);
+        this.load();
+      },
+      error: (failure: unknown) => {
+        this.busy.set(false);
+        this.leaveError.set(describeError(failure));
+      },
+    });
+  }
 
   /**
    * The household this member has asked to join and nobody has decided, or

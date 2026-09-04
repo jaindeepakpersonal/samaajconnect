@@ -157,6 +157,20 @@ public sealed class Family : AggregateRoot, ITenantScopedEntity
     }
 
     /// <summary>
+    /// Active members, oldest membership first.
+    /// </summary>
+    /// <remarks>
+    /// Pending and rejected rows are not members. Somebody who has only asked to
+    /// join is not somebody a household can be handed to, and not somebody whose
+    /// presence should stop the last real member leaving.
+    /// </remarks>
+    public IReadOnlyList<FamilyMember> ActiveMembers() =>
+        [.. _members
+            .Where(m => m.Status == FamilyMemberStatus.Active)
+            .OrderBy(m => m.DecidedAt ?? m.RequestedAt)
+            .ThenBy(m => m.Id)];
+
+    /// <summary>
     /// Hands headship to the longest-standing remaining member, and answers who
     /// that is — or null when the household has nobody left to head it.
     /// </summary>

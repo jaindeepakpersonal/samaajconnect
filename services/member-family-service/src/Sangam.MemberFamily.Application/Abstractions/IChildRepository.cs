@@ -36,6 +36,31 @@ public interface IChildRepository
     Task<IReadOnlyList<ChildProfile>> ListForConsumerAsync(
         Guid familyId, CancellationToken cancellationToken = default);
 
+    /// <summary>
+    /// Every child record held on one member's parental consent, wherever it
+    /// sits. Bypasses the tenant filter, for the erasure consumer.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// Erasure used to find children by the household the erasing member
+    /// <i>headed</i>, which was the same set for as long as nobody could leave
+    /// a household. Once they can, the two come apart: a head who leaves takes
+    /// their headship with them and the children they consented to stay behind,
+    /// so a family-shaped lookup would erase nothing and the records would go on
+    /// being held under a consent whose giver had erased their account.
+    /// </para>
+    /// <para>
+    /// The consent is the basis on which the record may exist at all
+    /// (DPDP s.9), so the consent is what erasure has to follow. That is the
+    /// rule this service already states — "their records exist on that person's
+    /// parental consent, and consent that no longer exists cannot keep
+    /// justifying the data it covered" — applied to the identifier that
+    /// actually carries it.
+    /// </para>
+    /// </remarks>
+    Task<IReadOnlyList<ChildProfile>> ListByConsentGiverAsync(
+        Guid memberProfileId, CancellationToken cancellationToken = default);
+
     void Add(ChildProfile child);
 }
 

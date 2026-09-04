@@ -203,4 +203,46 @@ public sealed class HouseholdContinuityTests
         family.SucceedHeadAfterRemoval(other).Should().BeNull();
         family.IsHead(headId).Should().BeTrue();
     }
+
+  /// <summary>
+  /// A head who leaves hands the household on, exactly as one who erases does.
+  /// </summary>
+  /// <remarks>
+  /// Four things are gated on being head - deciding a join request, adding a
+  /// child, starting a conversion, and seeing the family code - so a household
+  /// whose head walked out without succession would be as frozen as one whose
+  /// head erased.
+  /// </remarks>
+  [Fact]
+  public void A_head_who_leaves_hands_the_household_to_whoever_is_left()
+  {
+      var headId = Guid.NewGuid();
+      var family = Household(headId);
+
+      var successor = Join(family, family, Start.AddDays(1));
+
+      family.RemoveMember(headId);
+
+      family.SucceedHeadAfterRemoval(headId).Should().Be(successor);
+      family.IsHead(successor).Should().BeTrue();
+      family.FindMember(headId).Should().BeNull();
+  }
+
+  /// <summary>
+  /// Active members only, and in joining order. A pending request is not
+  /// somebody the household can be handed to, and not somebody whose presence
+  /// should stop the last real member leaving.
+  /// </summary>
+  [Fact]
+  public void Active_members_excludes_anybody_who_has_only_asked()
+  {
+      var headId = Guid.NewGuid();
+      var family = Household(headId);
+
+      var joined = Join(family, family, Start.AddDays(1));
+      family.RequestJoin(Guid.NewGuid(), Relationship.Sibling, Start.AddDays(2));
+
+      family.ActiveMembers().Select(m => m.MemberProfileId)
+          .Should().BeEquivalentTo([headId, joined]);
+  }
 }

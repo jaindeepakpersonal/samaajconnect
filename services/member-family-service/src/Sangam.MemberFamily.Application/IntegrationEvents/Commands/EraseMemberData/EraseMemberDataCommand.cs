@@ -70,20 +70,25 @@ public sealed class EraseMemberDataCommandHandler(
         var childrenErased = 0;
         var family = await families.GetForConsumerAsync(payload.UserId, cancellationToken);
 
-        if (family is not null && family.IsHead(payload.UserId))
+        // Children held on this person's parental consent go too, wherever they
+        // sit. Their records exist on that consent, and consent that no longer
+        // exists cannot keep justifying the data it covered.
+        //
+        // **By the consent, not by the household**, and the difference started
+        // mattering the moment a member could leave one. A head who leaves takes
+        // their headship with them and the children they consented to stay
+        // behind; a family-shaped lookup would then erase nothing and those
+        // records would go on being held under a consent whose giver had erased
+        // their account. The consent is what DPDP s.9 makes the basis, so the
+        // consent is what erasure follows.
+        foreach (var child in await children.ListByConsentGiverAsync(payload.UserId, cancellationToken))
         {
-            // Children this member headed go too. Their records were held on
-            // this person's parental consent, and consent that no longer
-            // exists cannot keep justifying the data it covered.
-            foreach (var child in await children.ListForConsumerAsync(family.Id, cancellationToken))
-            {
-                child.Erase();
+            child.Erase();
 
-                await images.RemoveAllForOwnerAsync(
-                    child.TenantId, ImageOwnerKind.Child, child.Id, cancellationToken);
+            await images.RemoveAllForOwnerAsync(
+                child.TenantId, ImageOwnerKind.Child, child.Id, cancellationToken);
 
-                childrenErased++;
-            }
+            childrenErased++;
         }
 
         // Who was in whose household is personal data about this member, so

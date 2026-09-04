@@ -85,6 +85,7 @@ enforced by `TenantAuthorizationBehavior`, not just UI hiding.
 | POST | `/families` | Member | Create family, become head |
 | POST | `/families/join-requests` | Member | Request to join via family code |
 | DELETE | `/families/join-requests/mine` | Member | Take back a request nobody has decided. No id: a member has at most one. Idempotent, but **409** if the head accepted in the meantime — you are in that household now |
+| DELETE | `/families/mine/membership` | Member | Leave the household you are in. Headship passes to the longest-standing member if you held it. Idempotent. **409** if you have only asked to join (withdraw instead), or if you are the last member and it has children |
 | POST | `/families/join-requests/{id}/decide` | FamilyHead | Accept/reject |
 | GET | `/children` | Member | Children in your own household |
 | POST | `/children` | FamilyHead | Add child profile |

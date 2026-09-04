@@ -3,6 +3,7 @@ using Sangam.MemberFamily.Api.Extensions;
 using Sangam.MemberFamily.Application.Families;
 using Sangam.MemberFamily.Application.Families.Commands.CreateFamily;
 using Sangam.MemberFamily.Application.Families.Commands.DecideJoinRequest;
+using Sangam.MemberFamily.Application.Families.Commands.LeaveFamily;
 using Sangam.MemberFamily.Application.Families.Commands.RequestJoinFamily;
 using Sangam.MemberFamily.Application.Families.Commands.WithdrawJoinRequest;
 using Sangam.MemberFamily.Application.Families.Queries.GetMyFamily;
@@ -69,6 +70,22 @@ public static class FamilyEndpoints
             .WithName("WithdrawJoinRequest")
             .WithSummary("Take back a request to join a household that nobody has decided yet.")
             .Produces<WithdrawJoinRequestResult>()
+            .ProducesProblem(StatusCodes.Status409Conflict);
+
+        // DELETE on "my membership", the same shape as withdrawing a request and
+        // for the same reason: a member belongs to at most one household, so
+        // there is nothing for the caller to name.
+        group.MapDelete("/mine/membership", async (
+                ISender sender,
+                CancellationToken cancellationToken) =>
+            {
+                var result = await sender.Send(new LeaveFamilyCommand(), cancellationToken);
+
+                return result.ToApiResult();
+            })
+            .WithName("LeaveFamily")
+            .WithSummary("Leave the household you belong to. Headship passes on if you held it.")
+            .Produces<LeaveFamilyResult>()
             .ProducesProblem(StatusCodes.Status409Conflict);
 
         group.MapPost("/{familyId:guid}/join-requests/{requestId:guid}/decide", async (

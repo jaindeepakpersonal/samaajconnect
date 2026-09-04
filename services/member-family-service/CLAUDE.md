@@ -35,6 +35,7 @@ worked example of a cross-service flow with no synchronous call.
 | `DecideChildConversionCommand` | `SamaajAdmin` + `Family.ApproveConversion` | built |
 | `EraseMemberDataCommand` | `[InternalRequest]` | built |
 | `WithdrawJoinRequestCommand` | any member, their own request | built |
+| `LeaveFamilyCommand` | any member, their own membership | built |
 
 ## Queries
 
@@ -83,6 +84,7 @@ here, which looks exactly like a broker problem and is not one.
 | GET | `/v1/families/mine` | any member |
 | POST | `/v1/families/join-requests` | any member |
 | DELETE | `/v1/families/join-requests/mine` | any member, their own request |
+| DELETE | `/v1/families/mine/membership` | any member, their own membership |
 | POST | `/v1/families/{familyId}/join-requests/{requestId}/decide` | head of that family |
 | GET | `/v1/children` | any member |
 | POST | `/v1/children` | head of that family + `Family.Write` |
@@ -112,9 +114,41 @@ already knows.
 **It withdraws a request and never a membership.** If the head accepted while
 the member was deciding to withdraw, the call is refused by name rather than
 quietly succeeding — otherwise "cancel my request" would silently mean "leave my
-family" for exactly the person whose request had just been accepted. Leaving a
-household you are in is a different act with different consequences, and it does
-not exist yet.
+family" for exactly the person whose request had just been accepted.
+
+**Joining a household used to be permanent, which was the same dead end one
+step later.** An active membership counts as belonging to one, so a member could
+not create their own or ask another — and nothing could remove them. Marrying
+into a different household, or a household splitting, had no path at all;
+erasing your account was the only way out, which is a right being used as a
+workaround for a missing feature. `LeaveFamilyCommand` is that path, for
+anybody in the household including its head, and a head leaving hands it on
+exactly as a head erasing does.
+
+**Leaving is refused in one case, and it is about the children rather than about
+the member.** The last active member of a household that has children cannot
+leave. A child record exists on somebody's parental consent (s.9) and lives in a
+household; if the last member walks out, those records stay with nobody able to
+see or manage them — and **nothing on this platform can remove a child record**,
+so that state would be permanent. Refusing names the gap rather than creating an
+orphan. Withdrawing parental consent is the act that should resolve it, and it is
+described in this file and not implemented; until it is, the refusal is the
+honest answer.
+
+**Erasure follows the consent, not the household**, and that changed when
+leaving arrived. It used to erase the children of the family the erasing member
+*headed*, which was the same set for as long as nobody could leave one. Once
+they can, the two come apart: a head who leaves takes their headship with them
+and the children they consented to stay behind, so a family-shaped lookup would
+erase nothing and those records would go on being held under a consent whose
+giver had erased their account. `ListByConsentGiverAsync` is the fix, and there
+is a test for exactly the departed-head case.
+
+**One question here is for counsel, not for this file.** If a consenting parent
+leaves a household and the other parent heads it, erasing the first still
+removes those children's records — because the consent that justified them was
+theirs. Whether the household's continuation is itself a basis is not something
+the code should decide. See `docs/product/DPDP-COMPLIANCE.md`.
 
 **Headship passes to the longest-standing member when the head erases**, and
 this file used to say the opposite. It said re-heading "belongs in an admin

@@ -157,14 +157,42 @@ public sealed class EraseMemberDataCommandHandlerTests
     }
 
     [Fact]
-    public async Task Erases_the_children_this_member_headed()
+    public async Task Erases_the_children_held_on_this_members_consent()
     {
         var family = HeadedFamily();
         var child = ChildProfile.Create(
             TenantId, family.Id, "Aarav Shah", new DateOnly(2012, 7, 19),
             Gender.Male, UserId, Now);
 
-        _children.ListForConsumerAsync(family.Id, Arg.Any<CancellationToken>()).Returns([child]);
+        _children.ListByConsentGiverAsync(UserId, Arg.Any<CancellationToken>()).Returns([child]);
+
+        var result = await Handle();
+
+        result.Value.ChildrenErased.Should().Be(1);
+        child.FullName.Should().NotContain("Aarav");
+    }
+
+    /// <summary>
+    /// The reason erasure follows the consent rather than the household.
+    /// </summary>
+    /// <remarks>
+    /// A head who leaves takes their headship with them and the children they
+    /// consented to stay behind. Under the old family-shaped lookup this member
+    /// headed nothing, so nothing was erased — and those records would have gone
+    /// on being held under a consent whose giver had erased their account.
+    /// </remarks>
+    [Fact]
+    public async Task Erases_them_even_when_this_member_has_left_that_household()
+    {
+        // No family at all for this member: they left before erasing.
+        _families.GetForConsumerAsync(UserId, Arg.Any<CancellationToken>())
+            .Returns((Family?)null);
+
+        var child = ChildProfile.Create(
+            TenantId, Guid.NewGuid(), "Aarav Shah", new DateOnly(2012, 7, 19),
+            Gender.Male, UserId, Now);
+
+        _children.ListByConsentGiverAsync(UserId, Arg.Any<CancellationToken>()).Returns([child]);
 
         var result = await Handle();
 

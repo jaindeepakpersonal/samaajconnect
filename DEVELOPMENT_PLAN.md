@@ -8,7 +8,60 @@ version of the plan; the reasoning behind the ordering lives in
 ## Current Status
 
 - **Stage:** every module has a service and member screens; Phase 5 hardening under way
-- **Last updated:** 2026-09-04 - **two ways a member could be stuck with no way
+- **Last updated:** 2026-09-04 - **the way out of a household, and whose consent
+  a child's record is held on.**
+
+  Last cycle gave a member a way to take back a request nobody had answered, and
+  said in the same breath that it withdraws a request and *never* a membership.
+  That was the right line to draw and it left the obvious question standing:
+  **once you are in a household, there was no way out at all.** Joining was
+  permanent short of erasing your entire account — which is a rights request
+  under DPDP section 12, not a way to correct a family you joined by mistake or
+  have since left.
+
+  `DELETE /v1/families/mine/membership` is that way out. Headship passes to the
+  longest-standing remaining member by the same rule the erasure consumer
+  already used, so the two paths out of a household cannot disagree about who
+  takes over.
+
+  **The one refusal is about children, and it is a real one.** The last member of
+  a household that has children may not leave. Nothing on this platform deletes a
+  child record — a child record ends when the consent behind it ends, through
+  erasure — so a household emptied of adults would leave those records standing
+  with nobody able to manage them, permanently. The service answers 409 by name
+  and the screen says why rather than offering a button that always fails.
+
+  **And that turned up the actual bug.** Erasure removed "the children of the
+  household this member heads". Both halves of that were the wrong question. It
+  read the *household*, so a parent who had given consent and then left took none
+  of it with them; and it read `IsHead`, so a consenting parent who was not the
+  head erased none of the children their consent was holding up. Section 9 makes
+  the parent's consent the basis on which a child's record may be held at all —
+  so erasure has to follow the consent, not the family tree.
+  `ListByConsentGiverAsync` does, wherever the child now sits, and there is a
+  test for exactly the case the old code got wrong.
+
+  This was invisible before this cycle because the two could not come apart:
+  leaving was impossible, so a consent-giver was always still in the household.
+  Adding one feature is what made an existing rule wrong.
+
+  Whether the household's *continuation* is itself a basis for those records is
+  a question for counsel, not for the code, and it is written down as one -
+  `docs/product/DPDP-COMPLIANCE.md`, open question 7. The platform's answer today
+  is the strictest reading.
+
+  Verified by three injections: making succession a no-op on leaving, letting the
+  last member of a household with children leave, and putting the household-shaped
+  lookup back into erasure. Each failed the test that should have caught it, and
+  each passed again unmodified afterwards.
+
+  324 of 324 smoke checks green through the gateway, which is 320 plus
+  exactly the four added here. One run at a time, which is last cycle's lesson
+  and cost nothing to remember.
+
+  1,657 tests green, up 13 — 3 unit and 4 integration in member-family-service,
+  6 in the member portal.
+- **Previously:** 2026-09-04 - **two ways a member could be stuck with no way
   out.**
 
   Three cycles of static checks in a row was enough, so this one is behaviour.
