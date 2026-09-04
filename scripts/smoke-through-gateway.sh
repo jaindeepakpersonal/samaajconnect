@@ -857,6 +857,81 @@ else
   fail=$((fail + 1))
 fi
 
+# ---- Taking back a join request ------------------------------------------------
+#
+# A pending request counts as belonging to a household, deliberately - otherwise
+# somebody could ask two families at once and both heads could accept. Nothing
+# could cancel one, so a head who never answered left that member unable to join
+# anywhere else or create their own, indefinitely, with no way out that did not
+# run through somebody else.
+#
+# **A registered member, not the invited administrator.** The first version of
+# this block used SAMAAJ_ADMIN_TOKEN and every check answered 404: an invited
+# admin account is created by invitation, which does not publish
+# `identity.user.registered.v1`, so member-family-service has no profile for
+# them and they are not a member of anything. Three checks failed for a reason
+# that had nothing to do with withdrawing.
+JOIN_STAMP="$(date +%s)"
+JOIN_EMAIL="joiner-$JOIN_STAMP@example.com"
+
+check "a second member registers" 201 \
+  "$(status -X POST "$GATEWAY/v1/identity/register" -H 'Content-Type: application/json' \
+     -d "{\"tenantSlug\":\"$SLUG\",\"fullName\":\"Joiner $JOIN_STAMP\",\"mobileOrEmail\":\"$JOIN_EMAIL\",\"password\":\"$MEMBER_PASSWORD\",\"consentedPurposes\":[\"Membership\"],\"noticeVersion\":\"$NOTICE_VERSION\"}")"
+
+JOIN_TOKEN=$(curl -s -X POST "$GATEWAY/v1/identity/login" -H 'Content-Type: application/json' \
+  -d "{\"mobileOrEmail\":\"$JOIN_EMAIL\",\"password\":\"$MEMBER_PASSWORD\"}" | json_field accessToken)
+
+# Not require_id: that guard is for GUIDs, and a JWT is not one - it aborted
+# the whole run on its first outing. The same is true of a family code.
+if [ -z "$JOIN_TOKEN" ]; then
+  echo "  FAIL  the second member could not sign in"
+  fail=$((fail + 1))
+  exit 1
+fi
+
+# Their profile is created by a consumer, so it is not there the instant
+# registration returns. Everything below needs it.
+joiner_profile=0
+for attempt in $(seq 1 30); do
+  if [ "$(status -H "Authorization: Bearer $JOIN_TOKEN" "$GATEWAY/v1/members/me")" = "200" ]; then
+    joiner_profile=1
+    break
+  fi
+  sleep 2
+done
+check "and their profile arrives over Kafka" 1 "$joiner_profile"
+
+FAMILY_CODE=$(curl -s -H "Authorization: Bearer $MEMBER_TOKEN" \
+  "$GATEWAY/v1/families/mine" | json_field familyCode)
+
+if [ -z "$FAMILY_CODE" ]; then
+  echo "  FAIL  no family code came back for the head"
+  fail=$((fail + 1))
+  exit 1
+fi
+
+check "withdrawing with nothing pending is success" 200 \
+  "$(status -X DELETE "$GATEWAY/v1/families/join-requests/mine" \
+     -H "Authorization: Bearer $JOIN_TOKEN")"
+
+check "they ask to join the head's household" 200 \
+  "$(status -X POST "$GATEWAY/v1/families/join-requests" \
+     -H 'Content-Type: application/json' -H "Authorization: Bearer $JOIN_TOKEN" \
+     -d "{\"familyCode\":\"$FAMILY_CODE\",\"relationship\":\"Sibling\"}")"
+
+# The dead end: one standing request and they cannot start a household either.
+check "and while it stands they cannot create their own household" 409 \
+  "$(status -X POST "$GATEWAY/v1/families" -H "Authorization: Bearer $JOIN_TOKEN")"
+
+check "they take the request back themselves" 200 \
+  "$(status -X DELETE "$GATEWAY/v1/families/join-requests/mine" \
+     -H "Authorization: Bearer $JOIN_TOKEN")"
+
+# 201 rather than 409 is what proves the request is gone rather than hidden.
+check "after which they can" 201 \
+  "$(status -X POST "$GATEWAY/v1/families" -H "Authorization: Bearer $JOIN_TOKEN")"
+
+
 # The role travelled with the invitation, so this admin can do admin work
 # without anyone granting them anything after activation.
 check "and can immediately see their Samaaj's administrators" 200 \

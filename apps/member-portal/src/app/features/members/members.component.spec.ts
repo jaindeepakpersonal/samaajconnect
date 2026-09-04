@@ -666,4 +666,97 @@ describe('FamilyComponent', () => {
 
     expect(text()).not.toContain('Remove photo');
   });
+
+  // ---- Waiting on a head who has not decided ------------------------------
+  //
+  // `/families/mine` answers with the household for somebody whose request is
+  // only pending, so this screen used to draw it as theirs - and nothing could
+  // take the request back, while a pending request blocks joining anywhere else
+  // or creating one of your own.
+
+  function waitingOn(headId: string) {
+    return family({
+      familyHeadMemberId: headId,
+      viewerIsHead: false,
+      members: [
+        familyMember({ id: 'fm-head', memberProfileId: headId, fullName: 'Anil Shah' }),
+        familyMember({
+          id: 'fm-me',
+          memberProfileId: ME,
+          fullName: 'Ravi Shah',
+          status: 'PendingJoinRequest',
+          decidedAt: null,
+        }),
+      ],
+    });
+  }
+
+  it('does not draw a household as yours while the request is only pending', () => {
+    load(waitingOn(HEAD));
+
+    expect(text()).toContain('Waiting to join a household');
+    expect(text()).not.toContain('Your household');
+  });
+
+  it('names who is being asked rather than printing an id', () => {
+    load(waitingOn(HEAD));
+
+    expect(text()).toContain('Anil Shah');
+    expect(text()).not.toContain(HEAD);
+  });
+
+  it('says plainly what the request costs while it stands', () => {
+    load(waitingOn(HEAD));
+
+    expect(text()).toContain('cannot join another household or create your own');
+  });
+
+  it('withdraws the request and re-reads', () => {
+    load(waitingOn(HEAD));
+
+    component.withdrawRequest();
+
+    const withdrawal = http.expectOne('/v1/families/join-requests/mine');
+    expect(withdrawal.request.method).toBe('DELETE');
+    withdrawal.flush({ withdrawn: true });
+
+    // Only the household:  does not refetch /identity/me, which is
+    // read once on init.
+    http.expectOne('/v1/families/mine').flush({}, { status: 404, statusText: 'Not Found' });
+    fixture.detectChanges();
+
+    expect(text()).toContain('Create a household');
+  });
+
+  /**
+   * The head accepted while this screen was open. The refusal is shown and the
+   * screen re-reads, so the member sees they are in the household rather than
+   * being told nothing happened.
+   */
+  it('shows a refusal rather than swallowing it', () => {
+    load(waitingOn(HEAD));
+
+    component.withdrawRequest();
+
+    http.expectOne('/v1/families/join-requests/mine').flush(
+      { detail: 'Your request was accepted, so you are in that household now.' },
+      { status: 409, statusText: 'Conflict' },
+    );
+
+    http.expectOne('/v1/families/mine').flush(
+      family({ members: [familyMember({ memberProfileId: ME, status: 'Active' })] }),
+    );
+    http.expectOne('/v1/children').flush([]);
+    fixture.detectChanges();
+    settlePhotos();
+
+    expect(text()).toContain('accepted');
+  });
+
+  it('draws the ordinary household screen once the request is accepted', () => {
+    load(family({ viewerIsHead: false }));
+
+    expect(text()).toContain('Your household');
+    expect(text()).not.toContain('Waiting to join a household');
+  });
 });

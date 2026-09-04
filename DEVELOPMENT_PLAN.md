@@ -8,7 +8,76 @@ version of the plan; the reasoning behind the ordering lives in
 ## Current Status
 
 - **Stage:** every module has a service and member screens; Phase 5 hardening under way
-- **Last updated:** 2026-09-04 - **a decision note longer than its column
+- **Last updated:** 2026-09-04 - **two ways a member could be stuck with no way
+  out.**
+
+  Three cycles of static checks in a row was enough, so this one is behaviour.
+  member-family-service's own CLAUDE.md named a gap — "a household whose head has
+  erased can no longer decide a join request; re-heading one is a known gap" —
+  and looking at it turned up a second, sharper one that needed no erasure at all.
+
+  **A member could ask to join a household and never take it back.** A pending
+  request counts as belonging to one, deliberately, so nobody can ask two
+  families at once and have both heads accept. Nothing could cancel it. So a
+  head who was slow, or who never looked, left that member unable to join
+  anywhere *or create a household of their own* — indefinitely, with no way out
+  that did not run through somebody else. That is not an edge case; it is what
+  happens when a head is simply slow. `DELETE /v1/families/join-requests/mine`
+  is the member's own way out, and the family screen now has the waiting state
+  it never had.
+
+  **It withdraws a request and never a membership.** If the head accepted while
+  the member was deciding to withdraw, the call is refused by name rather than
+  quietly succeeding — otherwise "cancel my request" would silently mean "leave
+  my family" for exactly the person whose request had just been accepted.
+
+  **And headship now passes to the longest-standing member when a head erases**,
+  which reverses a decision this repository had written down. The erasure
+  consumer said re-heading "belongs in an admin command, not here". An admin
+  command needs an administrator to notice and nothing tells them, so the
+  household stayed frozen until somebody complained — and four things were
+  frozen, because all four are gated on `IsHead`: deciding a join request,
+  adding a child, starting a conversion, and seeing the family code to invite
+  anyone. Doing it in the consumer means the headless state never exists rather
+  than existing until repaired.
+
+  Longest-standing needs no judgement and explains itself in a sentence. It is
+  the earliest to have *joined*, not to have asked, so a request accepted last
+  week does not outrank a member of ten years — there is a test for exactly that
+  distinction.
+
+  **Two of my own first versions were wrong, and both were caught by running
+  them rather than by reading them.**
+
+  The refusal message sat inside the waiting card, and withdrawing re-reads — so
+  the reload that made the message true was the same reload that removed the card
+  displaying it. A test caught that; it is at page level now.
+
+  And the smoke block used the invited Samaaj administrator as its second member.
+  Every check answered 404, because an invited admin account is created by
+  invitation, which does not publish `identity.user.registered.v1` — so
+  member-family-service has no profile for them and they are not a member of
+  anything. Three checks failed for a reason with nothing to do with
+  withdrawing, and had they happened to pass they would have proved nothing at
+  all. The block registers a real member now and waits for the profile to arrive
+  over Kafka before using it.
+
+  Verified by three injections: making succession a no-op, letting withdrawal
+  remove an accepted membership, and removing the validator-shaped guard. Each
+  failed the test that should have caught it.
+
+  **Two smoke runs against one stack destroy each other, and the wreckage is
+  convincing.** I started a second run before the first had finished. They both
+  wrote `.smoke.log`, so the output interleaved into one plausible-looking file,
+  and they both toggled the same Samaaj's module keys — so the volunteer-groups
+  section read `community` as off immediately after its own section had switched
+  it on, and every check answered the gateway's module-gate 404. Twenty minutes
+  went into a contradiction that was not real. The clean run is 320 of 320,
+  which is 313 plus exactly the seven checks added here. One run at a time.
+
+  1,644 tests green, up 20 — 14 in member-family-service and 6 in the member
+  portal. Seven new smoke checks through the gateway.
+- **Previously:** 2026-09-04 - **a decision note longer than its column
   answered 500.**
 
   The next unenforced rule after the last two. Root `CLAUDE.md` §4.3 asks for one

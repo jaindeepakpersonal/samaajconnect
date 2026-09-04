@@ -92,10 +92,29 @@ public sealed class EraseMemberDataCommandHandler(
         // The household itself stays, even when the erased member headed it.
         // Deleting it would take the remaining members' join with it and
         // orphan the child rows - other people's data restructured because
-        // one person exercised their own right. A household whose head
-        // has erased can no longer decide a join request - re-heading one is a
-        // gap, and belongs in an admin command, not here.
+        // one person exercised their own right.
         family?.RemoveMember(payload.UserId);
+
+        // And headship passes to the longest-standing member left.
+        //
+        // This file used to say re-heading "belongs in an admin command, not
+        // here", and that was wrong. An admin command needs an administrator to
+        // notice, and nothing tells them - so a household whose head erased
+        // stayed frozen until somebody complained: no join request could be
+        // decided, no child added, no conversion started, and the family code
+        // was invisible because only a head is shown it. Four things broken for
+        // everyone left, because one person exercised a right.
+        //
+        // Doing it here means the headless state never exists rather than
+        // existing until repaired, and the decision is small enough to explain
+        // in a sentence: the longest-standing member takes over.
+        if (family?.SucceedHeadAfterRemoval(payload.UserId) is { } successor)
+        {
+            logger.LogInformation(
+                "Household {FamilyId} is now headed by {MemberId} after its head erased",
+                family.Id,
+                successor);
+        }
 
         await unitOfWork.SaveChangesAsync(cancellationToken);
 

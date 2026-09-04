@@ -118,6 +118,17 @@ export class MembersApi {
     return this.http.post<Family>('/v1/families/join-requests', { familyCode, relationship });
   }
 
+  /**
+   * Takes back a request nobody has decided.
+   *
+   * No id: a member has at most one standing request and it is their own, so
+   * naming which to withdraw would be asking for something the caller cannot
+   * get wrong and the server already knows.
+   */
+  withdrawJoinRequest(): Observable<{ withdrawn: boolean }> {
+    return this.http.delete<{ withdrawn: boolean }>('/v1/families/join-requests/mine');
+  }
+
   /** The head accepts or turns down a request. */
   decideJoinRequest(
     familyId: string,

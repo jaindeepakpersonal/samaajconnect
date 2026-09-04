@@ -308,6 +308,25 @@ and gathering the data is reported separately from the browser refusing to save
 it, because those are different problems and only one of them is the member's to
 fix.
 
+**"Waiting to join a household" is a state this screen did not have.**
+`/families/mine` answers with the household for somebody whose request is only
+pending — deliberately, since a pending request counts as belonging to one — so
+the page drew it as theirs. Reading the viewer's own row is the only way to tell
+the two apart, and now it does: a member who has asked and not been answered gets
+a card saying so, naming who they asked, and offering to take the request back.
+
+That button had nothing behind it until this cycle. A pending request blocks
+joining anywhere else *and* creating your own household, and nothing could cancel
+one, so a head who never answered left that member stuck indefinitely with no way
+out that did not run through somebody else.
+
+**The refusal is shown at page level, not inside the card.** Withdrawing re-reads
+so the screen stops claiming to be waiting — and the one refusal worth showing is
+"the head accepted while you were deciding", which is exactly the case where the
+re-read takes the waiting card away. A message inside it would be removed by the
+same reload that made it true. A test caught that; the first version put the
+message where nobody would ever see it.
+
 **A parent's own children are the one place this app does resolve names.** The
 rule below — that names the portal cannot resolve are not invented — is about
 ids belonging to people the reader has no particular claim on, where resolving

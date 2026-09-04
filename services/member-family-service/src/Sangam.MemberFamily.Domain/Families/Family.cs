@@ -97,6 +97,124 @@ public sealed class Family : AggregateRoot, ITenantScopedEntity
     }
 
     /// <summary>
+    /// The outcome of a member trying to take back their own join request.
+    /// </summary>
+    public enum WithdrawOutcome
+    {
+        /// <summary>The pending request is gone.</summary>
+        Withdrawn,
+
+        /// <summary>There was nothing pending. The end state is the same.</summary>
+        NothingPending,
+
+        /// <summary>
+        /// The head accepted between the member asking and withdrawing, so this
+        /// is now a membership rather than a request.
+        /// </summary>
+        AlreadyAccepted,
+    }
+
+    /// <summary>
+    /// Takes back a request this member made and nobody has decided.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// <b>Without this a member could be stuck forever.</b> A pending request
+    /// counts as belonging to a household, deliberately - otherwise somebody
+    /// could ask two families at once and both heads could accept. But nothing
+    /// could cancel one, so a request the head never got round to deciding left
+    /// that member unable to join any other household or create their own, with
+    /// no way out that did not involve someone else acting. That is not an
+    /// erasure edge case; it is what happens when a head is simply slow.
+    /// </para>
+    /// <para>
+    /// <b>Only a pending request, never a membership.</b> Leaving a household
+    /// you are actually in is a different act with different consequences - the
+    /// children in it are held on somebody's consent, and the head's departure
+    /// is what <see cref="SucceedHeadAfterRemoval"/> exists for. Collapsing the
+    /// two into one call would let "cancel my request" quietly mean "leave my
+    /// family" for anyone whose request had just been accepted, which is why
+    /// that case is refused by name rather than treated as success.
+    /// </para>
+    /// </remarks>
+    public WithdrawOutcome WithdrawJoinRequest(Guid memberProfileId)
+    {
+        var existing = FindMember(memberProfileId);
+
+        if (existing is null || existing.Status == FamilyMemberStatus.Rejected)
+        {
+            return WithdrawOutcome.NothingPending;
+        }
+
+        if (existing.Status != FamilyMemberStatus.PendingJoinRequest)
+        {
+            return WithdrawOutcome.AlreadyAccepted;
+        }
+
+        _members.Remove(existing);
+
+        return WithdrawOutcome.Withdrawn;
+    }
+
+    /// <summary>
+    /// Hands headship to the longest-standing remaining member, and answers who
+    /// that is — or null when the household has nobody left to head it.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// Called when the head's own membership row has just been removed, which
+    /// happens when they erase their account. Until this existed the household
+    /// kept the erased member's id as its head, so <see cref="IsHead"/> was
+    /// false for everybody and four things stopped working at once: deciding a
+    /// join request, adding a child, starting a conversion, and seeing the
+    /// family code to invite anyone. A household of five people was frozen
+    /// because one of them exercised a right.
+    /// </para>
+    /// <para>
+    /// <b>This is a deliberate change of mind.</b> The erasure consumer used to
+    /// say re-heading "belongs in an admin command, not here". An admin command
+    /// needs an administrator to notice, and nothing tells them - so the
+    /// household stays broken until somebody complains, which is a worse
+    /// failure than the consumer making a small, explicable decision. Succeeding
+    /// at the moment of erasure also means the headless state never exists,
+    /// rather than existing until repaired.
+    /// </para>
+    /// <para>
+    /// Longest-standing rather than any other rule, because it is the one that
+    /// needs no judgement and can be explained to the household in a sentence.
+    /// It is the earliest to have joined, not the earliest to have asked: a
+    /// request that was accepted last week does not outrank a member of ten
+    /// years because they filled a form first.
+    /// </para>
+    /// </remarks>
+    public Guid? SucceedHeadAfterRemoval(Guid removedMemberId)
+    {
+        if (FamilyHeadMemberId != removedMemberId)
+        {
+            return null;
+        }
+
+        var successor = _members
+            .Where(m => m.Status == FamilyMemberStatus.Active)
+            .OrderBy(m => m.DecidedAt ?? m.RequestedAt)
+            .ThenBy(m => m.Id)
+            .FirstOrDefault();
+
+        if (successor is null)
+        {
+            // Nobody left. The household keeps the departed id as its head and
+            // is inert: no member can see it and no request can be made to it,
+            // because the code is only ever shown to a head. Leaving the field
+            // alone is better than inventing a head who is not there.
+            return null;
+        }
+
+        FamilyHeadMemberId = successor.MemberProfileId;
+
+        return FamilyHeadMemberId;
+    }
+
+    /// <summary>
     /// Removes one member's link to this household. Returns false when they
     /// were never in it, which is a normal outcome under at-least-once
     /// delivery rather than an error.

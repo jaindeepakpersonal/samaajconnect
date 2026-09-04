@@ -84,6 +84,7 @@ enforced by `TenantAuthorizationBehavior`, not just UI hiding.
 | DELETE | `/children/{id}/photo` | The child's household | Idempotent |
 | POST | `/families` | Member | Create family, become head |
 | POST | `/families/join-requests` | Member | Request to join via family code |
+| DELETE | `/families/join-requests/mine` | Member | Take back a request nobody has decided. No id: a member has at most one. Idempotent, but **409** if the head accepted in the meantime — you are in that household now |
 | POST | `/families/join-requests/{id}/decide` | FamilyHead | Accept/reject |
 | GET | `/children` | Member | Children in your own household |
 | POST | `/children` | FamilyHead | Add child profile |

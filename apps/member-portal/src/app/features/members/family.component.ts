@@ -47,12 +47,54 @@ import {
         <a class="btn secondary" routerLink="/home">Back to home</a>
       </header>
 
+      <!-- Page level, not inside the waiting card, and that is the point.
+           Withdrawing re-reads so the screen stops claiming to be waiting - but
+           the one refusal worth showing is "the head accepted while you were
+           deciding", and the re-read is exactly what takes the waiting card
+           away. A message inside it would be removed by the same reload that
+           made it true. -->
+      @if (withdrawError(); as message) {
+        <p class="notice info" role="status">{{ message }}</p>
+      }
+
       @if (loading()) {
         <p role="status">Loading your household…</p>
       } @else if (error(); as message) {
         <div class="notice error" role="alert">
           {{ message }}
           <button class="btn link" type="button" (click)="load()">Try again</button>
+        </div>
+      } @else if (awaitingDecision(); as household) {
+        <!-- Asked, not yet decided ------------------------------------------
+             This state had no screen. GET /families/mine returns the household
+             to somebody whose request is only pending, so the page rendered it
+             as theirs - and there was no way to take the request back, while a
+             pending request blocks joining anywhere else or creating one of
+             your own. A head who never answered left that member stuck with no
+             way out that did not run through somebody else. -->
+        <div class="card">
+          <h2>Waiting to join a household</h2>
+
+          <p>
+            You have asked to join {{ headName(household) }}. They decide, and until
+            they do you cannot join another household or create your own.
+          </p>
+
+          <div class="actions">
+            <button
+              class="btn secondary"
+              type="button"
+              [disabled]="busy()"
+              (click)="withdrawRequest()"
+            >
+              Withdraw my request
+            </button>
+          </div>
+
+          <p class="small">
+            Withdrawing frees you to ask a different household, or to start one.
+            It tells nobody, and you can ask this household again later.
+          </p>
         </div>
       } @else if (family(); as household) {
         <div class="grid2">
@@ -441,6 +483,63 @@ export class FamilyComponent implements OnInit {
   contact = '';
 
   private readonly me = computed(() => this.auth.user()?.userId ?? null);
+
+  readonly withdrawError = signal<string | null>(null);
+
+  /**
+   * The household this member has asked to join and nobody has decided, or
+   * null.
+   *
+   * `/families/mine` answers with the household for somebody whose request is
+   * only pending — deliberately, since a pending request counts as belonging
+   * to one — so without this the screen drew it as theirs. Reading the viewer's
+   * own row is the only way to tell the two apart.
+   */
+  readonly awaitingDecision = computed<Family | null>(() => {
+    const household = this.family();
+    const me = this.me();
+
+    if (household === null || me === null) {
+      return null;
+    }
+
+    const mine = household.members.find((person) => person.memberProfileId === me);
+
+    return mine?.status === 'PendingJoinRequest' ? household : null;
+  });
+
+  /** Who is being asked, so the screen names them rather than an id. */
+  headName(household: Family): string {
+    const head = household.members.find(
+      (person) => person.memberProfileId === household.familyHeadMemberId,
+    );
+
+    return head?.fullName ?? 'this household';
+  }
+
+  /**
+   * Takes the request back.
+   *
+   * A refusal here is the one case worth showing rather than swallowing: the
+   * head accepted while this screen was open, so the member is in the household
+   * now and re-reading shows them that.
+   */
+  withdrawRequest(): void {
+    this.withdrawError.set(null);
+    this.busy.set(true);
+
+    this.api.withdrawJoinRequest().subscribe({
+      next: () => {
+        this.busy.set(false);
+        this.load();
+      },
+      error: (failure: unknown) => {
+        this.busy.set(false);
+        this.withdrawError.set(describeError(failure));
+        this.load();
+      },
+    });
+  }
 
   ngOnInit(): void {
     // The household names people by id and the screen labels the reader as

@@ -237,4 +237,52 @@ public sealed class ErasureConsumerTests(MemberFamilyApiFactory factory)
 
         profiles.Should().Be(1);
     }
+
+    /// <summary>
+    /// A household whose head erases keeps working for the people left in it.
+    /// </summary>
+    /// <remarks>
+    /// Until this existed the household kept the erased member's id as its
+    /// head, so `IsHead` was false for everybody and four things stopped at
+    /// once: deciding a join request, adding a child, starting a conversion,
+    /// and seeing the family code to invite anyone. Five people frozen because
+    /// one of them exercised a right.
+    ///
+    /// This runs the whole consumer rather than calling the aggregate, because
+    /// the thing that could quietly stop happening is the consumer's call.
+    /// </remarks>
+    [Fact]
+    public async Task A_household_whose_head_erases_is_headed_by_whoever_is_left()
+    {
+        var household = await SeedHouseholdAsync();
+
+        var survivor = Guid.NewGuid();
+
+        await using (var scope = factory.Services.CreateAsyncScope())
+        {
+            var db = scope.ServiceProvider.GetRequiredService<MemberFamilyDbContext>();
+
+            var family = await db.Families.IgnoreQueryFilters()
+                .Include(f => f.Members)
+                .SingleAsync(f => f.Id == household.FamilyId);
+
+            var request = family.RequestJoin(
+                survivor, Relationship.Sibling, DateTimeOffset.UtcNow.AddDays(-30))!;
+
+            family.DecideJoinRequest(
+                request.Id, accepted: true, household.HeadId, DateTimeOffset.UtcNow.AddDays(-30));
+
+            await db.SaveChangesAsync();
+        }
+
+        await PublishErasureAsync(household.HeadId);
+
+        var headed = await factory.EventuallyAsync(
+            db => db.Families.IgnoreQueryFilters().AsNoTracking()
+                .SingleAsync(f => f.Id == household.FamilyId),
+            found => found.FamilyHeadMemberId == survivor);
+
+        headed.FamilyHeadMemberId.Should().Be(survivor);
+        headed.IsHead(survivor).Should().BeTrue();
+    }
 }

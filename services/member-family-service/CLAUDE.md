@@ -34,6 +34,7 @@ worked example of a cross-service flow with no synchronous call.
 | `RequestChildConversionCommand` | head of that family + `Family.Write` | built |
 | `DecideChildConversionCommand` | `SamaajAdmin` + `Family.ApproveConversion` | built |
 | `EraseMemberDataCommand` | `[InternalRequest]` | built |
+| `WithdrawJoinRequestCommand` | any member, their own request | built |
 
 ## Queries
 
@@ -81,6 +82,7 @@ here, which looks exactly like a broker problem and is not one.
 | POST | `/v1/families` | any member |
 | GET | `/v1/families/mine` | any member |
 | POST | `/v1/families/join-requests` | any member |
+| DELETE | `/v1/families/join-requests/mine` | any member, their own request |
 | POST | `/v1/families/{familyId}/join-requests/{requestId}/decide` | head of that family |
 | GET | `/v1/children` | any member |
 | POST | `/v1/children` | head of that family + `Family.Write` |
@@ -93,6 +95,43 @@ here, which looks exactly like a broker problem and is not one.
 | GET | `/health` | anonymous |
 
 ## Decisions worth knowing before you change this service
+
+**A member could ask to join a household and never take it back.** A pending
+request counts as belonging to one — deliberately, so nobody can ask two
+families at once and have both heads accept — and nothing could cancel it. A
+head who was slow, or who never looked, or who erased their account, left that
+member permanently unable to join anywhere or create a household of their own.
+The only way out ran through somebody else. That is not an edge case; it is what
+happens when a head is simply slow.
+
+`WithdrawJoinRequestCommand` is the member's own way out. It takes no
+parameters: a member has at most one standing request by construction, so naming
+which one would be asking for a fact the caller cannot get wrong and the server
+already knows.
+
+**It withdraws a request and never a membership.** If the head accepted while
+the member was deciding to withdraw, the call is refused by name rather than
+quietly succeeding — otherwise "cancel my request" would silently mean "leave my
+family" for exactly the person whose request had just been accepted. Leaving a
+household you are in is a different act with different consequences, and it does
+not exist yet.
+
+**Headship passes to the longest-standing member when the head erases**, and
+this file used to say the opposite. It said re-heading "belongs in an admin
+command, not here". That was wrong: an admin command needs an administrator to
+notice, and nothing tells them — so a household whose head erased stayed frozen
+until somebody complained. Four things stopped at once, because all four are
+gated on `IsHead`: deciding a join request, adding a child, starting a
+conversion, and seeing the family code to invite anyone. A household of five was
+unusable because one of them exercised a right.
+
+Doing it in the consumer means the headless state never exists rather than
+existing until repaired. Longest-standing is the rule because it needs no
+judgement and can be explained in a sentence — and it is the earliest to have
+*joined*, not to have asked, so a request accepted last week does not outrank a
+member of ten years. A household with nobody left keeps the departed id and is
+inert: no member can see it and no request can reach it, because the code is only
+ever shown to a head.
 
 **The platform hosts photos now, and that was a DPDP fix rather than a feature.**
 `PhotoUrl` was a link a client supplied, validated as absolute `http(s)` — which

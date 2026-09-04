@@ -4,6 +4,7 @@ using Sangam.MemberFamily.Application.Families;
 using Sangam.MemberFamily.Application.Families.Commands.CreateFamily;
 using Sangam.MemberFamily.Application.Families.Commands.DecideJoinRequest;
 using Sangam.MemberFamily.Application.Families.Commands.RequestJoinFamily;
+using Sangam.MemberFamily.Application.Families.Commands.WithdrawJoinRequest;
 using Sangam.MemberFamily.Application.Families.Queries.GetMyFamily;
 
 namespace Sangam.MemberFamily.Api.Endpoints;
@@ -52,6 +53,22 @@ public static class FamilyEndpoints
             .Produces<FamilyResponse>()
             .ProducesValidationProblem()
             .ProducesProblem(StatusCodes.Status404NotFound)
+            .ProducesProblem(StatusCodes.Status409Conflict);
+
+        // DELETE on the collection, because a member has at most one standing
+        // request and it is their own. An id in the path would be a fact the
+        // caller cannot get wrong and the server already knows.
+        group.MapDelete("/join-requests/mine", async (
+                ISender sender,
+                CancellationToken cancellationToken) =>
+            {
+                var result = await sender.Send(new WithdrawJoinRequestCommand(), cancellationToken);
+
+                return result.ToApiResult();
+            })
+            .WithName("WithdrawJoinRequest")
+            .WithSummary("Take back a request to join a household that nobody has decided yet.")
+            .Produces<WithdrawJoinRequestResult>()
             .ProducesProblem(StatusCodes.Status409Conflict);
 
         group.MapPost("/{familyId:guid}/join-requests/{requestId:guid}/decide", async (

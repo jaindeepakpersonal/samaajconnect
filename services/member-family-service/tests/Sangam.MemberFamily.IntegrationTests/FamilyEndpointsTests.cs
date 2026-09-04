@@ -181,4 +181,90 @@ public sealed class FamilyEndpointsTests(MemberFamilyApiFactory factory)
 
         problem.GetProperty("title").GetString().Should().Be("Family.None");
     }
+
+    // ---- Taking back a request ----------------------------------------------
+    //
+    // A pending request counts as belonging to a household, so until this
+    // existed a member waiting on a head who never answered could not join
+    // anywhere else or create their own - indefinitely, with no way out that
+    // did not run through somebody else.
+
+    /// <summary>
+    /// The dead end, end to end: ask, be ignored, and be unable to do anything
+    /// about it - then withdraw and be free.
+    /// </summary>
+    [Fact]
+    public async Task A_member_waiting_on_a_head_who_never_answers_can_take_it_back()
+    {
+        var head = MemberClient(_head, TenantA);
+        var joiner = MemberClient(_joiner, TenantA);
+
+        var created = await head.PostAsJsonAsync("/v1/families", new { });
+        var code = (await created.Content.ReadFromJsonAsync<JsonElement>())
+            .GetProperty("familyCode").GetString();
+
+        (await joiner.PostAsJsonAsync(
+            "/v1/families/join-requests", new { familyCode = code, relationship = "Sibling" }))
+            .StatusCode.Should().Be(HttpStatusCode.OK);
+
+        // Stuck: cannot create a household of their own while one request stands.
+        (await joiner.PostAsJsonAsync("/v1/families", new { }))
+            .StatusCode.Should().Be(HttpStatusCode.Conflict);
+
+        var withdrawn = await joiner.DeleteAsync("/v1/families/join-requests/mine");
+        withdrawn.StatusCode.Should().Be(HttpStatusCode.OK);
+
+        (await withdrawn.Content.ReadFromJsonAsync<JsonElement>())
+            .GetProperty("withdrawn").GetBoolean().Should().BeTrue();
+
+        // And now free to have a household at all.
+        (await joiner.PostAsJsonAsync("/v1/families", new { }))
+            .StatusCode.Should().Be(HttpStatusCode.Created);
+    }
+
+    [Fact]
+    public async Task Withdrawing_with_nothing_pending_is_success_and_changes_nothing()
+    {
+        var response = await MemberClient(_joiner, TenantA)
+            .DeleteAsync("/v1/families/join-requests/mine");
+
+        response.StatusCode.Should().Be(HttpStatusCode.OK);
+
+        (await response.Content.ReadFromJsonAsync<JsonElement>())
+            .GetProperty("withdrawn").GetBoolean().Should().BeFalse();
+    }
+
+    /// <summary>
+    /// The head accepted while the member was deciding to withdraw. Quietly
+    /// succeeding would take them out of a household they had just joined while
+    /// telling them they had cancelled a request.
+    /// </summary>
+    [Fact]
+    public async Task An_accepted_request_cannot_be_withdrawn()
+    {
+        var head = MemberClient(_head, TenantA);
+        var joiner = MemberClient(_joiner, TenantA);
+
+        var created = await head.PostAsJsonAsync("/v1/families", new { });
+        var family = await created.Content.ReadFromJsonAsync<JsonElement>();
+        var familyId = family.GetProperty("id").GetGuid();
+        var code = family.GetProperty("familyCode").GetString();
+
+        await joiner.PostAsJsonAsync(
+            "/v1/families/join-requests", new { familyCode = code, relationship = "Sibling" });
+
+        var mine = await head.GetFromJsonAsync<JsonElement>("/v1/families/mine");
+        var requestId = mine.GetProperty("members").EnumerateArray()
+            .First(m => m.GetProperty("status").GetString() == "PendingJoinRequest")
+            .GetProperty("id").GetGuid();
+
+        await head.PostAsJsonAsync(
+            $"/v1/families/{familyId}/join-requests/{requestId}/decide", new { accept = true });
+
+        (await joiner.DeleteAsync("/v1/families/join-requests/mine"))
+            .StatusCode.Should().Be(HttpStatusCode.Conflict);
+
+        // Still in the household, which is the point.
+        (await joiner.GetAsync("/v1/families/mine")).StatusCode.Should().Be(HttpStatusCode.OK);
+    }
 }
