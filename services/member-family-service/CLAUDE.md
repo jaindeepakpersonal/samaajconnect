@@ -481,14 +481,25 @@ child" indefinitely — true of every child whose consent-giver had erased their
 account. The row itself is kept, because a Pathshala enrolment, a register mark
 and an exam result all reference the id.
 
-> **Open question, deliberately not answered here.** `LeaveFamilyCommand` counts
-> every non-withdrawn child when deciding whether the last member may leave, and
-> that includes **converted** ones. A converted child has their own account and
-> can exercise s.12 themselves, so nobody needs to stay in the household for
-> them — the refusal is stricter than its own reasoning requires. Narrowing it
-> to `Minor` is a one-line change and a different blast radius: the same list
-> feeds the family screen, which should go on showing converted children. Left
-> for a cycle that can give it its own tests rather than folded into this one.
+**There is one way a child record stops being held, and erasure takes it.**
+Withdrawal and erasure were two doors to one outcome, and only one of them wrote
+down that it had happened: erasure called a separate `Erase()` that
+de-identified the row and left `ParentalConsent.WithdrawnAt` null. So a consent
+that stopped standing the day its giver erased still reported `Stands` as true,
+and nothing was announced — for every child whose parent had erased, s.6(7)'s
+question of *when* a consent stopped standing had no answer on the record.
+`Erase()` is now a private `DeIdentify()` that only `WithdrawParentalConsent`
+calls, and the erasure consumer calls that with the erasing member as the
+withdrawer. A unit test asserts the closed set of public methods on
+`ChildProfile`, so a second door has to be argued for.
+
+**And the leave refusal counts minors, not children.** It used to count every
+non-withdrawn child, which included **converted** ones — people with their own
+account and s.12 for themselves, who need nobody to stay in the household for
+them. A parent whose only remaining child record was a grown-up with a login
+could not leave, for the sake of somebody who did not need them to. The list is
+still unfiltered at the repository, because the family screen reads the same
+call and should go on showing converted children.
 
 ## Erasure
 
@@ -500,6 +511,13 @@ person's parental consent (s.9), and consent that no longer exists cannot keep
 justifying the data it covered. The birth year survives, shifted to 1 January:
 age is what decides conversion eligibility so the row still has to behave, and
 the exact birthday is how a child would be recognised.
+
+It does that by calling `WithdrawParentalConsent` — the same method a parent
+withdrawing calls, naming the erasing member as the withdrawer — rather than a
+private path of its own. The consent that stopped standing says so, and the
+withdrawal is announced on `members.child.consent-withdrawn.v1` whichever way it
+came about. An auditor asking when a consent stopped standing should not have to
+know that erasure was a different code path.
 
 **The household stays; the membership row goes.** Who was in whose household is
 personal data about the erased member, so their `FamilyMember` row is removed

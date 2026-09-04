@@ -83,7 +83,19 @@ public sealed class EraseMemberDataCommandHandler(
         // consent is what erasure follows.
         foreach (var child in await children.ListByConsentGiverAsync(payload.UserId, cancellationToken))
         {
-            child.Erase();
+            // The same call the parent's own withdrawal makes, and deliberately
+            // so. It used to be a separate `Erase()` that de-identified the row
+            // and left the consent's WithdrawnAt null - so a consent that
+            // stopped standing the day its giver erased still reported itself as
+            // standing, and nothing was announced. Section 6(7) asks when a
+            // consent stopped standing; for every child whose parent had erased,
+            // there was no answer on the record.
+            //
+            // The erasing member is named as the withdrawer because that is what
+            // happened: their account going is what removed the basis. Their id
+            // is already on the consent as its giver, so nothing new about them
+            // is being stored.
+            child.WithdrawParentalConsent(payload.UserId, clock.UtcNow);
 
             await images.RemoveAllForOwnerAsync(
                 child.TenantId, ImageOwnerKind.Child, child.Id, cancellationToken);

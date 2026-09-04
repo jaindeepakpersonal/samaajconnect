@@ -92,26 +92,58 @@ public sealed class ParentalConsentWithdrawalTests
     }
 
     [Fact]
-    public void Erasing_leaves_the_same_status()
-    {
-        var child = Child();
-
-        child.Erase();
-
-        child.Status.Should().Be(ChildStatus.Withdrawn);
-    }
-
-    [Fact]
-    public void Erasing_a_converted_child_does_not_move_their_status_back()
+    public void A_converted_child_does_not_move_their_status_back()
     {
         var child = Child();
 
         child.MarkConverted(Guid.NewGuid());
-        child.Erase();
+        child.WithdrawParentalConsent(Parent, Later);
 
         // The row that remains is the historical link to an account that exists,
         // not a child record. Calling it Withdrawn would lose that.
+        //
+        // The command refuses this case outright; the aggregate is careful about
+        // it anyway, because the erasure consumer reaches the same method by a
+        // path that has no such check - it erases whatever a consent covers.
         child.Status.Should().Be(ChildStatus.Converted);
+    }
+
+    [Fact]
+    public void There_is_one_way_a_child_record_stops_being_held()
+    {
+        // **Erasure used to take a different door.** It called an `Erase()` that
+        // de-identified the row and left the consent's WithdrawnAt null, so a
+        // consent that stopped standing the day its giver erased still reported
+        // itself as standing, and nothing was announced. Two doors to one
+        // outcome, and only one of them wrote down that it had happened -
+        // s.6(7) asks a Fiduciary when a consent stopped standing, and for
+        // those children there was no answer on the record.
+        //
+        // **The closed set, not the absence of one name.** The first version of
+        // this asserted that no public method was called "Erase", which the
+        // rename to `DeIdentify` walked straight past: making that private
+        // method public again is a second door and the test said nothing. Fault
+        // injection is what showed it, exactly as it did for the withdrawal
+        // event a cycle earlier - a test that names the thing it is against
+        // catches the thing it was written for and nothing else.
+        //
+        // Listing what may be public means a new one has to be argued for here.
+        var doors = typeof(ChildProfile)
+            .GetMethods()
+            .Where(m => m.DeclaringType == typeof(ChildProfile) && m.IsPublic && !m.IsSpecialName)
+            .Select(m => m.Name)
+            .OrderBy(name => name)
+            .ToList();
+
+        doors.Should().BeEquivalentTo([
+            nameof(ChildProfile.AgeOn),
+            nameof(ChildProfile.Create),
+            nameof(ChildProfile.IsEligibleForConversion),
+            nameof(ChildProfile.MarkConverted),
+            nameof(ChildProfile.RemovePhoto),
+            nameof(ChildProfile.SetPhoto),
+            nameof(ChildProfile.WithdrawParentalConsent),
+        ]);
     }
 
     [Fact]

@@ -76,24 +76,24 @@ public sealed class ChildErasureTests
             Gender.Male, Guid.NewGuid(), Now);
 
     [Fact]
-    public void Erase_clears_the_name_and_photo()
+    public void Withdrawing_clears_the_name_and_photo()
     {
         var child = Child();
 
-        child.Erase();
+        child.WithdrawParentalConsent(Guid.NewGuid(), DateTimeOffset.UtcNow);
 
         child.FullName.Should().NotContain("Aarav");
         child.PhotoImageId.Should().BeNull();
     }
 
     [Fact]
-    public void Erase_keeps_the_birth_year_but_not_the_birthday()
+    public void Withdrawing_keeps_the_birth_year_but_not_the_birthday()
     {
         // Age is what decides eligibility, so the row still has to behave. An
         // exact birthday is how a child would be recognised from it.
         var child = Child();
 
-        child.Erase();
+        child.WithdrawParentalConsent(Guid.NewGuid(), DateTimeOffset.UtcNow);
 
         child.DateOfBirth.Should().Be(new DateOnly(2012, 1, 1));
     }
@@ -170,6 +170,46 @@ public sealed class EraseMemberDataCommandHandlerTests
 
         result.Value.ChildrenErased.Should().Be(1);
         child.FullName.Should().NotContain("Aarav");
+    }
+
+    [Fact]
+    public async Task And_records_when_each_of_those_consents_stopped_standing()
+    {
+        // **This was the gap.** Erasure de-identified the row through a separate
+        // `Erase()` and left the consent untouched, so `Stands` went on saying
+        // yes for a consent whose giver no longer had an account - and s.6(7)
+        // asks a Fiduciary exactly when a consent stopped standing.
+        var family = HeadedFamily();
+        var child = ChildProfile.Create(
+            TenantId, family.Id, "Aarav Shah", new DateOnly(2012, 7, 19),
+            Gender.Male, UserId, Now);
+
+        _children.ListByConsentGiverAsync(UserId, Arg.Any<CancellationToken>()).Returns([child]);
+
+        await Handle();
+
+        child.ParentalConsent!.Stands.Should().BeFalse();
+        child.ParentalConsent.WithdrawnAt.Should().NotBeNull();
+        child.ParentalConsent.WithdrawnByMemberId.Should().Be(UserId);
+    }
+
+    [Fact]
+    public async Task And_announces_it_the_same_way_a_parent_withdrawing_would()
+    {
+        var family = HeadedFamily();
+        var child = ChildProfile.Create(
+            TenantId, family.Id, "Aarav Shah", new DateOnly(2012, 7, 19),
+            Gender.Male, UserId, Now);
+
+        _children.ListByConsentGiverAsync(UserId, Arg.Any<CancellationToken>()).Returns([child]);
+
+        await Handle();
+
+        // One topic for one fact, whichever door it came through. An auditor
+        // asking "when did this consent stop standing" should not have to know
+        // that erasure was a different code path.
+        child.DomainEvents.OfType<ParentalConsentWithdrawnDomainEvent>()
+            .Should().ContainSingle();
     }
 
     /// <summary>

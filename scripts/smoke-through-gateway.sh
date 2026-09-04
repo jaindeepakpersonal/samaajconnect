@@ -1125,14 +1125,6 @@ check "and leaving again is success rather than an error" 200 \
 check "after which they can start another household" 201 \
   "$(status -X POST "$GATEWAY/v1/families" -H "Authorization: Bearer $JOIN_TOKEN")"
 
-# The head of the smoke Samaaj's main household has children in it, added
-# earlier, and is its only member. Leaving would leave those records with nobody
-# able to manage them, and nothing on this platform can remove a child - so it is
-# refused rather than allowed to orphan them.
-check "but the last member of a household with children cannot" 409 \
-  "$(status -X DELETE "$GATEWAY/v1/families/mine/membership" \
-     -H "Authorization: Bearer $MEMBER_TOKEN")"
-
 # ---- Withdrawing parental consent (DPDP s.6(4)) --------------------------------
 #
 # Giving that consent was one tick beside a notice. Until this existed the only
@@ -1144,6 +1136,12 @@ check "but the last member of a household with children cannot" 409 \
 # **A second child, added here and removed here.** The household's first child
 # is placed in a Pathshala class by a later section; withdrawing that one would
 # break checks that have nothing to do with consent.
+#
+# It is also what makes the refusal below mean anything. That first child was
+# converted by the conversion section above, and a converted child no longer
+# holds their parent in the household - they have an account of their own and
+# s.12 with it. So the household needs a minor in it for "cannot leave" to be
+# the rule being tested rather than an accident of ordering.
 NOTICE_VERSION=$(curl -s -H "Authorization: Bearer $MEMBER_TOKEN" \
   "$GATEWAY/v1/children/data-notice" | json_field version)
 
@@ -1152,6 +1150,13 @@ SECOND_CHILD=$(curl -s -X POST "$GATEWAY/v1/children" -H 'Content-Type: applicat
   -d "{\"fullName\":\"Withdrawn Child\",\"dateOfBirth\":\"2016-03-04\",\"gender\":\"Female\",\"parentalConsentGiven\":true,\"noticeVersion\":\"$NOTICE_VERSION\"}" \
   | json_field id)
 require_id second_child "$SECOND_CHILD"
+
+# The head of the smoke Samaaj's main household is its only member, and now has
+# a minor in it. Leaving would leave that record with nobody able to manage it,
+# so it is refused rather than allowed to orphan them.
+check "but the last member of a household with a minor in it cannot" 409 \
+  "$(status -X DELETE "$GATEWAY/v1/families/mine/membership" \
+     -H "Authorization: Bearer $MEMBER_TOKEN")"
 
 check "another member cannot withdraw a consent they did not give" 404 \
   "$(status -X DELETE "$GATEWAY/v1/children/$SECOND_CHILD/parental-consent" \
@@ -1186,11 +1191,12 @@ else
   fail=$((fail + 1))
 fi
 
-# Which is why leaving is still refused: the count is per child, not "has
-# anybody in this household ever withdrawn anything".
-check "so leaving is still refused, because a child remains" 409 \
-  "$(status -X DELETE "$GATEWAY/v1/families/mine/membership" \
-     -H "Authorization: Bearer $MEMBER_TOKEN")"
+# **And now leaving would be allowed**, because the only child record left in
+# this household belongs to somebody who has their own account. That is not
+# checked here on purpose: the only way to check it is to actually leave, and
+# four later sections need this member in this household to see their child's
+# Pathshala class. `A_converted_child_does_not_hold_their_parent_in_the_household`
+# covers it against a real database instead.
 
 
 # The role travelled with the invitation, so this admin can do admin work

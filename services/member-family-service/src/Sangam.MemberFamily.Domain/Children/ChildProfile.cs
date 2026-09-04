@@ -145,11 +145,11 @@ public sealed class ChildProfile : AggregateRoot, ITenantScopedEntity
     /// after a Samaaj admin approved the request.
     /// </summary>
     /// <summary>
-    /// Erases the child from this record. Called when the family head who gave
-    /// the parental consent erases their own account: the consent was the
-    /// basis on which this data was held, so it cannot outlive them.
+    /// Strips everything a person could be recognised by. Never called on its
+    /// own: it is the second half of <see cref="WithdrawParentalConsent"/>,
+    /// which is the only way a child record stops being held.
     /// </summary>
-    public void Erase()
+    private void DeIdentify()
     {
         FullName = "Erased child";
         // The reference only; the handler deletes the bytes in the same
@@ -185,20 +185,28 @@ public sealed class ChildProfile : AggregateRoot, ITenantScopedEntity
     /// conditional on giving up unrelated ones.
     /// </para>
     /// <para>
-    /// What it does is what erasing does to the same record, because there is
-    /// only one right answer to "this data may no longer be held": the name and
-    /// the photograph go, the birth year survives shifted to 1 January, and the
-    /// row stays because a Pathshala enrolment, a register and an exam result
-    /// all point at this id. What it adds is the record of the withdrawal
-    /// itself, which erasure does not need - there, the person who could be
-    /// asked is gone.
+    /// <b>This is the only way a child record stops being held, and erasing the
+    /// consent-giver's account is one of its callers.</b> That was not true when
+    /// it was written: erasure called a separate <c>Erase()</c> that
+    /// de-identified the row and left <see cref="ParentalConsent.WithdrawnAt"/>
+    /// null, so a consent could have stopped standing months earlier while
+    /// <see cref="ParentalConsent.Stands"/> still said yes and nothing was
+    /// announced. Two doors to one outcome, and only one of them wrote down that
+    /// it had happened. Section 6(7) asks a Fiduciary when a consent stopped
+    /// standing, and for every child whose parent had erased, the platform could
+    /// not have said.
+    /// </para>
+    /// <para>
+    /// What it does: the name and the photograph go, the birth year survives
+    /// shifted to 1 January, and the row stays because a Pathshala enrolment, a
+    /// register and an exam result all point at this id.
     /// </para>
     /// </remarks>
     public void WithdrawParentalConsent(Guid withdrawnBy, DateTimeOffset at)
     {
         ParentalConsent?.Withdraw(withdrawnBy, at);
 
-        Erase();
+        DeIdentify();
 
         // Carries no name, no date and no photograph: audit-notification-service
         // records payloads verbatim in an append-only table, so an event about a

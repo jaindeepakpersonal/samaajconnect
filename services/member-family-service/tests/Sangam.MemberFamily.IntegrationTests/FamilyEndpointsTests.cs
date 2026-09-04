@@ -417,4 +417,59 @@ public sealed class FamilyEndpointsTests(MemberFamilyApiFactory factory)
         (await head.DeleteAsync("/v1/families/mine/membership"))
             .StatusCode.Should().Be(HttpStatusCode.OK);
     }
+
+    [Fact]
+    public async Task A_converted_child_does_not_hold_their_parent_in_the_household()
+    {
+        // The refusal exists because a child record would be left with nobody
+        // able to manage it. A converted child manages their own: they have an
+        // account, and section 12 for themselves. Counting them made the rule
+        // stricter than its own reasoning - a parent whose only remaining child
+        // record was a grown-up with their own login could not leave, for the
+        // sake of somebody who did not need them to stay.
+        var head = MemberClient(_head, TenantA);
+
+        await head.PostAsJsonAsync("/v1/families", new { });
+
+        var notice = await head.GetFromJsonAsync<JsonElement>("/v1/children/data-notice");
+
+        var addChild = await head.PostAsJsonAsync("/v1/children", new
+        {
+            fullName = "Grown Up",
+            dateOfBirth = DateOnly.FromDateTime(DateTime.UtcNow).AddYears(-19).ToString("yyyy-MM-dd"),
+            gender = "Male",
+            parentalConsentGiven = true,
+            noticeVersion = notice.GetProperty("version").GetString(),
+        });
+
+        addChild.StatusCode.Should().Be(HttpStatusCode.Created);
+
+        var childId = (await addChild.Content.ReadFromJsonAsync<JsonElement>())
+            .GetProperty("id").GetGuid();
+
+        (await head.DeleteAsync("/v1/families/mine/membership"))
+            .StatusCode.Should().Be(HttpStatusCode.Conflict);
+
+        await MarkConvertedAsync(childId);
+
+        (await head.DeleteAsync("/v1/families/mine/membership"))
+            .StatusCode.Should().Be(HttpStatusCode.OK);
+    }
+
+    /// <summary>
+    /// Completes the conversion the way the Kafka consumer does, without a
+    /// broker: the approval only asks identity-tenant-service for an account,
+    /// and the status moves when it answers.
+    /// </summary>
+    private async Task MarkConvertedAsync(Guid childId)
+    {
+        await using var scope = factory.Services.CreateAsyncScope();
+        var db = scope.ServiceProvider.GetRequiredService<MemberFamilyDbContext>();
+
+        var child = await db.ChildProfiles.IgnoreQueryFilters().SingleAsync(c => c.Id == childId);
+
+        child.MarkConverted(Guid.NewGuid());
+
+        await db.SaveChangesAsync();
+    }
 }

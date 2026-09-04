@@ -8,7 +8,67 @@ version of the plan; the reasoning behind the ordering lives in
 ## Current Status
 
 - **Stage:** every module has a service and member screens; Phase 5 hardening under way
-- **Last updated:** 2026-09-04 - **a right that could only be exercised by
+- **Last updated:** 2026-09-04 - **two doors to one outcome, and only one of
+  them wrote down that it had happened.**
+
+  Last cycle gave a parent a way to withdraw the consent a child's record is
+  held on, and left the older path alone. That was the mistake. A child record
+  stops being held in two circumstances - the parent withdraws, or the parent
+  erases their whole account - and they went through different code. Withdrawal
+  recorded `WithdrawnAt`, `WithdrawnByMemberId` and published
+  `members.child.consent-withdrawn.v1`. Erasure called a separate `Erase()` that
+  de-identified the row and **left the consent untouched**.
+
+  So a consent whose giver had erased months earlier still reported
+  `Stands == true`, and nothing was announced. Section 6(7) asks a Fiduciary
+  when a consent stopped standing; for every child whose parent had erased,
+  there was no answer on the record. The row said the data was gone and the
+  consent said it was still justified - a contradiction inside one aggregate.
+
+  `Erase()` is a private `DeIdentify()` now, reachable only through
+  `WithdrawParentalConsent`, and the erasure consumer calls that with the
+  erasing member named as the withdrawer. One door, and it always writes down
+  that it was used.
+
+  **And the leave refusal counts minors, not children.** This was written down
+  as an open question last cycle and is answered here. Refusing to let the last
+  member of a household leave exists because a child record would be left with
+  nobody able to manage it - but the count included **converted** children, who
+  hold their own account and have s.12 for themselves. A parent whose only
+  remaining child record was a grown-up with a login could not leave, for the
+  sake of somebody who did not need them to stay. The repository call is still
+  unfiltered, because the family screen reads it too and should go on showing
+  converted children.
+
+  **A test named the thing it was against instead of checking the property, for
+  the second cycle running.** The new "there is one way a child record stops
+  being held" test asserted that no public method was called `Erase` - which the
+  rename to `DeIdentify` walked straight past. Making that private method public
+  again is a second door and the test said nothing. It asserts the closed set of
+  public methods on `ChildProfile` now, so a new one has to be argued for. Both
+  times fault injection is what found it, and both times the passing version
+  looked entirely reasonable.
+
+  **The smoke run's own state proved the narrowing.** Its main household's first
+  child is converted by the conversion section, so "the last member of a
+  household with children cannot leave" had been passing partly by accident: it
+  would now answer 200. The block adds a minor before that check, which makes it
+  the rule being tested rather than an artefact of ordering. Whether leaving is
+  then allowed is deliberately not checked through the gateway - the only way to
+  check it is to actually leave, and four later sections need that member in that
+  household - so an integration test covers it against a real database instead.
+
+  Verified by three injections: erasure back on a silent de-identify, the leave
+  rule counting converted children again, and the private door made public. The
+  third failed nothing until the test was rewritten.
+
+  345 of 345 smoke checks green through the gateway. One fewer than last cycle,
+  and deliberately: the check it dropped could only be made by leaving a
+  household four later sections need that member to be in.
+
+  1,707 tests green, up 3 - 2 unit and 1 integration added, and the two
+  `Erase()` unit tests rewritten in place rather than added to.
+- **Previously:** 2026-09-04 - **a right that could only be exercised by
   giving up three others.**
 
   A child's record exists because a parent consented; DPDP section 9 makes that

@@ -3,6 +3,7 @@ using MediatR;
 using Sangam.MemberFamily.Application.Abstractions;
 using Sangam.MemberFamily.Application.Common;
 using Sangam.MemberFamily.Application.Security;
+using Sangam.MemberFamily.Domain.Children;
 
 namespace Sangam.MemberFamily.Application.Families.Commands.LeaveFamily;
 
@@ -88,16 +89,30 @@ public sealed class LeaveFamilyCommandHandler(
         //
         // A child record exists on somebody's parental consent (DPDP s.9) and
         // lives in a household. If the last member walks out, those records stay
-        // with nobody able to see or manage them - and nothing on this platform
-        // can remove a child, so the state would be permanent. Refusing names
-        // the gap instead of creating an orphan.
-        if (active.Count == 1 && householdChildren.Count > 0)
+        // with nobody able to see or manage them, and the state would be
+        // permanent. Refusing names the gap instead of creating an orphan.
+        //
+        // **Minors only, and the narrowing matters.** The list this counts also
+        // carries converted children - people who hold their own account, manage
+        // their own data and have s.12 for themselves. Nobody needs to stay in
+        // the household for them, so counting them made the refusal stricter
+        // than its own reasoning: a parent whose only remaining child record was
+        // a grown-up with their own login could not leave, for the sake of
+        // somebody who did not need them to stay.
+        //
+        // The list is not filtered at the repository because the family screen
+        // reads the same call and should go on showing converted children -
+        // "Has their own account" is a thing a household wants to see.
+        var stillDependent = householdChildren.Count(c => c.Status == ChildStatus.Minor);
+
+        if (active.Count == 1 && stillDependent > 0)
         {
             return Result.Failure<LeaveFamilyResult>(Error.Conflict(
                 "Family.WouldStrandChildren",
                 "You are the only person left in this household and it has "
                 + "children's records in it. Leaving would leave nobody able to "
-                + "manage them, so it is refused."));
+                + "manage them, so it is refused. Withdrawing your consent for "
+                + "each child removes their record and frees you to leave."));
         }
 
         family.RemoveMember(memberId);

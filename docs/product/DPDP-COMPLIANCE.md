@@ -153,6 +153,16 @@ remove it.
   announcing that a child's data may no longer be held would otherwise become
   the one copy of it that outlives everything else.
 
+**Erasure takes the same route, and did not at first.** When a parent erases
+their account, every child record held on their consent goes with it — and that
+originally ran through a separate method that de-identified the row and left the
+consent untouched. The consent went on reporting itself as standing, months
+after the person who gave it had no account, and nothing was announced. Two
+paths to one outcome and only one of them wrote down that it had happened: for
+every child whose parent had erased, section 6(7)'s question of *when* a consent
+stopped standing had no answer on the record. Both paths are one method now, and
+a test asserts the closed set of ways a child record can stop being held.
+
 ## Erasure vs. the audit log — the real tension
 
 §8(7) and §12 require erasure. `SECURITY-CHECKLIST.md` requires the audit log
