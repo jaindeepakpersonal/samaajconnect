@@ -555,6 +555,98 @@ describe('FamilyComponent', () => {
     expect(text()).toContain('child-notice-v1');
   });
 
+  // ---- Withdrawing parental consent (DPDP s.6(4)) -------------------------
+  //
+  // The right existed and was unreachable from this screen: the only way to
+  // withdraw was to erase your whole account. Giving was one tick, here.
+
+  function withConsent(givenBy: string) {
+    return child({
+      parentalConsent: {
+        givenByMemberId: givenBy,
+        noticeVersion: 'child-notice-v1',
+        attestation: 'I confirm.',
+        givenAt: new Date().toISOString(),
+      },
+    });
+  }
+
+  it('offers withdrawing to the person whose consent it is', () => {
+    load(family(), [withConsent(ME)]);
+
+    expect(buttonSaying('Withdraw parental consent')).toBeDefined();
+  });
+
+  it('and to nobody else, because the consent is not theirs to take back', () => {
+    // A head who inherited the household did not give this consent. Section
+    // 6(4) is a right over your own consent, not over the household's records.
+    load(family(), [withConsent('somebody-else')]);
+
+    expect(buttonSaying('Withdraw parental consent')).toBeUndefined();
+  });
+
+  it('says what withdrawing destroys before doing it', () => {
+    load(family(), [withConsent(ME)]);
+
+    buttonSaying('Withdraw parental consent')!.click();
+    fixture.detectChanges();
+
+    // Not "are you sure?". Section 6(4) is about ease, and this screen's own
+    // rule is that a reversible withdrawal takes no confirmation - but this one
+    // cannot be undone, and an unguarded click on that is a trap rather than
+    // ease.
+    expect(text()).toContain('nothing on this platform can bring them back');
+  });
+
+  it('leaves the trigger in place while the panel is open', () => {
+    load(family(), [withConsent(ME)]);
+
+    buttonSaying('Withdraw parental consent')!.click();
+    fixture.detectChanges();
+
+    const trigger = buttonSaying('Withdraw parental consent')!;
+
+    expect(trigger).toBeDefined();
+    expect(trigger.getAttribute('aria-expanded')).toBe('true');
+    expect(trigger.disabled).toBe(false);
+  });
+
+  it('withdraws and re-reads the household', () => {
+    load(family(), [withConsent(ME)]);
+
+    component.withdrawConsent(component.children()[0]);
+
+    http.expectOne('/v1/children/c1/parental-consent').flush({ withdrawn: true });
+
+    // A full re-read of the household: the child leaves the list, and what the
+    // member may do next changes with it - the last member of a household with
+    // children cannot leave, and now they can. `/identity/me` is not refetched;
+    // it is read once on init.
+    http.expectOne('/v1/families/mine').flush(family());
+    http.expectOne('/v1/children').flush([]);
+
+    fixture.detectChanges();
+
+    expect(component.children()).toHaveLength(0);
+  });
+
+  it('shows a refusal against that child rather than blanking the screen', () => {
+    load(family(), [withConsent(ME)]);
+
+    component.withdrawConsent(component.children()[0]);
+
+    http.expectOne('/v1/children/c1/parental-consent').flush(
+      { title: 'Conflict', detail: 'This person has their own account now.' },
+      { status: 409, statusText: 'Conflict' },
+    );
+
+    fixture.detectChanges();
+
+    expect(component.error()).toBeNull();
+    expect(component.consentError()['c1']).toContain('their own account now');
+    expect(text()).toContain('their own account now');
+  });
+
   it('does not offer an invitation it cannot send', () => {
     // The wireframe has an Invite button; there is no notification channel.
     load(family());

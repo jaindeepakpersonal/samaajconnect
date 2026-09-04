@@ -392,4 +392,179 @@ public sealed class ChildEndpointsTests(MemberFamilyApiFactory factory)
 
         decided.StatusCode.Should().Be(HttpStatusCode.BadRequest);
     }
+
+    // ---- Withdrawing parental consent (DPDP s.6(4)) -------------------------
+    //
+    // The only way to do this used to be POST /v1/identity/me/erase: destroy
+    // your own account, your household and everything you have written. Section
+    // 6(4) asks for ease comparable to giving, and giving was one tick.
+
+    private async Task<Guid> AddChildAsync(HttpClient head, int age = 10)
+    {
+        var created = await head.PostAsJsonAsync("/v1/children", NewChild(Aged(age)));
+
+        created.StatusCode.Should().Be(HttpStatusCode.Created);
+
+        return (await created.Content.ReadFromJsonAsync<JsonElement>())
+            .GetProperty("id").GetGuid();
+    }
+
+    [Fact]
+    public async Task A_parent_withdraws_the_consent_a_child_record_is_held_on()
+    {
+        var head = await HeadWithFamilyAsync();
+        var childId = await AddChildAsync(head);
+
+        var response = await head.DeleteAsync($"/v1/children/{childId}/parental-consent");
+
+        response.StatusCode.Should().Be(HttpStatusCode.OK);
+
+        (await response.Content.ReadFromJsonAsync<JsonElement>())
+            .GetProperty("withdrawn").GetBoolean().Should().BeTrue();
+    }
+
+    [Fact]
+    public async Task And_the_record_leaves_the_household_screen()
+    {
+        var head = await HeadWithFamilyAsync();
+        var childId = await AddChildAsync(head);
+
+        await head.DeleteAsync($"/v1/children/{childId}/parental-consent");
+
+        var listed = await head.GetFromJsonAsync<JsonElement>("/v1/children");
+
+        // Not just de-identified: gone from the list. Before this status
+        // existed, a de-identified child stayed on their family's screen as
+        // "Erased child" indefinitely.
+        listed.EnumerateArray().Should().NotContain(
+            c => c.GetProperty("id").GetGuid() == childId);
+    }
+
+    [Fact]
+    public async Task Withdrawing_twice_is_success_and_says_there_was_nothing_left()
+    {
+        var head = await HeadWithFamilyAsync();
+        var childId = await AddChildAsync(head);
+
+        await head.DeleteAsync($"/v1/children/{childId}/parental-consent");
+
+        var again = await head.DeleteAsync($"/v1/children/{childId}/parental-consent");
+
+        again.StatusCode.Should().Be(HttpStatusCode.OK);
+
+        (await again.Content.ReadFromJsonAsync<JsonElement>())
+            .GetProperty("withdrawn").GetBoolean().Should().BeFalse();
+    }
+
+    [Fact]
+    public async Task Somebody_who_did_not_give_the_consent_cannot_take_it_back()
+    {
+        var head = await HeadWithFamilyAsync();
+        var childId = await AddChildAsync(head);
+
+        // A member of the same Samaaj who is not the consent-giver. Told the
+        // record does not exist rather than that they may not touch it: a 403
+        // would confirm a child with that id is there.
+        var response = await MemberClient(_otherMember)
+            .DeleteAsync($"/v1/children/{childId}/parental-consent");
+
+        response.StatusCode.Should().Be(HttpStatusCode.NotFound);
+
+        // And nothing happened to the record.
+        var listed = await head.GetFromJsonAsync<JsonElement>("/v1/children");
+
+        listed.EnumerateArray().Should().Contain(
+            c => c.GetProperty("id").GetGuid() == childId);
+    }
+
+    [Fact]
+    public async Task A_converted_child_is_refused_because_the_consent_is_theirs_now()
+    {
+        var head = await HeadWithFamilyAsync();
+        var childId = await AddChildAsync(head, age: 18);
+
+        var requested = await head.PostAsJsonAsync(
+            $"/v1/children/{childId}/conversion",
+            new { mobileOrEmail = $"converted-{_run}@example.com" });
+
+        var requestId = (await requested.Content.ReadFromJsonAsync<JsonElement>())
+            .GetProperty("id").GetGuid();
+
+        (await AdminClient().PostAsJsonAsync(
+            $"/v1/children/conversion-requests/{requestId}/decide",
+            new { approve = true, note = "Approved" }))
+            .StatusCode.Should().Be(HttpStatusCode.OK);
+
+        await MarkConvertedAsync(childId);
+
+        var response = await head.DeleteAsync($"/v1/children/{childId}/parental-consent");
+
+        response.StatusCode.Should().Be(HttpStatusCode.Conflict);
+
+        (await response.Content.ReadAsStringAsync())
+            .Should().Contain("their own account now");
+    }
+
+    /// <summary>
+    /// Completes the conversion the way the Kafka consumer does, without a
+    /// broker. The approval above only asks identity-tenant-service to create
+    /// the account; the status moves when it answers.
+    /// </summary>
+    private async Task MarkConvertedAsync(Guid childId)
+    {
+        await using var scope = factory.Services.CreateAsyncScope();
+        var db = scope.ServiceProvider.GetRequiredService<MemberFamilyDbContext>();
+
+        var child = await db.ChildProfiles.IgnoreQueryFilters().SingleAsync(c => c.Id == childId);
+
+        child.MarkConverted(Guid.NewGuid());
+
+        await db.SaveChangesAsync();
+    }
+
+    [Fact]
+    public async Task The_withdrawal_is_written_to_the_outbox_for_the_audit_log()
+    {
+        var head = await HeadWithFamilyAsync();
+        var childId = await AddChildAsync(head);
+
+        await head.DeleteAsync($"/v1/children/{childId}/parental-consent");
+
+        await using var scope = factory.Services.CreateAsyncScope();
+        var db = scope.ServiceProvider.GetRequiredService<MemberFamilyDbContext>();
+
+        var message = await db.OutboxMessages
+            .Where(m => m.Topic == "members.child.consent-withdrawn.v1")
+            .OrderByDescending(m => m.OccurredAt)
+            .FirstOrDefaultAsync();
+
+        message.Should().NotBeNull();
+
+        // A Fiduciary has to be able to show when a consent stopped standing,
+        // and the append-only audit log is where that lives - which is also why
+        // the payload must carry no name and no date of birth.
+        message!.Payload.Should().Contain(childId.ToString());
+        message.Payload.Should().NotContain("Aarav");
+    }
+
+    [Fact]
+    public async Task The_consent_that_was_given_is_still_on_the_record_afterwards()
+    {
+        var head = await HeadWithFamilyAsync();
+        var childId = await AddChildAsync(head);
+
+        await head.DeleteAsync($"/v1/children/{childId}/parental-consent");
+
+        await using var scope = factory.Services.CreateAsyncScope();
+        var db = scope.ServiceProvider.GetRequiredService<MemberFamilyDbContext>();
+
+        var child = await db.ChildProfiles.IgnoreQueryFilters().SingleAsync(c => c.Id == childId);
+
+        // s.6(7): a Fiduciary must be able to demonstrate the consent it relied
+        // on. A withdrawal that wiped its own history could demonstrate nothing.
+        child.ParentalConsent!.GivenAt.Should().NotBe(default);
+        child.ParentalConsent.Attestation.Should().NotBeNullOrEmpty();
+        child.ParentalConsent.WithdrawnAt.Should().NotBeNull();
+        child.FullName.Should().Be("Erased child");
+    }
 }

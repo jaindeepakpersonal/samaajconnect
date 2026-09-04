@@ -38,6 +38,7 @@ worked example of a cross-service flow with no synchronous call.
 | `CompleteChildConversionCommand` | `[InternalRequest]` | built |
 | `WithdrawJoinRequestCommand` | any member, their own request | built |
 | `LeaveFamilyCommand` | any member, their own membership | built |
+| `WithdrawParentalConsentCommand` | the member who gave that consent, nobody else | built |
 | `UploadMemberPhotoCommand` | `Members.Read`, then self or `Members.Write` | built |
 | `RemoveMemberPhotoCommand` | `Members.Read`, then self or `Members.Write` | built |
 | `UploadChildPhotoCommand` | `Members.Read`, then the child's household | built |
@@ -66,6 +67,7 @@ worked example of a cross-service flow with no synchronous call.
 | `MemberProfileUpdatedDomainEvent` | `members.profile.updated.v1` | `MemberProfile.Update` |
 | `FamilyCreatedDomainEvent` | `members.family.created.v1` | `Family.Create` |
 | `ChildConversionApprovedDomainEvent` | `members.child-conversion.approved.v1` | `ChildConversionRequest.Approve` |
+| `ParentalConsentWithdrawnDomainEvent` | `members.child.consent-withdrawn.v1` | `ChildProfile.WithdrawParentalConsent` |
 
 ## Events consumed
 
@@ -98,6 +100,7 @@ here, which looks exactly like a broker problem and is not one.
 | POST | `/v1/families/{familyId}/join-requests/{requestId}/decide` | head of that family |
 | GET | `/v1/children` | any member |
 | POST | `/v1/children` | head of that family + `Family.Write` |
+| DELETE | `/v1/children/{id}/parental-consent` | the member who gave that consent |
 | POST | `/v1/children/{id}/conversion` | head of that family + `Family.Write` |
 | GET | `/v1/children/conversion-requests` | `SamaajAdmin` + `Family.ApproveConversion` |
 | POST | `/v1/children/conversion-requests/{requestId}/decide` | `SamaajAdmin` + `Family.ApproveConversion` |
@@ -445,6 +448,47 @@ innocuous-looking analytics call.
 **Withdrawing parental consent is erasure, not a toggle.** Unlike a member's own
 consent, this is not a switch: the record exists because of it. That is why
 `ParentalConsent` sits on the child rather than in a log of decisions.
+
+**And until 2026-09-04 there was no way to do it.** This file said in three
+places that a child's record is held on a parent's consent, and the only route
+to withdrawing that consent was `POST /v1/identity/me/erase` — destroy your own
+account, your household membership, and everything you have ever written on the
+platform. Section 6(4) asks that withdrawing be about as easy as giving, and
+giving was one tick beside a notice on the family screen. A right reachable only
+by surrendering unrelated ones is not the right.
+
+`DELETE /v1/children/{id}/parental-consent` is it. Three things about the shape:
+
+- **The consent-giver, and nobody else.** Not the current head, not another
+  parent in the household, not a Samaaj administrator. It is that person's
+  consent and s.6(4) is their right — the same reasoning that made erasure
+  follow `ListByConsentGiverAsync` rather than the family tree, one step
+  earlier. Anybody else is told the record does not exist rather than that they
+  may not touch it, because a 403 confirms a child with that id is there.
+- **A converted child is refused**, because that person holds their own account
+  and their own consent by then, and already has s.12 for themselves. Letting a
+  parent erase an adult's data on their own say-so is the failure this refusal
+  exists to prevent.
+- **The consent that was given survives the withdrawal.** `GivenAt`,
+  `NoticeVersion` and `Attestation` all stay, with `WithdrawnAt` and
+  `WithdrawnByMemberId` beside them. s.6(7) is about being able to demonstrate a
+  consent; a row that erased its own history could demonstrate nothing,
+  including that the consent had ever been properly obtained.
+
+**`ChildStatus.Withdrawn` is what stops a de-identified record haunting its
+household.** Before it, an erased child stayed on the family screen as "Erased
+child" indefinitely — true of every child whose consent-giver had erased their
+account. The row itself is kept, because a Pathshala enrolment, a register mark
+and an exam result all reference the id.
+
+> **Open question, deliberately not answered here.** `LeaveFamilyCommand` counts
+> every non-withdrawn child when deciding whether the last member may leave, and
+> that includes **converted** ones. A converted child has their own account and
+> can exercise s.12 themselves, so nobody needs to stay in the household for
+> them — the refusal is stricter than its own reasoning requires. Narrowing it
+> to `Minor` is a one-line change and a different blast radius: the same list
+> feeds the family screen, which should go on showing converted children. Left
+> for a cycle that can give it its own tests rather than folded into this one.
 
 ## Erasure
 

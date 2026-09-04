@@ -162,6 +162,48 @@ public sealed class ChildProfile : AggregateRoot, ITenantScopedEntity
         // birthday anyone could be recognised by.
         DateOfBirth = new DateOnly(DateOfBirth.Year, 1, 1);
         Gender = Gender.Unspecified;
+
+        // A converted child has their own account and their own consent, so
+        // their status is not this service's to change here - the row that
+        // remains is the historical link, not a child record any more.
+        if (Status == ChildStatus.Minor)
+        {
+            Status = ChildStatus.Withdrawn;
+        }
+    }
+
+    /// <summary>
+    /// The parent withdrawing the consent this record exists on (DPDP s.6(4)).
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// <b>Until this existed, the only way to withdraw a parental consent was
+    /// to erase your own account.</b> Section 6(4) requires withdrawing to be as
+    /// easy as giving, and giving was one tick beside a notice while withdrawing
+    /// meant destroying your own membership, your household, and everything you
+    /// had ever written. That is not comparable ease; it is the right made
+    /// conditional on giving up unrelated ones.
+    /// </para>
+    /// <para>
+    /// What it does is what erasing does to the same record, because there is
+    /// only one right answer to "this data may no longer be held": the name and
+    /// the photograph go, the birth year survives shifted to 1 January, and the
+    /// row stays because a Pathshala enrolment, a register and an exam result
+    /// all point at this id. What it adds is the record of the withdrawal
+    /// itself, which erasure does not need - there, the person who could be
+    /// asked is gone.
+    /// </para>
+    /// </remarks>
+    public void WithdrawParentalConsent(Guid withdrawnBy, DateTimeOffset at)
+    {
+        ParentalConsent?.Withdraw(withdrawnBy, at);
+
+        Erase();
+
+        // Carries no name, no date and no photograph: audit-notification-service
+        // records payloads verbatim in an append-only table, so an event about a
+        // child's data being removed must not itself be a copy of it.
+        Raise(new ParentalConsentWithdrawnDomainEvent(Id, TenantId, FamilyId, withdrawnBy, at));
     }
 
     public void MarkConverted(Guid convertedMemberId)

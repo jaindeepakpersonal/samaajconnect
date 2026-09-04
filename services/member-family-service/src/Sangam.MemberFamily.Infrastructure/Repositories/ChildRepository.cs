@@ -13,11 +13,23 @@ public sealed class ChildRepository(MemberFamilyDbContext dbContext) : IChildRep
     public Task<ChildProfile?> GetForConsumerAsync(Guid id, CancellationToken cancellationToken = default) =>
         dbContext.ChildProfiles.IgnoreQueryFilters().FirstOrDefaultAsync(c => c.Id == id, cancellationToken);
 
+    /// <summary>
+    /// The children a household still holds records for.
+    /// </summary>
+    /// <remarks>
+    /// <b>Withdrawn rows are excluded, and both callers want that.</b> The
+    /// family screen would otherwise list "Erased child" under a household
+    /// forever - which it did, for any child whose consent-giver had erased -
+    /// and `LeaveFamilyCommand` counts these to decide whether leaving would
+    /// strand children, where a de-identified row is exactly a child nobody
+    /// needs to stay for. The rows themselves are kept because other services
+    /// hold the id.
+    /// </remarks>
     public async Task<IReadOnlyList<ChildProfile>> ListForFamilyAsync(
         Guid familyId, CancellationToken cancellationToken = default) =>
         await dbContext.ChildProfiles
             .AsNoTracking()
-            .Where(c => c.FamilyId == familyId)
+            .Where(c => c.FamilyId == familyId && c.Status != ChildStatus.Withdrawn)
             .OrderBy(c => c.DateOfBirth)
             .ToListAsync(cancellationToken);
 

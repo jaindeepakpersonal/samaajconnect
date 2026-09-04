@@ -380,4 +380,41 @@ public sealed class FamilyEndpointsTests(MemberFamilyApiFactory factory)
         refused.StatusCode.Should().Be(HttpStatusCode.Conflict);
         (await refused.Content.ReadAsStringAsync()).Should().Contain("children");
     }
+
+    [Fact]
+    public async Task But_they_can_once_they_have_withdrawn_the_consent_holding_those_records()
+    {
+        // The loop this service's own documentation named and could not close.
+        // Refusing to let the last member leave was the honest answer *while*
+        // withdrawing consent did not exist; with it, the refusal is a step in a
+        // route out rather than a dead end.
+        var head = MemberClient(_head, TenantA);
+
+        await head.PostAsJsonAsync("/v1/families", new { });
+
+        var notice = await head.GetFromJsonAsync<JsonElement>("/v1/children/data-notice");
+
+        var addChild = await head.PostAsJsonAsync("/v1/children", new
+        {
+            fullName = "Anaya Shah",
+            dateOfBirth = "2016-04-02",
+            gender = "Female",
+            parentalConsentGiven = true,
+            noticeVersion = notice.GetProperty("version").GetString(),
+        });
+
+        addChild.StatusCode.Should().Be(HttpStatusCode.Created);
+
+        var childId = (await addChild.Content.ReadFromJsonAsync<JsonElement>())
+            .GetProperty("id").GetGuid();
+
+        (await head.DeleteAsync("/v1/families/mine/membership"))
+            .StatusCode.Should().Be(HttpStatusCode.Conflict);
+
+        (await head.DeleteAsync($"/v1/children/{childId}/parental-consent"))
+            .StatusCode.Should().Be(HttpStatusCode.OK);
+
+        (await head.DeleteAsync("/v1/families/mine/membership"))
+            .StatusCode.Should().Be(HttpStatusCode.OK);
+    }
 }

@@ -218,6 +218,31 @@ arrives first, its version travels back with the consent, and the tick is never
 pre-filled. A tick beside a notice that has not loaded is a tick against
 nothing.
 
+**And the tick can now be untied, which for three months it could not.** The
+consent is what makes the record lawful; withdrawing it had no endpoint, so the
+only way was `/privacy` → erase your entire account. Section 6(4) asks for ease
+comparable to giving, and giving was that one tick on this screen. The control
+sits under the consent line it undoes, and appears **only for the member whose
+consent it is** — a head who inherited the household did not give it.
+
+**It asks first, and that is not this app contradicting itself.** The rule two
+paragraphs down is that withdrawing a consent gets no confirmation, because an
+"are you sure?" in front of a right makes it harder to exercise than the Act
+allows. That rule is about a *reversible* withdrawal: a member who unticks a
+consent can tick it again. This one destroys a record nothing on the platform
+can restore, and the parent would have to enter the child again from scratch.
+A single unguarded click on that is not ease, it is a trap. So the panel says
+what is about to happen rather than asking whether they are sure, and the
+trigger stays in the DOM with `aria-expanded` — the focus rule three admin
+screens taught this repo.
+
+**The two buttons were nearly identical and that was a real defect, not a test
+problem.** The trigger and the confirmation both began "Withdraw consent", so a
+screen reader listing the page's buttons read the same phrase twice with no way
+to tell which was the one that acted. They are "Withdraw parental consent" and
+"Remove this record permanently" now. A spec caught it by matching the wrong
+one.
+
 **A workflow screen renders its buttons from the server, never from the
 status.** Social issues have eight states and a transition table the aggregate
 enforces; the service returns `availableTransitions` computed from that same

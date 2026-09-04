@@ -354,6 +354,57 @@ import {
                   Consent recorded {{ date(consent.givenAt) }} against notice
                   {{ consent.noticeVersion }}.
                 </p>
+
+                <!--
+                  Withdrawing it, for the person who gave it and nobody else.
+                  DPDP s.6(4) asks for ease comparable to giving, and giving was
+                  one tick beside a notice on this same screen. Until this
+                  existed the only way was to erase your entire account.
+                -->
+                @if (consent.givenByMemberId === me()) {
+                  @if (consentError()[child.id]; as message) {
+                    <p class="notice error" role="alert">{{ message }}</p>
+                  }
+
+                  @if (withdrawing() === child.id) {
+                    <div class="notice info" role="status">
+                      <p>
+                        This removes {{ child.fullName }}'s record. Their name, date of birth
+                        and photograph go; nothing on this platform can bring them back, and
+                        you would have to add them again from scratch.
+                      </p>
+
+                      <div class="actions">
+                        <button
+                          class="btn"
+                          type="button"
+                          [disabled]="busy()"
+                          (click)="withdrawConsent(child)"
+                        >
+                          Remove this record permanently
+                        </button>
+                        <button
+                          class="btn secondary"
+                          type="button"
+                          (click)="withdrawing.set(null)"
+                        >
+                          Keep it
+                        </button>
+                      </div>
+                    </div>
+                  }
+
+                  <div class="actions">
+                    <button
+                      class="btn secondary"
+                      type="button"
+                      [attr.aria-expanded]="withdrawing() === child.id"
+                      (click)="askToWithdraw(child)"
+                    >
+                      Withdraw parental consent<span class="sr-only"> for {{ child.fullName }}</span>
+                    </button>
+                  </div>
+                }
               }
             </div>
           }
@@ -537,12 +588,53 @@ export class FamilyComponent implements OnInit {
   consentGiven = false;
   contact = '';
 
-  private readonly me = computed(() => this.auth.user()?.userId ?? null);
+  /** The viewer's own member id. Read in the template too, to show the
+   *  withdraw-consent control only to the person whose consent it is. */
+  readonly me = computed(() => this.auth.user()?.userId ?? null);
 
   readonly withdrawError = signal<string | null>(null);
 
   readonly confirmingLeave = signal(false);
   readonly leaveError = signal<string | null>(null);
+
+  /** Which child's consent is being confirmed for withdrawal, if any. */
+  readonly withdrawing = signal<string | null>(null);
+  readonly consentError = signal<Record<string, string>>({});
+
+  askToWithdraw(child: Child): void {
+    this.consentError.set({});
+    this.withdrawing.set(this.withdrawing() === child.id ? null : child.id);
+  }
+
+  /**
+   * Withdraws the consent this child's record is held on.
+   *
+   * **Confirmed, and that is not the app making a right harder to exercise.**
+   * Section 6(4) is about the *ease* of withdrawing, and this screen's own rule
+   * for the member's own consent is that it takes no confirmation - because
+   * that one is reversible by ticking the box again. This one destroys a record
+   * nothing on the platform can restore. A single unguarded click on an
+   * irreversible action is not ease; it is a trap, and the panel says what is
+   * about to happen rather than asking "are you sure?".
+   */
+  withdrawConsent(child: Child): void {
+    this.consentError.set({});
+    this.busy.set(true);
+
+    this.api.withdrawParentalConsent(child.id).subscribe({
+      next: () => {
+        this.busy.set(false);
+        this.withdrawing.set(null);
+        // A full re-read: the child leaves the list, and the household's counts
+        // and what the member may do next both change with it.
+        this.load();
+      },
+      error: (failure: unknown) => {
+        this.busy.set(false);
+        this.consentError.set({ [child.id]: describeError(failure) });
+      },
+    });
+  }
 
   askToLeave(): void {
     this.leaveError.set(null);

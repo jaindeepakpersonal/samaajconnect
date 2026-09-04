@@ -206,6 +206,25 @@ export class MembersApi {
     return this.http.delete<void>(`/v1/children/${childId}/photo`);
   }
 
+  /**
+   * Withdraws the parental consent one child's record is held on.
+   *
+   * DPDP section 6(4) requires withdrawing a consent to be about as easy as
+   * giving it, and giving was one tick beside the notice on the family screen.
+   * Until this endpoint existed the only way to withdraw was
+   * `POST /v1/identity/me/erase` — surrendering your own account, your household
+   * and everything you had written, which is section 12 and a different right
+   * entirely.
+   *
+   * DELETE on the consent rather than on the child, because the consent is what
+   * is being withdrawn; the record going is the consequence.
+   */
+  withdrawParentalConsent(childId: string): Observable<{ withdrawn: boolean }> {
+    return this.http.delete<{ withdrawn: boolean }>(
+      `/v1/children/${childId}/parental-consent`,
+    );
+  }
+
   /** Starts the adult-child conversion. A Samaaj admin decides it. */
   startConversion(childId: string, mobileOrEmail: string): Observable<unknown> {
     return this.http.post(`/v1/children/${childId}/conversion`, { mobileOrEmail });

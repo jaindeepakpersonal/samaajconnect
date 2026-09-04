@@ -28,7 +28,7 @@ deferrable — it attaches the moment the first child record is created.
 |---|---|---|---|
 | 5 | Notice, itemised, at or before consent | **built** | `ConsentNotice`, shown on Register |
 | 6 | Consent: free, specific, informed, unconditional, unambiguous | **built** | `ConsentRecord` per purpose |
-| 6(4)–(6) | Withdrawal as easy as giving | **built** | `POST /v1/identity/me/consents/{purpose}/withdraw` |
+| 6(4)–(6) | Withdrawal as easy as giving | **built** | `POST /v1/identity/me/consents/{purpose}/withdraw` for a member's own; `DELETE /v1/children/{id}/parental-consent` for a child's. The second was missing until 2026-09-04 — see "The withdrawal that could only be reached through erasure" below |
 | 6(7) | Consent records retained and producible | **built** | `ConsentRecord` is append-only |
 | 8(1) | Process only for the consented purpose | partial | Purpose is recorded; enforcement is by code review, not by a runtime check |
 | 8(4) | Reasonable security safeguards | partial | See "Security" below |
@@ -111,6 +111,47 @@ requires, rather than visible only to members. It is kept separate from the
 Samaaj's general contact: conflating the two would make it impossible to tell
 whether a Samaaj has actually named one. A name with no email or phone is
 refused, because that is not a means of redressal.
+
+## The withdrawal that could only be reached through erasure
+
+Section 6(4) requires that withdrawing a consent be about as easy as giving it.
+For a member's own consents the platform has always met that: giving was a tick
+during registration, withdrawing is one call and the member portal deliberately
+puts no confirmation in front of it.
+
+**For a child's, it did not, and the gap lasted until 2026-09-04.** A child's
+record exists on a parent's consent under section 9. Giving that consent was one
+tick beside the child notice on the family screen. Withdrawing it had no
+endpoint at all — the only route was `POST /v1/identity/me/erase`, which is
+section 12 and takes the parent's own account, their household membership, their
+timeline posts and everything else with it.
+
+That is not a shortfall in ease. It is the right made conditional on
+surrendering unrelated ones, which is closer to the "unconditional" wording in
+section 6 than to a usability problem. Three separate files described the
+consent as the basis for the record and none of them noticed that nothing could
+remove it.
+
+`DELETE /v1/children/{id}/parental-consent` closes it. What the design turns on:
+
+- **Only the person who gave the consent may withdraw it.** Not the household
+  head, not another parent, not a Samaaj administrator. The right belongs to
+  whoever gave it, and the platform stores `GivenByMemberId` precisely so this
+  question has an answer rather than an assumption.
+- **A converted child is refused.** Once conversion completes, that person's data
+  is held on their own consent and they have section 12 for themselves. Allowing
+  a parent to erase an adult's records on their own say-so would be a worse
+  failure than the one being fixed.
+- **The consent record survives its own withdrawal.** Section 6(7) requires a
+  Fiduciary to be able to produce the consent it relied on, so `GivenAt`,
+  `NoticeVersion` and the verbatim attestation stay, with `WithdrawnAt` and
+  `WithdrawnByMemberId` added beside them. A withdrawal that wiped its own
+  history could not demonstrate that consent had ever been properly obtained.
+- **The event carries no child in it.** `members.child.consent-withdrawn.v1`
+  holds ids and a timestamp. audit-notification-service subscribes by a catch-all
+  pattern and stores payloads verbatim in an append-only table, so an event
+  announcing that a child's data may no longer be held would otherwise become
+  the one copy of it that outlives everything else.
 
 ## Erasure vs. the audit log — the real tension
 

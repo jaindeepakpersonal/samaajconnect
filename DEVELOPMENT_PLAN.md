@@ -8,7 +8,85 @@ version of the plan; the reasoning behind the ordering lives in
 ## Current Status
 
 - **Stage:** every module has a service and member screens; Phase 5 hardening under way
-- **Last updated:** 2026-09-04 - **a permission that was granted and could not
+- **Last updated:** 2026-09-04 - **a right that could only be exercised by
+  giving up three others.**
+
+  A child's record exists because a parent consented; DPDP section 9 makes that
+  consent the basis on which the data may be held at all, and this service says
+  so in three separate places. **Nothing could withdraw it.** The only route was
+  `POST /v1/identity/me/erase` - destroy your own account, your household
+  membership, your timeline posts and everything else you had ever written.
+
+  Section 6(4) asks that withdrawing a consent be about as easy as giving it,
+  and giving was **one tick beside a notice** on the family screen. That is not
+  a shortfall in ease; it is the right made conditional on surrendering
+  unrelated ones, which reads closer to the "unconditional" wording in section 6
+  than to a usability problem.
+
+  `DELETE /v1/children/{id}/parental-consent` closes it. Three things about the
+  shape:
+
+  **Only the person who gave the consent may withdraw it.** Not the household
+  head, not another parent in it, not a Samaaj administrator. `GivenByMemberId`
+  is stored precisely so this question has an answer rather than an assumption -
+  the same reasoning that made erasure follow the consent rather than the family
+  tree, applied one step earlier. Anybody else is told the record does not exist,
+  because a 403 confirms a child with that id is there.
+
+  **A converted child is refused.** That person holds their own account and their
+  own consent by then, and has section 12 for themselves. Letting a parent erase
+  an adult's data on their own say-so would be a worse failure than the one being
+  fixed.
+
+  **The consent survives its own withdrawal.** `GivenAt`, `NoticeVersion` and the
+  verbatim attestation all stay, with `WithdrawnAt` and `WithdrawnByMemberId`
+  beside them. Section 6(7) requires a Fiduciary to produce the consent it relied
+  on, and a row that erased its own history could not demonstrate that consent
+  had ever been properly obtained.
+
+  **`ChildStatus.Withdrawn` fixed something that was already broken.** A
+  de-identified child stayed on their household's screen as "Erased child"
+  indefinitely - true of every child whose consent-giver had erased their
+  account, for as long as erasure has existed. The row is kept, because a
+  Pathshala enrolment, a register mark and an exam result all reference the id.
+
+  **A test was passing for a reason that could never have failed.** It asserted
+  the withdrawal event's rendered text did not contain the child's name - but
+  the record is de-identified *before* the event is raised, so by that line the
+  name is already "Erased child". A field carrying the name would have been added
+  and the test would have gone on passing. It asserts on the event's declared
+  property types now: ids and a timestamp, nothing else. Injection is what showed
+  it; four of the five injections failed the right test straight away and the
+  fifth failed nothing, which is the more useful result.
+
+  **Two buttons on the family screen both began "Withdraw consent"**, so a screen
+  reader listing them read the same phrase twice with no way to tell which one
+  acted. A spec caught it by matching the wrong one. They are "Withdraw parental
+  consent" and "Remove this record permanently" now.
+
+  **One thing deliberately left undone, and written down as such.**
+  `LeaveFamilyCommand` counts every non-withdrawn child when deciding whether the
+  last member may leave, including converted ones - who have their own account and
+  need nobody to stay for them. Narrowing that is a one line change with a
+  different blast radius, since the same list feeds the family screen, which
+  should go on showing them. It belongs to a cycle that can give it its own tests
+  rather than folded into this one.
+
+  346 of 346 smoke checks green through the gateway, which is 340 plus exactly
+  the six added here.
+
+  **And the smoke run tipped past its own token lifetime.** Access tokens live
+  fifteen minutes; `MEMBER_TOKEN` was minted once and used 2,400 lines later, and
+  six added checks were enough to push the Pathshala module gate past the
+  boundary. Two checks failed with 401s and neither had anything to do with
+  Pathshala - the exact reading problem `refresh_tokens` was written to prevent,
+  by a rule that only held until the boundary moved. It is called after every
+  `sleep 62` now, which is where the wall clock actually goes and what grows
+  every time somebody adds a module-gated section.
+
+  1,704 tests green, up 22 - 8 unit and 8 integration in member-family-service,
+  and 6 in the member portal.
+- **Previously:** 2026-09-04 - **a permission that was granted and could not
   be used, and using it would have been worse than not.**
 
   The admin panel's nav has carried a disabled **Members** item since it was

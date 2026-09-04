@@ -4,6 +4,7 @@ using Sangam.MemberFamily.Application.Children;
 using Sangam.MemberFamily.Application.Children.Commands.CreateChildProfile;
 using Sangam.MemberFamily.Application.Children.Commands.DecideChildConversion;
 using Sangam.MemberFamily.Application.Children.Commands.RequestChildConversion;
+using Sangam.MemberFamily.Application.Children.Commands.WithdrawParentalConsent;
 using Sangam.MemberFamily.Application.Children.Queries.GetChildDataNotice;
 using Sangam.MemberFamily.Application.Children.Queries.ListConversionRequests;
 using Sangam.MemberFamily.Application.Children.Queries.GetChildNames;
@@ -97,6 +98,29 @@ public static class ChildEndpoints
             .Produces<ConversionRequestResponse>()
             .ProducesValidationProblem()
             .ProducesProblem(StatusCodes.Status403Forbidden)
+            .ProducesProblem(StatusCodes.Status409Conflict);
+
+        // Withdrawing the parental consent one child's record is held on.
+        //
+        // DELETE on the consent rather than on the child, because that is what
+        // the act is: DPDP s.6(4) is a right over the consent, and the record
+        // going is the consequence. It also keeps the child's own resource path
+        // meaning "this child", which a DELETE there would quietly change.
+        group.MapDelete("/{id:guid}/parental-consent", async (
+                Guid id,
+                ISender sender,
+                CancellationToken cancellationToken) =>
+            {
+                var result = await sender.Send(
+                    new WithdrawParentalConsentCommand(id), cancellationToken);
+
+                return result.ToApiResult();
+            })
+            .WithName("WithdrawParentalConsent")
+            .WithSummary("Withdraw the consent a child's record is held on. Removes the record.")
+            .Produces<WithdrawParentalConsentResult>()
+            .ProducesValidationProblem()
+            .ProducesProblem(StatusCodes.Status404NotFound)
             .ProducesProblem(StatusCodes.Status409Conflict);
 
         group.MapGet("/conversion-requests", async (ISender sender, CancellationToken cancellationToken) =>

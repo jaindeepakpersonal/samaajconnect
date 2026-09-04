@@ -190,9 +190,19 @@ sign_in_as() {
 # service they happened to land on. Adding the Boli section cost twenty-one such
 # failures, none of them about Boli.
 #
-# Called before the late sections rather than between every check, because a
-# token that has just been minted is not the thing under test anywhere in
-# between - the expiry behaviour itself is covered by unit tests, not here.
+# **Called after every `sleep 62`**, which is the rule that replaced "call it
+# before the late sections". Each of those sleeps waits out the gateway's
+# module-key cache, so they are where the run's wall clock actually goes, and
+# they are added one at a time by whoever adds a module-gated section. Refreshing
+# before the late sections only worked until the boundary moved: this cycle added
+# six checks with no new sleep at all, and the Pathshala module gate - two
+# checks, 2,400 lines after MEMBER_TOKEN was minted - started answering 401.
+# Neither failure had anything to do with Pathshala, which is exactly the reading
+# problem described above.
+#
+# Not between every check, because a token that has just been minted is not the
+# thing under test anywhere in between - expiry itself is covered by unit tests,
+# not here.
 refresh_tokens() {
   ADMIN_TOKEN=$(sign_in_super_admin)
   MEMBER_TOKEN=$(sign_in_as "$MEMBER" "$MEMBER_PASSWORD")
@@ -1123,6 +1133,65 @@ check "but the last member of a household with children cannot" 409 \
   "$(status -X DELETE "$GATEWAY/v1/families/mine/membership" \
      -H "Authorization: Bearer $MEMBER_TOKEN")"
 
+# ---- Withdrawing parental consent (DPDP s.6(4)) --------------------------------
+#
+# Giving that consent was one tick beside a notice. Until this existed the only
+# way to withdraw it was POST /v1/identity/me/erase - destroy your own account,
+# your household, and everything you had written. Section 6(4) asks for
+# comparable ease, so that was the right made conditional on surrendering
+# unrelated ones.
+#
+# **A second child, added here and removed here.** The household's first child
+# is placed in a Pathshala class by a later section; withdrawing that one would
+# break checks that have nothing to do with consent.
+NOTICE_VERSION=$(curl -s -H "Authorization: Bearer $MEMBER_TOKEN" \
+  "$GATEWAY/v1/children/data-notice" | json_field version)
+
+SECOND_CHILD=$(curl -s -X POST "$GATEWAY/v1/children" -H 'Content-Type: application/json' \
+  -H "Authorization: Bearer $MEMBER_TOKEN" \
+  -d "{\"fullName\":\"Withdrawn Child\",\"dateOfBirth\":\"2016-03-04\",\"gender\":\"Female\",\"parentalConsentGiven\":true,\"noticeVersion\":\"$NOTICE_VERSION\"}" \
+  | json_field id)
+require_id second_child "$SECOND_CHILD"
+
+check "another member cannot withdraw a consent they did not give" 404 \
+  "$(status -X DELETE "$GATEWAY/v1/children/$SECOND_CHILD/parental-consent" \
+     -H "Authorization: Bearer $JOIN_TOKEN")"
+
+check "the parent who gave it withdraws it" 200 \
+  "$(status -X DELETE "$GATEWAY/v1/children/$SECOND_CHILD/parental-consent" \
+     -H "Authorization: Bearer $MEMBER_TOKEN")"
+
+check "and withdrawing again is success rather than an error" 200 \
+  "$(status -X DELETE "$GATEWAY/v1/children/$SECOND_CHILD/parental-consent" \
+     -H "Authorization: Bearer $MEMBER_TOKEN")"
+
+HOUSEHOLD_CHILDREN=$(curl -s -H "Authorization: Bearer $MEMBER_TOKEN" "$GATEWAY/v1/children")
+
+if printf '%s' "$HOUSEHOLD_CHILDREN" | grep -q "$SECOND_CHILD"; then
+  echo "  FAIL  the record is off the household's list"
+  fail=$((fail + 1))
+else
+  echo "  ok    the record is off the household's list"
+  pass=$((pass + 1))
+fi
+
+# The self-check on the one above. If the list were empty for some other
+# reason - a broken query, a 403 rendered as an empty body - the check would
+# pass while proving nothing.
+if printf '%s' "$HOUSEHOLD_CHILDREN" | grep -q "$CHILD_ID"; then
+  echo "  ok    while the household's other child is untouched"
+  pass=$((pass + 1))
+else
+  echo "  FAIL  the household's other child is untouched"
+  fail=$((fail + 1))
+fi
+
+# Which is why leaving is still refused: the count is per child, not "has
+# anybody in this household ever withdrawn anything".
+check "so leaving is still refused, because a child remains" 409 \
+  "$(status -X DELETE "$GATEWAY/v1/families/mine/membership" \
+     -H "Authorization: Bearer $MEMBER_TOKEN")"
+
 
 # The role travelled with the invitation, so this admin can do admin work
 # without anyone granting them anything after activation.
@@ -1451,6 +1520,9 @@ check "the community module is switched on for this Samaaj" 200 \
 # not instant. Waiting is the honest way to test it.
 sleep 62
 
+refresh_tokens
+
+
 check "a member reads the timeline" 200 \
   "$(status -H "Authorization: Bearer $MEMBER_TOKEN" "$GATEWAY/v1/timeline/posts")"
 
@@ -1576,6 +1648,9 @@ check "switching the community module off" 200 \
 
 sleep 62
 
+refresh_tokens
+
+
 check "the timeline then answers 404, not 403" 404 \
   "$(status -H "Authorization: Bearer $MEMBER_TOKEN" "$GATEWAY/v1/timeline/posts")"
 
@@ -1591,6 +1666,9 @@ check "switching it back on" 200 \
 # this every module-gated check after here fails with a 404 that looks like a
 # routing bug and is not one - the module really was off a moment ago.
 sleep 62
+
+refresh_tokens
+
 
 echo
 echo "Volunteer groups: applying, and the president's queue"
@@ -1855,6 +1933,9 @@ check "switching the community module off" 200 \
 
 sleep 62
 
+refresh_tokens
+
+
 check "the groups route then answers 404 as well" 404 \
   "$(status -H "Authorization: Bearer $MEMBER_TOKEN" "$GATEWAY/v1/volunteer-groups/groups")"
 
@@ -1867,6 +1948,9 @@ check "switching it back on" 200 \
      -d '{"enabledModules":["community","pathshala"]}')"
 
 sleep 62
+
+refresh_tokens
+
 
 echo
 
@@ -1883,6 +1967,9 @@ check "switching the social-issues module on alongside community" 200 \
      -d '{"enabledModules":["community","pathshala","social-issues"]}')"
 
 sleep 62
+
+refresh_tokens
+
 
 ISSUE_TITLE="Road safety near the community school $(date +%s)"
 
@@ -2009,6 +2096,9 @@ check "switching the social-issues module off alone" 200 \
 
 sleep 62
 
+refresh_tokens
+
+
 check "the social-issues route answers 404" 404 \
   "$(status -H "Authorization: Bearer $MEMBER_TOKEN" "$GATEWAY/v1/social-issues")"
 
@@ -2024,6 +2114,9 @@ check "switching the celebrity-voting module on" 200 \
      -d '{"enabledModules":["community","pathshala","celebrity-voting"]}')"
 
 sleep 62
+
+refresh_tokens
+
 
 # A campaign runs over time, and nominations and voting are deliberately never
 # open at once - members who vote early must see the same ballot as members who
@@ -2281,6 +2374,9 @@ check "switching the celebrity-voting module off again" 200 \
 
 sleep 62
 
+refresh_tokens
+
+
 check "the celebrity-voting route answers 404" 404 \
   "$(status -H "Authorization: Bearer $MEMBER_TOKEN" "$GATEWAY/v1/celebrity-voting/campaigns")"
 
@@ -2358,6 +2454,9 @@ check "switching the pathshala module on" 200 \
      -d '{"enabledModules":["community","pathshala"]}')"
 
 sleep 62
+
+refresh_tokens
+
 
 # Only a Super Admin creates the master record (DATA-MODEL.md section 9); the
 # Samaaj runs it afterwards. ADMIN_TOKEN is the platform account, so it can do
@@ -2691,6 +2790,9 @@ check "switching the pathshala module off" 200 \
 
 sleep 62
 
+refresh_tokens
+
+
 check "the pathshala route answers 404" 404 \
   "$(status -H "Authorization: Bearer $MEMBER_TOKEN" "$GATEWAY/v1/pathshala/pathshalas")"
 
@@ -2707,8 +2809,6 @@ echo "Boli: an occasion, a Boli, a bid, a close, a result, an announcement"
 # somebody else's service, which is the failure this script already has an
 # open item about.
 boli_checks() {
-  refresh_tokens
-
 
   # boli-service had no gateway coverage at all until now, which root CLAUDE.md
   # section 9 asks for on every service - a route that works in isolation but is
@@ -3005,9 +3105,6 @@ boli_checks() {
 }
 
 boli_checks || echo "  ..    the rest of the Boli checks were skipped"
-
-# The section above spends two minutes waiting out the module cache twice over.
-refresh_tokens
 
 echo
 echo "Step-up: taking a Samaaj out of service re-asks for the password"
