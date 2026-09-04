@@ -33,6 +33,19 @@ public sealed class ChildConversionRequest : AggregateRoot, ITenantScopedEntity
     public DateTimeOffset RequestedAt { get; private set; }
     public Guid? DecidedBy { get; private set; }
     public DateTimeOffset? DecidedAt { get; private set; }
+
+    /// <summary>
+    /// How long a decision note may be, in one place.
+    /// </summary>
+    /// <remarks>
+    /// The validator and the EF column both read this. They were two numbers
+    /// once, and only one of them existed: the column was capped at 1000 and
+    /// nothing checked the input, so a longer note reached Postgres, was refused
+    /// with SQLSTATE 22001, and came back to an administrator as a 500 saying
+    /// only that something had gone wrong.
+    /// </remarks>
+    public const int MaxDecisionNoteLength = 1000;
+
     public string? DecisionNote { get; private set; }
 
     private ChildConversionRequest() { }

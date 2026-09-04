@@ -355,4 +355,41 @@ public sealed class ChildEndpointsTests(MemberFamilyApiFactory factory)
         export.GetProperty("children").EnumerateArray().Should().BeEmpty();
         export.GetProperty("family").ValueKind.Should().Be(JsonValueKind.Null);
     }
+
+    /// <summary>
+    /// A decision note longer than the column holds is refused as a bad
+    /// request, not as a server error.
+    /// </summary>
+    /// <remarks>
+    /// `DecideChildConversionCommand` had no validator at all - one of the
+    /// three requests on the platform carrying free text with nothing checking
+    /// it - while `DecisionNote` is `HasMaxLength(1000)`. Postgres refuses a
+    /// longer value with SQLSTATE 22001, `UnhandledExceptionBehavior` turns
+    /// that into a generic failure, and an administrator who wrote a long note
+    /// is told only that something went wrong.
+    ///
+    /// Root CLAUDE.md §4.3 asks for one validator per command for exactly this
+    /// reason: `ValidationBehavior` runs the validators that exist, so a
+    /// command with none has no input validation whatsoever.
+    /// </remarks>
+    [Fact]
+    public async Task A_decision_note_longer_than_the_column_is_a_bad_request()
+    {
+        var head = await HeadWithFamilyAsync();
+
+        var created = await head.PostAsJsonAsync("/v1/children", NewChild(Aged(18)));
+        var childId = (await created.Content.ReadFromJsonAsync<JsonElement>()).GetProperty("id").GetGuid();
+
+        var requested = await head.PostAsJsonAsync(
+            $"/v1/children/{childId}/conversion", new { mobileOrEmail = "long-note@example.com" });
+
+        var requestId = (await requested.Content.ReadFromJsonAsync<JsonElement>())
+            .GetProperty("id").GetGuid();
+
+        var decided = await AdminClient().PostAsJsonAsync(
+            $"/v1/children/conversion-requests/{requestId}/decide",
+            new { approve = false, note = new string('x', 1001) });
+
+        decided.StatusCode.Should().Be(HttpStatusCode.BadRequest);
+    }
 }

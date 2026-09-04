@@ -8,7 +8,50 @@ version of the plan; the reasoning behind the ordering lives in
 ## Current Status
 
 - **Stage:** every module has a service and member screens; Phase 5 hardening under way
-- **Last updated:** 2026-09-04 - **the sweep for fields nothing can write.**
+- **Last updated:** 2026-09-04 - **a decision note longer than its column
+  answered 500.**
+
+  The next unenforced rule after the last two. Root `CLAUDE.md` §4.3 asks for one
+  validator per command or query, and `ValidationBehavior` runs the validators
+  that exist — so a request with none has **no input validation at all**, not a
+  lighter version of it. 61 of the platform's requests had no validator.
+
+  Most of those are right: a query with no parameters has nothing to check. The
+  ones that matter carry a **string**, because that is the input that can be the
+  wrong length and a length is what a database refuses. Three did.
+
+  **`DecideChildConversionCommand` was the real one.** It takes a free-text
+  decision note, had no validator, and `DecisionNote` is capped at 1000
+  characters in the column — so a longer note reached Postgres, was refused with
+  SQLSTATE 22001, `UnhandledExceptionBehavior` turned that into a generic
+  failure, and a Samaaj administrator who wrote a long note was told only that
+  something had gone wrong.
+
+  **That was measured, not reasoned about.** The test was written to assert the
+  400 it should give, run against the unfixed code, and answered
+  `500 InternalServerError` with `Failure/Unexpected` in the log. Then the
+  validator, then green — and relaxing the rule to 100,000 puts the failure
+  straight back.
+
+  The length now lives in `ChildConversionRequest.MaxDecisionNoteLength`, which
+  the validator and the EF configuration both read. They were two numbers and
+  only one existed; making them one number is what stops the 500 coming back the
+  next time somebody changes the column.
+
+  **The other two findings were fine, and saying why is the point.**
+  `WithdrawConsentCommand.Purpose` is parsed against an enum in its handler and
+  answers 404 on anything else; `ListIssuesQuery.Category` is a parameterised
+  equality where an unknown value matches nothing. Neither is stored. A
+  validator on either would be ceremony, so `scripts/validator-coverage.sh`
+  reports rather than fails — a list carrying permanent known-good entries is
+  one people learn to skim, which is the same reasoning the endpoint sweep uses.
+
+  The rule worth remembering is narrower than "every command needs a validator":
+  **free text that is persisted must be bounded before it reaches the database**,
+  because the database's refusal is a 500 and a validator's is a 400.
+
+  1,624 tests green, up 1. CI runs the sweep.
+- **Previously:** 2026-09-04 - **the sweep for fields nothing can write.**
 
   The previous cycle ended by naming a gap and not filling it: **a field the API
   can read and nothing can write is the same family of gap as an endpoint with

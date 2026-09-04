@@ -62,7 +62,9 @@ public sealed class ChildConversionRequestConfiguration
         builder.Property(r => r.RequestedByMemberId).IsRequired();
         builder.Property(r => r.MobileOrEmail).HasMaxLength(320).IsRequired();
         builder.Property(r => r.RequestedAt).IsRequired();
-        builder.Property(r => r.DecisionNote).HasMaxLength(1000);
+        // The same number the validator uses, from the aggregate that owns it.
+        builder.Property(r => r.DecisionNote)
+            .HasMaxLength(ChildConversionRequest.MaxDecisionNoteLength);
 
         builder.Property(r => r.Status).HasConversion<string>().HasMaxLength(20).IsRequired();
 
