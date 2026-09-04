@@ -8,7 +8,45 @@ version of the plan; the reasoning behind the ordering lives in
 ## Current Status
 
 - **Stage:** every module has a service and member screens; Phase 5 hardening under way
-- **Last updated:** 2026-09-04 - **Samaaj logos, and a field nothing could
+- **Last updated:** 2026-09-04 - **the sweep for fields nothing can write.**
+
+  The previous cycle ended by naming a gap and not filling it: **a field the API
+  can read and nothing can write is the same family of gap as an endpoint with
+  no caller**, and `scripts/unreachable-endpoints.sh` finds only the second.
+  `scripts/unwritable-fields.sh` is the first. It reads every domain property
+  with a private setter - 396 of them - and reports any that nothing in its
+  service assigns.
+
+  **It finds nothing today, and that is only worth saying because it was proven
+  able to find something.** Run against the tree one commit back it reports
+  `Tenant.LogoUrl`, which is exactly the field it was written for; run against
+  main it reports none, because that field is genuinely gone. A sweep validated
+  only by its own silence is the trap this repository has now hit three times.
+
+  **The first version was silent for the wrong reason.** Its property-matching
+  regex matched nothing at all, so a clean run meant "found no properties"
+  rather than "found no problems" - 0 of 0 rather than 0 of 396. Printing the
+  denominator is what makes that visible, which is why the summary carries it.
+
+  **Two false-positive classes, both real and both fixed.** Counting only `X =`
+  reported `ActivationCode.FailedAttempts`, which `RecordFailedAttempt()`
+  increments; `++`, `--`, `+=` and `-=` are writes too. And
+  `Notification.DeliveryAttempts` is written by raw SQL -
+  `delivery_attempts = delivery_attempts + 1` inside the claim query, where it
+  has to be, because the increment must be atomic with claiming the row. The
+  sweep now looks for the snake_case column name as well.
+
+  That second fix was itself verified rather than assumed: deleting the SQL
+  increment brings the finding straight back, so the SQL branch narrows the
+  search rather than blanket-suppressing it. A suppression that could not fail
+  would have left a check that always passes.
+
+  **Reported, never failed**, like the endpoint sweep and for the same reason: a
+  property with no writer is not automatically a bug, and a list with a
+  permanent known-good entry on it is one people learn to skim.
+
+  1,623 tests green, unchanged - this cycle adds a check, not behaviour.
+- **Previously:** 2026-09-04 - **Samaaj logos, and a field nothing could
   write.**
 
   The other half of the image work, and it started by finding that the problem

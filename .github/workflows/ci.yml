@@ -122,7 +122,7 @@ jobs:
     name: Cross-service conventions
     runs-on: ubuntu-latest
 
-    # Rules the repository states in prose and no compiler enforces. All five
+    # Rules the repository states in prose and no compiler enforces. All six
     # of these read source rather than running anything, so they are seconds.
     steps:
       - uses: actions/checkout@v4
@@ -167,6 +167,14 @@ jobs:
       # cycles of gaps went unnoticed.
       - name: Endpoints no app can reach
         run: bash scripts/unreachable-endpoints.sh
+
+      # The mirror of the sweep above, and reported the same way. Tenant.LogoUrl
+      # was a response field with a wireframe control and no command behind it
+      # for the platform's whole life - a field the API could read and nothing
+      # could write. One legitimate case exists (a value written by raw SQL), so
+      # this reports rather than fails.
+      - name: Domain fields nothing can write
+        run: bash scripts/unwritable-fields.sh
 
   migrations:
     name: EF migrations are up to date

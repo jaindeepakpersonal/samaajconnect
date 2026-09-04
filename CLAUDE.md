@@ -292,6 +292,7 @@ Neither uses `*service-defaults` — they need no database and no broker.
 | Capacity and a waitlist that moves | `services/events-service/CLAUDE.md` |
 | A multi-state workflow as a transition table | `services/social-issues-service/CLAUDE.md` |
 | Which endpoints no screen can reach | `scripts/unreachable-endpoints.sh` |
+| Which fields nothing can write | `scripts/unwritable-fields.sh` |
 | Whether every service still agrees with §4.4 | `scripts/pipeline-order.sh` |
 | Whether the security checklist is still true | `scripts/security-invariants.sh` |
 | Whether any service is quietly left out | `scripts/service-coverage.sh` |
