@@ -48,6 +48,8 @@ app.MapGet("/health", () => Results.Ok(new { status = "healthy" }))
     .ExcludeFromDescription();
 
 app.MapMemberEndpoints();
+app.MapMemberPhotoEndpoints();
+app.MapChildPhotoEndpoints();
 app.MapFamilyEndpoints();
 app.MapChildEndpoints();
 

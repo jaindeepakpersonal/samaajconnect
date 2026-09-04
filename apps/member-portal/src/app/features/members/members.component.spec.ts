@@ -269,6 +269,11 @@ describe('FamilyComponent', () => {
   beforeEach(() => {
     TestBed.configureTestingModule({ imports: [FamilyComponent], providers: providers() });
 
+    // jsdom implements neither, and the directive that renders a child's photo
+    // uses both.
+    URL.createObjectURL = () => 'blob:test';
+    URL.revokeObjectURL = () => undefined;
+
     fixture = TestBed.createComponent(FamilyComponent);
     component = fixture.componentInstance;
     http = TestBed.inject(HttpTestingController);
@@ -289,6 +294,24 @@ describe('FamilyComponent', () => {
     } else {
       request.flush(household);
       http.expectOne('/v1/children').flush(children);
+    }
+
+    fixture.detectChanges();
+    settlePhotos();
+  }
+
+  /**
+   * Flushes the photo requests the `scAuthedSrc` directive makes.
+   *
+   * A child with a photo now costs a second request: the image goes through
+   * `HttpClient` so the auth interceptor can attach the token, because a plain
+   * `<img src>` is fetched by the browser with no Authorization header at all.
+   * A test that leaves one open fails `http.verify()` in `afterEach` and leaves
+   * the TestBed dirty for every test after it.
+   */
+  function settlePhotos(): void {
+    for (const request of http.match((r) => r.url.endsWith('/photo') && r.method === 'GET')) {
+      request.flush(new Blob(['x']));
     }
 
     fixture.detectChanges();
@@ -461,7 +484,6 @@ describe('FamilyComponent', () => {
       fullName: 'Anaya Jain',
       dateOfBirth: '2015-02-02',
       gender: 'Female',
-      photoUrl: null,
       parentalConsentGiven: true,
       noticeVersion: 'child-notice-v3',
     });
@@ -550,5 +572,98 @@ describe('FamilyComponent', () => {
 
     expect(component.error()).toBeNull();
     expect(text()).toContain('Your household');
+  });
+
+  // ---- A child's photo ----------------------------------------------------
+  //
+  // The reason the platform hosts images at all. A child's photo used to be a
+  // URL, so every viewer of the record told a third-party host that a child's
+  // picture had just been looked at - the tracking DPDP s.9(3) prohibits.
+
+  function chooseFor(childId: string, file: File): void {
+    const input: HTMLInputElement =
+      fixture.nativeElement.querySelector(`input#child-photo-${childId}`);
+
+    Object.defineProperty(input, 'files', { value: [file], configurable: true });
+    input.dispatchEvent(new Event('change'));
+    fixture.detectChanges();
+  }
+
+  function picture(bytes = 10): File {
+    return new File([new Uint8Array(bytes)], 'photo.png', { type: 'image/png' });
+  }
+
+  it('offers a file input for each child rather than a link field', () => {
+    load(family(), [child()]);
+
+    const input: HTMLInputElement =
+      fixture.nativeElement.querySelector('input#child-photo-c1');
+
+    expect(input.type).toBe('file');
+    expect(input.accept).toBe('image/jpeg,image/png,image/webp');
+    expect(text()).toContain('Add a photo');
+  });
+
+  it('uploads a chosen photo as multipart and re-reads the children', () => {
+    load(family(), [child()]);
+
+    chooseFor('c1', picture());
+
+    const upload = http.expectOne('/v1/children/c1/photo');
+    expect(upload.request.method).toBe('POST');
+    expect(upload.request.body).toBeInstanceOf(FormData);
+    // The browser writes the multipart boundary; a Content-Type set by hand
+    // would have none and no server could parse the body.
+    expect(upload.request.headers.has('Content-Type')).toBe(false);
+
+    upload.flush(null);
+
+    http.expectOne('/v1/children').flush([child({ photoUrl: '/v1/children/c1/photo' })]);
+    fixture.detectChanges();
+    settlePhotos();
+
+    expect(text()).toContain('Replace photo');
+  });
+
+  it('refuses a photo over 2 MB without sending it', () => {
+    load(family(), [child()]);
+
+    chooseFor('c1', picture(2 * 1024 * 1024 + 1));
+
+    http.verify();
+    expect(text()).toContain('larger than 2 MB');
+  });
+
+  it('reports a refused upload against the child it was for', () => {
+    load(family(), [child(), child({ id: 'c2', fullName: 'Vivaan Jain' })]);
+
+    chooseFor('c2', picture());
+
+    http.expectOne('/v1/children/c2/photo').flush(
+      { detail: 'That file is not a picture the platform accepts.' },
+      { status: 400, statusText: 'Bad Request' },
+    );
+    fixture.detectChanges();
+
+    expect(component.photoError()['c2']).toContain('not a picture the platform accepts');
+    expect(component.photoError()['c1']).toBeUndefined();
+  });
+
+  it('offers removal only once a child has a photo', () => {
+    load(family(), [child({ photoUrl: '/v1/children/c1/photo' })]);
+
+    expect(text()).toContain('Remove photo');
+
+    component.removeChildPhoto(child({ photoUrl: '/v1/children/c1/photo' }));
+
+    const removal = http.expectOne('/v1/children/c1/photo');
+    expect(removal.request.method).toBe('DELETE');
+    removal.flush(null);
+
+    http.expectOne('/v1/children').flush([child({ photoUrl: null })]);
+    fixture.detectChanges();
+    settlePhotos();
+
+    expect(text()).not.toContain('Remove photo');
   });
 });

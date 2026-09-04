@@ -161,3 +161,18 @@
   border-bottom: 0;
   padding-top: var(--space-4);
 }
+
+/* A profile photo, on the member's own screen and in the directory.
+   Square and cropped rather than letterboxed: members upload whatever their
+   phone took, and a directory of differently-shaped boxes reads as broken.
+   `object-fit: cover` keeps faces centred without the platform re-encoding
+   anything. */
+.profile-photo {
+  width: 120px;
+  height: 120px;
+  border-radius: var(--radius-md);
+  object-fit: cover;
+  background: var(--soft);
+  display: block;
+  margin-bottom: var(--space-3);
+}

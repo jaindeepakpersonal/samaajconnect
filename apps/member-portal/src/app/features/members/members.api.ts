@@ -61,7 +61,6 @@ export class MembersApi {
   updateMe(profile: MyProfile): Observable<MyProfile> {
     return this.http.patch<MyProfile>(`/v1/members/${profile.id}`, {
       fullName: profile.fullName,
-      photoUrl: profile.photoUrl,
       dateOfBirth: profile.dateOfBirth,
       gender: profile.gender,
       mobile: profile.mobile,
@@ -76,6 +75,30 @@ export class MembersApi {
       // edited anything else.
       isListedInDirectory: profile.isListedInDirectory,
     });
+  }
+
+  // ---- Photos -------------------------------------------------------------
+
+  /**
+   * Uploads a photo the platform will host.
+   *
+   * Sent as multipart because it is a file. Note what is deliberately absent:
+   * no Content-Type is set on the request, so the browser writes the multipart
+   * boundary itself - setting it by hand produces a body no server can parse.
+   * The part header naming the file type is sent and ignored: the service reads
+   * the format out of the bytes, because a declared type is a string the
+   * uploader chose.
+   */
+  uploadMyPhoto(memberId: string, file: File): Observable<void> {
+    const body = new FormData();
+    body.append('file', file);
+
+    return this.http.post<void>(`/v1/members/${memberId}/photo`, body);
+  }
+
+  /** Takes a photo down. Doing it twice is success. */
+  removeMyPhoto(memberId: string): Observable<void> {
+    return this.http.delete<void>(`/v1/members/${memberId}/photo`);
   }
 
   // ---- The household ------------------------------------------------------
@@ -134,10 +157,29 @@ export class MembersApi {
       fullName,
       dateOfBirth,
       gender,
-      photoUrl: null,
       parentalConsentGiven: true,
       noticeVersion,
     });
+  }
+
+  /**
+   * Adds or replaces a child's photo.
+   *
+   * A household's own act, not an administrator's: unlike a member photo, this
+   * is not opened by `Members.Write`. A Samaaj admin correcting a member's
+   * details is administrative work and a child's photograph is not — the same
+   * line the service draws, and the same one that keeps deciding a join request
+   * with the household head.
+   */
+  uploadChildPhoto(childId: string, file: File): Observable<void> {
+    const body = new FormData();
+    body.append('file', file);
+
+    return this.http.post<void>(`/v1/children/${childId}/photo`, body);
+  }
+
+  removeChildPhoto(childId: string): Observable<void> {
+    return this.http.delete<void>(`/v1/children/${childId}/photo`);
   }
 
   /** Starts the adult-child conversion. A Samaaj admin decides it. */

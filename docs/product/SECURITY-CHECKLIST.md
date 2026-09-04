@@ -330,19 +330,52 @@ is the outer gate and grants nothing on its own.
 
 - [ ] Uploaded files (post media, social issue evidence, profile
       photos) are size/type restricted and virus-scanned before being
-      served back to any user. **Nothing is uploaded to this platform yet** —
-      there is no file storage and no upload endpoint. What exists is a *link*:
-      `PhotoUrl` on a member or child, and `LogoUrl` on a Samaaj, supplied by
-      the client. Those are now validated as absolute `http(s)` URLs, which
-      closes the `javascript:`/`data:` stored-scripting hole.
-      **It does not close the tracking one**: a photo hosted anywhere sends
-      every viewer's IP address to that host, and on a `ChildProfile` that is
-      exactly the third-party tracking of children DPDP s.9(3) prohibits. The
-      real fix is the platform hosting its own images, at which point this item
-      becomes live in full. Tracked in `DEVELOPMENT_PLAN.md`.
-- [ ] File storage access is authorization-checked per request, not
-      just obscured by a random URL. Not applicable until there is storage;
-      when there is, it must not be a public bucket with unguessable keys.
+      served back to any user. **Two of the three, since 2026-09-04.**
+
+      Member and child photos are hosted by the platform now, so this item is
+      live rather than not applicable. **Size**: 2 MB, enforced in the domain,
+      again at the endpoint against a bounded read rather than a declared
+      `Content-Length`, and once more in each portal so a phone is not asked to
+      send two megabytes to be refused. **Type**: read out of the bytes and
+      never taken from the upload's header, which is a string the uploader
+      chose — JPEG, PNG and WebP only. SVG is excluded and the exclusion is
+      load-bearing: an SVG is a document that can carry script, and these are
+      served from the platform's own origin.
+
+      **Virus scanning is not done, and nothing here pretends otherwise.**
+      Sniffing proves the bytes begin like an image; it says nothing about what
+      a decoder does with the rest of them. Closing it needs a scanner in the
+      deployment rather than a check in a domain type, and it is the only reason
+      this box is still unticked. Tracked in `DEVELOPMENT_PLAN.md`.
+
+      Post media and social-issue evidence are still not uploadable at all —
+      there is no endpoint for either.
+
+      A Samaaj's `LogoUrl` is still a client-supplied link, and still carries
+      the tracking problem below for anyone who opens a Samaaj page. It is the
+      remaining half of this work.
+- [x] File storage access is authorization-checked per request, not
+      just obscured by a random URL. **This is why the bytes are served by the
+      service that owns the profile** rather than by a media service or a
+      bucket. Who may see a member's photo is who may see the member — same
+      Samaaj, `Members.Read` — and that rule already lived there; a child's
+      photo is the household's, so `Members.Write` does not open it, matching
+      the line `DecideJoinRequestCommand` already draws. A separate store would
+      have had to be told those rules, asked about them, or handed a signed URL.
+
+      `Cache-Control: private` on every response, because a shared cache holding
+      an image would hand it to a caller who never passed the check that
+      produced it. Both portals fetch photos through `HttpClient` rather than an
+      `<img src>` — see `AuthedImageDirective` in `libs/shared` — precisely so
+      the token is attached and the check happens; an `<img src>` is fetched by
+      the browser with no `Authorization` header at all, which is the shape of
+      request that makes people reach for unguessable URLs.
+
+      **What replaced the tracking hole.** A photo used to be a URL the client
+      supplied, so every member who opened the directory fetched it from
+      whatever host it named — and on a `ChildProfile` that is exactly the
+      third-party tracking of children DPDP s.9(3) prohibits. Nothing outside
+      the Samaaj is asked for anything now.
 
 ## Data privacy
 

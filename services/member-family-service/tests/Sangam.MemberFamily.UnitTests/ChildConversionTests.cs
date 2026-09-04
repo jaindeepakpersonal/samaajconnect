@@ -15,7 +15,7 @@ public sealed class ChildProfileTests
 
     private static ChildProfile ChildBornOn(DateOnly dateOfBirth) =>
         ChildProfile.Create(
-            TenantId, FamilyId, "Aarav Jain", dateOfBirth, Gender.Male, null, ConsentGivenBy, Now);
+            TenantId, FamilyId, "Aarav Jain", dateOfBirth, Gender.Male, ConsentGivenBy, Now);
 
     [Fact]
     public void A_new_child_is_a_minor_with_no_account_of_their_own()

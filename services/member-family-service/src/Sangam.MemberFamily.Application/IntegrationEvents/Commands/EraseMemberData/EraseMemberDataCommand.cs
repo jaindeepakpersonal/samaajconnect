@@ -3,6 +3,7 @@ using MediatR;
 using Microsoft.Extensions.Logging;
 using Sangam.MemberFamily.Application.Abstractions;
 using Sangam.MemberFamily.Application.Common;
+using Sangam.MemberFamily.Domain.Media;
 using Sangam.MemberFamily.Application.Security;
 
 namespace Sangam.MemberFamily.Application.IntegrationEvents.Commands.EraseMemberData;
@@ -21,6 +22,7 @@ public sealed class EraseMemberDataCommandHandler(
     IMemberProfileRepository profiles,
     IFamilyRepository families,
     IChildRepository children,
+    IImageStore images,
     IUnitOfWork unitOfWork,
     IDateTimeProvider clock,
     ILogger<EraseMemberDataCommandHandler> logger)
@@ -54,6 +56,17 @@ public sealed class EraseMemberDataCommandHandler(
 
         profile.Erase(clock.UtcNow);
 
+        // The photograph, not only the reference to it. A picture of a person is
+        // the most directly identifying thing this service holds, and a row of
+        // bytes nothing points at is not erased - it is merely unreachable by
+        // the paths that happen to exist today.
+        //
+        // RemoveAllForOwnerAsync rather than deleting the id the profile held:
+        // that deletes only the one this service knew about, and "we removed
+        // the one we knew about" is not what erasure means.
+        await images.RemoveAllForOwnerAsync(
+            profile.TenantId, ImageOwnerKind.Member, profile.Id, cancellationToken);
+
         var childrenErased = 0;
         var family = await families.GetForConsumerAsync(payload.UserId, cancellationToken);
 
@@ -65,6 +78,10 @@ public sealed class EraseMemberDataCommandHandler(
             foreach (var child in await children.ListForConsumerAsync(family.Id, cancellationToken))
             {
                 child.Erase();
+
+                await images.RemoveAllForOwnerAsync(
+                    child.TenantId, ImageOwnerKind.Child, child.Id, cancellationToken);
+
                 childrenErased++;
             }
         }

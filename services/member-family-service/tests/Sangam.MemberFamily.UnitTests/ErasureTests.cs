@@ -21,7 +21,7 @@ public sealed class ProfileErasureTests
             Guid.NewGuid(), Guid.NewGuid(), "Ravi Shah", "ravi@example.com", Now);
 
         profile.Update(
-            "Ravi Shah", "https://cdn/photo.jpg", new DateOnly(1985, 4, 2), Gender.Male,
+            "Ravi Shah", new DateOnly(1985, 4, 2), Gender.Male,
             "9876543210", "ravi@example.com", "12 Temple Road", "Ghatkopar", "Chartered Accountant",
             new FieldPrivacy(
                 PrivacyLevel.Public, PrivacyLevel.Public, PrivacyLevel.Public,
@@ -44,7 +44,7 @@ public sealed class ProfileErasureTests
         profile.Address.Should().BeNull();
         profile.Locality.Should().BeNull();
         profile.Profession.Should().BeNull();
-        profile.PhotoUrl.Should().BeNull();
+        profile.PhotoImageId.Should().BeNull();
         profile.DateOfBirth.Should().BeNull();
         profile.FullName.Should().NotContain("Ravi");
     }
@@ -73,7 +73,7 @@ public sealed class ChildErasureTests
     private static ChildProfile Child() =>
         ChildProfile.Create(
             Guid.NewGuid(), Guid.NewGuid(), "Aarav Shah", new DateOnly(2012, 7, 19),
-            Gender.Male, "https://cdn/aarav.jpg", Guid.NewGuid(), Now);
+            Gender.Male, Guid.NewGuid(), Now);
 
     [Fact]
     public void Erase_clears_the_name_and_photo()
@@ -83,7 +83,7 @@ public sealed class ChildErasureTests
         child.Erase();
 
         child.FullName.Should().NotContain("Aarav");
-        child.PhotoUrl.Should().BeNull();
+        child.PhotoImageId.Should().BeNull();
     }
 
     [Fact]
@@ -108,6 +108,7 @@ public sealed class EraseMemberDataCommandHandlerTests
     private readonly IMemberProfileRepository _profiles = Substitute.For<IMemberProfileRepository>();
     private readonly IFamilyRepository _families = Substitute.For<IFamilyRepository>();
     private readonly IChildRepository _children = Substitute.For<IChildRepository>();
+    private readonly IImageStore _images = Substitute.For<IImageStore>();
     private readonly IUnitOfWork _unitOfWork = Substitute.For<IUnitOfWork>();
     private readonly IDateTimeProvider _clock = Substitute.For<IDateTimeProvider>();
     private readonly EraseMemberDataCommandHandler _handler;
@@ -121,7 +122,7 @@ public sealed class EraseMemberDataCommandHandlerTests
         _profiles.GetForConsumerAsync(UserId, Arg.Any<CancellationToken>()).Returns(_profile);
 
         _handler = new EraseMemberDataCommandHandler(
-            _profiles, _families, _children, _unitOfWork, _clock,
+            _profiles, _families, _children, _images, _unitOfWork, _clock,
             NullLogger<EraseMemberDataCommandHandler>.Instance);
     }
 
@@ -161,7 +162,7 @@ public sealed class EraseMemberDataCommandHandlerTests
         var family = HeadedFamily();
         var child = ChildProfile.Create(
             TenantId, family.Id, "Aarav Shah", new DateOnly(2012, 7, 19),
-            Gender.Male, null, UserId, Now);
+            Gender.Male, UserId, Now);
 
         _children.ListForConsumerAsync(family.Id, Arg.Any<CancellationToken>()).Returns([child]);
 

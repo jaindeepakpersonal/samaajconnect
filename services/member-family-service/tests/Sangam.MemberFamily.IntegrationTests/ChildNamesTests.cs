@@ -49,7 +49,6 @@ public sealed class ChildNamesTests(MemberFamilyApiFactory factory)
             name,
             new DateOnly(2014, 3, 9),
             Gender.Male,
-            photoUrl: null,
             headId,
             DateTimeOffset.UtcNow);
 

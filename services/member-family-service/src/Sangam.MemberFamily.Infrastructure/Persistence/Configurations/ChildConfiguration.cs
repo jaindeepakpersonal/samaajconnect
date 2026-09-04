@@ -20,7 +20,7 @@ public sealed class ChildProfileConfiguration : IEntityTypeConfiguration<ChildPr
         builder.Property(c => c.FamilyId).IsRequired();
         builder.Property(c => c.FullName).HasMaxLength(200).IsRequired();
         builder.Property(c => c.DateOfBirth).IsRequired();
-        builder.Property(c => c.PhotoUrl).HasMaxLength(2048);
+        // No max length: PhotoImageId is a Guid pointing at stored_images.
         builder.Property(c => c.CreatedAt).IsRequired();
 
         builder.Property(c => c.Gender).HasConversion<string>().HasMaxLength(20).IsRequired();

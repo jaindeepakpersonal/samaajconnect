@@ -34,6 +34,7 @@ public static class DependencyInjection
         services.AddScoped<IMemberProfileRepository, MemberProfileRepository>();
         services.AddScoped<IFamilyRepository, FamilyRepository>();
         services.AddScoped<IChildRepository, ChildRepository>();
+        services.AddScoped<IImageStore, ImageStore>();
         services.AddScoped<IChildConversionRepository, ChildConversionRepository>();
         services.AddSingleton<IDateTimeProvider, SystemDateTimeProvider>();
 

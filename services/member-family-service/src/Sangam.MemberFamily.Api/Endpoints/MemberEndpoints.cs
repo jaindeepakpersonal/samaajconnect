@@ -82,7 +82,6 @@ public static class MemberEndpoints
                 var command = new UpdateProfileCommand(
                     id,
                     request.FullName,
-                    request.PhotoUrl,
                     request.DateOfBirth,
                     request.Gender,
                     request.Mobile,
@@ -109,7 +108,6 @@ public static class MemberEndpoints
 
     public sealed record UpdateProfileRequest(
         string FullName,
-        string? PhotoUrl,
         DateOnly? DateOfBirth,
         string? Gender,
         string? Mobile,

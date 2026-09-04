@@ -19,6 +19,7 @@ worked example of a cross-service flow with no synchronous call.
 | `ChildProfile` | built | No login of its own; the family manages the record. |
 | `ChildConversionRequest` | built | Admin-approved. |
 | `ParentalConsent` | built | Owned by `ChildProfile`; required to create one (DPDP s.9). |
+| `StoredImage` | built | A photo the platform hosts: bytes, sniffed type, and whose. |
 
 ## Commands
 
@@ -92,6 +93,59 @@ here, which looks exactly like a broker problem and is not one.
 | GET | `/health` | anonymous |
 
 ## Decisions worth knowing before you change this service
+
+**The platform hosts photos now, and that was a DPDP fix rather than a feature.**
+`PhotoUrl` was a link a client supplied, validated as absolute `http(s)` — which
+closed the `javascript:` hole and said plainly that it did nothing about the real
+one. Every member who opened the directory fetched the picture from whatever host
+it named, handing that host their IP address; on a `ChildProfile` that is exactly
+the third-party tracking of children s.9(3) prohibits. `StoredImage` holds the
+bytes and `PhotoImageId` replaces the URL on both aggregates.
+
+**The bytes live in this service's own database, and the alternative was
+considered rather than skipped.** MinIO in compose and S3 in production is the
+obvious answer and it was rejected for this scale: a Samaaj runs to a few thousand
+members with one photo each, capped at 2 MB and typically a tenth of that. What an
+object store would cost is a second place data lives — one that
+`scripts/backup-restore-drill.sh` does not dump, so a platform that has spent real
+effort proving its backups restore would have quietly acquired a store outside
+them. In the database they are inside the existing dump, inside the tenant query
+filter, and inside the transaction that writes the profile row. `IImageStore` is
+the seam that makes changing that one implementation and a migration.
+
+**The type is read from the bytes, never from the upload.** A declared
+`Content-Type` is a string the uploader chose. `ImageContent.Sniff` reads the
+signature, and the type served back to a browser is the one it derived — so
+`StoredImage.Capture` has no `contentType` parameter at all, and a test asserts
+that absence. JPEG, PNG and WebP only. **SVG is excluded and the exclusion is
+load-bearing**: an SVG is a document that can carry script and these are served
+from the platform's own origin, so accepting one would trade the tracking hole
+for a stored-scripting one.
+
+**Authorization is the profile's, which is why the bytes are served here.** Who
+may see a member's photo is who may see the member; who may see a child's photo
+is their household. Those rules already lived in this service. A media service
+would have had to be told them, asked about them, or handed a signed URL — three
+ways for a second copy of a rule to disagree with the first. It also gives
+`SECURITY-CHECKLIST.md`'s "authorization-checked per request, not just obscured
+by a random URL" for free.
+
+**`Members.Write` opens a member's photo and not a child's.** An administrator
+correcting a member's details is administrative work; a child's photograph is
+not. Same line `DecideJoinRequestCommand` draws, for the same reason.
+
+**Replacing a photo deletes the old row in the same transaction**, and the
+aggregate hands the id back rather than deleting anything itself — it does not
+know about the images table. A method that silently orphaned the previous row
+would leave a photograph of somebody in the database with nothing referring to
+it and no path that would ever find it again. Erasure uses
+`RemoveAllForOwnerAsync` rather than the id the profile holds, because "we
+deleted the one we knew about" is not what erasure means.
+
+**What is not done: virus scanning.** Sniffing proves the bytes begin like an
+image and says nothing about what a decoder does with the rest of them. That
+needs a scanner in the deployment, and `ImageContent`'s remarks say so rather
+than letting the size and type checks read as complete.
 
 **A profile's id is the user's id.** DATA-MODEL.md §3 says `Id (=UserId)`, and
 following it literally buys two things: two services agree on one identifier for

@@ -48,7 +48,6 @@ public sealed class DirectoryListingTests(MemberFamilyApiFactory factory)
 
         profile.Update(
             name,
-            photoUrl: null,
             dateOfBirth: null,
             gender: Gender.Unspecified,
             mobile: "+919812345678",

@@ -13,7 +13,7 @@ public static class ChildMappings
             child.DateOfBirth,
             child.AgeOn(today),
             child.Gender.ToString(),
-            child.PhotoUrl,
+            child.PhotoImageId is null ? null : $"/v1/children/{child.Id}/photo",
             child.Status.ToString(),
             child.IsEligibleForConversion(today),
             hasPendingConversion,

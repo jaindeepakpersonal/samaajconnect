@@ -17,7 +17,7 @@ public sealed class MemberProfileConfiguration : IEntityTypeConfiguration<Member
 
         builder.Property(p => p.TenantId).IsRequired();
         builder.Property(p => p.FullName).HasMaxLength(200).IsRequired();
-        builder.Property(p => p.PhotoUrl).HasMaxLength(2048);
+        // No max length: PhotoImageId is a Guid pointing at stored_images.
         builder.Property(p => p.Mobile).HasMaxLength(20);
         builder.Property(p => p.Email).HasMaxLength(320);
         builder.Property(p => p.Address).HasMaxLength(500);

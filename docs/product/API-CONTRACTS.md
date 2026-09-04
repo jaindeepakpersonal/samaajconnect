@@ -75,7 +75,13 @@ enforced by `TenantAuthorizationBehavior`, not just UI hiding.
 |---|---|---|---|
 | GET | `/members` | Member, SamaajAdmin | Search/filter tenant directory |
 | GET | `/members/{id}` | `Members.Read` | One member, through the same per-field privacy mapper the directory uses |
-| PATCH | `/members/{id}` | Member (self), SamaajAdmin | Update profile. Replaces it whole: `privacy` and `isListedInDirectory` are both **required**, because defaulting either would silently reopen something a member had closed |
+| PATCH | `/members/{id}` | Member (self), SamaajAdmin | Update profile. Replaces it whole: `privacy` and `isListedInDirectory` are both **required**, because defaulting either would silently reopen something a member had closed. Takes **no** photo field — see below |
+| POST | `/members/{id}/photo` | Member (self), `Members.Write` | `multipart/form-data`, one file part. JPEG, PNG or WebP, 2 MB |
+| GET | `/members/{id}/photo` | `Members.Read` | The bytes. `ETag` + `Cache-Control: private` |
+| DELETE | `/members/{id}/photo` | Member (self), `Members.Write` | Idempotent |
+| POST | `/children/{id}/photo` | The child's household | As above. **Not** opened by `Members.Write` |
+| GET | `/children/{id}/photo` | The child's household | |
+| DELETE | `/children/{id}/photo` | The child's household | Idempotent |
 | POST | `/families` | Member | Create family, become head |
 | POST | `/families/join-requests` | Member | Request to join via family code |
 | POST | `/families/join-requests/{id}/decide` | FamilyHead | Accept/reject |
@@ -87,6 +93,28 @@ enforced by `TenantAuthorizationBehavior`, not just UI hiding.
 | POST | `/children/{id}/conversion` | FamilyHead | Start adult-child conversion |
 | GET | `/children/conversion-requests` | SamaajAdmin | Requests awaiting a decision |
 | POST | `/children/conversion-requests/{id}/decide` | SamaajAdmin | Approve or reject (admin-approved, decided 2026-08-28) |
+
+**`photoUrl` is still a string on every member and child response, and it still
+goes straight into an `img src` — what changed is where it points.** It used to
+be a URL a client supplied; it is now a path on this platform,
+`/v1/members/{id}/photo` or `/v1/children/{id}/photo`, or null when there is no
+photo. Neither portal's wire shape changed.
+
+**A client cannot render it with a plain `<img src>`.** The path is authorized
+per request like anything else, and a tag the browser fetches by itself carries
+no `Authorization` header. Fetch it as a blob through the same HTTP client
+everything else uses — `libs/shared`'s `AuthedImageDirective` is that, for both
+apps. Serving photos unauthenticated behind unguessable URLs was the alternative
+and `SECURITY-CHECKLIST.md` rules it out in as many words.
+
+The upload is `multipart/form-data` with one file part. **The part's declared
+content type is ignored**: the format is read from the bytes, and that derived
+type is what the `GET` serves back. JPEG, PNG and WebP; SVG is refused because
+these are served from the platform's own origin. 2 MB, answered as `413` when
+the body exceeds it and `400` when the bytes are not an image. Responses carry a
+strong `ETag`, so a directory page costs 304s on a second visit, and
+`Cache-Control: private`, because a shared cache would hand an image to a caller
+who never passed the check that produced it.
 
 ## volunteer-groups-service — `/v1/volunteer-groups`
 

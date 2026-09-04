@@ -10,6 +10,7 @@ export * from './auth/auth.interceptor';
 export * from './auth/auth.models';
 export * from './auth/auth.service';
 export * from './auth/token.store';
+export * from './media/authed-image.directive';
 export * from './money/money';
 export * from './tenant/module-keys';
 export * from './tenant/tenant.interceptor';

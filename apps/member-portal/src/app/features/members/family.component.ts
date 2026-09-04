@@ -1,7 +1,7 @@
 import { Component, OnInit, computed, inject, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { RouterLink } from '@angular/router';
-import { AuthService, describeError } from '@samaajconnect/shared';
+import { AuthedImageDirective, AuthService, describeError } from '@samaajconnect/shared';
 import { MembersApi } from './members.api';
 import {
   Child,
@@ -35,7 +35,7 @@ import {
  */
 @Component({
   selector: 'app-family',
-  imports: [FormsModule, RouterLink],
+  imports: [AuthedImageDirective, FormsModule, RouterLink],
   styleUrl: './members.css',
   template: `
     <div class="members-page">
@@ -165,7 +165,49 @@ import {
           @for (child of children(); track child.id) {
             <div class="card">
               <h2>{{ child.fullName }}</h2>
+
+              <!-- The photo the platform hosts. This is the field DPDP s.9(3)
+                   was about: it used to be a link, so every viewer of a child's
+                   record told a third-party host that a child's picture had
+                   just been looked at. -->
+              @if (child.photoUrl; as path) {
+                <img class="profile-photo" [scAuthedSrc]="path" [alt]="child.fullName" />
+              }
+
               <p>{{ date(child.dateOfBirth) }} • Age {{ child.age }}</p>
+
+              <label [for]="'child-photo-' + child.id">
+                {{ child.photoUrl ? 'Replace photo' : 'Add a photo' }}
+              </label>
+              <input
+                class="input"
+                [id]="'child-photo-' + child.id"
+                type="file"
+                accept="image/jpeg,image/png,image/webp"
+                [disabled]="photoBusy() === child.id"
+                (change)="chooseChildPhoto(child, $event)"
+              />
+              <p class="small">
+                JPEG, PNG or WebP, up to 2 MB. Kept by the platform and shown only to your
+                household — no other website is asked for it.
+              </p>
+
+              @if (photoError()[child.id]; as message) {
+                <p class="notice error" role="alert">{{ message }}</p>
+              }
+
+              @if (child.photoUrl) {
+                <div class="actions">
+                  <button
+                    class="btn secondary"
+                    type="button"
+                    [disabled]="photoBusy() === child.id"
+                    (click)="removeChildPhoto(child)"
+                  >
+                    Remove photo
+                  </button>
+                </div>
+              }
 
               @if (child.status === 'Converted') {
                 <span class="pill ok">Has their own account</span>
@@ -382,6 +424,10 @@ export class FamilyComponent implements OnInit {
   /** Per-request failures, so one refusal does not blank the queue. */
   readonly actionError = signal<Record<string, string>>({});
   readonly convertError = signal<Record<string, string>>({});
+
+  /** Which child's photo is being uploaded or removed, if any. */
+  readonly photoBusy = signal<string | null>(null);
+  readonly photoError = signal<Record<string, string>>({});
 
   readonly addingChild = signal(false);
   readonly converting = signal<string | null>(null);
@@ -601,6 +647,67 @@ export class FamilyComponent implements OnInit {
     });
   }
 
+  // ---- A child's photo ----------------------------------------------------
+
+  /**
+   * Uploads the chosen picture straight away.
+   *
+   * The size is checked here as well as by the service so that a parent on a
+   * phone is not asked to send two megabytes in order to be told it was too
+   * many. The service still decides; this only avoids a round trip it was
+   * always going to refuse.
+   *
+   * The input is cleared afterwards, or choosing the same file twice fires no
+   * `change` event and a failed attempt could not be retried with the same
+   * picture.
+   */
+  chooseChildPhoto(child: Child, event: Event): void {
+    const input = event.target as HTMLInputElement;
+    const file = input.files?.[0] ?? null;
+
+    input.value = '';
+    this.clearFrom(this.photoError, child.id);
+
+    if (file === null) {
+      return;
+    }
+
+    if (file.size > MaxPhotoBytes) {
+      this.addTo(this.photoError, child.id, 'That photo is larger than 2 MB. Choose a smaller one.');
+      return;
+    }
+
+    this.photoBusy.set(child.id);
+
+    this.api.uploadChildPhoto(child.id, file).subscribe({
+      next: () => {
+        this.photoBusy.set(null);
+        // Re-read rather than assume: the path is the server's to derive.
+        this.loadChildren();
+      },
+      error: (failure: unknown) => {
+        this.photoBusy.set(null);
+        this.addTo(this.photoError, child.id, describeError(failure));
+      },
+    });
+  }
+
+  removeChildPhoto(child: Child): void {
+    this.clearFrom(this.photoError, child.id);
+    this.photoBusy.set(child.id);
+
+    this.api.removeChildPhoto(child.id).subscribe({
+      next: () => {
+        this.photoBusy.set(null);
+        this.loadChildren();
+      },
+      error: (failure: unknown) => {
+        this.photoBusy.set(null);
+        this.addTo(this.photoError, child.id, describeError(failure));
+      },
+    });
+  }
+
   // ---- Rendering ----------------------------------------------------------
 
   activeMembers(household: Family): readonly FamilyMember[] {
@@ -647,3 +754,6 @@ export class FamilyComponent implements OnInit {
     target.set(rest);
   }
 }
+
+/** 2 MB, matching `ImageContent.MaxBytes` in member-family-service. */
+const MaxPhotoBytes = 2 * 1024 * 1024;

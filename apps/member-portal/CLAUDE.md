@@ -179,11 +179,30 @@ of a group they apply to. A checkbox that read as "hide me from the platform"
 would be promising something the platform does not do, so the sentence under it
 says what it does.
 
-**"Upload Photo" is a link field, because that is what the API takes.** There is
-no file storage, and the service accepts an absolute http(s) URL. The note says
-what a link costs - every member who opens the directory fetches it from
-whatever host it points at - which is the tracking gap `ImageUrl` documents and
-does not close.
+**"Upload Photo" is a real upload now, and it saves on its own.** It was a link
+field for as long as the platform hosted no images, with a note saying what a
+link cost: every member who opened the directory fetched it from whatever host it
+named. The platform stores the bytes now, so the control is a file input and the
+note says what that buys instead.
+
+Uploading is its own request rather than part of Save, because a file and a form
+field are different things and they were only ever one control while the photo
+was text somebody typed. Choosing a picture takes effect immediately, which is
+what people expect of a profile photo, and a failed upload cannot lose an address
+somebody was halfway through editing.
+
+**A photo is fetched, never linked.** `photoUrl` is a path on this platform and
+authorized per request, so an `<img src>` would fail — the browser sends no
+`Authorization` header for a tag it fetches itself. `libs/shared`'s
+`[scAuthedSrc]` fetches through `HttpClient` and hands the element an object URL.
+Any screen showing a photo uses it.
+
+**Every spec that renders a profile or a child now has a second request to
+settle.** The photo fetch is real HTTP, so a test that leaves it open fails
+`http.verify()` in `afterEach` and leaves the TestBed dirty for everything after
+it — which showed up as six unrelated tests failing with "Cannot configure the
+test module". Both member specs have a `settlePhotos()` helper for it, and both
+stub `URL.createObjectURL`, which jsdom does not implement.
 
 **The directory has no profession filter, and that is a privacy decision.**
 Profession carries a per-field privacy level. A server-side filter on it would

@@ -5,6 +5,7 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using Sangam.MemberFamily.Domain.Children;
 using Sangam.MemberFamily.Domain.Families;
+using Sangam.MemberFamily.Domain.Media;
 using Sangam.MemberFamily.Domain.Members;
 using Sangam.MemberFamily.Infrastructure.Messaging;
 using Sangam.MemberFamily.Infrastructure.Persistence;
@@ -28,6 +29,8 @@ public sealed class ErasureConsumerTests(MemberFamilyApiFactory factory)
 {
     private static readonly Guid TenantId = Guid.NewGuid();
 
+    private static byte[] Png() => [0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A, 1, 2, 3];
+
     private sealed record Household(Guid HeadId, Guid FamilyId, Guid ChildId);
 
     private async Task<Household> SeedHouseholdAsync()
@@ -40,7 +43,7 @@ public sealed class ErasureConsumerTests(MemberFamilyApiFactory factory)
             headId, TenantId, "Ravi Shah", "ravi@example.com", DateTimeOffset.UtcNow);
 
         profile.Update(
-            "Ravi Shah", null, new DateOnly(1985, 4, 2), Gender.Male,
+            "Ravi Shah", new DateOnly(1985, 4, 2), Gender.Male,
             "9876543210", "ravi@example.com", "12 Temple Road", "Ghatkopar",
             "Chartered Accountant", FieldPrivacy.Default,
             isListedInDirectory: true, DateTimeOffset.UtcNow, Guid.NewGuid());
@@ -52,9 +55,20 @@ public sealed class ErasureConsumerTests(MemberFamilyApiFactory factory)
 
         var child = ChildProfile.Create(
             TenantId, family.Id, "Aarav Shah", new DateOnly(2012, 7, 19),
-            Gender.Male, "https://cdn/aarav.jpg", headId, DateTimeOffset.UtcNow);
+            Gender.Male, headId, DateTimeOffset.UtcNow);
 
         db.ChildProfiles.Add(child);
+
+        // Both get a photo, because the reference going null is not the same as
+        // the photograph being gone - and the second is what erasure means.
+        var headPhoto = StoredImage.Capture(
+            TenantId, ImageOwnerKind.Member, headId, Png(), headId, DateTimeOffset.UtcNow);
+        var childPhoto = StoredImage.Capture(
+            TenantId, ImageOwnerKind.Child, child.Id, Png(), headId, DateTimeOffset.UtcNow);
+
+        db.StoredImages.AddRange(headPhoto, childPhoto);
+        profile.SetPhoto(headPhoto.Id, DateTimeOffset.UtcNow, headId);
+        child.SetPhoto(childPhoto.Id);
 
         await db.SaveChangesAsync();
 
@@ -119,8 +133,47 @@ public sealed class ErasureConsumerTests(MemberFamilyApiFactory factory)
             found => !found.FullName.Contains("Aarav"));
 
         child.FullName.Should().NotContain("Aarav");
-        child.PhotoUrl.Should().BeNull();
+        child.PhotoImageId.Should().BeNull();
         child.DateOfBirth.Should().Be(new DateOnly(2012, 1, 1));
+    }
+
+    /// <summary>
+    /// The photographs, not just the references to them.
+    /// </summary>
+    /// <remarks>
+    /// A row of bytes that nothing points at has not been erased; it is merely
+    /// unreachable by the paths that happen to exist today. This asserts against
+    /// the <c>stored_images</c> table rather than against the profile, and it
+    /// runs the whole consumer rather than calling the store, because the thing
+    /// that could quietly stop happening is the handler's call.
+    /// </remarks>
+    [Fact]
+    public async Task An_erasure_event_deletes_the_photographs_themselves()
+    {
+        var household = await SeedHouseholdAsync();
+
+        await using (var scope = factory.Services.CreateAsyncScope())
+        {
+            var seeded = scope.ServiceProvider.GetRequiredService<MemberFamilyDbContext>();
+
+            (await seeded.StoredImages.IgnoreQueryFilters()
+                .CountAsync(i => i.OwnerId == household.HeadId || i.OwnerId == household.ChildId))
+                .Should().Be(2);
+        }
+
+        await PublishErasureAsync(household.HeadId);
+
+        // The result is asserted, not just awaited. `EventuallyAsync` returns
+        // the last value it saw when it times out rather than throwing, so an
+        // `await` with no assertion after it passes however the wait ended -
+        // which is exactly what this test did until removing the handler's call
+        // failed to break it. The 44-second run was the only tell.
+        var remaining = await factory.EventuallyAsync(
+            db => db.StoredImages.IgnoreQueryFilters().AsNoTracking()
+                .CountAsync(i => i.OwnerId == household.HeadId || i.OwnerId == household.ChildId),
+            found => found == 0);
+
+        remaining.Should().Be(0);
     }
 
     [Fact]

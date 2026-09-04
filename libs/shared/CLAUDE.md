@@ -21,6 +21,7 @@ What is here now:
 | `auth/auth.models.ts` | The shapes identity-tenant-service answers with |
 | `auth/auth.service.ts` | Sign in, sign out, and who the current user is |
 | `auth/token.store.ts` | The session, in `sessionStorage` |
+| `media/authed-image.directive.ts` | Puts a platform-hosted image into an `<img>`, fetched with the caller's token |
 | `money/money.ts` | Paise ↔ rupees, and how long a Boli has left |
 | `tenant/module-keys.ts` | The closed list of module keys |
 | `tenant/tenant.interceptor.ts` | Rewrites relative API paths to the gateway |
@@ -62,6 +63,34 @@ by eye.
 Adding a module still means three places: `ModuleCatalog` in
 identity-tenant-service, the gateway route's `Metadata.module`, and
 `ModuleKeys` here. The spec now catches two of the three disagreeing.
+
+**`AuthedImageDirective` exists because `sessionStorage` tokens and `<img src>`
+do not mix.** A plain `<img src="/v1/members/x/photo">` is fetched by the browser
+with no `Authorization` header, and both apps attach the token in an HTTP
+interceptor — deliberately, because a cookie would be sent automatically on every
+request and this platform has no CSRF protection. So the thing that makes
+token-in-storage safe is the same thing that makes an image tag fail. The
+directive fetches through `HttpClient`, gets the token attached like every other
+call, and turns the blob into an object URL it owns the lifetime of.
+
+The alternative was unauthenticated but unguessable photo URLs, which
+`SECURITY-CHECKLIST.md` rules out in as many words. What it costs is one request
+per photo — the same number either way, and the service sends a strong ETag, so a
+second visit is 304s with no bytes.
+
+Two things it does that look like defensiveness and are not. It ignores a
+response that arrives after the source changed, because adopting a late one shows
+the wrong person's face; and it skips a refetch when the same path is set again,
+because Angular re-runs an input binding on every change-detection pass and a
+directory page would otherwise issue an unbounded number of requests. Both have
+tests, and both fail if the guard is removed.
+
+**Its spec drives the directive directly rather than through a host component**,
+because `npm run test:libs` is plain Vitest with no Angular compiler — a spec here
+cannot compile a template. The first version used a host component and every test
+failed with NG0303, which reads like a directive-scope problem and is really a
+"you are in the wrong test runner" problem. Setting the input by hand calls
+exactly the setter Angular would.
 
 **The tenant interceptor attaches no tenant**, and the name is a leftover from
 the subdomain design that root `CLAUDE.md` §6 supersedes. It rewrites relative

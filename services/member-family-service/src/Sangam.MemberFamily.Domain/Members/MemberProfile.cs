@@ -18,7 +18,22 @@ public sealed class MemberProfile : AggregateRoot, ITenantScopedEntity
     public Guid TenantId { get; private set; }
 
     public string FullName { get; private set; } = null!;
-    public string? PhotoUrl { get; private set; }
+
+    /// <summary>
+    /// The <see cref="Media.StoredImage"/> holding this member's photo, or null.
+    /// </summary>
+    /// <remarks>
+    /// This replaced a client-supplied <c>PhotoUrl</c>. The URL was validated as
+    /// absolute http(s), which stopped <c>javascript:</c> links and did nothing
+    /// about the real problem: every member who opened the directory fetched the
+    /// image from whatever host it named, handing that host their IP address.
+    /// The platform hosts the bytes now — see <see cref="Media.StoredImage"/>.
+    ///
+    /// It is set by uploading a photo, not by saving the profile form, which is
+    /// why <see cref="Update"/> does not take it. Those are two different acts
+    /// and were only ever one field because the photo used to be text.
+    /// </remarks>
+    public Guid? PhotoImageId { get; private set; }
     public DateOnly? DateOfBirth { get; private set; }
     public Gender Gender { get; private set; }
     public string? Mobile { get; private set; }
@@ -122,7 +137,11 @@ public sealed class MemberProfile : AggregateRoot, ITenantScopedEntity
     public void Erase(DateTimeOffset erasedAt)
     {
         FullName = "Erased member";
-        PhotoUrl = null;
+        // The reference only. The bytes are a photograph of the person and are
+        // deleted by the same handler, in the same transaction - a profile that
+        // forgot which image was theirs while the image stayed in the table
+        // would be the worst of both.
+        PhotoImageId = null;
         DateOfBirth = null;
         Gender = Gender.Unspecified;
         Mobile = null;
@@ -143,9 +162,57 @@ public sealed class MemberProfile : AggregateRoot, ITenantScopedEntity
         UpdatedAt = erasedAt;
     }
 
+    /// <summary>
+    /// Points this profile at a newly stored photo, and answers which image it
+    /// was pointing at before.
+    /// </summary>
+    /// <remarks>
+    /// Returning the previous id rather than deleting anything is deliberate:
+    /// the aggregate does not know about the images table, and a method that
+    /// silently orphaned the old row would leave a photograph of somebody in
+    /// the database with nothing referring to it. The handler deletes what this
+    /// hands back, in the same transaction.
+    ///
+    /// The audit note says the photo changed and never which image id, for the
+    /// same reason <see cref="Update"/> records field names and not values: the
+    /// audit table is append-only and deliberately hard to redact.
+    /// </remarks>
+    public Guid? SetPhoto(Guid imageId, DateTimeOffset updatedAt, Guid updatedBy)
+    {
+        var previous = PhotoImageId;
+        PhotoImageId = imageId;
+        UpdatedAt = updatedAt;
+
+        Raise(new MemberProfileUpdatedDomainEvent(
+            Id, TenantId, FullName, [nameof(PhotoImageId)], updatedBy, updatedAt));
+
+        return previous;
+    }
+
+    /// <summary>
+    /// Removes the photo, answering the image id to delete, or null when there
+    /// was no photo — which is success and not an error.
+    /// </summary>
+    public Guid? RemovePhoto(DateTimeOffset updatedAt, Guid updatedBy)
+    {
+        var previous = PhotoImageId;
+
+        if (previous is null)
+        {
+            return null;
+        }
+
+        PhotoImageId = null;
+        UpdatedAt = updatedAt;
+
+        Raise(new MemberProfileUpdatedDomainEvent(
+            Id, TenantId, FullName, [nameof(PhotoImageId)], updatedBy, updatedAt));
+
+        return previous;
+    }
+
     public void Update(
         string fullName,
-        string? photoUrl,
         DateOnly? dateOfBirth,
         Gender gender,
         string? mobile,
@@ -174,7 +241,6 @@ public sealed class MemberProfile : AggregateRoot, ITenantScopedEntity
         var changed = new List<string>();
 
         Note(changed, nameof(FullName), FullName, fullName.Trim());
-        Note(changed, nameof(PhotoUrl), PhotoUrl, Normalize(photoUrl));
         Note(changed, nameof(DateOfBirth), DateOfBirth?.ToString("O"), dateOfBirth?.ToString("O"));
         Note(changed, nameof(Gender), Gender.ToString(), gender.ToString());
         Note(changed, nameof(Mobile), Mobile, Normalize(mobile));
@@ -194,7 +260,6 @@ public sealed class MemberProfile : AggregateRoot, ITenantScopedEntity
         }
 
         FullName = fullName.Trim();
-        PhotoUrl = Normalize(photoUrl);
         DateOfBirth = dateOfBirth;
         Gender = gender;
         Mobile = Normalize(mobile);

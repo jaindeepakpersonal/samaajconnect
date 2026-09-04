@@ -19,7 +19,17 @@ public sealed class ChildProfile : AggregateRoot, ITenantScopedEntity
     public string FullName { get; private set; } = null!;
     public DateOnly DateOfBirth { get; private set; }
     public Gender Gender { get; private set; }
-    public string? PhotoUrl { get; private set; }
+    /// <summary>
+    /// The <see cref="Media.StoredImage"/> holding this child's photo, or null.
+    /// </summary>
+    /// <remarks>
+    /// This is the field DPDP s.9(3) was actually about. A client-supplied URL
+    /// meant every viewer of a child's record - their family, their Pathshala -
+    /// fetched the picture from whatever host it named, telling that host a
+    /// child's photograph had just been looked at and by which IP. The platform
+    /// hosts the bytes now, so no third party is told anything.
+    /// </remarks>
+    public Guid? PhotoImageId { get; private set; }
     public ChildStatus Status { get; private set; }
 
     /// <summary>
@@ -48,7 +58,6 @@ public sealed class ChildProfile : AggregateRoot, ITenantScopedEntity
         string fullName,
         DateOnly dateOfBirth,
         Gender gender,
-        string? photoUrl,
         Guid consentGivenByMemberId,
         DateTimeOffset createdAt)
     {
@@ -70,10 +79,38 @@ public sealed class ChildProfile : AggregateRoot, ITenantScopedEntity
             FullName = fullName.Trim(),
             DateOfBirth = dateOfBirth,
             Gender = gender,
-            PhotoUrl = string.IsNullOrWhiteSpace(photoUrl) ? null : photoUrl.Trim(),
             Status = ChildStatus.Minor,
             CreatedAt = createdAt,
         };
+    }
+
+    /// <summary>
+    /// Points this record at a newly stored photo, answering the previous image
+    /// id so the handler can delete it in the same transaction.
+    /// </summary>
+    /// <remarks>
+    /// No event is raised, unlike <see cref="Members.MemberProfile.SetPhoto"/>.
+    /// A member's profile changing is news the Samaaj may act on; a child's
+    /// photograph changing is a household matter, and publishing it would put a
+    /// record that a child's picture was updated into an append-only audit
+    /// table that is deliberately hard to redact.
+    /// </remarks>
+    public Guid? SetPhoto(Guid imageId)
+    {
+        var previous = PhotoImageId;
+        PhotoImageId = imageId;
+        return previous;
+    }
+
+    /// <summary>
+    /// Removes the photo, answering the image id to delete, or null when there
+    /// was none — which is success, not an error.
+    /// </summary>
+    public Guid? RemovePhoto()
+    {
+        var previous = PhotoImageId;
+        PhotoImageId = null;
+        return previous;
     }
 
     /// <summary>
@@ -115,7 +152,10 @@ public sealed class ChildProfile : AggregateRoot, ITenantScopedEntity
     public void Erase()
     {
         FullName = "Erased child";
-        PhotoUrl = null;
+        // The reference only; the handler deletes the bytes in the same
+        // transaction. A photograph of a child is the last thing that should
+        // survive the withdrawal of the consent it was held under.
+        PhotoImageId = null;
 
         // Kept, because age is what decides eligibility and the row still has
         // to behave; shifted to the first of its year so it is no longer a

@@ -25,7 +25,6 @@ namespace Sangam.MemberFamily.Application.Members.Commands.UpdateProfile;
 public sealed record UpdateProfileCommand(
     Guid MemberId,
     string FullName,
-    string? PhotoUrl,
     DateOnly? DateOfBirth,
     string? Gender,
     string? Mobile,

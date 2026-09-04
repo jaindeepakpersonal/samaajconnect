@@ -5,6 +5,7 @@ using Sangam.MemberFamily.Application.Abstractions;
 using Sangam.MemberFamily.Domain.Children;
 using Sangam.MemberFamily.Domain.Common;
 using Sangam.MemberFamily.Domain.Families;
+using Sangam.MemberFamily.Domain.Media;
 using Sangam.MemberFamily.Domain.Members;
 
 namespace Sangam.MemberFamily.Infrastructure.Persistence;
@@ -25,6 +26,9 @@ public sealed class MemberFamilyDbContext(
     public DbSet<ChildProfile> ChildProfiles => Set<ChildProfile>();
 
     public DbSet<ChildConversionRequest> ChildConversionRequests => Set<ChildConversionRequest>();
+
+    /// <summary>Hosted images: profile and child photos, bytes included.</summary>
+    public DbSet<StoredImage> StoredImages => Set<StoredImage>();
 
     public DbSet<OutboxMessage> OutboxMessages => Set<OutboxMessage>();
 

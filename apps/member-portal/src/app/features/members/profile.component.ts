@@ -1,7 +1,7 @@
-import { Component, OnInit, inject, signal } from '@angular/core';
+import { Component, OnInit, computed, inject, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { RouterLink } from '@angular/router';
-import { describeError } from '@samaajconnect/shared';
+import { AuthedImageDirective, describeError } from '@samaajconnect/shared';
 import { MembersApi } from './members.api';
 import { Gender, MyProfile, PrivacyLevel } from './members.models';
 
@@ -25,15 +25,22 @@ import { Gender, MyProfile, PrivacyLevel } from './members.models';
  * else — the screen says so, because a control that reads as "hide me from the
  * platform" would be promising something it does not do.
  *
- * **"Upload Photo" is a link field.** There is no file storage on the platform
- * (`DEVELOPMENT_PLAN.md` Phase 5), and the service accepts an `http(s)` URL, so
- * the honest control is the one that matches what the API takes. The note says
- * what a link costs: every member who opens the directory fetches it from
- * whatever host it points at.
+ * **The photo is a real upload now, and it is saved on its own.** It used to be
+ * a link field, because the platform hosted no images and the honest control was
+ * the one matching what the API took — with a note saying what a link cost:
+ * every member who opened the directory fetched it from whatever host it named.
+ * The platform stores the bytes itself now, so the control is a file input and
+ * the note says what that buys instead.
+ *
+ * Uploading is its own request rather than part of Save, because a file and a
+ * form field are different things and they were only ever one control while the
+ * photo was text somebody typed. It also means choosing a picture takes effect
+ * immediately, which is what people expect of a profile photo, and a failed
+ * upload cannot lose an address somebody was halfway through editing.
  */
 @Component({
   selector: 'app-profile',
-  imports: [FormsModule, RouterLink],
+  imports: [AuthedImageDirective, FormsModule, RouterLink],
   styleUrl: './members.css',
   template: `
     <div class="members-page">
@@ -146,21 +153,54 @@ import { Gender, MyProfile, PrivacyLevel } from './members.models';
               maxlength="500"
             ></textarea>
 
-            <label for="photo">Photo link</label>
+            <!-- The photo is uploaded on its own, not saved with the rest of
+                 the form: it is a file rather than a field, and the two were
+                 only ever one control because the photo used to be a link
+                 somebody typed. -->
+            <h3>Photo</h3>
+
+            @if (photoPath(); as path) {
+              <img class="profile-photo" [scAuthedSrc]="path" alt="Your profile photo" />
+            } @else {
+              <p class="small">You have not added a photo.</p>
+            }
+
+            <label for="photo">Choose a photo</label>
             <input
               class="input"
               id="photo"
-              name="photoUrl"
-              type="url"
-              [(ngModel)]="form.photoUrl"
-              maxlength="2048"
-              placeholder="https://…"
+              name="photo"
+              type="file"
+              accept="image/jpeg,image/png,image/webp"
+              [disabled]="uploading()"
+              (change)="choosePhoto($event)"
             />
             <p class="small">
-              A link, not an upload: the platform does not host images yet. Everyone who opens
-              the directory will fetch your photo from whatever site it points at, so use one
-              you are happy for them to reach.
+              JPEG, PNG or WebP, up to 2 MB. The platform stores it and serves it to your
+              Samaaj itself — nobody else's website is asked for it, and nobody outside your
+              Samaaj can fetch it.
             </p>
+
+            @if (photoError(); as message) {
+              <p class="notice error" role="alert">{{ message }}</p>
+            }
+
+            @if (photoNotice(); as message) {
+              <p class="notice info" role="status">{{ message }}</p>
+            }
+
+            @if (photoPath()) {
+              <div class="actions">
+                <button
+                  class="btn secondary"
+                  type="button"
+                  [disabled]="uploading()"
+                  (click)="removePhoto()"
+                >
+                  Remove photo
+                </button>
+              </div>
+            }
           </div>
 
           <!-- Privacy ------------------------------------------------------ -->
@@ -227,6 +267,19 @@ export class ProfileComponent implements OnInit {
   readonly attempted = signal(false);
   readonly error = signal<string | null>(null);
 
+  readonly uploading = signal(false);
+  readonly photoError = signal<string | null>(null);
+  readonly photoNotice = signal<string | null>(null);
+
+  /**
+   * Where the member's own photo is, or null.
+   *
+   * Read off the profile rather than kept separately, so that after an upload
+   * the screen shows what the server says it holds rather than what the browser
+   * thinks it just sent.
+   */
+  readonly photoPath = computed(() => this.profile()?.photoUrl ?? null);
+
   /** Stops a member dating their birth in the future before the server has to. */
   readonly today = new Date().toISOString().slice(0, 10);
 
@@ -269,7 +322,6 @@ export class ProfileComponent implements OnInit {
     address: '',
     locality: '',
     profession: '',
-    photoUrl: '',
     dateOfBirth: '',
     gender: 'Unspecified' as Gender,
     isListedInDirectory: true,
@@ -315,7 +367,6 @@ export class ProfileComponent implements OnInit {
       address: me.address ?? '',
       locality: me.locality ?? '',
       profession: me.profession ?? '',
-      photoUrl: me.photoUrl ?? '',
       // The service sends a date, the control wants yyyy-MM-dd, and they
       // already agree — but a value with a time on it would silently render as
       // an empty date input rather than as an error.
@@ -351,7 +402,6 @@ export class ProfileComponent implements OnInit {
         address: blankToNull(this.form.address),
         locality: blankToNull(this.form.locality),
         profession: blankToNull(this.form.profession),
-        photoUrl: blankToNull(this.form.photoUrl),
         dateOfBirth: blankToNull(this.form.dateOfBirth),
         gender: this.form.gender,
         isListedInDirectory: this.form.isListedInDirectory,
@@ -374,7 +424,98 @@ export class ProfileComponent implements OnInit {
         },
       });
   }
+
+  // ---- The photo ----------------------------------------------------------
+
+  /**
+   * Uploads the chosen file straight away.
+   *
+   * The size is checked here as well as by the service, and that is not a
+   * duplicated rule for its own sake: sending two megabytes over a phone
+   * connection to be told it was too big is a bad way to find out. The service
+   * is still the one that decides — this only saves a round trip it was always
+   * going to refuse.
+   *
+   * The file input is cleared afterwards so that choosing the same file twice
+   * fires `change` again. Without it, a member whose first attempt failed could
+   * not retry with the same picture.
+   */
+  choosePhoto(event: Event): void {
+    const input = event.target as HTMLInputElement;
+    const file = input.files?.[0] ?? null;
+
+    input.value = '';
+
+    if (file === null) {
+      return;
+    }
+
+    this.photoError.set(null);
+    this.photoNotice.set(null);
+
+    if (file.size > MaxPhotoBytes) {
+      this.photoError.set('That photo is larger than 2 MB. Choose a smaller one.');
+      return;
+    }
+
+    const me = this.profile();
+
+    if (me === null) {
+      return;
+    }
+
+    this.uploading.set(true);
+
+    this.api.uploadMyPhoto(me.id, file).subscribe({
+      next: () => {
+        this.uploading.set(false);
+        this.photoNotice.set('Your photo has been updated.');
+        // Re-read rather than assume. The path is derived by the server, and a
+        // screen that invented it would be guessing at a contract it does not
+        // own.
+        this.reload();
+      },
+      error: (failure) => {
+        this.uploading.set(false);
+        this.photoError.set(describeError(failure));
+      },
+    });
+  }
+
+  removePhoto(): void {
+    const me = this.profile();
+
+    if (me === null) {
+      return;
+    }
+
+    this.photoError.set(null);
+    this.photoNotice.set(null);
+    this.uploading.set(true);
+
+    this.api.removeMyPhoto(me.id).subscribe({
+      next: () => {
+        this.uploading.set(false);
+        this.photoNotice.set('Your photo has been removed.');
+        this.reload();
+      },
+      error: (failure) => {
+        this.uploading.set(false);
+        this.photoError.set(describeError(failure));
+      },
+    });
+  }
+
+  private reload(): void {
+    this.api.me().subscribe({
+      next: (updated) => this.profile.set(updated),
+      error: (failure) => this.photoError.set(describeError(failure)),
+    });
+  }
 }
+
+/** 2 MB, matching `ImageContent.MaxBytes` in member-family-service. */
+const MaxPhotoBytes = 2 * 1024 * 1024;
 
 function blankToNull(value: string): string | null {
   const trimmed = value.trim();

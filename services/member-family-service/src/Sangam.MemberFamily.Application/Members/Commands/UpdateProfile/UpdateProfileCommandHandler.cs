@@ -46,7 +46,6 @@ public sealed class UpdateProfileCommandHandler(
 
         profile.Update(
             command.FullName,
-            command.PhotoUrl,
             command.DateOfBirth,
             ParseGender(command.Gender),
             command.Mobile,

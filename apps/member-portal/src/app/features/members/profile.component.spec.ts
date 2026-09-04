@@ -49,6 +49,11 @@ describe('ProfileComponent', () => {
       ],
     });
 
+    // jsdom implements neither, and the directive that renders a photo uses
+    // both. Without these the first profile carrying a photo throws.
+    URL.createObjectURL = () => 'blob:test';
+    URL.revokeObjectURL = () => undefined;
+
     fixture = TestBed.createComponent(ProfileComponent);
     component = fixture.componentInstance;
     http = TestBed.inject(HttpTestingController);
@@ -58,10 +63,30 @@ describe('ProfileComponent', () => {
 
   const text = () => fixture.nativeElement.textContent as string;
 
+  /**
+   * Flushes the photo request the `scAuthedSrc` directive makes.
+   *
+   * A profile with a photo now costs a second request: the image is fetched
+   * through `HttpClient` so the auth interceptor can attach the token, because
+   * a plain `<img src>` would be fetched by the browser with no Authorization
+   * header at all. Every test that renders a profile with a photo has to settle
+   * it, or `http.verify()` fails in `afterEach` and leaves the TestBed dirty for
+   * everything after it — which is exactly what happened when these tests were
+   * first written.
+   */
+  function settlePhoto(): void {
+    for (const request of http.match((r) => r.url.endsWith('/photo') && r.method === 'GET')) {
+      request.flush(new Blob(['x']));
+    }
+
+    fixture.detectChanges();
+  }
+
   function load(me: MyProfile = profile()): void {
     fixture.detectChanges();
     http.expectOne('/v1/members/me').flush(me);
     fixture.detectChanges();
+    settlePhoto();
   }
 
   it('fills the form from what the server holds', () => {
@@ -76,11 +101,11 @@ describe('ProfileComponent', () => {
   it('seeds every optional field to an empty string, never undefined', () => {
     // An undefined bound to a control renders as an empty one that then posts
     // undefined — the same trap as a <select> with no matching option.
-    load(profile({ address: null, profession: null, photoUrl: null }));
+    load(profile({ address: null, profession: null, mobile: null }));
 
     expect(component.form.address).toBe('');
     expect(component.form.profession).toBe('');
-    expect(component.form.photoUrl).toBe('');
+    expect(component.form.mobile).toBe('');
   });
 
   it('sends the directory setting on every save', () => {
@@ -170,5 +195,146 @@ describe('ProfileComponent', () => {
     fixture.detectChanges();
 
     expect(fixture.nativeElement.querySelector('[role="alert"]')).not.toBeNull();
+  });
+
+  // ---- The photo ----------------------------------------------------------
+
+  /**
+   * The photo used to be a text field holding somebody else's URL. What
+   * replaced it is a file input and its own request, because a file and a form
+   * field are different things.
+   */
+  it('offers a file input rather than a link field', () => {
+    load();
+
+    const input: HTMLInputElement =
+      fixture.nativeElement.querySelector('input#photo');
+
+    expect(input.type).toBe('file');
+    expect(input.accept).toBe('image/jpeg,image/png,image/webp');
+  });
+
+  it('says so plainly when the member has no photo', () => {
+    load(profile({ photoUrl: null }));
+
+    expect(text()).toContain('You have not added a photo');
+  });
+
+  function choose(file: File): void {
+    const input: HTMLInputElement =
+      fixture.nativeElement.querySelector('input#photo');
+
+    Object.defineProperty(input, 'files', { value: [file], configurable: true });
+    input.dispatchEvent(new Event('change'));
+    fixture.detectChanges();
+  }
+
+  function image(bytes = 10, type = 'image/png'): File {
+    return new File([new Uint8Array(bytes)], 'photo.png', { type });
+  }
+
+  it('uploads the chosen file as multipart and re-reads the profile', () => {
+    load(profile({ photoUrl: null }));
+
+    choose(image());
+
+    const upload = http.expectOne('/v1/members/m1/photo');
+    expect(upload.request.method).toBe('POST');
+    expect(upload.request.body).toBeInstanceOf(FormData);
+
+    // The browser writes the multipart boundary, so the app must not set a
+    // Content-Type of its own - one without a boundary is a body no server can
+    // parse.
+    expect(upload.request.headers.has('Content-Type')).toBe(false);
+
+    upload.flush(null);
+
+    // Re-read rather than assumed: the path is the server's to derive.
+    http.expectOne('/v1/members/me').flush(profile({ photoUrl: '/v1/members/m1/photo' }));
+    fixture.detectChanges();
+    settlePhoto();
+
+    expect(component.photoPath()).toBe('/v1/members/m1/photo');
+    expect(text()).toContain('Your photo has been updated');
+  });
+
+  /**
+   * The service refuses it anyway. Checking here saves sending two megabytes
+   * over a phone connection to be told what was already knowable.
+   */
+  it('refuses a file over 2 MB without sending it', () => {
+    load();
+
+    choose(image(2 * 1024 * 1024 + 1));
+
+    http.verify();
+    expect(text()).toContain('larger than 2 MB');
+  });
+
+  /**
+   * Without clearing the input, choosing the same file twice fires no change
+   * event - so a member whose first attempt failed could not retry with the
+   * same picture.
+   */
+  it('clears the input so the same file can be chosen again', () => {
+    load();
+
+    const input: HTMLInputElement =
+      fixture.nativeElement.querySelector('input#photo');
+
+    choose(image());
+    http.expectOne('/v1/members/m1/photo').flush(null);
+    http.expectOne('/v1/members/me').flush(profile());
+    fixture.detectChanges();
+    settlePhoto();
+
+    expect(input.value).toBe('');
+  });
+
+  it('reports a refused upload without claiming anything was saved', () => {
+    load(profile({ photoUrl: null }));
+
+    choose(image());
+
+    http.expectOne('/v1/members/m1/photo')
+      .flush(
+        { detail: 'That file is not a picture the platform accepts.' },
+        { status: 400, statusText: 'Bad Request' },
+      );
+    fixture.detectChanges();
+
+    // Deliberately not asserting on 'JPEG, PNG or WebP': the static help text
+    // under the file input says exactly that, so this test would pass with no
+    // error shown at all. It did, until the message was made distinctive.
+    expect(text()).toContain('not a picture the platform accepts');
+    expect(text()).not.toContain('Your photo has been updated');
+  });
+
+  it('offers no removal when there is no photo to remove', () => {
+    load(profile({ photoUrl: null }));
+
+    expect(text()).not.toContain('Remove photo');
+  });
+
+  it('offers removal once there is a photo', () => {
+    load(profile({ photoUrl: '/v1/members/m1/photo' }));
+
+    expect(text()).toContain('Remove photo');
+  });
+
+  it('removes the photo and re-reads', () => {
+    load(profile({ photoUrl: '/v1/members/m1/photo' }));
+
+    component.removePhoto();
+
+    const removal = http.expectOne('/v1/members/m1/photo');
+    expect(removal.request.method).toBe('DELETE');
+    removal.flush(null);
+
+    http.expectOne('/v1/members/me').flush(profile({ photoUrl: null }));
+    fixture.detectChanges();
+
+    expect(component.photoPath()).toBeNull();
+    expect(text()).toContain('Your photo has been removed');
   });
 });

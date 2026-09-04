@@ -393,6 +393,105 @@ else
   fail=$((fail + 1))
 fi
 
+
+# ---- Photos the platform hosts ------------------------------------------------
+#
+# A profile photo used to be a URL a member typed, which meant every viewer of
+# the directory fetched it from whatever host it named. The platform stores the
+# bytes now and serves them itself, so nothing outside the Samaaj is asked for
+# anything - and on a child's record that is the third-party tracking DPDP
+# s.9(3) prohibits.
+#
+# The files here are written as raw bytes rather than shipped as fixtures,
+# because what is being checked is the signature the service reads. A committed
+# .png would be testing that the file was still in the repository.
+PHOTO_DIR=$(mktemp -d)
+trap 'rm -rf "$PHOTO_DIR"' EXIT
+
+printf '\211PNG\r\n\032\n\001\002\003\004\005\006\007\010' > "$PHOTO_DIR/photo.png"
+printf '<svg xmlns="http://www.w3.org/2000/svg"><script>alert(1)</script></svg>' \
+  > "$PHOTO_DIR/nasty.svg"
+
+check "a member uploads their own photo" 200 \
+  "$(status -X POST "$GATEWAY/v1/members/$MEMBER_ID/photo" \
+     -H "Authorization: Bearer $MEMBER_TOKEN" -F "file=@$PHOTO_DIR/photo.png")"
+
+# The type comes out of the bytes, not out of the part header - the header is a
+# string the uploader chose.
+PHOTO_TYPE=$(curl -s -o /dev/null -w '%{content_type}' \
+  -H "Authorization: Bearer $MEMBER_TOKEN" "$GATEWAY/v1/members/$MEMBER_ID/photo")
+
+if [ "${PHOTO_TYPE%%;*}" = "image/png" ]; then
+  echo "  ok    and it comes back as the type read from its bytes"
+  pass=$((pass + 1))
+else
+  echo "  FAIL  the photo came back as '$PHOTO_TYPE'"
+  fail=$((fail + 1))
+fi
+
+# An SVG is a document that can carry script, and this is served from the
+# platform's own origin - accepting one would close the tracking hole and open a
+# stored-scripting one in its place.
+#
+# No `;type=image/png` on the -F argument, and that is not an oversight: curl
+# answers 000 for that form here rather than sending anything, so the check
+# would have failed for a reason that has nothing to do with SVGs. The claim it
+# was meant to make - that the declared type is ignored - is made by the JPEG
+# check below instead, which is a stronger version of it anyway.
+check "an SVG is refused" 400 \
+  "$(status -X POST "$GATEWAY/v1/members/$MEMBER_ID/photo" \
+     -H "Authorization: Bearer $MEMBER_TOKEN" \
+     -F "file=@$PHOTO_DIR/nasty.svg")"
+
+# JPEG bytes under a .png name. The type served back is read from the bytes, so
+# the name and whatever header accompanied it decide nothing.
+printf '\377\330\377\340\000\020JFIF\000\001' > "$PHOTO_DIR/actually-a-jpeg.png"
+
+curl -s -o /dev/null -X POST "$GATEWAY/v1/members/$MEMBER_ID/photo" \
+  -H "Authorization: Bearer $MEMBER_TOKEN" -F "file=@$PHOTO_DIR/actually-a-jpeg.png"
+
+DISGUISED_TYPE=$(curl -s -o /dev/null -w '%{content_type}' \
+  -H "Authorization: Bearer $MEMBER_TOKEN" "$GATEWAY/v1/members/$MEMBER_ID/photo")
+
+if [ "${DISGUISED_TYPE%%;*}" = "image/jpeg" ]; then
+  echo "  ok    and a JPEG named .png is still served as a JPEG"
+  pass=$((pass + 1))
+else
+  echo "  FAIL  a disguised JPEG came back as '$DISGUISED_TYPE'"
+  fail=$((fail + 1))
+fi
+
+# The directory hands out a path on this platform rather than a foreign host.
+if curl -s -H "Authorization: Bearer $MEMBER_TOKEN" "$GATEWAY/v1/members/me" \
+   | grep -q "\"photoUrl\":\"/v1/members/$MEMBER_ID/photo\""; then
+  echo "  ok    and the profile points at this platform, not somebody else's host"
+  pass=$((pass + 1))
+else
+  echo "  FAIL  the profile's photoUrl is not a path on this platform"
+  fail=$((fail + 1))
+fi
+
+# There is deliberately no "another member cannot replace it" check here, and
+# the reason is worth writing down rather than leaving as an omission.
+# CHILD_TOKEN is the only second member this script has, and it is not signed in
+# until the conversion section further down - so a check here would send an
+# empty bearer, get 401 rather than the 403 it was written for, and pass or fail
+# for a reason that has nothing to do with photos. HostedPhotoTests covers that
+# rule against two real members, in both directions, and cross-tenant besides.
+
+check "an anonymous caller cannot fetch it at all" 401 \
+  "$(status "$GATEWAY/v1/members/$MEMBER_ID/photo")"
+
+check "the member takes their photo down" 200 \
+  "$(status -X DELETE "$GATEWAY/v1/members/$MEMBER_ID/photo" \
+     -H "Authorization: Bearer $MEMBER_TOKEN")"
+
+check "and doing it twice is still success" 200 \
+  "$(status -X DELETE "$GATEWAY/v1/members/$MEMBER_ID/photo" \
+     -H "Authorization: Bearer $MEMBER_TOKEN")"
+
+check "after which there is no photo to fetch" 404 \
+  "$(status -H "Authorization: Bearer $MEMBER_TOKEN" "$GATEWAY/v1/members/$MEMBER_ID/photo")"
 check "back into the directory" 200 \
   "$(status -X PATCH "$GATEWAY/v1/members/$MEMBER_ID" -H 'Content-Type: application/json' \
      -H "Authorization: Bearer $MEMBER_TOKEN" -d "$(profile_body true)")"

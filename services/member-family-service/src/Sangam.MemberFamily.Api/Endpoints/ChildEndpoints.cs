@@ -68,7 +68,6 @@ public static class ChildEndpoints
                     request.FullName,
                     request.DateOfBirth,
                     request.Gender,
-                    request.PhotoUrl,
                     request.ParentalConsentGiven,
                     request.NoticeVersion ?? string.Empty);
 
@@ -143,7 +142,6 @@ public static class ChildEndpoints
         string FullName,
         DateOnly DateOfBirth,
         string? Gender,
-        string? PhotoUrl,
         bool ParentalConsentGiven,
         string? NoticeVersion);
 

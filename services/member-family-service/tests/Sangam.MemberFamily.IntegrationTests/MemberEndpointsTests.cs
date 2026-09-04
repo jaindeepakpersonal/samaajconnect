@@ -53,7 +53,6 @@ public sealed class MemberEndpointsTests(MemberFamilyApiFactory factory)
 
         profile.Update(
             name,
-            photoUrl: null,
             dateOfBirth: new DateOnly(1990, 1, 1),
             gender: Gender.Unspecified,
             mobile: "+919812345678",

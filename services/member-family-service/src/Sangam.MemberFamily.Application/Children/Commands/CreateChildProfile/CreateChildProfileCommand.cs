@@ -13,6 +13,5 @@ public sealed record CreateChildProfileCommand(
     string FullName,
     DateOnly DateOfBirth,
     string? Gender,
-    string? PhotoUrl,
     bool ParentalConsentGiven,
     string NoticeVersion) : ICommand<ChildResponse>;

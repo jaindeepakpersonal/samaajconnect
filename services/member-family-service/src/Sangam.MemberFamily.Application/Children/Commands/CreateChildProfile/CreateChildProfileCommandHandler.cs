@@ -47,7 +47,6 @@ public sealed class CreateChildProfileCommandHandler(
             command.FullName,
             command.DateOfBirth,
             ParseGender(command.Gender),
-            command.PhotoUrl,
             // The head is the person attesting; the validator has already
             // refused the request if they did not.
             memberId,

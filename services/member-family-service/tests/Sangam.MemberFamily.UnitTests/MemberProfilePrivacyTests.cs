@@ -23,7 +23,6 @@ public sealed class MemberProfilePrivacyTests
 
         profile.Update(
             "Ravi Shah",
-            photoUrl: null,
             dateOfBirth: new DateOnly(1990, 5, 14),
             gender: Gender.Male,
             mobile: "+919812345678",

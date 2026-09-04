@@ -40,7 +40,6 @@ public sealed class ConversionCompletionTests(MemberFamilyApiFactory factory)
             "Aarav Jain",
             DateOnly.FromDateTime(DateTime.UtcNow).AddYears(-19),
             Gender.Male,
-            null,
             headId,
             DateTimeOffset.UtcNow);
 

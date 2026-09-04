@@ -12,11 +12,6 @@ public sealed class UpdateProfileCommandValidator : AbstractValidator<UpdateProf
     {
         RuleFor(x => x.MemberId).NotEmpty();
         RuleFor(x => x.FullName).NotEmpty().MaximumLength(200);
-        RuleFor(x => x.PhotoUrl)
-            .Must(ImageUrl.IsAcceptable)
-            .WithMessage(
-                "A photo link must be a full http:// or https:// web address. "
-                + "Scripted and inline links are not accepted.");
         RuleFor(x => x.Mobile).MaximumLength(20);
         RuleFor(x => x.Email).MaximumLength(320);
         RuleFor(x => x.Address).MaximumLength(500);

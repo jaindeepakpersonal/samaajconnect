@@ -8,7 +8,75 @@ version of the plan; the reasoning behind the ordering lives in
 ## Current Status
 
 - **Stage:** every module has a service and member screens; Phase 5 hardening under way
-- **Last updated:** 2026-09-04 - **acting on the lesson from yesterday: the
+- **Last updated:** 2026-09-04 - **the platform hosts its own photos now.**
+
+  The last Phase 5 item that needed nothing from outside. A member's or a child's
+  photo was a URL a client supplied, validated as absolute `http(s)` - which
+  closed the `javascript:` hole and said plainly, in `ImageUrl`'s own remarks,
+  that it did nothing about the real one: every member who opened the directory
+  fetched the picture from whatever host it named, handing that host their IP
+  address. On a `ChildProfile` that is exactly the third-party tracking of
+  children DPDP s.9(3) prohibits, and this platform's compliance answer for
+  s.9(3) has always been "we do not do it".
+
+  **The bytes live in member-family-service's own Postgres, and the obvious
+  alternative was considered rather than skipped.** MinIO in compose and S3 in
+  production is the standard answer; at this scale it buys nothing and costs a
+  second place data lives - one `scripts/backup-restore-drill.sh` does not dump.
+  A platform that has spent three cycles proving its backups restore would have
+  quietly acquired a store outside them. In the database the images are inside
+  the existing dump, inside the tenant query filter, and inside the transaction
+  that writes the profile row. `IImageStore` is the seam that makes changing that
+  one implementation and a migration rather than a rewrite.
+
+  **The type is read from the bytes and never from the upload.** A declared
+  content type is a string the uploader chose, so `StoredImage.Capture` has no
+  parameter for one at all and a test asserts that absence. JPEG, PNG, WebP.
+  **SVG is refused, and that exclusion is the load-bearing one**: an SVG is a
+  document that can carry script and these are served from the platform's own
+  origin, so accepting one would trade a tracking hole for a stored-scripting
+  hole.
+
+  **Authorization is the profile's own rule, which is why the owning service
+  serves the bytes.** Who may see a member's photo is who may see the member;
+  a child's photo is their household's, so `Members.Write` does not open it -
+  the same line `DecideJoinRequestCommand` already draws. A media service would
+  have had to be told those rules, asked about them, or handed a signed URL.
+  That also gives `SECURITY-CHECKLIST.md`'s "authorization-checked per request,
+  not just obscured by a random URL" for free, and that box is ticked now.
+
+  **A plain `<img src>` cannot render these, and working out why was the
+  interesting part.** Both apps keep the token in `sessionStorage` and attach it
+  in an interceptor - deliberately, because a cookie would be sent automatically
+  and this platform has no CSRF protection. A tag the browser fetches by itself
+  carries no `Authorization` header, so the very thing that makes
+  token-in-storage safe is what breaks an image tag. `libs/shared`'s
+  `AuthedImageDirective` fetches through `HttpClient` and owns the object URL's
+  lifetime. Unauthenticated-but-unguessable was the alternative and the checklist
+  rules it out in as many words.
+
+  **Four things went wrong that are worth keeping.** A test asserting an upload
+  error contained "JPEG, PNG or WebP" was passing off the static help text under
+  the file input, which says exactly that - it would have passed with no error
+  shown at all. `describeError` reads `detail`, not `title`, which is what
+  exposed it. Putting both endpoint groups in one file broke CLAUDE.md §4.6 and
+  `unreachable-endpoints.sh` caught it by mis-reporting three `/v1/children`
+  routes as `/v1/members` ones. A child-photo test 404'd for the wrong reason
+  until the parent uploaded first. And editing the smoke script while it was
+  running corrupted the run - bash reads a script by byte offset.
+
+  Verified by seven injections across the three layers - dropping the self-check,
+  dropping the family check, making the sniffer always answer JPEG, and the
+  directive's three guards - each caught by the check it should be. Nine smoke
+  checks through the gateway, including a JPEG named `.png` coming back as a
+  JPEG.
+
+  What is left: a Samaaj's `LogoUrl`, and virus scanning, which needs a scanner
+  in the deployment rather than a check in a domain type.
+
+  1,594 tests green, up 58 — 36 in member-family-service and 22 across the two
+  frontend suites.
+- **Previously:** 2026-09-04 - **acting on the lesson from yesterday: the
   other hand-written lists.**
 
   §9 now says a hand-written list of the ten services is a list something will
@@ -904,14 +972,23 @@ unit tested.
 - [ ] HTTPS-only in production: TLS termination, HSTS, secure-cookie policy,
       and `ForwardedHeaders` so the gateway rate limiter partitions on the real
       caller rather than on the proxy
-- [ ] Platform-hosted images, replacing the client-supplied `PhotoUrl` and
-      `LogoUrl`. Those are now validated as absolute http(s) URLs, which stops
-      `javascript:` links, but a photo hosted anywhere still sends every
-      viewer's IP to that host - and on a `ChildProfile` that is the
-      third-party tracking of children DPDP s.9(3) prohibits. Storage also makes
-      the file-handling half of `SECURITY-CHECKLIST.md` live: size and type
-      limits, virus scanning, and per-request authorization rather than an
-      unguessable URL
+- [x] **Platform-hosted images: member and child photos, 2026-09-04.**
+      `PhotoUrl` was a client-supplied link, so every viewer fetched the picture
+      from whatever host it named — third-party tracking of children on a
+      `ChildProfile`, which DPDP s.9(3) prohibits. `StoredImage` holds the bytes
+      in member-family-service's own database, behind `IImageStore` so an object
+      store is one implementation away; the type is read from the bytes and
+      never from the upload's header; SVG is refused; 2 MB, checked three times.
+      Authorization is the profile's own rule, which is why the owning service
+      serves the bytes. Both portals fetch through `[scAuthedSrc]`, because an
+      `<img src>` carries no token
+- [ ] **The rest of the image work.** A Samaaj's `LogoUrl` is still a
+      client-supplied link and carries the same tracking problem for anyone who
+      opens a Samaaj page — the same treatment in identity-tenant-service.
+      **Virus scanning is the other half and needs a scanner in the
+      deployment**: sniffing proves the bytes begin like an image and says
+      nothing about what a decoder does with the rest of them. Post media and
+      social-issue evidence remain not uploadable at all
 - [x] Tenant-isolation penetration testing (attempt cross-tenant IDOR
       on every write endpoint) — `scripts/tenant-isolation-probe.sh`. Two real
       Samaaj; B's member and B's administrator attempt reads and writes

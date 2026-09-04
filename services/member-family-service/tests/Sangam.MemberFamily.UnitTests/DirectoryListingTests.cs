@@ -21,7 +21,6 @@ public sealed class DirectoryListingTests
     private static void Update(MemberProfile profile, bool listed) =>
         profile.Update(
             "Ravi Shah",
-            photoUrl: null,
             dateOfBirth: null,
             gender: Gender.Male,
             mobile: "+919812345678",
@@ -112,7 +111,6 @@ public sealed class UpdateProfileCommandValidatorDirectoryTests
     private static UpdateProfileCommand Command(bool? listed) => new(
         Guid.NewGuid(),
         "Ravi Shah",
-        PhotoUrl: null,
         DateOfBirth: null,
         Gender: "Male",
         Mobile: null,

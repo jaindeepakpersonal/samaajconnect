@@ -9,12 +9,6 @@ public sealed class CreateChildProfileCommandValidator : AbstractValidator<Creat
     public CreateChildProfileCommandValidator()
     {
         RuleFor(x => x.FullName).NotEmpty().MaximumLength(200);
-        RuleFor(x => x.PhotoUrl)
-            .Must(ImageUrl.IsAcceptable)
-            .WithMessage(
-                "A photo link must be a full http:// or https:// web address. "
-                + "Scripted and inline links are not accepted.");
-
         RuleFor(x => x.DateOfBirth)
             .Must(value => value <= DateOnly.FromDateTime(DateTime.UtcNow))
             .WithMessage("Date of birth cannot be in the future.")
