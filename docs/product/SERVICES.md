@@ -56,6 +56,14 @@ and expose its endpoints behind the gateway at the route prefix shown.
 - **Tenant role(s):** `Member` (self-service), `FamilyHead` (family
   management), `SamaajAdmin` (moderation/correction)
 
+  "Correction" is a narrower thing than it reads as here, and the narrowing
+  is deliberate. An administrator holding `Members.Write` corrects factual
+  details — a misspelt name, a stale number — through
+  `PATCH /v1/members/{id}/details`. They cannot change what a member shares
+  with their Samaaj, nor whether that member appears in the directory. Both
+  travel only on the member's own `PATCH /v1/members/{id}`, which is self only.
+  See `services/member-family-service/CLAUDE.md` for why the two were split.
+
 ## 3. timeline-service
 
 - **First / primary aggregate:** `TimelinePost`

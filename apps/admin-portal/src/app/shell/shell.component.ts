@@ -232,7 +232,7 @@ const NAV: readonly NavGroup[] = [
       // at which point the panel was telling administrators something plainly
       // untrue about their own platform - and the member portal has screens for
       // all of them. What is missing here is the administrative view.
-      { label: 'Members', pending: 'The member directory screen is not built yet.' },
+      { label: 'Members', route: '/members' },
       { label: 'Families & Children', route: '/conversions' },
       { label: 'Timeline / Moderation', route: '/moderation' },
       { label: 'Volunteer Groups', route: '/groups' },

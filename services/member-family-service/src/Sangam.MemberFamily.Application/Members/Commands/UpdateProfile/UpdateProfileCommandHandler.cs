@@ -35,13 +35,28 @@ public sealed class UpdateProfileCommandHandler(
                 Error.NotFound("Member.NotFound", "No such member in this Samaaj."));
         }
 
-        var isSelf = currentUser.UserId == profile.Id;
-        var mayCorrectOthers = currentUser.HasPermission(PermissionKeys.MembersWrite);
-
-        if (!isSelf && !mayCorrectOthers)
+        // **Self, and nobody else - including a Samaaj administrator.**
+        //
+        // This used to let anyone holding `Members.Write` through, and that was
+        // a write nobody could perform correctly. The command replaces the
+        // profile whole, so it requires `privacy` and `isListedInDirectory` -
+        // and no read an administrator can make returns either. Correcting a
+        // misspelt name meant sending privacy levels the caller had no way to
+        // know, and an unparseable level parses as Private, so the likeliest
+        // accident was hiding every field a member had chosen to share, with
+        // nothing telling the member it had happened.
+        //
+        // An administrator has `PATCH /v1/members/{id}/details` now, which
+        // carries no privacy fields at all. What a member shares stays the
+        // member's decision, and it is enforced by there being no other way in
+        // rather than by an administrator being careful.
+        if (currentUser.UserId != profile.Id)
         {
             return Result.Failure<MyProfileResponse>(Error.Forbidden(
-                "Member.NotYours", "You can only change your own profile."));
+                "Member.NotYours",
+                "You can only change your own profile here. A Samaaj administrator "
+                + "corrects someone else's details at /v1/members/{id}/details, which "
+                + "leaves what they share to them."));
         }
 
         profile.Update(

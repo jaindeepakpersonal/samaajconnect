@@ -404,6 +404,82 @@ else
   fail=$((fail + 1))
 fi
 
+# ---- An administrator correcting somebody's details ---------------------------
+#
+# `Members.Write` was granted to SamaajAdmin from the first migration and there
+# was no way to use it correctly: the whole-profile PATCH requires the member's
+# privacy levels, and no read available to an administrator returns them. The
+# member above is unlisted with a Private email, which is exactly the state a
+# guessed correction would have destroyed - so this section leaves them that way
+# and checks it.
+# ADMIN_TOKEN is the platform Super Admin, who has no Samaaj of their own, so
+# the override header is what scopes them into this one. The admin section
+# further down defines ADMIN_TENANT_HEADER with the same value; this section
+# runs before it, which is why it is spelt out here rather than reused.
+ADMIN_SCOPE="X-Tenant-Override-Id: $TENANT_ID"
+
+check "an administrator corrects a member's details" 200 \
+  "$(status -X PATCH "$GATEWAY/v1/members/$MEMBER_ID/details" \
+     -H 'Content-Type: application/json' -H "Authorization: Bearer $ADMIN_TOKEN" \
+     -H "$ADMIN_SCOPE" \
+     -d '{"fullName":"Smoke Member Corrected","gender":"Male","mobile":"+919800000000","locality":"Udaipur"}')"
+
+CORRECTED=$(curl -s -H "Authorization: Bearer $ADMIN_TOKEN" -H "$ADMIN_SCOPE" \
+  "$GATEWAY/v1/members/$MEMBER_ID")
+
+if printf '%s' "$CORRECTED" | grep -q '"fullName":"Smoke Member Corrected"'; then
+  echo "  ok    and the correction is what the next read returns"
+  pass=$((pass + 1))
+else
+  echo "  FAIL  the correction is what the next read returns"
+  fail=$((fail + 1))
+fi
+
+# The point of the separate endpoint. The member took themselves out of the
+# directory two checks ago; a correction that put them back would be the exact
+# accident the request shape now makes impossible.
+if curl -s -H "Authorization: Bearer $MEMBER_TOKEN" "$GATEWAY/v1/members" \
+   | grep -q "$MEMBER_ID"; then
+  echo "  FAIL  a correction put an unlisted member back in the directory"
+  fail=$((fail + 1))
+else
+  echo "  ok    and they are still out of the directory, which was their decision"
+  pass=$((pass + 1))
+fi
+
+check "a member cannot correct anybody else" 403 \
+  "$(status -X PATCH "$GATEWAY/v1/members/$MEMBER_ID/details" \
+     -H 'Content-Type: application/json' -H "Authorization: Bearer $MEMBER_TOKEN" \
+     -d '{"fullName":"Hijacked","gender":"Male"}')"
+
+check "and the whole-profile update is the member's own now, not an admin's" 403 \
+  "$(status -X PATCH "$GATEWAY/v1/members/$MEMBER_ID" \
+     -H 'Content-Type: application/json' -H "Authorization: Bearer $ADMIN_TOKEN" \
+     -H "$ADMIN_SCOPE" -d "$(profile_body true)")"
+
+# Which means the member is *still* unlisted: the refusal above changed nothing
+# on its way to being refused, and that body would have relisted them.
+if curl -s -H "Authorization: Bearer $MEMBER_TOKEN" "$GATEWAY/v1/members" \
+   | grep -q "$MEMBER_ID"; then
+  echo "  FAIL  a refused whole-profile update still relisted them"
+  fail=$((fail + 1))
+else
+  echo "  ok    and a refusal changed nothing on the way to being refused"
+  pass=$((pass + 1))
+fi
+
+check "a correction with no name is a validation problem, not a 500" 400 \
+  "$(status -X PATCH "$GATEWAY/v1/members/$MEMBER_ID/details" \
+     -H 'Content-Type: application/json' -H "Authorization: Bearer $ADMIN_TOKEN" \
+     -H "$ADMIN_SCOPE" -d '{"fullName":"","gender":"Male"}')"
+
+# Put the name back, so later sections read the member they expect.
+check "the member's name is put back" 200 \
+  "$(status -X PATCH "$GATEWAY/v1/members/$MEMBER_ID/details" \
+     -H 'Content-Type: application/json' -H "Authorization: Bearer $ADMIN_TOKEN" \
+     -H "$ADMIN_SCOPE" \
+     -d '{"fullName":"Smoke Member","gender":"Male","mobile":"+919812345678","locality":"Udaipur"}')"
+
 
 # ---- Photos the platform hosts ------------------------------------------------
 #

@@ -5,6 +5,7 @@ import {
   ActivationCode,
   Attendee,
   AttendanceStatus,
+  AdminMember,
   AdminUser,
   AssignRoleResult,
   AuditLogEntry,
@@ -29,6 +30,7 @@ import {
   InviteAdminRequest,
   InviteAdminResult,
   IssueStatus,
+  MemberCorrection,
   ModuleDescriptor,
   OrganizerGroup,
   OrganizerType,
@@ -263,6 +265,49 @@ export class AdminApi {
    */
   listMembers(): Observable<{ id: string; fullName: string }[]> {
     return this.http.get<{ id: string; fullName: string }[]>('/v1/members?limit=100');
+  }
+
+  // ---- Member administration ---------------------------------------------
+
+  /**
+   * The Samaaj's directory, for an administrator.
+   *
+   * The same endpoint the member portal's directory calls, and it answers
+   * differently: an administrator sees members who have taken themselves out of
+   * the directory, and sees every field regardless of the level the member put
+   * on it. Both follow from the same decision, that correcting somebody's
+   * details is administrative work.
+   */
+  searchMembers(term: string | null, locality: string | null): Observable<AdminMember[]> {
+    let params = new HttpParams().set('limit', 100);
+
+    if (term && term.trim() !== '') {
+      params = params.set('term', term.trim());
+    }
+
+    if (locality && locality.trim() !== '') {
+      params = params.set('locality', locality.trim());
+    }
+
+    return this.http.get<AdminMember[]>('/v1/members', { params });
+  }
+
+  member(id: string): Observable<AdminMember> {
+    return this.http.get<AdminMember>(`/v1/members/${id}`);
+  }
+
+  /**
+   * Corrects somebody's details.
+   *
+   * A different path from the member portal's `PATCH /v1/members/{id}`, and the
+   * difference is what the request does *not* carry. The whole-profile update
+   * requires the member's privacy levels and whether they are listed — neither
+   * of which any read available to an administrator returns — so correcting a
+   * misspelt name through it meant guessing, and an unreadable level parses as
+   * Private. This body has no such field to get wrong.
+   */
+  correctMember(id: string, correction: MemberCorrection): Observable<AdminMember> {
+    return this.http.patch<AdminMember>(`/v1/members/${id}/details`, correction);
   }
 
   // ---- Pathshala ---------------------------------------------------------

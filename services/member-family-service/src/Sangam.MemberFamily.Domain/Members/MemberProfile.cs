@@ -275,6 +275,54 @@ public sealed class MemberProfile : AggregateRoot, ITenantScopedEntity
             Id, TenantId, FullName, changed, updatedBy, updatedAt));
     }
 
+    /// <summary>
+    /// A Samaaj administrator correcting somebody's factual details.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// <b>It cannot reach <see cref="Privacy"/> or
+    /// <see cref="IsListedInDirectory"/>, and that is the whole reason it
+    /// exists.</b> Both are the member's own decisions about what their Samaaj
+    /// may see, and a misspelt name is not a reason to revisit them.
+    /// </para>
+    /// <para>
+    /// Before this, an administrator's only route was <see cref="Update"/>,
+    /// which replaces the profile whole and therefore <i>requires</i> both. No
+    /// read an administrator could make returned either one -
+    /// <c>ToDirectoryResponse</c> omits them and <c>ToOwnerResponse</c> is only
+    /// ever built for the caller's own profile - so correcting a phone number
+    /// meant sending privacy settings the caller had no way to know. An
+    /// unreadable level parses as <c>Private</c>, so the likeliest accident was
+    /// silently hiding every field a member had chosen to share, and the member
+    /// is never told. Enforcing it here rather than in the handler means the
+    /// guarantee survives the next handler somebody writes.
+    /// </para>
+    /// </remarks>
+    public void CorrectDetails(
+        string fullName,
+        DateOnly? dateOfBirth,
+        Gender gender,
+        string? mobile,
+        string? email,
+        string? address,
+        string? locality,
+        string? profession,
+        DateTimeOffset updatedAt,
+        Guid correctedBy) =>
+        Update(
+            fullName,
+            dateOfBirth,
+            gender,
+            mobile,
+            email,
+            address,
+            locality,
+            profession,
+            Privacy,
+            IsListedInDirectory,
+            updatedAt,
+            correctedBy);
+
     private static void Note(List<string> changed, string field, string? before, string? after)
     {
         if (!string.Equals(before, after, StringComparison.Ordinal))

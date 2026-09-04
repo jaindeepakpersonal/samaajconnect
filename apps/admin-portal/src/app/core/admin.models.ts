@@ -626,3 +626,42 @@ export interface SocialIssue {
   readonly createdAt: string;
   readonly publishedAt: string | null;
 }
+
+/**
+ * Mirrors `MemberResponse`, which is what member-family-service returns to a
+ * Samaaj administrator for anybody in their Samaaj.
+ *
+ * **Every field can be null and null means "not set", not "not shared".** For
+ * an administrator the two collapse: `IsVisibleTo` lets a Samaaj admin past
+ * every privacy level, precisely because correcting somebody's details is the
+ * job. In the member portal the same shape has to be read the other way round,
+ * which is why that app's directory says "Not shared" and this one does not.
+ *
+ * What is deliberately absent is the member's privacy settings and whether they
+ * are listed. This screen cannot change either, so being shown them would be
+ * being shown a control that does nothing.
+ */
+export interface AdminMember {
+  readonly id: string;
+  readonly fullName: string;
+  readonly photoUrl: string | null;
+  readonly locality: string | null;
+  readonly dateOfBirth: string | null;
+  readonly mobile: string | null;
+  readonly email: string | null;
+  readonly address: string | null;
+  readonly profession: string | null;
+  readonly gender: string;
+}
+
+/** The body of `PATCH /v1/members/{id}/details`. No privacy fields, by design. */
+export interface MemberCorrection {
+  readonly fullName: string;
+  readonly dateOfBirth: string | null;
+  readonly gender: string;
+  readonly mobile: string | null;
+  readonly email: string | null;
+  readonly address: string | null;
+  readonly locality: string | null;
+  readonly profession: string | null;
+}

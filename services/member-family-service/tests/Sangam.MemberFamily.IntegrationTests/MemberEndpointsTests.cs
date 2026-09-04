@@ -308,4 +308,132 @@ public sealed class MemberEndpointsTests(MemberFamilyApiFactory factory)
 
         response.StatusCode.Should().NotBe(HttpStatusCode.InternalServerError);
     }
+
+    // ---- Correcting somebody else's details ---------------------------------
+    //
+    // `Members.Write` was granted, `SERVICES.md` said an administrator could
+    // correct anyone's profile, and the only command that let them do it
+    // required privacy levels no administrator could read. These cover the
+    // separate path, and - more importantly - that the old one is now closed.
+
+    private async Task<MemberProfile> ReloadAsync(Guid id)
+    {
+        await using var scope = factory.Services.CreateAsyncScope();
+        var db = scope.ServiceProvider.GetRequiredService<MemberFamilyDbContext>();
+
+        return await db.MemberProfiles.IgnoreQueryFilters().SingleAsync(p => p.Id == id);
+    }
+
+    private static object Correction(string fullName, string? mobile = "+919812345678") => new
+    {
+        fullName,
+        dateOfBirth = "1990-01-01",
+        gender = "Unspecified",
+        mobile,
+        email = "kept@example.com",
+        address = "An address",
+        locality = "Udaipur",
+        profession = "Architect",
+    };
+
+    [Fact]
+    public async Task An_administrator_corrects_another_members_details()
+    {
+        var response = await AdminClient(TenantA).PatchAsJsonAsync(
+            "/v1/members/" + _meera + "/details",
+            Correction(Named("Meera Shaha")));
+
+        response.StatusCode.Should().Be(HttpStatusCode.OK);
+
+        (await ReloadAsync(_meera)).FullName.Should().Be(Named("Meera Shaha"));
+    }
+
+    [Fact]
+    public async Task And_it_cannot_touch_what_that_member_chose_to_share()
+    {
+        var before = await ReloadAsync(_meera);
+        var privacyBefore = before.Privacy;
+
+        (await AdminClient(TenantA).PatchAsJsonAsync(
+            "/v1/members/" + _meera + "/details",
+            Correction(Named("Meera Corrected"), mobile: "+919800000000")))
+            .StatusCode.Should().Be(HttpStatusCode.OK);
+
+        var after = await ReloadAsync(_meera);
+
+        after.Mobile.Should().Be("+919800000000");
+
+        // The whole reason this endpoint exists. The request carries no privacy
+        // fields, so there is nothing an administrator could have sent by
+        // accident and nothing they had to guess.
+        after.Privacy.Should().Be(privacyBefore);
+        after.IsListedInDirectory.Should().BeTrue();
+    }
+
+    [Fact]
+    public async Task A_member_without_Members_Write_cannot_correct_anybody()
+    {
+        (await MemberClient(_ravi, TenantA).PatchAsJsonAsync(
+            "/v1/members/" + _meera + "/details",
+            Correction(Named("Hijacked"))))
+            .StatusCode.Should().Be(HttpStatusCode.Forbidden);
+    }
+
+    [Fact]
+    public async Task An_administrator_of_another_Samaaj_is_told_no_such_member()
+    {
+        // The IDOR guard again, on the new write path. A 403 here would confirm
+        // the member exists somewhere.
+        (await AdminClient(TenantA).PatchAsJsonAsync(
+            "/v1/members/" + _outsider + "/details",
+            Correction(Named("Hijacked"))))
+            .StatusCode.Should().Be(HttpStatusCode.NotFound);
+    }
+
+    [Fact]
+    public async Task An_administrator_correcting_themselves_is_sent_to_their_own_screen()
+    {
+        // Not a refusal of the change, a refusal of the route. Their own screen
+        // can set privacy; this one cannot, and silently dropping that for the
+        // one caller entitled to it would be worse than saying so.
+        var admin = Guid.NewGuid();
+
+        await SeedAsync(admin, TenantA, Named("An Admin"), "Udaipur");
+
+        var client = factory.CreateClientAs(
+            admin, TenantA, ["SamaajAdmin"], ["Members.Read", "Members.Write"]);
+
+        var response = await client.PatchAsJsonAsync(
+            "/v1/members/" + admin + "/details", Correction(Named("An Admin")));
+
+        response.StatusCode.Should().Be(HttpStatusCode.Conflict);
+
+        (await response.Content.ReadAsStringAsync())
+            .Should().Contain("your profile screen");
+    }
+
+    [Fact]
+    public async Task The_whole_profile_update_is_now_the_members_own_and_nobody_elses()
+    {
+        // The half of this change that removes something. An administrator
+        // sending a complete profile - the shape that carries privacy - is
+        // refused however much permission they hold, because there is no body
+        // they could send that does not decide something for the member.
+        var response = await AdminClient(TenantA).PatchAsJsonAsync(
+            "/v1/members/" + _meera,
+            new
+            {
+                fullName = Named("Meera Shah"),
+                privacy = PrivacyAll("Public"),
+                isListedInDirectory = true,
+            });
+
+        response.StatusCode.Should().Be(HttpStatusCode.Forbidden);
+
+        (await response.Content.ReadAsStringAsync())
+            .Should().Contain("/details");
+
+        // And it changed nothing on the way to being refused.
+        (await ReloadAsync(_meera)).Privacy.Email.Should().Be(PrivacyLevel.Private);
+    }
 }

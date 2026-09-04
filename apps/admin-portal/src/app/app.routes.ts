@@ -152,6 +152,18 @@ export const routes: Routes = [
           import('./features/issues/issue-queue.component').then((m) => m.IssueQueueComponent),
       },
       {
+        path: 'members',
+        title: 'Members - samaajconnect admin',
+        loadComponent: () =>
+          import('./features/members/member-list.component').then((m) => m.MemberListComponent),
+      },
+      {
+        path: 'members/:id',
+        title: 'Member - samaajconnect admin',
+        loadComponent: () =>
+          import('./features/members/member-detail.component').then((m) => m.MemberDetailComponent),
+      },
+      {
         path: 'moderation',
         title: 'Content moderation - samaajconnect admin',
         loadComponent: () =>

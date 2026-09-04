@@ -76,7 +76,8 @@ enforced by `TenantAuthorizationBehavior`, not just UI hiding.
 |---|---|---|---|
 | GET | `/members` | Member, SamaajAdmin | Search/filter tenant directory |
 | GET | `/members/{id}` | `Members.Read` | One member, through the same per-field privacy mapper the directory uses |
-| PATCH | `/members/{id}` | Member (self), SamaajAdmin | Update profile. Replaces it whole: `privacy` and `isListedInDirectory` are both **required**, because defaulting either would silently reopen something a member had closed. Takes **no** photo field — see below |
+| PATCH | `/members/{id}` | Member, **self only** | Update your own profile. Replaces it whole: `privacy` and `isListedInDirectory` are both **required**, because defaulting either would silently reopen something a member had closed. Takes **no** photo field — see below |
+| PATCH | `/members/{id}/details` | `SamaajAdmin` + `Members.Write`, never self | Correct somebody else's factual details. The same fields **minus** `privacy` and `isListedInDirectory`, which are the member's own. **409** on your own id: use the profile screen, which can set them |
 | POST | `/members/{id}/photo` | Member (self), `Members.Write` | `multipart/form-data`, one file part. JPEG, PNG or WebP, 2 MB |
 | GET | `/members/{id}/photo` | `Members.Read` | The bytes. `ETag` + `Cache-Control: private` |
 | DELETE | `/members/{id}/photo` | Member (self), `Members.Write` | Idempotent |

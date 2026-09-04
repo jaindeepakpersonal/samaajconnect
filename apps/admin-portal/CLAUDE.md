@@ -31,7 +31,9 @@ screen. The spec is `docs/product/wireframes/admin-panel-wireframes.html`.
 | Campaign detail | `/voting/:id` | — | built; no wireframe covers running one. Stage, ballot, nominations, tally, result |
 | Volunteer Groups | `/groups` | `#groups` (member-facing) | built. Create with a president, and stand one down |
 | Social Issues | `/issues` | `#issues` | built. The reviewer's approval queue |
-| Members, Reports, Settings | — | various | not built. Member administration is done from the Samaaj screen and the role matrix; reporting is a later phase |
+| Members | `/members` | `#members` | built. Search the Samaaj directory and open somebody |
+| Member detail | `/members/:id` | — | built; the wireframe's "View" had no screen behind it. The correction form |
+| Reports, Settings | — | various | not built. Reporting is a later phase; Samaaj settings live on the Samaaj screen |
 
 The unbuilt screens appear in the nav, disabled, each saying why. That is
 deliberate: the wireframe promised them, and an administrator who cannot see
@@ -402,6 +404,40 @@ can create here; one it is looser about is a wasted round trip.
 **Models live in this app, not in `libs/shared`.** Only the admin panel calls
 these endpoints. A type moves to the shared library when both apps need it, not
 in anticipation.
+
+**The Members screen closed a permission that was granted and unusable.**
+`Members.Write` has been on SamaajAdmin since the catalogue was seeded and
+`SERVICES.md` has always said it lets an administrator correct anyone's profile
+in their Samaaj. There was no screen — and the endpoint that existed could not
+have been used correctly by one. `PATCH /v1/members/{id}` replaces the profile
+whole and therefore requires the member's privacy levels and whether they are
+listed, and **no read an administrator can make returns either**. A form built
+against it would have had to guess, and an unreadable level parses as Private,
+so the likeliest accident was quietly hiding every field a member had chosen to
+share.
+
+`PATCH /v1/members/{id}/details` carries no privacy fields at all, which is why
+this form has no privacy controls and no directory tick. They are not omitted
+for space, and the note under the form says so: a control that cannot be saved
+is worse than an absent one, and this panel has been wrong in that direction
+before — it told itself a Pathshala create form "would be a control that always
+answers 403" and left the endpoint with no caller for several cycles.
+
+**Three of the wireframe's five Members columns are gone, and none of them is a
+layout decision.** **ID** ("MEM-00124") is an identifier this platform does not
+have; a member's id is a GUID nobody reads out over the phone, and a short code
+would be one nothing else on the platform knows. **Family** would be a call per
+row into a household this endpoint does not return, and a household's membership
+is other members' data — so putting it on a directory row is a privacy decision.
+**Status** belongs to identity-tenant-service, and its pending accounts already
+have a screen under Admin Users. Locality takes their place because it is what
+the search actually filters on.
+
+**Profession is shown and cannot be searched, and the screen says why.** The
+field carries a per-field privacy level, so a server-side filter on it would let
+anybody confirm a private value one query at a time — member-family-service
+refuses to offer one for that reason. A box quietly missing from a search form
+reads as an oversight; a sentence saying it is a privacy decision does not.
 
 ## Accessibility
 

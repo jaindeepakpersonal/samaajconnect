@@ -8,7 +8,73 @@ version of the plan; the reasoning behind the ordering lives in
 ## Current Status
 
 - **Stage:** every module has a service and member screens; Phase 5 hardening under way
-- **Last updated:** 2026-09-04 - **a service's own documentation is a
+- **Last updated:** 2026-09-04 - **a permission that was granted and could not
+  be used, and using it would have been worse than not.**
+
+  The admin panel's nav has carried a disabled **Members** item since it was
+  built, reading "the member directory screen is not built yet". That was true
+  and it was not the whole truth. `Members.Write` has been granted to SamaajAdmin
+  since the authorization catalogue was seeded, `SERVICES.md` has always said an
+  administrator holding it may correct anyone's profile in their Samaaj, and
+  `UpdateProfileCommand` accepted them. **Building the screen would not have been
+  enough, because the endpoint could not have been called correctly.**
+
+  That command replaces the profile whole, so it *requires* `privacy` and
+  `isListedInDirectory` - deliberately, because defaulting either would silently
+  reopen something a member had closed. But **no read available to an
+  administrator returns either one.** `ToDirectoryResponse`, the only mapper an
+  administrator reaches for somebody else, omits both. `ToOwnerResponse`, which
+  carries them, is only ever built for the caller's own profile.
+
+  So an administrator correcting a misspelt name had two outcomes available, and
+  both were silent. Send levels they guessed, and they overwrite decisions the
+  member made. Send anything unparseable - an omitted field, an empty object -
+  and `Level()` falls back to `Private`, hiding every field the member had chosen
+  to share. The member is not told either way.
+
+  **The read and the write were each correct on their own and did not fit
+  together.** That is the same shape as the Pathshala register that could be
+  written and never read back: two complete halves, and a gap only visible to
+  somebody trying to use them in one sitting.
+
+  `PATCH /v1/members/{id}/details` is the fix, and the shape of the request *is*
+  the fix: it carries no privacy fields at all, so there is nothing to guess and
+  nothing to send by accident. `MemberProfile.CorrectDetails` passes the
+  profile's own settings straight back through `Update`, so the guarantee lives
+  in the aggregate rather than in a handler remembering.
+
+  **And the whole-profile update is self only now.** Leaving the old path open
+  would have left the hazard reachable by anyone with `Members.Write` and a curl,
+  which is the entire finding. Nothing lost a capability it was using: no test
+  and no screen exercised an administrator through that route, which is itself
+  the evidence it had never worked.
+
+  **The Members screen is built**, from the wireframe's `#members`, with a
+  detail screen behind the "View" button that had nowhere to go. Three of the
+  wireframe's five columns are gone and none of the three is a layout decision:
+  **ID** ("MEM-00124") is an identifier this platform does not have; **Family**
+  would be a call per row into a household that is other members' data; and
+  **Status** belongs to identity-tenant-service, which already has a screen for
+  it. Profession is shown and cannot be searched, and the screen says why - a
+  server-side filter on a field carrying a privacy level would let anybody
+  confirm a private value one query at a time.
+
+  Verified by five injections: a correction resetting privacy to the default,
+  the admin bypass put back on the whole-profile update, the self-check removed,
+  the admin client sending a privacy object, and a cleared box sent as an empty
+  string rather than null. Each failed the test that should have caught it, and
+  each passed again unmodified.
+
+  **Last cycle's check caught this cycle's own omission**, which is the first
+  time one of these has paid for itself the same week: `scripts/service-docs.sh`
+  failed on `CorrectMemberDetailsCommand` before I had written the row for it.
+
+  340 of 340 smoke checks green through the gateway, which is 332 plus exactly
+  the eight added here.
+
+  1,682 tests green, up 25 - 5 unit and 6 integration in member-family-service,
+  and 14 in the admin panel.
+- **Previously:** 2026-09-04 - **a service's own documentation is a
   hand-written list too.**
 
   §9 already wrote the lesson down: "a hand-written list of the ten services is

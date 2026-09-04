@@ -26,7 +26,8 @@ worked example of a cross-service flow with no synchronous call.
 | Command | Policy | Status |
 |---|---|---|
 | `CreateProfileForNewUserCommand` | `[InternalRequest]` | built |
-| `UpdateProfileCommand` | self, or `Members.Write` | built |
+| `UpdateProfileCommand` | self only - see below | built |
+| `CorrectMemberDetailsCommand` | `SamaajAdmin` + `Members.Write`, never self | built |
 | `CreateFamilyCommand` | any member | built |
 | `RequestJoinFamilyCommand` | any member | built |
 | `DecideJoinRequestCommand` | head of that family | built |
@@ -87,7 +88,8 @@ here, which looks exactly like a broker problem and is not one.
 |---|---|---|
 | GET | `/v1/members` | `Members.Read` |
 | GET | `/v1/members/me` | any authenticated role |
-| PATCH | `/v1/members/{id}` | self, or `Members.Write` |
+| PATCH | `/v1/members/{id}` | self only |
+| PATCH | `/v1/members/{id}/details` | `SamaajAdmin` + `Members.Write`, never self |
 | POST | `/v1/families` | any member |
 | GET | `/v1/families/mine` | any member |
 | POST | `/v1/families/join-requests` | any member |
@@ -105,6 +107,46 @@ here, which looks exactly like a broker problem and is not one.
 | GET | `/health` | anonymous |
 
 ## Decisions worth knowing before you change this service
+
+**An administrator held a permission they could not use, and using it would
+have been worse than not.** `Members.Write` has been granted to SamaajAdmin
+since the authorization catalogue was seeded, and `SERVICES.md` has always said
+an administrator holding it may correct anyone's profile in their Samaaj.
+`UpdateProfileCommand` accepted them. Nothing could actually be done with it.
+
+The command replaces the profile whole, so it **requires** `privacy` and
+`isListedInDirectory` - deliberately, because defaulting either would silently
+reopen something a member had closed. But **no read available to an
+administrator returns either one**. `ToDirectoryResponse`, the only mapper an
+administrator reaches for somebody else, omits both; `ToOwnerResponse`, which
+carries them, is only ever built for the caller's own profile.
+
+So the two outcomes available to an administrator correcting a misspelt name
+were: send levels they guessed, overwriting choices the member made; or send
+something unparseable - an empty object, an omitted field - and have
+`Level()` fall back to `Private`, hiding every field the member had chosen to
+share. Neither tells the member anything. The read and the write were each
+correct on their own and did not fit together, which is the same shape as the
+Pathshala register that could be written and not read back.
+
+`CorrectMemberDetailsCommand` and `PATCH /v1/members/{id}/details` are the
+answer, and the shape of the request is the fix: **it carries no privacy fields
+at all**, so there is nothing to guess and nothing to send by accident.
+`MemberProfile.CorrectDetails` passes the profile's own `Privacy` and
+`IsListedInDirectory` straight back through `Update`, so the guarantee lives in
+the aggregate rather than in a handler remembering.
+
+**And the whole-profile update is now self only.** Leaving the old path open
+would have left the hazard reachable by anyone with `Members.Write` and a curl,
+which is the entire finding. Nothing lost a capability it was using: no test and
+no screen exercised an administrator through that route, which is why closing it
+broke nothing - itself the evidence that it had never worked.
+
+**Correcting your own profile through the admin path is refused by name.** An
+administrator has their own profile screen, where they can see and set their
+privacy; routing themselves through the correction path would make them the one
+caller who silently loses the ability to change something they are entitled to
+change.
 
 **A member could ask to join a household and never take it back.** A pending
 request counts as belonging to one — deliberately, so nobody can ask two

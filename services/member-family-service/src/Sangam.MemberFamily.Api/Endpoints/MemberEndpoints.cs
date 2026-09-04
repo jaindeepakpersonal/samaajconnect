@@ -1,6 +1,7 @@
 using MediatR;
 using Sangam.MemberFamily.Api.Extensions;
 using Sangam.MemberFamily.Application.Members;
+using Sangam.MemberFamily.Application.Members.Commands.CorrectMemberDetails;
 using Sangam.MemberFamily.Application.Members.Commands.UpdateProfile;
 using Sangam.MemberFamily.Application.Members.Queries.GetMember;
 using Sangam.MemberFamily.Application.Members.Queries.GetMyData;
@@ -97,11 +98,47 @@ public static class MemberEndpoints
                 return result.ToApiResult();
             })
             .WithName("UpdateProfile")
-            .WithSummary("Update a profile. Your own, or anyone's in this Samaaj with Members.Write.")
+            .WithSummary("Update your own profile, including what your Samaaj may see.")
             .Produces<MyProfileResponse>()
             .ProducesValidationProblem()
             .ProducesProblem(StatusCodes.Status403Forbidden)
             .ProducesProblem(StatusCodes.Status404NotFound);
+
+        // A Samaaj administrator correcting somebody else's details.
+        //
+        // A separate path rather than a flag on the one above, because the two
+        // requests carry different things: this one has no privacy fields, and
+        // that absence is the guarantee. A shared endpoint that ignored them
+        // for one caller and honoured them for another would put the rule in a
+        // handler's `if` instead of in the shape of the request.
+        group.MapPatch("/{id:guid}/details", async (
+                Guid id,
+                CorrectMemberDetailsRequest request,
+                ISender sender,
+                CancellationToken cancellationToken) =>
+            {
+                var command = new CorrectMemberDetailsCommand(
+                    id,
+                    request.FullName,
+                    request.DateOfBirth,
+                    request.Gender,
+                    request.Mobile,
+                    request.Email,
+                    request.Address,
+                    request.Locality,
+                    request.Profession);
+
+                var result = await sender.Send(command, cancellationToken);
+
+                return result.ToApiResult();
+            })
+            .WithName("CorrectMemberDetails")
+            .WithSummary("Correct another member's details. Never what they share.")
+            .Produces<MemberResponse>()
+            .ProducesValidationProblem()
+            .ProducesProblem(StatusCodes.Status403Forbidden)
+            .ProducesProblem(StatusCodes.Status404NotFound)
+            .ProducesProblem(StatusCodes.Status409Conflict);
 
         return app;
     }
@@ -117,4 +154,17 @@ public static class MemberEndpoints
         string? Profession,
         PrivacySettings Privacy,
         bool? IsListedInDirectory);
+
+    /// <summary>
+    /// The same factual fields, and deliberately no privacy ones.
+    /// </summary>
+    public sealed record CorrectMemberDetailsRequest(
+        string FullName,
+        DateOnly? DateOfBirth,
+        string? Gender,
+        string? Mobile,
+        string? Email,
+        string? Address,
+        string? Locality,
+        string? Profession);
 }

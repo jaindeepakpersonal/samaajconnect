@@ -173,7 +173,7 @@ existing platform (`Pathshala.Attendance.Write`, `Issue.Approve`):
 | `Tenant.Manage` | Create/activate/deactivate tenants |
 | `AdminUsers.Manage` | Create/invite admins, assign roles |
 | `Roles.Manage` | Edit the role/permission matrix for a Samaaj. A Samaaj administrator cannot have this one taken away — that is the lock-out floor, enforced in the service and drawn as a fixed tick rather than a checkbox in the admin panel |
-| `Members.Read` / `Members.Write` | Directory search / profile correction |
+| `Members.Read` / `Members.Write` | Directory search / correcting somebody's factual details. `Members.Write` **cannot** change what a member shares or whether they are listed — those travel only on the member's own self-service update, and the correction endpoint carries no such field to send. Until 2026-09-04 the only route open to this permission required them, and no read available to an administrator returned them |
 | `Family.Write` | Family/child management |
 | `Family.ApproveConversion` | Approve adult-child conversion |
 | `Timeline.Post` / `Timeline.Moderate` | Post / moderate content |
