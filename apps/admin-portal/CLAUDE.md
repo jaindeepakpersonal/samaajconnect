@@ -11,9 +11,9 @@ screen. The spec is `docs/product/wireframes/admin-panel-wireframes.html`.
 |---|---|---|---|
 | Sign in | `/login` | — (the wireframe has none) | built |
 | Dashboard | `/dashboard` | `#dashboard` | built, partial — see below |
-| Samaaj / Tenants | `/tenants` | `#tenants` | built |
+| Samaaj / Tenants | `/tenants` | `#tenants` | built. Status, modules, logo, and the DPDP s.13 grievance contact |
 | Create Samaaj | `/tenants/new` | `#createtenant` | built |
-| Admin Users & Roles | `/admins` | `#admins` | built |
+| Admin Users & Roles | `/admins` | `#admins` | built. Roles, and re-issuing a one-time activation code |
 | Invite Admin | `/admins/invite` | `#inviteadmin` | built |
 | Role & Permission Matrix | `/roles` | `#rolematrix` | built, editable per Samaaj |
 | Adult Child Conversion Queue | `/conversions` | `#conversionqueue` | built |
@@ -404,6 +404,42 @@ can create here; one it is looser about is a wasted round trip.
 **Models live in this app, not in `libs/shared`.** Only the admin panel calls
 these endpoints. A type moves to the shared library when both apps need it, not
 in anticipation.
+
+**Two API-client methods had no caller, and the endpoint sweep could not see
+either.** `scripts/unreachable-endpoints.sh` finds callers by looking for `/v1/`
+literals in app code — and every endpoint's literal lives in `admin-api.ts`, so
+an endpoint whose *client method* nothing calls still counts as reached. The
+dead end simply moved one layer up, which is what
+`scripts/uncalled-api-methods.sh` now sweeps for.
+
+**`setGrievanceContact`** is the one that mattered. DPDP section 13 requires a
+Data Fiduciary to publish who answers a member's complaint about their data;
+`DPDP-COMPLIANCE.md` marked the obligation **built**, and the only way for a
+Samaaj to actually name anybody was curl. The Samaaj screen carries the control
+now, and a Samaaj that has named nobody says so on its row without anything
+being opened.
+
+**`issueActivationCode`** is the one that made this file's neighbour lie. The
+Invite screen has told administrators from the day it shipped that "a lost code
+is re-issued from the Admin Users screen, which cancels this one" — and nothing
+on that screen called it, so an account stuck at Pending Activation stayed stuck
+while the dashboard counted it every day. The button is on the status cell of a
+pending row, and the panel says the earlier code has been cancelled, because an
+administrator who hands out a second code without knowing that leaves somebody
+holding a dead one.
+
+**The grievance form duplicates the service's rule and must stay in step.** A
+name with no email and no phone is refused, because that is not a means of
+redressal; clearing all three is allowed, because removing a contact is not the
+same act as naming an unreachable one. The smoke run checks the refusal against
+the service, so the copy here cannot quietly become stricter or looser than the
+thing that decides.
+
+**And backticks do not belong in an inline template's HTML comments.** An
+Angular component's template is a JavaScript template literal, so a backtick
+inside a `<!-- -->` ends it — the compiler then reports NG1002 "Incorrect number
+of arguments to @Component decorator" and a cascade of syntax errors pointing at
+lines that are fine. This has now cost two cycles.
 
 **The Members screen closed a permission that was granted and unusable.**
 `Members.Write` has been on SamaajAdmin since the catalogue was seeded and

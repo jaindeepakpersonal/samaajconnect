@@ -8,7 +8,66 @@ version of the plan; the reasoning behind the ordering lives in
 ## Current Status
 
 - **Stage:** every module has a service and member screens; Phase 5 hardening under way
-- **Last updated:** 2026-09-04 - **two doors to one outcome, and only one of
+- **Last updated:** 2026-09-04 - **the dead end moved one layer up, and the
+  sweep that looks for dead ends could not see it.**
+
+  `scripts/unreachable-endpoints.sh` finds callers by looking for `/v1/` literals
+  in app code. Every endpoint's literal lives in the app's own API client. So an
+  endpoint whose **client method** nothing calls still counts as reached, and the
+  sweep has been reporting clean over two of them.
+
+  `scripts/uncalled-api-methods.sh` is that missing half. member-portal's own
+  `CLAUDE.md` named this shape cycles ago - "that is the shape of gap this app
+  should look for: a client method with no caller" - after `updateMe` sat
+  uncalled through three cycles. Naming it was not enough.
+
+  **`setGrievanceContact` is the one that mattered.** DPDP section 13 requires a
+  Data Fiduciary to publish who answers a member's complaint about how their
+  data is handled. The endpoint was built, the client method was written,
+  `DPDP-COMPLIANCE.md` marked the obligation **built** - and no screen called
+  it, so the only way for a Samaaj to name anybody was curl. Built in the sense
+  that the platform could store an answer; unmet in the sense that no Samaaj
+  could give one.
+
+  The Samaaj screen carries the control now, and a Samaaj that has named nobody
+  says **"Not named"** on its row without anything being opened. The count of
+  Samaaj that have not met section 13 is the number a platform operator needs,
+  and it should not be behind a click.
+
+  **`issueActivationCode` is the one that made a neighbouring screen lie.** The
+  Invite screen has told administrators since the day it shipped that "a lost
+  code is re-issued from the Admin Users screen, which cancels this one".
+  Nothing on that screen called it. An account stuck at Pending Activation
+  stayed stuck, while the dashboard counted it every day - a tile that was a
+  dead end. The button is on the status cell of a pending row now, and the panel
+  says the earlier code has been cancelled, because an administrator who hands
+  out a second one without knowing that leaves somebody holding a dead code.
+
+  **A smoke check I wrote was wrong about the service, and the service was
+  right.** I expected a replaced activation code to be refused with 400; it
+  answers **403**, deliberately, because `ActivateAccountCommandHandler` gives
+  one indistinguishable refusal for every way activation can fail - "no such
+  account", "already activated" and "wrong code" would otherwise let somebody
+  with a list of identifiers work out which ones are mid-conversion. The check
+  now asserts 403 and says why, which is worth more than the check I meant to
+  write.
+
+  Verified by three injections: a name with no way to reach the person allowed
+  through, the grievance panel opening empty rather than seeded, and the
+  previous code left on screen while the next is requested. Each failed the test
+  that should have caught it.
+
+  **Backticks in an inline template's HTML comment, for the second time.** An
+  Angular template is a JavaScript template literal, so a backtick inside a
+  comment ends it - and the compiler reports NG1002 plus a cascade of syntax
+  errors pointing at lines that are fine. Written into `admin-portal/CLAUDE.md`
+  this time rather than remembered.
+
+  348 of 348 smoke checks green through the gateway, which is 345 plus exactly
+  the three added here.
+
+  1,719 tests green, up 12, all in the admin panel.
+- **Previously:** 2026-09-04 - **two doors to one outcome, and only one of
   them wrote down that it had happened.**
 
   Last cycle gave a parent a way to withdraw the consent a child's record is

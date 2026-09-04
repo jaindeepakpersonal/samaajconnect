@@ -112,6 +112,20 @@ Samaaj's general contact: conflating the two would make it impossible to tell
 whether a Samaaj has actually named one. A name with no email or phone is
 refused, because that is not a means of redressal.
 
+**And until 2026-09-04 the only way to name anybody was curl.** This section
+described the endpoint, the table above marked the obligation **built**, the
+admin panel's API client had the method written — and no screen called it. The
+obligation was built in the sense that the platform could store an answer, and
+unmet in the sense that no Samaaj could give one. `scripts/unreachable-endpoints.sh`
+reported nothing, because it finds callers by looking for `/v1/` literals in app
+code and the literal was sitting in the API client itself; the dead end had moved
+one layer up. `scripts/uncalled-api-methods.sh` is the sweep that sees that layer.
+
+The Samaaj screen now carries a **Grievance contact** control per Samaaj, and a
+Samaaj that has named nobody says "Not named" on its row without anything being
+opened — the count of Samaaj that have not met section 13 is the number a
+platform operator needs.
+
 ## The withdrawal that could only be reached through erasure
 
 Section 6(4) requires that withdrawing a consent be about as easy as giving it.

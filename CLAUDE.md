@@ -298,6 +298,7 @@ Neither uses `*service-defaults` — they need no database and no broker.
 | A multi-state workflow as a transition table | `services/social-issues-service/CLAUDE.md` |
 | Which endpoints no screen can reach | `scripts/unreachable-endpoints.sh` |
 | Which fields nothing can write | `scripts/unwritable-fields.sh` |
+| Which API-client methods no screen calls | `scripts/uncalled-api-methods.sh` |
 | Which free text reaches a handler unvalidated | `scripts/validator-coverage.sh` |
 | Whether every service still agrees with §4.4 | `scripts/pipeline-order.sh` |
 | Whether the security checklist is still true | `scripts/security-invariants.sh` |

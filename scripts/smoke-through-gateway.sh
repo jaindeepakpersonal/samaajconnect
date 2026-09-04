@@ -767,6 +767,16 @@ check "naming the grievance contact" 200 \
 GRIEVANCE=$(curl -s "$GATEWAY/v1/identity/tenants/$SLUG" | json_field email)
 check "it is published to anyone, as section 13 requires" "grievances@example.com" "$GRIEVANCE"
 
+# The rule the admin panel's form duplicates, checked against the service that
+# actually holds it. A name with no way to reach the person is not a means of
+# redressal - and a form stricter than the service would refuse a contact
+# nobody could save, while one looser is a round trip that reads as a bug.
+check "a name with no way to reach them is refused" 400 \
+  "$(status -X PUT "$GATEWAY/v1/identity/tenants/$TENANT_ID/grievance-contact" \
+     -H 'Content-Type: application/json' -H "Authorization: Bearer $ADMIN_TOKEN" \
+     -H "$ADMIN_TENANT_HEADER" \
+     -d '{"name":"Ravi Shah","email":null,"phone":null}')"
+
 # ---- The Samaaj's logo --------------------------------------------------------
 #
 # `LogoUrl` had been on the record since the first migration with nothing able
@@ -927,9 +937,41 @@ check "the same identifier cannot be invited twice" 409 \
      -H "Authorization: Bearer $ADMIN_TOKEN" -H "$ADMIN_TENANT_HEADER" \
      -d "{\"fullName\":\"Rajesh Jain\",\"mobileOrEmail\":\"$INVITE_EMAIL\",\"roles\":[\"SamaajAdmin\"]}")"
 
-check "the invited admin redeems the code and sets a password" 200 \
+# Re-issuing a code, which the Admin Users screen now offers and the Invite
+# screen has always promised - "a lost code is re-issued from the Admin Users
+# screen, which cancels this one". Nothing called that endpoint from either app
+# until now, so the sentence was true of the service and false of the platform.
+#
+# What is checked is the half the screen states and a reader has to trust: the
+# earlier code stops working. A second live code would mean a lost one stayed
+# usable by whoever found it.
+# INVITED_ID came off the invitation response above. Re-deriving it from the
+# pending list would take the first userId in it, which is whoever happens to be
+# waiting first - the id-extraction mistake this script has an open item about.
+SECOND_CODE=$(curl -s -X POST "$GATEWAY/v1/identity/activations/$INVITED_ID/code" \
+  -H "Authorization: Bearer $ADMIN_TOKEN" -H "$ADMIN_TENANT_HEADER" | json_field code)
+
+if [ -n "$SECOND_CODE" ] && [ "$SECOND_CODE" != "$INVITE_CODE" ]; then
+  echo "  ok    a fresh code is issued for an account still waiting"
+  pass=$((pass + 1))
+else
+  echo "  FAIL  a fresh code is issued for an account still waiting"
+  fail=$((fail + 1))
+fi
+
+# **403, not 400, and that is the service being careful.**
+# `ActivateAccountCommandHandler` gives one indistinguishable refusal for every
+# way activation can fail: "no such account", "already activated" and "wrong
+# code" would otherwise let somebody holding a list of identifiers work out
+# which ones are mid-conversion. This check was written expecting 400 and the
+# service was right.
+check "and the code it replaced no longer works" 403 \
   "$(status -X POST "$GATEWAY/v1/identity/activations/redeem" -H 'Content-Type: application/json' \
      -d "{\"mobileOrEmail\":\"$INVITE_EMAIL\",\"code\":\"$INVITE_CODE\",\"password\":\"$MEMBER_PASSWORD\"}")"
+
+check "the invited admin redeems the code and sets a password" 200 \
+  "$(status -X POST "$GATEWAY/v1/identity/activations/redeem" -H 'Content-Type: application/json' \
+     -d "{\"mobileOrEmail\":\"$INVITE_EMAIL\",\"code\":\"$SECOND_CODE\",\"password\":\"$MEMBER_PASSWORD\"}")"
 
 SAMAAJ_ADMIN_TOKEN=$(curl -s -X POST "$GATEWAY/v1/identity/login" \
   -H 'Content-Type: application/json' \

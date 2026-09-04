@@ -4,7 +4,7 @@ import { RouterLink } from '@angular/router';
 import { AuthService, describeError } from '@samaajconnect/shared';
 import { AdminApi } from '../../core/admin-api';
 import { AdminScope } from '../../core/admin-scope';
-import { AdminUser, Role } from '../../core/admin.models';
+import { ActivationCode, AdminUser, Role } from '../../core/admin.models';
 
 /**
  * Admin Users & Roles, from the admin wireframe's `#admins` screen.
@@ -75,6 +75,45 @@ import { AdminUser, Role } from '../../core/admin.models';
                     [class.off]="admin.status !== 'Active' && admin.status !== 'PendingActivation'"
                     >{{ spaced(admin.status) }}</span
                   >
+
+                  <!--
+                    The Invite screen has always told administrators that "a
+                    lost code is re-issued from the Admin Users screen, which
+                    cancels this one". It was not: the endpoint and the client
+                    method both existed and no screen called either, so an
+                    account stuck at Pending Activation stayed stuck and the
+                    dashboard counted it every day.
+                  -->
+                  @if (admin.status === 'PendingActivation') {
+                    <div class="actions">
+                      <button
+                        class="btn alt small"
+                        type="button"
+                        [disabled]="reissuing() === admin.userId"
+                        (click)="reissue(admin)"
+                      >
+                        {{ reissuing() === admin.userId ? 'Issuing…' : 'Re-issue code' }}
+                        <span class="sr-only">for {{ admin.fullName }}</span>
+                      </button>
+                    </div>
+                  }
+
+                  @if (issued(); as code) {
+                    @if (code.userId === admin.userId) {
+                      <div class="notice" role="status">
+                        <p class="code">{{ code.code }}</p>
+                        <p class="small">
+                          <b>Shown once.</b> Only its hash is stored, so it cannot be looked
+                          up again — hand it to {{ code.fullName }} in person. It expires
+                          {{ code.expiresAt | date: 'd MMM y, HH:mm' }}, and issuing this one
+                          cancelled any earlier code.
+                        </p>
+                        <button class="btn alt small" type="button" (click)="issued.set(null)">
+                          Done
+                        </button>
+                      </div>
+                    }
+                  }
                 </td>
                 <td>
                   @if (admin.lastLoginAt) {
@@ -129,6 +168,38 @@ export class AdminListComponent implements OnInit {
   readonly loading = signal(true);
   readonly error = signal<string | null>(null);
   readonly busy = signal<string | null>(null);
+
+  /** Which account a code is being minted for, and the code once it arrives. */
+  readonly reissuing = signal<string | null>(null);
+  readonly issued = signal<ActivationCode | null>(null);
+
+  /**
+   * Mints a fresh one-time code for an account still waiting to be activated.
+   *
+   * Issuing cancels any earlier code, which is why the panel says so: an
+   * administrator who hands out a second code without knowing that would leave
+   * somebody holding one that has silently stopped working.
+   *
+   * The previous code is cleared before the request rather than after it, so a
+   * failure cannot leave the last person's code sitting on screen next to a new
+   * name — the same rule the invite screen follows.
+   */
+  reissue(admin: AdminUser): void {
+    this.reissuing.set(admin.userId);
+    this.issued.set(null);
+    this.error.set(null);
+
+    this.api.issueActivationCode(admin.userId).subscribe({
+      next: (code) => {
+        this.issued.set(code);
+        this.reissuing.set(null);
+      },
+      error: (failure: unknown) => {
+        this.error.set(describeError(failure));
+        this.reissuing.set(null);
+      },
+    });
+  }
 
   readonly assignableRoles = computed(() => this.roles().filter((r) => r.assignableToAdmins));
 

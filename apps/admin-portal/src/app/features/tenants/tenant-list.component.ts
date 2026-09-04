@@ -162,6 +162,26 @@ import { ModuleDescriptor, Tenant, TenantStatus } from '../../core/admin.models'
                       >
                         Logo
                       </button>
+                      <!--
+                        DPDP section 13. DPDP-COMPLIANCE.md has marked this
+                        obligation "built" since the endpoint landed, and until
+                        this button existed the only way a Samaaj could name the
+                        person who answers a member's complaint about their data
+                        was curl. The endpoint sweep never saw it: the path
+                        literal sits in admin-api.ts, so the endpoint counted as
+                        reached while the client method had no caller.
+                      -->
+                      <button
+                        class="btn small"
+                        type="button"
+                        [attr.aria-expanded]="grievanceFor() === tenant.id"
+                        (click)="openGrievance(tenant)"
+                      >
+                        Grievance contact
+                        @if (tenant.grievanceContact === null) {
+                          <span class="pill warn">Not named</span>
+                        }
+                      </button>
                     }
                   </div>
 
@@ -240,6 +260,88 @@ import { ModuleDescriptor, Tenant, TenantStatus } from '../../core/admin.models'
                           Close
                         </button>
                       </div>
+                    </div>
+                  }
+
+                  @if (grievanceFor() === tenant.id) {
+                    <div class="modules" role="status">
+                      <p class="small">
+                        Section 13 of the DPDP Act requires this Samaaj to publish who a
+                        member complains to about how their data is handled. It appears on
+                        the Samaaj's public summary, so it is deliberately separate from the
+                        general contact — otherwise there would be no way to tell whether a
+                        Samaaj had named one at all.
+                      </p>
+
+                      <div class="field">
+                        <label [for]="tenant.id + 'gname'">Name</label>
+                        <input
+                          class="input"
+                          [id]="tenant.id + 'gname'"
+                          maxlength="200"
+                          [(ngModel)]="grievance.name"
+                          [ngModelOptions]="{ standalone: true }"
+                        />
+                      </div>
+
+                      <div class="field">
+                        <label [for]="tenant.id + 'gemail'">Email</label>
+                        <input
+                          class="input"
+                          [id]="tenant.id + 'gemail'"
+                          maxlength="320"
+                          [(ngModel)]="grievance.email"
+                          [ngModelOptions]="{ standalone: true }"
+                        />
+                      </div>
+
+                      <div class="field">
+                        <label [for]="tenant.id + 'gphone'">Phone</label>
+                        <input
+                          class="input"
+                          [id]="tenant.id + 'gphone'"
+                          maxlength="20"
+                          [(ngModel)]="grievance.phone"
+                          [ngModelOptions]="{ standalone: true }"
+                        />
+                      </div>
+
+                      <!--
+                        The service's rule, duplicated on purpose and required to
+                        stay in step: a name with no way to reach the person is
+                        not a means of redressal. Stricter here would be a
+                        contact nobody could save; looser is a round trip that
+                        reads as a bug.
+                      -->
+                      @if (grievanceIncomplete()) {
+                        <p class="small" role="alert">
+                          Give an email address or a phone number. A name on its own is not a
+                          way to reach anybody.
+                        </p>
+                      }
+
+                      <div class="actions">
+                        <button
+                          class="btn small"
+                          type="button"
+                          [disabled]="busyId() === tenant.id || grievanceIncomplete()"
+                          (click)="saveGrievance(tenant)"
+                        >
+                          {{ busyId() === tenant.id ? 'Saving…' : 'Save contact' }}
+                        </button>
+                        <button
+                          class="btn alt small"
+                          type="button"
+                          (click)="grievanceFor.set(null)"
+                        >
+                          Cancel
+                        </button>
+                      </div>
+
+                      <p class="small">
+                        Clearing all three removes the contact. The Act asks for one, so the
+                        Samaaj is then published as having named nobody.
+                      </p>
                     </div>
                   }
 
@@ -434,6 +536,76 @@ export class TenantListComponent implements OnInit {
   openLogo(tenant: Tenant): void {
     this.logoError.set(null);
     this.logoFor.set(this.logoFor() === tenant.id ? null : tenant.id);
+  }
+
+  // ---- The grievance contact (DPDP s.13) ---------------------------------
+
+  readonly grievanceFor = signal<string | null>(null);
+
+  grievance = { name: '', email: '', phone: '' };
+
+  openGrievance(tenant: Tenant): void {
+    this.error.set(null);
+
+    if (this.grievanceFor() === tenant.id) {
+      this.grievanceFor.set(null);
+      return;
+    }
+
+    // Seeded from what is stored, so opening the panel to change a phone number
+    // does not silently drop the name that was already there - the command
+    // replaces all three fields at once.
+    this.grievance = {
+      name: tenant.grievanceContact?.name ?? '',
+      email: tenant.grievanceContact?.email ?? '',
+      phone: tenant.grievanceContact?.phone ?? '',
+    };
+
+    this.grievanceFor.set(tenant.id);
+  }
+
+  /**
+   * A name with no way to reach the person is not a means of redressal, which
+   * is the service's own rule. Clearing all three is allowed: that is removing
+   * the contact, not naming an unreachable one.
+   */
+  grievanceIncomplete(): boolean {
+    return (
+      this.grievance.name.trim() !== '' &&
+      this.grievance.email.trim() === '' &&
+      this.grievance.phone.trim() === ''
+    );
+  }
+
+  saveGrievance(tenant: Tenant): void {
+    if (this.grievanceIncomplete()) {
+      return;
+    }
+
+    this.busyId.set(tenant.id);
+    this.error.set(null);
+
+    this.api
+      .setGrievanceContact(tenant.id, {
+        name: this.blank(this.grievance.name),
+        email: this.blank(this.grievance.email),
+        phone: this.blank(this.grievance.phone),
+      })
+      .subscribe({
+        next: (updated) => {
+          this.replace(updated);
+          this.busyId.set(null);
+          this.grievanceFor.set(null);
+        },
+        error: (failure: unknown) => {
+          this.error.set(describeError(failure));
+          this.busyId.set(null);
+        },
+      });
+  }
+
+  private blank(value: string): string | null {
+    return value.trim() === '' ? null : value.trim();
   }
 
   /**
