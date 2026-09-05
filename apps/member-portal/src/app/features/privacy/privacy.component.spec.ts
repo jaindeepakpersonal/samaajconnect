@@ -254,6 +254,41 @@ describe('PrivacyComponent', () => {
     component.erase();
   });
 
+  it('keeps its trigger in the DOM rather than replacing it with the panel', () => {
+    // A confirmation that swaps out its own trigger drops keyboard focus to
+    // the document body - the finding three admin screens already shared
+    // (WCAG 2.4.3), and family.component.ts's own leave-household panel cites
+    // it explicitly. This screen's erasure trigger did not, despite being the
+    // single most irreversible action on the platform.
+    load();
+
+    component.askToConfirm();
+    fixture.detectChanges();
+
+    const trigger = Array.from(
+      (fixture.nativeElement as HTMLElement).querySelectorAll('button'),
+    ).find((b) => b.textContent?.trim() === 'Erase my account') as HTMLButtonElement | undefined;
+
+    expect(trigger).toBeDefined();
+    expect(trigger?.getAttribute('aria-expanded')).toBe('true');
+  });
+
+  it('announces why it asks for a password to a screen reader, not only sighted members', () => {
+    // The same WCAG 4.1.3 gap as the admin panel's own password-confirmation
+    // screens: nothing else moves focus when this text appears, so a screen
+    // reader user hears nothing unless it is a live region.
+    load();
+
+    component.askToConfirm();
+    fixture.detectChanges();
+
+    const warning = (fixture.nativeElement as HTMLElement).querySelector(
+      '.card p[role="status"]',
+    );
+
+    expect(warning?.textContent).toContain('deliberate one');
+  });
+
   it('keeps the panel open on a wrong password rather than ending the session', () => {
     // A wrong password answers 403 Auth.StepUpFailed and not 401, because the
     // interceptor renews on a 401 and retries - which here would submit the

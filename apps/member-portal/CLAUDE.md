@@ -542,6 +542,28 @@ today is the skip link sliding in, which is small — but the preference is a
 preference rather than a threshold, and the rule belongs there before something
 larger is added and nobody remembers to ask.
 
+**The erasure confirmation had the exact bug the first audit already fixed
+elsewhere, on 2026-09-05.** `PrivacyComponent`'s "Erase my account" panel
+rendered its trigger and its confirmation as an `@if`/`@else` pair, so
+confirming replaced the button the member had just pressed and dropped
+keyboard focus to the document body - the same WCAG 2.4.3 finding the first
+audit fixed on three admin screens, on the single most irreversible action
+this app has. `family.component.ts`'s own leave-household panel got this
+right and even cites the finding in a comment; nobody had checked erasure
+against it. The trigger now renders unconditionally with `aria-expanded`,
+matching that panel exactly, and `askToConfirm()` toggles rather than only
+opening, so pressing it again closes what is already open.
+
+The warning paragraph inside the confirm panel also had no `role="status"`,
+the WCAG 4.1.3 half of the same finding: nothing else moves focus when the
+panel appears, so a screen reader user heard nothing. Fixed on the paragraph
+itself rather than a wrapping element, so the surrounding `.card` keeps
+whatever implicit role it already had.
+
+Found by testing the live panel's DOM directly - `aria-expanded` and the
+trigger's presence after activation - rather than by rereading the template,
+which is what a second `@if`/`@else` pair reads as correct at a glance.
+
 Not yet done: a pass with a real screen reader, and keyboard-only walkthroughs
 of the longer workflows (the Boli bid form, the issue transitions). Those need a
 person, not a script.

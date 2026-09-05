@@ -8,7 +8,41 @@ version of the plan; the reasoning behind the ordering lives in
 ## Current Status
 
 - **Stage:** every module has a service and member screens; Phase 5 hardening under way
-- **Last updated:** 2026-09-05 - **a screen reader heard nothing when a
+- **Last updated:** 2026-09-05 - **the platform's single most irreversible
+  action had the exact keyboard-focus bug an audit had already fixed on
+  three other screens, undiscovered because nobody had reason to reopen it.**
+
+  Checking member-portal for the same "asks first" confirmation shape the
+  previous cycle just found broken in admin-portal turned up something
+  worse: `PrivacyComponent`'s "Erase my account" panel used an
+  `@if`/`@else` pair for its trigger and its confirmation, so confirming
+  literally replaced the button the member had just pressed and dropped
+  keyboard focus to the document body - the identical WCAG 2.4.3 bug the
+  2026-09-02 audit fixed on three *admin* screens (Boli publication,
+  campaign publication, standing a Pathshala down), on the one member-facing
+  action that destroys an account for good. This app's own
+  `family.component.ts` shows the right pattern right next to it - the
+  leave-household panel keeps its trigger unconditionally rendered with
+  `aria-expanded`, and even comments that it is doing so on purpose, citing
+  the finding by name.
+
+  The same panel's warning paragraph also lacked `role="status"` (WCAG
+  4.1.3, the other half of the last cycle's finding): nothing else moves
+  focus when it appears, so a screen reader user heard nothing.
+
+  Both are fixed the same way as the last cycle's admin-portal fix: the
+  trigger renders unconditionally with `aria-expanded`, `askToConfirm()`
+  toggles rather than only opening, and `role="status"` sits on the warning
+  paragraph itself rather than a wrapping element.
+
+  Verified by fault injection (the trigger-swap bug reintroduced, confirmed
+  the new test fails, restored) and live against the running stack: the
+  trigger stays present with `aria-expanded="true"` after activation, and the
+  warning is exposed as `role="status"` - checked via direct DOM inspection,
+  without ever submitting the destructive action itself.
+
+  338 member-portal tests green, up 2.
+- **Previously:** 2026-09-05 - **a screen reader heard nothing when a
   password-confirmation panel appeared warning that the action about to
   happen could not be undone - on the one shape of confirmation panel two
   prior accessibility passes had no reason to re-check.**

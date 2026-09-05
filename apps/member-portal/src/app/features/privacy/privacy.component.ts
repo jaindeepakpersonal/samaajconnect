@@ -217,16 +217,24 @@ import {
           parental consent. It cannot be undone, and no administrator has to approve it.
         </p>
 
-        @if (!confirming()) {
-          <div class="actions">
-            <button class="btn danger" type="button" (click)="askToConfirm()">
-              Erase my account
-            </button>
-          </div>
-        } @else {
+        <div class="actions">
+          <!-- The trigger stays and stays enabled: a confirmation that
+               replaces its own trigger drops keyboard focus to the body,
+               the finding three admin screens already shared (WCAG 2.4.3). -->
+          <button
+            class="btn danger"
+            type="button"
+            [attr.aria-expanded]="confirming()"
+            (click)="askToConfirm()"
+          >
+            Erase my account
+          </button>
+        </div>
+
+        @if (confirming()) {
           <div class="card">
             <h2>Confirm with your password</h2>
-            <p class="small">
+            <p class="small" role="status">
               We ask so that an irreversible action is a deliberate one, and so that it is
               you making it.
             </p>
@@ -427,7 +435,7 @@ export class PrivacyComponent implements OnInit {
   // ---- Erasure -----------------------------------------------------------
 
   askToConfirm(): void {
-    this.confirming.set(true);
+    this.confirming.set(!this.confirming());
     this.eraseError.set(null);
     this.password = '';
   }
