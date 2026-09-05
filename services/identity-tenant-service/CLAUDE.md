@@ -88,6 +88,7 @@ tenant is reported as 404 rather than as a distinct state, for the same reason.
 | `AdminInvitedDomainEvent` | `identity.admin.invited.v1` | `User.Invite` |
 | `UserRoleGrantedDomainEvent` | `identity.user.role-granted.v1` | `User.GrantRole` |
 | `UserRoleRevokedDomainEvent` | `identity.user.role-revoked.v1` | `User.RevokeRole` |
+| `SessionRevokedDomainEvent` | `identity.session.revoked.v1` | `User.RecordSessionRevoked` |
 | (no aggregate) | `identity.member-data.exported.v1` | `DataExportRecorder` |
 
 Delivery is at-least-once by design (see `Messaging/OutboxDispatcher.cs`).
@@ -280,6 +281,22 @@ which, so the entire chain is revoked and both are made to sign in again. A
 member who hits this is inconvenienced; an attacker loses access. A run of
 `ReuseDetected` on one account is the closest thing this platform has to an
 intrusion signal - treat it as an incident.
+
+**"Treat it as an incident" had nowhere to be treated, until 2026-09-04.**
+`SessionRevokedDomainEvent` existed, carried exactly this reasoning in its own
+doc comment, and was raised nowhere:
+`SessionService.RevokeSessionOutOfBandAsync` revoked the token chain against a
+raw `DbContext` scope with nothing tracked, so the Outbox had nothing to drain,
+and the signal reached `ILogger.LogWarning` and no further - invisible to the
+audit trail an administrator can actually search. `User.RecordSessionRevoked`
+is now called in that same scope before it saves, so the event drains through
+the Outbox in the same transaction as the revocation. Given no reason to notify
+the member (revoking already does that, by ending their session), and given the
+audit trail is the intended reader, it carries no `Notification` spec -
+`audit-notification-service`'s `KnownEvents` gives it its own descriptor
+instead, so the audit row names the session as the entity and the account as
+the actor rather than falling to the derived default, which would have left
+both blank.
 
 **That revocation is written on its own connection.** Refreshing is a command,
 so `TransactionBehavior` rolls it back when the handler returns a failure - and

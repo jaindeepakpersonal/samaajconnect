@@ -139,4 +139,46 @@ public sealed class UserTests
 
         user.Roles.Should().HaveCount(2);
     }
+
+    [Fact]
+    public void Recording_a_revoked_session_raises_the_event_the_intrusion_signal_needs()
+    {
+        // Until this existed, SessionEndReason.ReuseDetected - "the closest
+        // thing this platform has to an intrusion signal" per its own doc
+        // comment - reached only a log line. RevokeSessionOutOfBandAsync
+        // revoked the token chain against a raw DbContext with nothing
+        // tracked, so there was nothing for the Outbox to drain.
+        var user = Register();
+        var sessionId = Guid.NewGuid();
+
+        user.ClearDomainEvents();
+
+        user.RecordSessionRevoked(sessionId, SessionEndReason.ReuseDetected, tokensRevoked: 3, Now);
+
+        var raised = user.DomainEvents.Should().ContainSingle()
+            .Which.Should().BeOfType<SessionRevokedDomainEvent>().Subject;
+
+        raised.UserId.Should().Be(user.Id);
+        raised.TenantId.Should().Be(TenantId);
+        raised.SessionId.Should().Be(sessionId);
+        raised.Reason.Should().Be("ReuseDetected");
+        raised.TokensRevoked.Should().Be(3);
+        raised.OccurredAt.Should().Be(Now);
+    }
+
+    [Fact]
+    public void The_reason_travels_as_the_enum_name_a_reader_can_recognise()
+    {
+        // Not the numeric value: SessionEndReason's members are declared with
+        // explicit integers precisely so a stored payload survives the enum
+        // gaining a member in the middle, but a bare "4" in the audit log
+        // means nothing without the source open beside it.
+        var user = Register();
+
+        user.RecordSessionRevoked(
+            Guid.NewGuid(), SessionEndReason.EndedByAdministrator, tokensRevoked: 1, Now);
+
+        user.DomainEvents.OfType<SessionRevokedDomainEvent>()
+            .Single().Reason.Should().Be("EndedByAdministrator");
+    }
 }

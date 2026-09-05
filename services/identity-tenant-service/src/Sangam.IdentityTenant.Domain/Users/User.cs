@@ -292,6 +292,26 @@ public sealed class User : AggregateRoot, ITenantScopedEntity
         Raise(new UserLoggedInDomainEvent(Id, TenantId, now));
     }
 
+    /// <summary>
+    /// Records that one of this account's sessions was ended before its
+    /// natural expiry — <see cref="SessionRevokedDomainEvent"/>.
+    /// </summary>
+    /// <remarks>
+    /// Changes nothing on the account itself; this exists purely to raise the
+    /// event through the Outbox rather than let it stop at a log line. That was
+    /// the actual gap: <c>SessionEndReason.ReuseDetected</c> is, in its own
+    /// documented words, "the closest thing this platform has to an intrusion
+    /// signal", and until this method existed it reached only
+    /// <c>ILogger.LogWarning</c> — never the append-only audit trail an
+    /// administrator can actually search, because
+    /// <c>RevokeSessionOutOfBandAsync</c> revokes the token chain directly
+    /// against a raw <c>DbContext</c> rather than through a tracked aggregate,
+    /// and nothing tracked meant nothing for the Outbox to drain.
+    /// </remarks>
+    public void RecordSessionRevoked(
+        Guid sessionId, SessionEndReason reason, int tokensRevoked, DateTimeOffset now) =>
+        Raise(new SessionRevokedDomainEvent(Id, TenantId, sessionId, reason.ToString(), tokensRevoked, now));
+
     public void MarkContactVerified() => IsContactVerified = true;
 
     /// <summary>

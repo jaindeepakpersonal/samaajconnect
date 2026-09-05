@@ -109,6 +109,27 @@ public static class KnownEvents
             EntityIdProperty: "userId",
             ActorIdProperty: "userId"),
 
+        // The entity is the session, not the account, because the same account
+        // can have several live sessions and this is about one ending early -
+        // "ReuseDetected" on one device says nothing about the others. ActorId
+        // is the account itself in both reasons this reaches: a replayed token
+        // is discovered on the account's own next refresh attempt, and
+        // "EndedByAdministrator" fires the same way when that attempt finds the
+        // account suspended, not from a separate admin action with its own
+        // actor to record.
+        //
+        // Until 2026-09-04 this event was declared and documented at length -
+        // "the closest thing this platform has to an intrusion signal" - and
+        // never once raised. Revoking a session went straight to a raw
+        // DbContext with nothing tracked for the Outbox to drain, so the
+        // signal reached ILogger.LogWarning and nothing else: not this audit
+        // trail, searchable by nobody.
+        ["identity.session.revoked.v1"] = new(
+            Action: "SessionRevoked",
+            EntityName: "Session",
+            EntityIdProperty: "sessionId",
+            ActorIdProperty: "userId"),
+
         // The administrative events below all name someone *other* than the
         // subject as the actor, which is exactly why they are described here
         // rather than left to the derived defaults. "Who granted this?" is the

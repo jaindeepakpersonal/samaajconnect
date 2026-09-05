@@ -2473,6 +2473,38 @@ check "and kills the live token in the same session" 401 \
   "$(status -X POST "$GATEWAY/v1/identity/token/refresh" -H 'Content-Type: application/json' \
      -d "{\"refreshToken\":\"$REFRESH_2\"}")"
 
+# The reuse detection above is a real event now, not only a refusal. Until
+# 2026-09-04, SessionRevokedDomainEvent - "the closest thing this platform has
+# to an intrusion signal" - was declared and never once raised, so nothing
+# about a replayed token reached this audit trail; the only place it had ever
+# been visible was ILogger.LogWarning. This is the same poll-with-retry shape
+# the broadcast and erasure checks already use, because the row arrives over
+# Kafka through the outbox rather than inside the request that triggered it.
+# AuditLogResponse carries the actor id, never the payload - the audit list is
+# a ledger, not a viewer of what changed - so what is checked is that a
+# SessionRevoked row names this member as its actor, the same shape the
+# erasure check below uses. The `action` filter already narrows to the one
+# descriptor that can produce this action, so entityName needs no separate
+# check here.
+session_revocation_audited=0
+for attempt in $(seq 1 20); do
+  if curl -s -H "Authorization: Bearer $ADMIN_TOKEN" -H "$ADMIN_TENANT_HEADER" \
+     "$GATEWAY/v1/audit/logs?action=SessionRevoked&limit=200" \
+     | grep -q "\"actorUserId\":\"$MEMBER_ID\""; then
+    session_revocation_audited=1
+    break
+  fi
+  sleep 2
+done
+
+if [ "$session_revocation_audited" -eq 1 ]; then
+  echo "  ok    the reuse detection reaches the audit trail, not only a log line"
+  pass=$((pass + 1))
+else
+  echo "  FAIL  the reuse detection reaches the audit trail"
+  fail=$((fail + 1))
+fi
+
 SESSION_LOGIN=$(curl -s -X POST "$GATEWAY/v1/identity/login" -H 'Content-Type: application/json' \
   -d "{\"mobileOrEmail\":\"$MEMBER\",\"password\":\"$MEMBER_PASSWORD\"}")
 REFRESH_3=$(printf '%s' "$SESSION_LOGIN" | json_field refreshToken)

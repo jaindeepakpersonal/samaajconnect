@@ -79,6 +79,16 @@ contact address to send it to - most events name a member by id and nothing
 else, deliberately, because a payload holding a mobile number is a payload that
 later has to be redacted.
 
+**`identity.session.revoked.v1` had a descriptor added on 2026-09-04, and
+identity-tenant-service's own docs explain why it mattered more than most.** A
+run of `ReuseDetected` on one account is described there as "the closest thing
+this platform has to an intrusion signal - treat it as an incident", and until
+that date the event was never raised at all, so this service had never once
+recorded one. Now that it is, the derived default would have given the audit
+row no actor and no entity id - exactly the row an administrator reads to
+answer "who did this?", left blank for precisely the event that matters most.
+The descriptor names the session as the entity and the account as the actor.
+
 ## API endpoints
 
 | Method | Path | Roles |

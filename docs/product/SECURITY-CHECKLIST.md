@@ -257,6 +257,16 @@ is the outer gate and grants nothing on its own.
       a failure and `TransactionBehavior` would otherwise roll the revocation
       back with it.
 
+      **Fixed, 2026-09-04: the revocation reached nothing but a log line.**
+      `SessionRevokedDomainEvent` was declared, documented as "the closest thing
+      this platform has to an intrusion signal", and never raised — the
+      out-of-band revocation wrote directly to a raw `DbContext` with nothing
+      tracked, so the Outbox had nothing to drain. `User.RecordSessionRevoked`
+      now raises it in the same transaction as the revocation, and
+      `audit-notification-service`'s `KnownEvents` gives it a descriptor naming
+      the session and the account, rather than the blank the derived default
+      would have left.
+
       **What remains open, precisely.** An access token cannot be withdrawn —
       that is what makes it stateless, and what lets every service authorize
       without calling identity-tenant-service. So a stolen access token, or one

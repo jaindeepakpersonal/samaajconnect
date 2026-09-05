@@ -184,6 +184,24 @@ public sealed class SessionService(
             token.Revoke(reason, now);
         }
 
+        // Raised against the User, not the RefreshToken - RefreshToken is a
+        // plain entity, not an AggregateRoot, and has nothing to drain to the
+        // Outbox. IgnoreQueryFilters for the same reason the query above uses
+        // it: this scope has no request and so no resolved tenant, and
+        // TenantWriteGuard is deliberately silent in exactly that case.
+        //
+        // Only when something actually changed. An empty chain means the
+        // session was already gone - revoked or never existed - and there is
+        // nothing to announce.
+        if (chain.Count > 0)
+        {
+            var user = await dbContext.Users
+                .IgnoreQueryFilters()
+                .FirstOrDefaultAsync(u => u.Id == chain[0].UserId, cancellationToken);
+
+            user?.RecordSessionRevoked(sessionId, reason, chain.Count, now);
+        }
+
         await dbContext.SaveChangesAsync(cancellationToken);
 
         return chain.Count;

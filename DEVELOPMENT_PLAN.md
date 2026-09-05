@@ -8,7 +8,54 @@ version of the plan; the reasoning behind the ordering lives in
 ## Current Status
 
 - **Stage:** every module has a service and member screens; Phase 5 hardening under way
-- **Last updated:** 2026-09-04 - **three copies of one stale claim, all
+- **Last updated:** 2026-09-05 - **the closest thing this platform has to an
+  intrusion signal, declared, documented, and raised nowhere.**
+
+  `SessionRevokedDomainEvent` exists in identity-tenant-service's domain layer
+  with a full doc comment: audited because the reasons matter operationally,
+  and `SessionEndReason.ReuseDetected` - a refresh token presented twice, which
+  means two parties hold it and one is not the member - is "the closest thing
+  this platform has to an intrusion signal... treat a run of those on one
+  account as an incident." The service's own `CLAUDE.md` repeats the same
+  sentence. **It was never once constructed.**
+
+  `RevokeSessionOutOfBandAsync` - the method both reuse-detection and an
+  account found suspended mid-refresh call to revoke the whole session chain -
+  revokes each `RefreshToken` row directly against a raw scoped `DbContext`.
+  `RefreshToken` is a plain entity, not an `AggregateRoot`; nothing was tracked
+  for the Outbox to drain. The only trace of "somebody is holding a stolen
+  session" was `ILogger.LogWarning` - not the append-only audit trail
+  `SECURITY-CHECKLIST.md` calls the thing an administrator can actually search.
+
+  `User.RecordSessionRevoked` raises the event now, called from that same
+  out-of-band scope before it saves - so the event drains through the Outbox in
+  the same transaction as the revocation, the way every other event on this
+  platform does. `audit-notification-service`'s `KnownEvents` gained a
+  descriptor too: without one, the derived default gives an audit row no actor
+  and no entity id, which is exactly the two columns that answer "who did
+  this?" - left blank for precisely the event that matters most. The row now
+  names the session as the entity and the account as the actor.
+
+  **Found by grepping every service for a domain event type that is declared
+  and never constructed** - the mirror image of "an endpoint with no caller"
+  and "a field nothing can write", the two shapes this repository already
+  tracks with sweeps. This one had no sweep, because unlike an HTTP endpoint or
+  a property, there is no single grep that proves an event is *never* raised
+  across an entire codebase without also catching every event that legitimately
+  has few call sites - so this was a one-off read, not a script. Worth another
+  pass elsewhere; not turned into a check this cycle because a check with a
+  meaningful false-positive rate is worse than an occasional manual read.
+
+  Verified by two injections: the call to `RecordSessionRevoked` removed
+  entirely, and the reason hard-coded to a wrong string. Both failed the tests
+  that should have caught them.
+
+  349 of 349 smoke checks green through the gateway, which is 348 plus exactly
+  the one added here.
+
+  1,723 tests green, up 4 - 2 unit and 1 integration in identity-tenant-service,
+  and 1 unit in audit-notification-service.
+- **Previously:** 2026-09-04 - **three copies of one stale claim, all
   behind the same two facts that changed underneath them.**
 
   Two cycles built real capability - erasure and withdrawal following the

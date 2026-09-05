@@ -91,6 +91,25 @@ public sealed class KnownEventsTests
         KnownEvents.Describe("identity.user.logged-in.v1").Notification.Should().BeNull();
     }
 
+    [Fact]
+    public void A_revoked_session_is_recorded_as_its_own_entity_with_the_account_as_actor()
+    {
+        // Until this descriptor existed, identity.session.revoked.v1 fell to
+        // the derived default: no actor, no entity id. That is the row an
+        // administrator reads to answer "who did this?" for the one reason
+        // this event exists to carry - a replayed refresh token, "the closest
+        // thing this platform has to an intrusion signal" per its own doc
+        // comment - and the derived descriptor would have answered with a
+        // blank both times.
+        var descriptor = KnownEvents.Describe("identity.session.revoked.v1");
+
+        descriptor.Action.Should().Be("SessionRevoked");
+        descriptor.EntityName.Should().Be("Session");
+        descriptor.EntityIdProperty.Should().Be("sessionId");
+        descriptor.ActorIdProperty.Should().Be("userId");
+        descriptor.Notification.Should().BeNull();
+    }
+
     [Theory]
     [InlineData("identity.admin.invited.v1", "AdminInvited", "invitedBy")]
     [InlineData("identity.user.role-granted.v1", "RoleGranted", "grantedBy")]

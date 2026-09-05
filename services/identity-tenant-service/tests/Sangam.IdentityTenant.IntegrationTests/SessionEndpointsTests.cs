@@ -224,6 +224,40 @@ public sealed class SessionEndpointsTests(IdentityTenantApiFactory factory)
         revoked.Should().Be(2);
     }
 
+    [Fact]
+    public async Task Reuse_reaches_the_outbox_not_only_a_log_line()
+    {
+        // Until 2026-09-04, SessionEndReason.ReuseDetected - "the closest thing
+        // this platform has to an intrusion signal" per its own doc comment -
+        // was raised nowhere. RevokeSessionOutOfBandAsync revoked the token
+        // chain against a raw DbContext with no tracked aggregate, so the
+        // Outbox had nothing to drain and the only trace was ILogger.LogWarning
+        // - invisible to the audit trail SECURITY-CHECKLIST.md relies on being
+        // searchable.
+        var signed = await SignInAsync();
+
+        var refreshed = await RefreshAsync(signed.RefreshToken);
+        var live = (await refreshed.Content.ReadFromJsonAsync<JsonElement>())
+            .GetProperty("refreshToken").GetString()!;
+
+        await RefreshAsync(signed.RefreshToken);
+        await RefreshAsync(live);
+
+        var message = await factory.WithDbContextAsync(db =>
+            db.OutboxMessages
+                .Where(m => m.Topic == "identity.session.revoked.v1")
+                .OrderByDescending(m => m.OccurredAt)
+                .FirstOrDefaultAsync());
+
+        message.Should().NotBeNull();
+        message!.Payload.Should().Contain("\"reason\": \"ReuseDetected\"");
+
+        // The count that made "treat a run of those on one account as an
+        // incident" (the event's own advice) something an administrator could
+        // actually act on rather than count log lines for.
+        message.Payload.Should().Contain("\"tokensRevoked\": 2");
+    }
+
     // ---- Signing out ------------------------------------------------------
 
     [Fact]
