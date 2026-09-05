@@ -255,6 +255,30 @@ public static class KnownEvents
             EntityIdProperty: "groupId",
             BeforeProperties: ["previousStatus"]),
 
+        // social-issues-service's IssueStatusChangedDomainEvent already
+        // carries a distinct ActorUserId - separate from SubmittedByMemberId,
+        // its own doc comment explains why ("the author who is waiting on the
+        // answer and the reviewer who gave it") - so the derived default was
+        // not merely blank here, it was throwing away a field the event went
+        // out of its way to carry.
+        ["social-issues.issue.submitted.v1"] = new(
+            Action: "IssueSubmitted",
+            EntityName: "Issue",
+            EntityIdProperty: "issueId",
+            ActorIdProperty: "submittedByMemberId"),
+
+        ["social-issues.issue.status-changed.v1"] = new(
+            Action: "IssueStatusChanged",
+            EntityName: "Issue",
+            EntityIdProperty: "issueId",
+            ActorIdProperty: "actorUserId",
+            BeforeProperties: ["previousStatus"]),
+
+        ["social-issues.issue.published.v1"] = new(
+            Action: "IssuePublished",
+            EntityName: "Issue",
+            EntityIdProperty: "issueId"),
+
         // Erasure is handled by ErasePersonalDataCommandHandler rather than
         // recorded through this path, and it writes its own row with no actor
         // deliberately. Listed here so the omission reads as a decision.

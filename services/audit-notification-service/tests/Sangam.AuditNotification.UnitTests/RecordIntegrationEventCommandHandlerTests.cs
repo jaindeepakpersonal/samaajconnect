@@ -125,6 +125,33 @@ public sealed class RecordIntegrationEventCommandHandlerTests
     }
 
     [Fact]
+    public async Task A_decided_issue_is_audited_against_the_reviewer_not_its_author()
+    {
+        // social-issues.issue.status-changed.v1 had no descriptor at all until
+        // this cycle, and its own event carries a distinct ActorUserId
+        // precisely so the reviewer who decided it, not the member who
+        // submitted it, lands on the audit row.
+        var issueId = Guid.NewGuid();
+        var submittedBy = Guid.NewGuid();
+        var reviewerId = Guid.NewGuid();
+
+        await Handle(Envelope(
+            topic: "social-issues.issue.status-changed.v1",
+            payload: $$"""
+                {"issueId":"{{issueId}}","tenantId":"{{TenantId}}",
+                 "submittedByMemberId":"{{submittedBy}}","actorUserId":"{{reviewerId}}",
+                 "previousStatus":"UnderReview","status":"Published"}
+                """));
+
+        _auditLogs.Received(1).Add(Arg.Is<AuditLog>(a =>
+            a.Action == "IssueStatusChanged"
+            && a.EntityName == "Issue"
+            && a.EntityId == issueId.ToString()
+            && a.ActorUserId == reviewerId
+            && a.BeforeState == "{\"previousStatus\":\"UnderReview\"}"));
+    }
+
+    [Fact]
     public async Task A_redelivered_event_is_skipped_rather_than_recorded_twice()
     {
         _auditLogs.AlreadyRecordedAsync(Arg.Any<Guid>(), Arg.Any<CancellationToken>()).Returns(true);

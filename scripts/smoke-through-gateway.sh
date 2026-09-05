@@ -2202,6 +2202,36 @@ check "the reviewer approves it" 200 \
      -H "Authorization: Bearer $ADMIN_TOKEN" -H "$ADMIN_TENANT_HEADER" \
      -d '{"status":"Approved","reason":null}')"
 
+# social-issues.issue.status-changed.v1 had no KnownEvents descriptor until
+# this cycle, despite its own event carrying a distinct ActorUserId built for
+# exactly this reason - "the author who is waiting on the answer and the
+# reviewer who gave it" is one question this row is supposed to answer, and
+# the derived default answered it with a blank. The same poll-with-retry
+# shape the member-removal check above uses, for the same reason: the row
+# arrives over Kafka through the outbox rather than inside this request.
+REVIEWER_ID=$(curl -s -H "Authorization: Bearer $ADMIN_TOKEN" -H "$ADMIN_TENANT_HEADER" \
+  "$GATEWAY/v1/identity/me" | json_field userId)
+require_id reviewer_id "$REVIEWER_ID"
+
+issue_decision_audited=0
+for attempt in $(seq 1 20); do
+  if curl -s -H "Authorization: Bearer $ADMIN_TOKEN" -H "$ADMIN_TENANT_HEADER" \
+     "$GATEWAY/v1/audit/logs?action=IssueStatusChanged&limit=200" \
+     | grep -q "\"entityId\":\"$ISSUE_ID\",\"actorUserId\":\"$REVIEWER_ID\""; then
+    issue_decision_audited=1
+    break
+  fi
+  sleep 2
+done
+
+if [ "$issue_decision_audited" -eq 1 ]; then
+  echo "  ok    the decision names the reviewer who made it, not just the issue"
+  pass=$((pass + 1))
+else
+  echo "  FAIL  the decision reaches the audit trail with its actor and entity id"
+  fail=$((fail + 1))
+fi
+
 check "and publishes it" 200 \
   "$(status -X POST "$GATEWAY/v1/social-issues/$ISSUE_ID/status" -H 'Content-Type: application/json' \
      -H "Authorization: Bearer $ADMIN_TOKEN" -H "$ADMIN_TENANT_HEADER" \

@@ -232,4 +232,52 @@ public sealed class KnownEventsTests
         descriptor.EntityIdProperty.Should().Be("groupId");
         descriptor.BeforeProperties.Should().BeEquivalentTo(["previousStatus"]);
     }
+
+    // ---- social-issues-service ------------------------------------------
+    //
+    // IssueStatusChangedDomainEvent's own doc comment names two different
+    // people - "the author who is waiting on the answer and the reviewer who
+    // gave it" - and carries a distinct ActorUserId for exactly that reason.
+    // The derived default was not merely blank here; it discarded a field the
+    // event went out of its way to carry.
+
+    [Fact]
+    public void A_submitted_issue_is_recorded_against_the_member_who_raised_it()
+    {
+        var descriptor = KnownEvents.Describe("social-issues.issue.submitted.v1");
+
+        descriptor.Action.Should().Be("IssueSubmitted");
+        descriptor.EntityName.Should().Be("Issue");
+        descriptor.EntityIdProperty.Should().Be("issueId");
+        descriptor.ActorIdProperty.Should().Be("submittedByMemberId");
+    }
+
+    [Fact]
+    public void An_issue_s_status_change_names_the_reviewer_not_its_author()
+    {
+        // SubmittedByMemberId travels on the same event, unlike a group
+        // application decision, because the author is who a member portal
+        // screen shows the answer to - but the actor answering "who decided
+        // this?" is ActorUserId, which is what belongs on the audit row.
+        var descriptor = KnownEvents.Describe("social-issues.issue.status-changed.v1");
+
+        descriptor.Action.Should().Be("IssueStatusChanged");
+        descriptor.EntityName.Should().Be("Issue");
+        descriptor.EntityIdProperty.Should().Be("issueId");
+        descriptor.ActorIdProperty.Should().Be("actorUserId");
+        descriptor.BeforeProperties.Should().BeEquivalentTo(["previousStatus"]);
+    }
+
+    [Fact]
+    public void A_published_issue_is_recorded_against_itself_with_no_actor()
+    {
+        // Published announces visibility rather than a decision - the decision
+        // is the status change right before it, which already names who made
+        // it - so there is no second actor to carry here.
+        var descriptor = KnownEvents.Describe("social-issues.issue.published.v1");
+
+        descriptor.EntityName.Should().Be("Issue");
+        descriptor.EntityIdProperty.Should().Be("issueId");
+        descriptor.ActorIdProperty.Should().BeNull();
+    }
 }

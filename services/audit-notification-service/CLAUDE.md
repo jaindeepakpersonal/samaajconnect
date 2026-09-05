@@ -121,13 +121,31 @@ president who did it - the same shape the reuse-detection check above uses,
 because this row also arrives over Kafka through the outbox rather than
 inside the request that triggered it.
 
-The other 28 undescribed topics on the platform were not touched this pass.
+The other 28 undescribed topics on the platform were not touched that pass.
 Not every one needs a descriptor - a self-action like applying to something
 already gets a usable entity id and actor from the same field, the same shape
 `identity.user.logged-in.v1` uses - but several likely have the same shape as
-these seven: an administrative act with a real "who did this" question and a
+those seven: an administrative act with a real "who did this" question and a
 blank answer. Worth another pass, service by service, rather than guessing at
 all 28 in the same sweep that found these seven.
+
+**social-issues-service's three topics followed the day after, and one of
+them is the clearest case on the platform for why this matters.**
+`IssueStatusChangedDomainEvent`'s own doc comment names two different people -
+"the author who is waiting on the answer and the reviewer who gave it" - and
+the event carries a distinct `ActorUserId` for exactly that reason, separate
+from `SubmittedByMemberId`. The derived default was not merely blank here; it
+discarded a field the event went out of its way to carry, on the one topic
+where a member's own submission and a reviewer's decision about it are two
+different facts that must not be recorded as the same person.
+`issue.published.v1` genuinely carries no second actor - the decision is the
+status change immediately before it, which already names who made it - so its
+descriptor gives an entity id and no actor, which is correct rather than
+incomplete. `smoke-through-gateway.sh` checks the flagship one end to end:
+that an `IssueStatusChanged` row names the reviewing Samaaj admin, not the
+member whose issue it was.
+
+25 of the 28 originally-undescribed topics remain untouched.
 
 ## API endpoints
 

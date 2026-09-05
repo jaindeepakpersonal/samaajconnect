@@ -8,7 +8,38 @@ version of the plan; the reasoning behind the ordering lives in
 ## Current Status
 
 - **Stage:** every module has a service and member screens; Phase 5 hardening under way
-- **Last updated:** 2026-09-05 - **an administrator had no way to suspend a
+- **Last updated:** 2026-09-05 - **an issue's audit row could not tell a
+  member's own submission from a reviewer's decision about it - two different
+  people, recorded as if they were the same blank.**
+
+  Continuing the service-by-service pass the last cycle proposed rather than
+  guessing at all 28 remaining undescribed topics at once:
+  social-issues-service's three topics were the next candidate, because
+  `IssueStatusChangedDomainEvent`'s own doc comment already names two
+  different people - "the author who is waiting on the answer and the
+  reviewer who gave it" - and carries a distinct `ActorUserId` field
+  precisely so the audit row could tell them apart. The derived default
+  discarded that field entirely, exactly as the last cycle's finding
+  discarded `removedBy`.
+
+  `issue.submitted.v1` gets an entity id and the submitting member as actor -
+  a self-action, the same shape as a group application. `issue.published.v1`
+  gets an entity id and no actor: the decision already happened one event
+  earlier, so there is no second actor to name here, and giving it one would
+  be inventing a fact rather than recording one.
+
+  Verified by fault injection (the `status-changed.v1` descriptor removed
+  entirely fails both the unit test and the handler test) and a new smoke
+  check confirming an `IssueStatusChanged` row names the reviewing Samaaj
+  admin rather than the member whose issue it was.
+
+  365 of 365 smoke checks green through the gateway, which is 364 plus
+  exactly the one added here.
+
+  160 tests green in audit-notification-service (110 unit + 50 integration),
+  up 4. 25 of the platform's originally-undescribed 28 topics remain, per
+  the service's own CLAUDE.md.
+- **Previously:** 2026-09-05 - **an administrator had no way to suspend a
   problem account, and the backend had needed nothing new to let them.**
 
   `SetUserSuspensionCommand`, its step-up, the self-suspend refusal, the
