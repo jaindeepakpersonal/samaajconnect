@@ -327,6 +327,7 @@ Neither uses `*service-defaults` — they need no database and no broker.
 | Whether the module keys still agree in all three places | `scripts/module-keys.sh` |
 | Which domain events fall through to audit-notification-service's derived default | `scripts/audit-descriptor-coverage.sh` |
 | Which template class names resolve to no CSS rule at all | `scripts/css-class-coverage.sh` |
+| Which tables have no captioned accessible name | `scripts/table-caption-coverage.sh` |
 | Scaffold a new bounded-context service | `.claude/skills/new-microservice/SKILL.md` |
 | Add a command/query to an existing service | `.claude/skills/add-service-feature/SKILL.md` |
 | Turn a wireframe screen into a real component | `.claude/skills/wireframe-to-angular/SKILL.md` |

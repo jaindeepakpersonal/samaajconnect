@@ -567,6 +567,14 @@ listing the tables on the class screen got "table, table, table". The caption is
 1×1px rather than `display: none`, which is what keeps it in the accessibility
 tree.
 
+**Make that 24, one of them missed on the day this was written and found on
+2026-09-05.** The Role & Permission Matrix — this app's own widest table — had
+no caption at all, the exact gap this paragraph describes, in the one screen
+its own accessibility note already singles out for needing more attention, not
+less. `scripts/table-caption-coverage.sh` now holds every table to this, and
+CI runs it, so a 25th table missing one fails the day it lands rather than on
+the next full re-read of every screen.
+
 **Card titles are `h2`, not `h3`.** Every screen in both apps went `h1` straight
 to `h3`, which leaves the outline with a level missing (WCAG 1.3.1). Sub-headings
 inside a card stay `h3` and now sit correctly under the card's `h2`. Both

@@ -50,6 +50,7 @@ import { Role, RoleMatrix } from '../../core/admin.models';
 
       <div class="table-wrap">
         <table class="matrix">
+          <caption class="sr-only">Which roles hold which permissions</caption>
           <thead>
             <tr>
               <th scope="col">Permission</th>

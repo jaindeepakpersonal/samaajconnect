@@ -41,6 +41,17 @@ version of the plan; the reasoning behind the ordering lives in
   CI - the eleventh check in the pattern `CLAUDE.md` §9 describes, and the
   first to check the frontend rather than the backend or the pipeline.
 
+  The same "is an established convention actually followed everywhere"
+  question, asked of a second convention, found a second gap: the
+  2026-09-02 accessibility audit gave 23 tables a `<caption
+  class="sr-only">` so a screen reader stops reading "table, table, table" -
+  and `role-matrix.component.ts`, this app's own widest table, had none. It
+  is the one screen admin-portal's own accessibility notes already single
+  out for needing *more* attention, not less. Fixed, verified live (rebuilt
+  admin-portal, confirmed the caption resolves in the DOM), and given the
+  same treatment as the CSS gap: `scripts/table-caption-coverage.sh`, wired
+  into CI, verified by fault injection.
+
   198 admin-portal tests still green, unaffected.
 - **Previously:** 2026-09-05 - **the smoke suite's own member-directory
   check had quietly become dependent on how many times the suite itself had

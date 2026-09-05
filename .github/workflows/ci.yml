@@ -123,7 +123,7 @@ jobs:
     runs-on: ubuntu-latest
 
     # Rules the repository states in prose and no compiler enforces. All
-    # eleven of these read source rather than running anything, so they are
+    # twelve of these read source rather than running anything, so they are
     # seconds.
     steps:
       - uses: actions/checkout@v4
@@ -229,6 +229,15 @@ jobs:
       # already between two of the four copies.
       - name: Every class a template uses resolves to a rule
         run: bash scripts/css-class-coverage.sh
+
+      # The 2026-09-02 accessibility audit gave 23 tables a caption because a
+      # screen reader listing them otherwise reads "table, table, table" -
+      # nothing checked that a 24th table gets one too, or that none of the
+      # 23 loses theirs later. role-matrix.component.ts, the widest table in
+      # either app per this app's own CLAUDE.md, was missing one on
+      # 2026-09-05.
+      - name: Every table has a captioned accessible name
+        run: bash scripts/table-caption-coverage.sh
 
   migrations:
     name: EF migrations are up to date
