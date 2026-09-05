@@ -131,8 +131,15 @@ export class IssueQueueComponent implements OnInit {
   readonly error = signal<string | null>(null);
   readonly done = signal<string | null>(null);
 
-  /** Issue id → the reason typed for it, if any. */
-  reason: Record<string, string> = {};
+  /**
+   * Issue id → the reason typed for it, if any. Genuinely `undefined` for an
+   * issue nobody has typed into yet — `[(ngModel)]` reads before it ever
+   * writes, and `Record<string, string>` claims otherwise only because
+   * TypeScript does not check index signatures against reality by default.
+   * The `?? ''` fallback at every read is load-bearing, not dead code a
+   * stricter type would prove safe to delete.
+   */
+  reason: Record<string, string | undefined> = {};
 
   ngOnInit(): void {
     this.load();

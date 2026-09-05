@@ -8,7 +8,32 @@ version of the plan; the reasoning behind the ordering lives in
 ## Current Status
 
 - **Stage:** every module has a service and member screens; Phase 5 hardening under way
-- **Last updated:** 2026-09-05 - **six classes across seven admin-portal
+- **Last updated:** 2026-09-05 - **a compiler warning that has sat unfixed
+  across several cycles' worth of test output turned out to be pointing at a
+  real bug, in the opposite direction its own message suggested.**
+
+  `issue-queue.component.ts`'s `reason: Record<string, string> = {}` made
+  the TypeScript compiler certain `reason[issue.id]` is always a `string`,
+  so it flagged the `?? ''` fallback at every read as provably dead code -
+  "safely removable." It is not: `[(ngModel)]="reason[issue.id]"` reads
+  before it ever writes, so an issue nobody has typed a reason for yet has
+  a genuinely `undefined` entry, and `Record<string, string>` was simply
+  the wrong type for that reality. Following the compiler's own suggestion
+  and deleting the fallback would have thrown `Cannot read properties of
+  undefined (reading 'trim')` the first time a reviewer approved an issue
+  without ever touching its reason field - confirmed by temporarily doing
+  exactly that: the existing test `approves without needing one` (which
+  never sets a reason before approving) failed with precisely that error,
+  proving the fallback was load-bearing rather than dead.
+
+  Fixed by correcting the type - `Record<string, string | undefined>` -
+  rather than the code the warning pointed at, which needed no test of its
+  own: the existing "approves without needing one" test already covers the
+  genuinely-undefined case and would have caught this regression on its
+  own if it had ever landed.
+
+  198 admin-portal tests still green, warning gone.
+- **Previously:** 2026-09-05 - **six classes across seven admin-portal
   screens matched no CSS rule at all, one of them copied into four screens
   with a drift already between two of the copies before becoming a fifth
   screen's silently-unstyled class instead of a fifth copy.**
