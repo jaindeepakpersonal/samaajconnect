@@ -226,6 +226,12 @@ session.
   convenience only. The backend check in §4.4/§6 is the actual
   authorization boundary — never let a guard be the only thing
   standing between a user and an action they shouldn't have.
+- **A class used in a template must resolve to a rule the component can
+  actually see** — the app's own `src/styles.css`, or that component's own
+  `styles:`/`styleUrl`. Nothing fails when it doesn't: the element renders
+  unstyled, and because most layout here comes from `label`/`.input`/flex
+  defaults rather than the missing rule, it usually looks close enough that
+  nobody notices. `scripts/css-class-coverage.sh` checks it, and CI runs it.
 
 ## 8. Environment variables & docker-compose convention
 
@@ -320,6 +326,7 @@ Neither uses `*service-defaults` — they need no database and no broker.
 | Whether a service documents everything it can be asked to do | `scripts/service-docs.sh` |
 | Whether the module keys still agree in all three places | `scripts/module-keys.sh` |
 | Which domain events fall through to audit-notification-service's derived default | `scripts/audit-descriptor-coverage.sh` |
+| Which template class names resolve to no CSS rule at all | `scripts/css-class-coverage.sh` |
 | Scaffold a new bounded-context service | `.claude/skills/new-microservice/SKILL.md` |
 | Add a command/query to an existing service | `.claude/skills/add-service-feature/SKILL.md` |
 | Turn a wireframe screen into a real component | `.claude/skills/wireframe-to-angular/SKILL.md` |

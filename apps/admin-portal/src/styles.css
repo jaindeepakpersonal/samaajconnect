@@ -225,6 +225,41 @@ textarea.input {
   border-color: var(--danger);
 }
 
+/* A narrower input beside a label that reads as one sentence with it - a
+   seconds count, an increment amount - rather than the full-width default.
+   Copied into four screens' own local styles with a drift already between
+   them (200px in one, 220px everywhere else) before becoming the fifth
+   screen's silently-unstyled class instead of a fifth copy. One rule here is
+   what the growing lint used to be duplication instead of a gap. */
+.input.inline {
+  margin: 0;
+  max-width: 220px;
+}
+
+/* The one-time activation code shown after inviting an admin or re-issuing a
+   lost one - two screens, so this belongs here rather than in either. */
+.code {
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: 28px;
+  letter-spacing: 0.12em;
+  background: var(--soft);
+  color: var(--accent-ink);
+  border-radius: var(--radius-sm);
+  padding: var(--space-3) var(--space-4);
+  margin: var(--space-2) 0;
+  user-select: all;
+  overflow-wrap: anywhere;
+}
+
+/* A password-confirmation panel that asks before acting - deactivating a
+   Samaaj, suspending an admin. Two screens, so this belongs here too. */
+.confirm {
+  margin-top: var(--space-3);
+  padding-top: var(--space-2);
+  border-top: 1px solid var(--line-soft);
+  min-width: 260px;
+}
+
 .field-error {
   color: var(--danger);
   font-size: 13px;

@@ -8,7 +8,41 @@ version of the plan; the reasoning behind the ordering lives in
 ## Current Status
 
 - **Stage:** every module has a service and member screens; Phase 5 hardening under way
-- **Last updated:** 2026-09-05 - **the smoke suite's own member-directory
+- **Last updated:** 2026-09-05 - **six classes across seven admin-portal
+  screens matched no CSS rule at all, one of them copied into four screens
+  with a drift already between two of the copies before becoming a fifth
+  screen's silently-unstyled class instead of a fifth copy.**
+
+  Both apps' own `CLAUDE.md` already named this exact failure mode -
+  member-portal's `.muted`/`.visually-hidden` and a `.warn` pill that shipped
+  in the wrong colour - and neither app had a script holding it to the rule.
+  A systematic sweep (every class a template uses, checked against the app's
+  `src/styles.css` and that component's own styles) found six real gaps:
+  `.input.inline` existed in four screens' own local styles, two of the four
+  already disagreeing on its `max-width` (220px in three, 200px in the
+  fourth), and was missing entirely from a fifth; `.code` and `.confirm` each
+  existed in one screen's local styles while a second screen used the class
+  and defined nothing - the second of those two is the Suspend panel cycle
+  83 built, which has rendered with no border or spacing since the day it
+  shipped. `class="btn secondary"` on three buttons was a plainer mistake -
+  every other screen here uses `.btn.alt` - and three `<div class="field">`
+  wrappers styled nowhere were removed rather than given a rule, since every
+  other form in this app places a label and input as direct siblings.
+
+  All three genuinely shared rules are now in `src/styles.css` once, the
+  duplicate copies are gone, and the two mistakes are fixed to match this
+  app's own established classes. Verified live against the running stack
+  (rebuilt admin-portal, checked computed styles for `.confirm`, `.code`,
+  `.input.inline` and `.btn.alt` directly) and by fault injection
+  (`.confirm`'s rule renamed, confirmed the new script fails naming both
+  screens that use it, restored).
+
+  `scripts/css-class-coverage.sh` is this sweep made permanent and wired into
+  CI - the eleventh check in the pattern `CLAUDE.md` §9 describes, and the
+  first to check the frontend rather than the backend or the pipeline.
+
+  198 admin-portal tests still green, unaffected.
+- **Previously:** 2026-09-05 - **the smoke suite's own member-directory
   check had quietly become dependent on how many times the suite itself had
   run - fixed rather than left as a separately-flagged task.**
 

@@ -200,11 +200,6 @@ import { Occasion, PendingResult } from '../../core/admin.models';
       margin-top: var(--space-5);
     }
 
-    .input.inline {
-      margin: 0;
-      max-width: 220px;
-    }
-
     .row-actions {
       display: flex;
       gap: var(--space-2);

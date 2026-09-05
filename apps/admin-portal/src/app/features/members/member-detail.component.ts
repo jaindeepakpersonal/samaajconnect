@@ -163,7 +163,7 @@ import { AdminMember } from '../../core/admin.models';
             <button class="btn" type="submit" [disabled]="saving()">
               {{ saving() ? 'Saving…' : 'Save corrections' }}
             </button>
-            <a class="btn secondary" routerLink="/members">Cancel</a>
+            <a class="btn alt" routerLink="/members">Cancel</a>
           </div>
         </form>
       </div>

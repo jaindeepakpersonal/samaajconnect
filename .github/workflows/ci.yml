@@ -122,8 +122,9 @@ jobs:
     name: Cross-service conventions
     runs-on: ubuntu-latest
 
-    # Rules the repository states in prose and no compiler enforces. All ten
-    # of these read source rather than running anything, so they are seconds.
+    # Rules the repository states in prose and no compiler enforces. All
+    # eleven of these read source rather than running anything, so they are
+    # seconds.
     steps:
       - uses: actions/checkout@v4
 
@@ -218,6 +219,16 @@ jobs:
       # KnownEvents.cs against ten services' Domain folders by hand.
       - name: Every domain event has an audit descriptor
         run: bash scripts/audit-descriptor-coverage.sh
+
+      # Nothing fails when a template's class name resolves to no rule -
+      # member-portal's own CLAUDE.md already named this failure mode for
+      # `.muted`/`.visually-hidden` and a `.warn` pill in the wrong colour,
+      # and neither app had a script holding it to that. Six classes across
+      # seven admin-portal screens matched nothing on 2026-09-05, including
+      # a rule pasted into four screens' own local styles with a drift
+      # already between two of the four copies.
+      - name: Every class a template uses resolves to a rule
+        run: bash scripts/css-class-coverage.sh
 
   migrations:
     name: EF migrations are up to date

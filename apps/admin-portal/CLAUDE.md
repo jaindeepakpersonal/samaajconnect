@@ -489,6 +489,31 @@ anybody confirm a private value one query at a time — member-family-service
 refuses to offer one for that reason. A box quietly missing from a search form
 reads as an oversight; a sentence saying it is a privacy decision does not.
 
+**Class names are checked against a stylesheet before they are used, the same
+rule member-portal's own `CLAUDE.md` states and this app had never written
+down.** Six classes across seven screens matched nothing, on 2026-09-05:
+`.input.inline` was pasted into four screens' own local styles with a drift
+already between two of the four copies (`max-width: 220px` in three,
+`200px` in the fourth) before becoming a fifth screen's silently-unstyled
+class instead of a fifth copy; `.code` and `.confirm` each existed in exactly
+one screen's local styles while a second screen used the class and defined
+nothing. None of the three failed anything — the elements rendered unstyled
+and mostly looked right, which is the same silent failure member-portal's own
+`.muted`/`.visually-hidden` finding and the `.warn` pill in the wrong colour
+already were. All three are now in `src/styles.css` once, and the four
+duplicate `.input.inline` copies are gone.
+
+Two more were plainer mistakes: `class="btn secondary"` on three buttons where
+every other screen uses `.btn.alt` — `.secondary` was never a class this app
+had, so the button rendered as a bare `.btn`, not the alt style two of the
+three needed on a Cancel/Clear action. And three `<div class="field">`
+wrappers around a label and an input, styled nowhere, doing nothing that
+`label`'s own `margin-top` was not already doing — unlike the other five, this
+one is not a class this app needed at all: every other form here places a
+label and an input as direct siblings, so the wrapper is gone rather than
+given a rule to keep it consistent with a pattern this app doesn't otherwise
+use.
+
 ## Accessibility
 
 Same standard as member-portal (WCAG 2.1 AA). In place: labelled controls

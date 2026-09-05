@@ -81,7 +81,7 @@ import { AdminMember } from '../../core/admin.models';
 
             <div class="actions">
               <button class="btn" type="submit" [disabled]="loading()">Search</button>
-              <button class="btn secondary" type="button" (click)="clear()">Clear</button>
+              <button class="btn alt" type="button" (click)="clear()">Clear</button>
             </div>
           </div>
         </form>
@@ -127,7 +127,7 @@ import { AdminMember } from '../../core/admin.models';
                   <td>{{ member.mobile ?? '—' }}</td>
                   <td>{{ member.email ?? '—' }}</td>
                   <td>
-                    <a class="btn secondary" [routerLink]="['/members', member.id]">
+                    <a class="btn alt" [routerLink]="['/members', member.id]">
                       Open<span class="sr-only"> {{ member.fullName }}</span>
                     </a>
                   </td>

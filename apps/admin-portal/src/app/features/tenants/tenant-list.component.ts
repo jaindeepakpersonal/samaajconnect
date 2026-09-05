@@ -273,38 +273,32 @@ import { ModuleDescriptor, Tenant, TenantStatus } from '../../core/admin.models'
                         Samaaj had named one at all.
                       </p>
 
-                      <div class="field">
-                        <label [for]="tenant.id + 'gname'">Name</label>
-                        <input
-                          class="input"
-                          [id]="tenant.id + 'gname'"
-                          maxlength="200"
-                          [(ngModel)]="grievance.name"
-                          [ngModelOptions]="{ standalone: true }"
-                        />
-                      </div>
+                      <label [for]="tenant.id + 'gname'">Name</label>
+                      <input
+                        class="input"
+                        [id]="tenant.id + 'gname'"
+                        maxlength="200"
+                        [(ngModel)]="grievance.name"
+                        [ngModelOptions]="{ standalone: true }"
+                      />
 
-                      <div class="field">
-                        <label [for]="tenant.id + 'gemail'">Email</label>
-                        <input
-                          class="input"
-                          [id]="tenant.id + 'gemail'"
-                          maxlength="320"
-                          [(ngModel)]="grievance.email"
-                          [ngModelOptions]="{ standalone: true }"
-                        />
-                      </div>
+                      <label [for]="tenant.id + 'gemail'">Email</label>
+                      <input
+                        class="input"
+                        [id]="tenant.id + 'gemail'"
+                        maxlength="320"
+                        [(ngModel)]="grievance.email"
+                        [ngModelOptions]="{ standalone: true }"
+                      />
 
-                      <div class="field">
-                        <label [for]="tenant.id + 'gphone'">Phone</label>
-                        <input
-                          class="input"
-                          [id]="tenant.id + 'gphone'"
-                          maxlength="20"
-                          [(ngModel)]="grievance.phone"
-                          [ngModelOptions]="{ standalone: true }"
-                        />
-                      </div>
+                      <label [for]="tenant.id + 'gphone'">Phone</label>
+                      <input
+                        class="input"
+                        [id]="tenant.id + 'gphone'"
+                        maxlength="20"
+                        [(ngModel)]="grievance.phone"
+                        [ngModelOptions]="{ standalone: true }"
+                      />
 
                       <!--
                         The service's rule, duplicated on purpose and required to
@@ -416,13 +410,6 @@ import { ModuleDescriptor, Tenant, TenantStatus } from '../../core/admin.models'
     }
 
     .modules {
-      margin-top: var(--space-3);
-      padding-top: var(--space-2);
-      border-top: 1px solid var(--line-soft);
-      min-width: 260px;
-    }
-
-    .confirm {
       margin-top: var(--space-3);
       padding-top: var(--space-2);
       border-top: 1px solid var(--line-soft);

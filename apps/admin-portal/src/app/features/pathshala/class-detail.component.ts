@@ -393,11 +393,6 @@ type Mark = AttendanceStatus | '';
       flex: 1 1 160px;
     }
 
-    .input.inline {
-      margin: 0;
-      max-width: 200px;
-    }
-
     .row-actions {
       display: flex;
       gap: var(--space-2);

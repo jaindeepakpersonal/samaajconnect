@@ -163,18 +163,6 @@ import { InviteAdminResult, Role } from '../../core/admin.models';
       font-weight: 400;
     }
 
-    .code {
-      font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
-      font-size: 28px;
-      letter-spacing: 0.12em;
-      background: var(--soft);
-      color: var(--accent-ink);
-      border-radius: var(--radius-sm);
-      padding: var(--space-3) var(--space-4);
-      margin: var(--space-2) 0;
-      user-select: all;
-      overflow-wrap: anywhere;
-    }
   `,
 })
 export class InviteAdminComponent implements OnInit {

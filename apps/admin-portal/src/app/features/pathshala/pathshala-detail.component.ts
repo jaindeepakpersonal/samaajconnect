@@ -325,11 +325,6 @@ import { isNotFound } from '../../core/http-status';
       flex: 1 1 180px;
     }
 
-    .input.inline {
-      margin: 0;
-      max-width: 220px;
-    }
-
     .row-actions {
       display: flex;
       gap: var(--space-2);
