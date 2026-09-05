@@ -280,4 +280,47 @@ public sealed class KnownEventsTests
         descriptor.EntityIdProperty.Should().Be("issueId");
         descriptor.ActorIdProperty.Should().BeNull();
     }
+
+    // ---- timeline-service --------------------------------------------
+    //
+    // The same shape a third time: PostModeratedDomainEvent carries a
+    // distinct ActorUserId separate from AuthorMemberId, because a
+    // moderator's decision about somebody else's post is not that member's
+    // own act.
+
+    [Fact]
+    public void A_submitted_post_is_recorded_against_the_member_who_wrote_it()
+    {
+        var descriptor = KnownEvents.Describe("timeline.post.submitted.v1");
+
+        descriptor.Action.Should().Be("PostSubmitted");
+        descriptor.EntityName.Should().Be("Post");
+        descriptor.EntityIdProperty.Should().Be("postId");
+        descriptor.ActorIdProperty.Should().Be("authorMemberId");
+    }
+
+    [Fact]
+    public void A_moderated_post_names_the_moderator_not_its_author()
+    {
+        var descriptor = KnownEvents.Describe("timeline.post.moderated.v1");
+
+        descriptor.Action.Should().Be("PostModerated");
+        descriptor.EntityName.Should().Be("Post");
+        descriptor.EntityIdProperty.Should().Be("postId");
+        descriptor.ActorIdProperty.Should().Be("actorUserId");
+        descriptor.BeforeProperties.Should().BeEquivalentTo(["previousStatus"]);
+    }
+
+    [Fact]
+    public void A_reported_post_never_names_who_reported_it()
+    {
+        // PostReportedDomainEvent's own doc comment: a reporter who could be
+        // identified is a reporter who stays quiet. This descriptor must
+        // never grow an ActorIdProperty, unlike the other two.
+        var descriptor = KnownEvents.Describe("timeline.post.reported.v1");
+
+        descriptor.EntityName.Should().Be("Post");
+        descriptor.EntityIdProperty.Should().Be("postId");
+        descriptor.ActorIdProperty.Should().BeNull();
+    }
 }

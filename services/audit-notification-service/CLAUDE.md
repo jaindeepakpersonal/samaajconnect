@@ -147,6 +147,23 @@ member whose issue it was.
 
 25 of the 28 originally-undescribed topics remain untouched.
 
+**timeline-service's three topics followed the day after, the same shape a
+third time.** `PostModeratedDomainEvent` carries a distinct `ActorUserId`
+separate from `AuthorMemberId`, for the same reason
+`IssueStatusChangedDomainEvent` does - a moderator's decision about somebody
+else's post is not that member's own act. `post.reported.v1` is the case this
+pass is careful to get right in the other direction:
+`PostReportedDomainEvent`'s own doc comment says a reporter who could be
+identified is a reporter who stays quiet, and it carries no reporter id at
+all, so its descriptor gives an entity id and **must never** grow an
+`ActorIdProperty` - unlike `issue.published.v1`, which has no actor to carry,
+this one has one it deliberately withholds. `smoke-through-gateway.sh` checks
+the flagship one end to end, the same shape as the social-issues check: a
+`PostModerated` row names the moderating administrator, not the member whose
+post it was.
+
+22 of the 28 originally-undescribed topics remain untouched.
+
 ## API endpoints
 
 | Method | Path | Roles |

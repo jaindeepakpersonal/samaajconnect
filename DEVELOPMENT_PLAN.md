@@ -8,7 +8,32 @@ version of the plan; the reasoning behind the ordering lives in
 ## Current Status
 
 - **Stage:** every module has a service and member screens; Phase 5 hardening under way
-- **Last updated:** 2026-09-05 - **an issue's audit row could not tell a
+- **Last updated:** 2026-09-05 - **a moderated post's audit row could not
+  tell its author from the administrator who decided its fate - the same
+  gap as the issue tracker's, in the third service to have it.**
+
+  Third stop on the service-by-service pass: `PostModeratedDomainEvent`
+  carries a distinct `ActorUserId` separate from `AuthorMemberId`, for the
+  same reason `IssueStatusChangedDomainEvent` does two entries ago - a
+  moderator's decision about somebody else's post is not that member's own
+  act. `post.reported.v1` is the other half of this pass worth naming
+  specifically: `PostReportedDomainEvent`'s own doc comment says a reporter
+  who could be identified is a reporter who stays quiet, and it carries no
+  reporter id to describe - its descriptor gives an entity id and no actor,
+  and must never grow one.
+
+  Verified by fault injection (the `moderated.v1` descriptor removed
+  entirely fails both the unit test and the handler test) and a new smoke
+  check confirming a `PostModerated` row names the moderating administrator
+  rather than the member whose post it was.
+
+  366 of 366 smoke checks green through the gateway, which is 365 plus
+  exactly the one added here.
+
+  164 tests green in audit-notification-service (114 unit + 50
+  integration), up 4. 22 of the platform's originally-undescribed 28
+  topics remain.
+- **Previously:** 2026-09-05 - **an issue's audit row could not tell a
   member's own submission from a reviewer's decision about it - two different
   people, recorded as if they were the same blank.**
 

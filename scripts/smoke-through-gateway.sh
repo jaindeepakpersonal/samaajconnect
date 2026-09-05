@@ -1684,6 +1684,35 @@ else
   fail=$((fail + 1))
 fi
 
+# timeline.post.moderated.v1 had no KnownEvents descriptor until this cycle,
+# despite its own event carrying a distinct ActorUserId - a moderator's
+# decision about somebody else's post is not that member's own act, the same
+# reason social-issues.issue.status-changed.v1 needed one. Same
+# poll-with-retry shape as that check: the row arrives over Kafka through the
+# outbox rather than inside this request.
+MODERATOR_ID=$(curl -s -H "Authorization: Bearer $ADMIN_TOKEN" -H "$ADMIN_TENANT_HEADER" \
+  "$GATEWAY/v1/identity/me" | json_field userId)
+require_id moderator_id "$MODERATOR_ID"
+
+post_moderation_audited=0
+for attempt in $(seq 1 20); do
+  if curl -s -H "Authorization: Bearer $ADMIN_TOKEN" -H "$ADMIN_TENANT_HEADER" \
+     "$GATEWAY/v1/audit/logs?action=PostModerated&limit=200" \
+     | grep -q "\"entityId\":\"$POST_ID\",\"actorUserId\":\"$MODERATOR_ID\""; then
+    post_moderation_audited=1
+    break
+  fi
+  sleep 2
+done
+
+if [ "$post_moderation_audited" -eq 1 ]; then
+  echo "  ok    the approval names the moderator, not just the post"
+  pass=$((pass + 1))
+else
+  echo "  FAIL  the moderation reaches the audit trail with its actor and entity id"
+  fail=$((fail + 1))
+fi
+
 check "commenting on an approved post" 201 \
   "$(status -X POST "$GATEWAY/v1/timeline/posts/$POST_ID/comments" -H 'Content-Type: application/json' \
      -H "Authorization: Bearer $MEMBER_TOKEN" -d '{"body":"Happy to help."}')"

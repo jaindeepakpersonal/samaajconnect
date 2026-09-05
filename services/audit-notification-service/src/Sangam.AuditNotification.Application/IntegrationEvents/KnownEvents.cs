@@ -279,6 +279,32 @@ public static class KnownEvents
             EntityName: "Issue",
             EntityIdProperty: "issueId"),
 
+        // timeline-service's third topic in this same shape: PostModeratedDomainEvent
+        // carries a distinct ActorUserId separate from AuthorMemberId, for the
+        // same reason IssueStatusChangedDomainEvent does - a moderator's
+        // decision about somebody else's post is not that member's own act.
+        // PostReportedDomainEvent is the opposite case done correctly: its own
+        // doc comment says a reporter who could be identified is a reporter who
+        // stays quiet, so it carries no reporter id to describe at all - the
+        // descriptor below must never grow an ActorIdProperty for it.
+        ["timeline.post.submitted.v1"] = new(
+            Action: "PostSubmitted",
+            EntityName: "Post",
+            EntityIdProperty: "postId",
+            ActorIdProperty: "authorMemberId"),
+
+        ["timeline.post.moderated.v1"] = new(
+            Action: "PostModerated",
+            EntityName: "Post",
+            EntityIdProperty: "postId",
+            ActorIdProperty: "actorUserId",
+            BeforeProperties: ["previousStatus"]),
+
+        ["timeline.post.reported.v1"] = new(
+            Action: "PostReported",
+            EntityName: "Post",
+            EntityIdProperty: "postId"),
+
         // Erasure is handled by ErasePersonalDataCommandHandler rather than
         // recorded through this path, and it writes its own row with no actor
         // deliberately. Listed here so the omission reads as a decision.

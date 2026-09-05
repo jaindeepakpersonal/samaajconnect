@@ -152,6 +152,32 @@ public sealed class RecordIntegrationEventCommandHandlerTests
     }
 
     [Fact]
+    public async Task A_moderated_post_is_audited_against_the_moderator_not_its_author()
+    {
+        // timeline.post.moderated.v1 had no descriptor at all until this
+        // cycle, and its own event carries a distinct ActorUserId precisely
+        // so the moderator who decided, not the member who wrote the post,
+        // lands on the audit row.
+        var postId = Guid.NewGuid();
+        var authorId = Guid.NewGuid();
+        var moderatorId = Guid.NewGuid();
+
+        await Handle(Envelope(
+            topic: "timeline.post.moderated.v1",
+            payload: $$"""
+                {"postId":"{{postId}}","tenantId":"{{TenantId}}",
+                 "authorMemberId":"{{authorId}}","actorUserId":"{{moderatorId}}",
+                 "decision":"Approve","previousStatus":"PendingReview","status":"Approved"}
+                """));
+
+        _auditLogs.Received(1).Add(Arg.Is<AuditLog>(a =>
+            a.Action == "PostModerated"
+            && a.EntityName == "Post"
+            && a.EntityId == postId.ToString()
+            && a.ActorUserId == moderatorId));
+    }
+
+    [Fact]
     public async Task A_redelivered_event_is_skipped_rather_than_recorded_twice()
     {
         _auditLogs.AlreadyRecordedAsync(Arg.Any<Guid>(), Arg.Any<CancellationToken>()).Returns(true);
