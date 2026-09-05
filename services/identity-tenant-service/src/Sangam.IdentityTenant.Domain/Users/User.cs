@@ -262,6 +262,28 @@ public sealed class User : AggregateRoot, ITenantScopedEntity
             Id, TenantId, ConvertedFromChildProfileId ?? Guid.Empty, MobileOrEmail, now));
     }
 
+    /// <summary>
+    /// Replaces the password on an already-active account, at the member's own
+    /// request.
+    /// </summary>
+    /// <remarks>
+    /// The only other place <see cref="PasswordHash"/> is ever written after
+    /// construction is <see cref="Activate"/>, moving a
+    /// <see cref="UserStatus.PendingActivation"/> account to
+    /// <see cref="UserStatus.Active"/> for the first time. Whether *this*
+    /// account is in a state that may change its password is the handler's
+    /// question, not this method's - the same division <see cref="Activate"/>
+    /// itself draws, per its own remarks.
+    /// </remarks>
+    public void ChangePassword(string newPasswordHash, DateTimeOffset now)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(newPasswordHash);
+
+        PasswordHash = newPasswordHash;
+
+        Raise(new PasswordChangedDomainEvent(Id, TenantId, now));
+    }
+
     public bool IsLockedOut(DateTimeOffset now) => LockedOutUntil is not null && LockedOutUntil > now;
 
     /// <summary>

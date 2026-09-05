@@ -122,6 +122,33 @@ public static class KnownEvents
             EntityIdProperty: "userId",
             ActorIdProperty: "userId"),
 
+        // A self-action, the same shape as logging in - nobody else can change
+        // your password for you, so the actor is always the subject. The
+        // in-app notification is what lets a member notice a change they did
+        // not make: every *other* session ends the moment this happens
+        // (SessionEndReason.PasswordChanged), but the one that made the
+        // request is still live for its own token's remaining life, and would
+        // otherwise have no way to learn anything happened at all.
+        ["identity.user.password-changed.v1"] = new(
+            Action: "PasswordChanged",
+            EntityName: "User",
+            EntityIdProperty: "userId",
+            ActorIdProperty: "userId",
+            Notification: payload =>
+            {
+                if (!payload.TryGetProperty("userId", out var userId)
+                    || !userId.TryGetGuid(out var recipientId))
+                {
+                    return null;
+                }
+
+                return new NotificationSpec(
+                    recipientId,
+                    "Your password was changed",
+                    "Your password was changed just now. If this wasn't you, contact your "
+                    + "Samaaj administrator.");
+            }),
+
         // The entity is the session, not the account, because the same account
         // can have several live sessions and this is about one ending early -
         // "ReuseDetected" on one device says nothing about the others. ActorId

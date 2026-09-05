@@ -8,7 +8,52 @@ version of the plan; the reasoning behind the ordering lives in
 ## Current Status
 
 - **Stage:** every module has a service and member screens; Phase 5 hardening under way
-- **Last updated:** 2026-09-05 - **member-portal had no persistent
+- **Last updated:** 2026-09-05 - **no account on the platform could ever
+  replace a password it already had - not a member's, not a Samaaj Admin's,
+  not the bootstrap Super Admin's - until `ChangePasswordCommand`.**
+
+  Found while trying to change the bootstrap Super Admin's own password:
+  editing `Bootstrap__SuperAdminPassword` in `docker-compose.yml` and
+  restarting does nothing once a Super Admin already exists (the bootstrapper
+  is a deliberate one-time no-op), and neither does `docker compose down &&
+  up` - Postgres data lives in the named `postgres-data` volume, untouched by
+  `down` without `-v`. `User.PasswordHash` had exactly two writers -
+  construction, and a one-time activation redemption that never runs again
+  once an account is active - and `SessionEndReason.PasswordChanged` had sat
+  declared and unused since the first migration, anticipating exactly this.
+
+  `ChangePasswordCommand` (any authenticated role, self only) verifies the
+  current password the same way `IStepUpAuthentication` does - `GetSelfAsync`,
+  the lockout check, the same `IFailedLoginRecorder` a wrong login counts
+  against - but with its own message rather than that service's, which is
+  written for an irreversible action and would be false here. Ends every
+  other session for the account via the previously-unused
+  `SessionEndReason.PasswordChanged`. Both apps get a screen: member-portal's
+  on `/profile` as a third card, admin-portal's on a new `/change-password`
+  route, reached from the shell's own name in the top bar - which used to be
+  a bare `<span>` and is a `routerLink` now, the same pattern member-portal's
+  shell already uses for its own user chip.
+
+  Verified with 211 identity-tenant-service unit tests (13 new) and 182
+  integration tests (7 new, against a real Postgres, including that a refresh
+  token issued before the change is refused afterwards), 141
+  audit-notification-service unit tests, `scripts/audit-descriptor-coverage.sh`
+  (51 topics, one new), full production builds and `tsc --noEmit` for both
+  apps, 344 member-portal and 204 admin-portal frontend tests (6 new each),
+  and a live walkthrough: signed in as the actual bootstrap Super Admin with
+  the actual `change-me-immediately` default, changed it through the new
+  admin-portal screen, confirmed the old password now fails and the new one
+  works, and confirmed the audit row and the in-app notification both landed
+  by querying `samaajconnect_audit_notification` directly.
+
+  **Deliberately out of scope, and noted rather than dropped:** the
+  wireframe's own `#forgot`/`#otp` screens - an anonymous, code-based reset for
+  someone who does not know their current password at all. That is a larger
+  piece of work needing a new value object mirroring `ActivationCode`, a new
+  failed-attempt recorder, and a real delivery channel for the code (today
+  only a container log) - scoped as a follow-up cycle rather than folded into
+  this one.
+- **Previously:** 2026-09-05 - **member-portal had no persistent
   navigation at all, and the wireframe review asked for was really a
   wireframe-fidelity gap the whole session's bug-hunting had not been
   looking for.**

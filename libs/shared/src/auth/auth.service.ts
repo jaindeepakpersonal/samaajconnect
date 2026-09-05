@@ -2,11 +2,12 @@ import { HttpClient } from '@angular/common/http';
 import { Injectable, computed, inject, signal } from '@angular/core';
 import { Observable, catchError, of, shareReplay, tap } from 'rxjs';
 import {
+  ActivationResult,
+  ChangePasswordResult,
   ConsentNotice,
   CurrentUser,
   LoginResult,
   RegisterRequest,
-  ActivationResult,
   RegisterResult,
   TenantSummary,
 } from './auth.models';
@@ -95,6 +96,18 @@ export class AuthService {
   /** The consent notice, which must be shown before registering (DPDP s.5). */
   consentNotice(): Observable<ConsentNotice> {
     return this.http.get<ConsentNotice>('/v1/identity/consent-notice');
+  }
+
+  /**
+   * Sets a new password, given the current one. Ends every other session for
+   * the account - the whole point of changing a password is worth nothing if
+   * a stolen refresh token is left able to renew forever.
+   */
+  changePassword(currentPassword: string, newPassword: string): Observable<ChangePasswordResult> {
+    return this.http.post<ChangePasswordResult>('/v1/identity/me/password', {
+      currentPassword,
+      newPassword,
+    });
   }
 
   /**

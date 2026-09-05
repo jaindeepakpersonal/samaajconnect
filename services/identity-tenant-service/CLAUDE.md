@@ -49,6 +49,7 @@ since those happen *before* a tenant is established.
 | `UploadTenantLogoCommand` | `SuperAdmin`, `SamaajAdmin` + `Tenant.Manage` | built |
 | `RemoveTenantLogoCommand` | `SuperAdmin`, `SamaajAdmin` + `Tenant.Manage` | built |
 | `SetRolePermissionCommand` | `Roles.Manage` | built |
+| `ChangePasswordCommand` | any authenticated role, self only | built |
 
 A new Samaaj is created **Inactive**. Creating the record and letting it serve
 traffic are two separately audited decisions, so activation is its own command.
@@ -91,6 +92,7 @@ tenant is reported as 404 rather than as a distinct state, for the same reason.
 | `UserStatusChangedDomainEvent` | `identity.user.status-changed.v1` | `User.Suspend` and `.Reinstate` |
 | `UserRoleRevokedDomainEvent` | `identity.user.role-revoked.v1` | `User.RevokeRole` |
 | `SessionRevokedDomainEvent` | `identity.session.revoked.v1` | `User.RecordSessionRevoked` |
+| `PasswordChangedDomainEvent` | `identity.user.password-changed.v1` | `User.ChangePassword` |
 | (no aggregate) | `identity.member-data.exported.v1` | `DataExportRecorder` |
 
 Delivery is at-least-once by design (see `Messaging/OutboxDispatcher.cs`).
@@ -123,6 +125,7 @@ offsets for messages it did nothing with.
 | POST | `/v1/identity/token/refresh` | anonymous |
 | POST | `/v1/identity/logout` | anonymous |
 | GET | `/v1/identity/me` | any authenticated role |
+| POST | `/v1/identity/me/password` | any authenticated role |
 | GET | `/v1/identity/activations/pending` | `SamaajAdmin` + `AdminUsers.Manage` |
 | POST | `/v1/identity/activations/{userId}/code` | `SamaajAdmin` + `AdminUsers.Manage` |
 | POST | `/v1/identity/activations/redeem` | anonymous |
@@ -338,6 +341,34 @@ would not be for a password: a salt defends against precomputation over a
 guessable space, and the input is 256 bits of randomness. That is also why it is
 fast - slowness buys nothing against an input nobody can enumerate. Never pass
 anything a human typed to `HashDeterministic`.
+
+**No account could ever replace its own password, until `ChangePasswordCommand`.**
+`User.PasswordHash` had exactly two writers: construction, and `Activate()`,
+which only runs once, moving a `PendingActivation` account to `Active` for the
+first time. An account that already had a working password - every member,
+every Samaaj Admin, the bootstrap Super Admin - had no way to set a new one.
+`SessionEndReason.PasswordChanged` had even anticipated this: it sat declared
+in the first migration, its own doc comment saying "the member changed their
+password", raised by nothing, for exactly as long as there was nothing that
+could change one.
+
+The current password is checked inline rather than through
+`IStepUpAuthentication`, though the shape - `GetSelfAsync`, the lockout check,
+`IPasswordHasher.Verify`, the same `IFailedLoginRecorder` a wrong login counts
+against - is identical. What is not reused is the message: `ConfirmAsync`'s
+failure is written for an irreversible action ("...cannot be undone, so we ask
+for it first"), and that is false for a password, which can always be changed
+back. A security message about something that cannot happen dilutes the ones
+that matter, the same reasoning the tenant-logo tracking note above already
+follows.
+
+Changing a password ends every other session for the account
+(`ISessionService.EndAllForUserAsync`, `SessionEndReason.PasswordChanged`) -
+the request's own access token is exempt, since it cannot be withdrawn and
+outlives this by fifteen minutes at most, but every refresh token is revoked
+immediately. A stolen refresh token is worth nothing the moment its owner
+changes their password; leaving it live would mean the whole point of changing
+one only bites once that token's own fourteen-day life runs out.
 
 ## Consent and the DPDP Act
 

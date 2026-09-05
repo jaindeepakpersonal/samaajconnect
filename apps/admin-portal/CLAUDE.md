@@ -33,6 +33,7 @@ screen. The spec is `docs/product/wireframes/admin-panel-wireframes.html`.
 | Social Issues | `/issues` | `#issues` | built. The reviewer's approval queue |
 | Members | `/members` | `#members` | built. Search the Samaaj directory and open somebody |
 | Member detail | `/members/:id` | — | built; the wireframe's "View" had no screen behind it. The correction form |
+| Change password | `/change-password` | — | built; no wireframe covers it — the wireframe's sign-in screen has no forgot-password link at all |
 | Reports, Settings | — | various | not built. Reporting is a later phase; Samaaj settings live on the Samaaj screen |
 
 The unbuilt screens appear in the nav, disabled, each saying why. That is
@@ -432,6 +433,19 @@ separate workflow. Suspending asks for the caller's own password first, the
 same asymmetry the Samaaj status control already draws between taking
 something out of service and restoring it; reinstating is one click, because
 it is reversible by the very click that undoes it.
+
+**No account on the platform could ever change its own password, until the
+same day this file's top bar name became a link.** Not a Samaaj Admin's, not
+the bootstrap Super Admin's - `identity-tenant-service`'s `User` aggregate had
+exactly two places that ever wrote a password hash, construction and a
+one-time activation redemption, and neither runs again once an account is
+already active. The wireframe's sign-in screen has no forgot-password link at
+all to translate, so this panel's own top bar is where the control lives:
+the caller's own name, which used to be a bare `<span>`, is now a
+`routerLink` to `/change-password` - the same pattern member-portal's shell
+already uses for its user chip linking to `/profile`. Changing a password
+signs out every other device the account is signed into; the screen says so,
+rather than leaving whoever is signed in elsewhere to wonder why.
 
 **`issueActivationCode`** is the one that made this file's neighbour lie. The
 Invite screen has told administrators from the day it shipped that "a lost code

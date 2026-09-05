@@ -33,7 +33,7 @@ before translating another screen.
 | Pathshala events | — | `#pathevents` | not built — no endpoint exists |
 | Set your password | `/activate` | — | built; no wireframe covers redeeming an activation code, and three admin screens told people to do it here |
 | Forgot password / OTP | — | `#forgot`, `#otp` | not built — no endpoint exists |
-| My Profile | `/profile` | `#profile` | built |
+| My Profile | `/profile` | `#profile` | built. Its own "Change your password" card too — no wireframe covers it |
 
 ## Where things live
 
@@ -227,6 +227,18 @@ field are different things and they were only ever one control while the photo
 was text somebody typed. Choosing a picture takes effect immediately, which is
 what people expect of a profile photo, and a failed upload cannot lose an address
 somebody was halfway through editing.
+
+**Change your password is a third, separate form on this screen, not a third
+field on Save.** Nothing on the platform could ever replace a working
+password before this - not a member's, not a Samaaj Admin's, not the bootstrap
+Super Admin's - and it is not directory data, so folding it into the same
+submission as a locality edit would make the two the same request for no
+reason. A wrong current password answers the same 403 `Auth.StepUpFailed` the
+privacy screen's erasure panel already handles, shown inline rather than
+signing the member out, since they are still who they say they are - they
+simply mistyped. Every other signed-in device is signed out the moment it
+succeeds, which the screen says plainly rather than leaving a member to
+wonder why a different tab suddenly asks them to sign in again.
 
 **A photo is fetched, never linked.** `photoUrl` is a path on this platform and
 authorized per request, so an `<img src>` would fail — the browser sends no

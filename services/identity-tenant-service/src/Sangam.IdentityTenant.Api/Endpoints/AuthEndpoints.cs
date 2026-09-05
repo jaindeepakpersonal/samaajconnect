@@ -1,6 +1,7 @@
 using MediatR;
 using Sangam.IdentityTenant.Api.Extensions;
 using Sangam.IdentityTenant.Application.Users;
+using Sangam.IdentityTenant.Application.Users.Commands.ChangePassword;
 using Sangam.IdentityTenant.Application.Users.Commands.Login;
 using Sangam.IdentityTenant.Application.Users.Commands.RefreshSession;
 using Sangam.IdentityTenant.Application.Users.Commands.SignOut;
@@ -104,6 +105,26 @@ public static class AuthEndpoints
             .ProducesProblem(StatusCodes.Status401Unauthorized)
             .ProducesProblem(StatusCodes.Status404NotFound);
 
+        group.MapPost("/me/password", async (
+                ChangePasswordRequest request,
+                ISender sender,
+                CancellationToken cancellationToken) =>
+            {
+                var result = await sender.Send(
+                    new ChangePasswordCommand(request.CurrentPassword, request.NewPassword),
+                    cancellationToken);
+
+                return result.ToApiResult();
+            })
+            .RequireAuthorization()
+            .WithName("ChangePassword")
+            .WithSummary("Set a new password, given the current one. Ends every other session.")
+            .Produces<ChangePasswordResponse>()
+            .ProducesValidationProblem()
+            .ProducesProblem(StatusCodes.Status401Unauthorized)
+            .ProducesProblem(StatusCodes.Status403Forbidden)
+            .ProducesProblem(StatusCodes.Status409Conflict);
+
         return app;
     }
 
@@ -129,4 +150,6 @@ public static class AuthEndpoints
     /// than only this one - "sign out on all my devices".
     /// </summary>
     public sealed record SignOutRequest(string RefreshToken, bool Everywhere = false);
+
+    public sealed record ChangePasswordRequest(string CurrentPassword, string NewPassword);
 }

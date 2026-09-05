@@ -1,6 +1,6 @@
 import { Component, OnInit, computed, inject, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
-import { AuthedImageDirective, describeError } from '@samaajconnect/shared';
+import { AuthService, AuthedImageDirective, describeError } from '@samaajconnect/shared';
 import { MembersApi } from './members.api';
 import { Gender, MyProfile, PrivacyLevel } from './members.models';
 
@@ -251,12 +251,82 @@ import { Gender, MyProfile, PrivacyLevel } from './members.models';
             </div>
           </div>
         </form>
+
+        <!-- A separate form and a separate request from the profile above: a
+             password is not a directory field, and folding it into Save
+             changes would mean editing your locality and changing your
+             password become the same submission. -->
+        <form (ngSubmit)="changePassword()">
+          <div class="card">
+            <h2>Change your password</h2>
+            <p class="small">Every other signed-in device is signed out once this takes effect.</p>
+
+            <label for="current-password">Current password</label>
+            <input
+              class="input"
+              id="current-password"
+              name="currentPassword"
+              type="password"
+              autocomplete="current-password"
+              [(ngModel)]="passwordForm.current"
+              [attr.aria-invalid]="passwordAttempted() && !passwordForm.current ? 'true' : null"
+            />
+
+            <label for="new-password">New password</label>
+            <input
+              class="input"
+              id="new-password"
+              name="newPassword"
+              type="password"
+              autocomplete="new-password"
+              [(ngModel)]="passwordForm.next"
+              [attr.aria-invalid]="showNewPasswordError() ? 'true' : null"
+            />
+            <p class="small">At least 10 characters, and different from your current one.</p>
+            @if (showNewPasswordError()) {
+              <p class="field-error">
+                Choose a password of at least 10 characters, different from your current one.
+              </p>
+            }
+
+            <label for="confirm-password">Confirm new password</label>
+            <input
+              class="input"
+              id="confirm-password"
+              name="confirmPassword"
+              type="password"
+              autocomplete="new-password"
+              [(ngModel)]="passwordForm.confirm"
+              [attr.aria-invalid]="showConfirmError() ? 'true' : null"
+            />
+            @if (showConfirmError()) {
+              <p class="field-error">The passwords do not match.</p>
+            }
+
+            @if (passwordError(); as message) {
+              <p class="notice error" role="alert">{{ message }}</p>
+            }
+
+            @if (passwordChanged()) {
+              <p class="notice info" role="status">
+                Your password has been changed. Every other signed-in device has been signed out.
+              </p>
+            }
+
+            <div class="actions">
+              <button class="btn" type="submit" [disabled]="changingPassword()">
+                {{ changingPassword() ? 'Changing…' : 'Change password' }}
+              </button>
+            </div>
+          </div>
+        </form>
       }
     </div>
   `,
 })
 export class ProfileComponent implements OnInit {
   private readonly api = inject(MembersApi);
+  private readonly auth = inject(AuthService);
 
   readonly profile = signal<MyProfile | null>(null);
   readonly loading = signal(false);
@@ -264,6 +334,30 @@ export class ProfileComponent implements OnInit {
   readonly saved = signal(false);
   readonly attempted = signal(false);
   readonly error = signal<string | null>(null);
+
+  readonly passwordForm = { current: '', next: '', confirm: '' };
+  readonly passwordAttempted = signal(false);
+  readonly changingPassword = signal(false);
+  readonly passwordChanged = signal(false);
+  readonly passwordError = signal<string | null>(null);
+
+  /**
+   * A plain method, not a `computed` - `passwordForm`'s fields are ordinary
+   * `ngModel`-bound properties rather than signals, the same reason `form`
+   * above is read directly in the template instead of through one. A
+   * `computed` here would cache against `passwordAttempted()` alone and never
+   * see a keystroke.
+   */
+  showNewPasswordError(): boolean {
+    return (
+      this.passwordAttempted()
+      && (this.passwordForm.next.length < 10 || this.passwordForm.next === this.passwordForm.current)
+    );
+  }
+
+  showConfirmError(): boolean {
+    return this.passwordAttempted() && this.passwordForm.confirm !== this.passwordForm.next;
+  }
 
   readonly uploading = signal(false);
   readonly photoError = signal<string | null>(null);
@@ -421,6 +515,33 @@ export class ProfileComponent implements OnInit {
           this.saving.set(false);
         },
       });
+  }
+
+  changePassword(): void {
+    this.passwordAttempted.set(true);
+    this.passwordChanged.set(false);
+    this.passwordError.set(null);
+
+    if (this.showNewPasswordError() || this.showConfirmError() || !this.passwordForm.current) {
+      return;
+    }
+
+    this.changingPassword.set(true);
+
+    this.auth.changePassword(this.passwordForm.current, this.passwordForm.next).subscribe({
+      next: () => {
+        this.changingPassword.set(false);
+        this.passwordAttempted.set(false);
+        this.passwordChanged.set(true);
+        this.passwordForm.current = '';
+        this.passwordForm.next = '';
+        this.passwordForm.confirm = '';
+      },
+      error: (failure) => {
+        this.changingPassword.set(false);
+        this.passwordError.set(describeError(failure));
+      },
+    });
   }
 
   // ---- The photo ----------------------------------------------------------

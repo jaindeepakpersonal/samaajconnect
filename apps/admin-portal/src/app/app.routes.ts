@@ -177,6 +177,14 @@ export const routes: Routes = [
         loadComponent: () =>
           import('./features/notifications/broadcast.component').then((m) => m.BroadcastComponent),
       },
+      {
+        path: 'change-password',
+        title: 'Change password - samaajconnect admin',
+        loadComponent: () =>
+          import('./features/account/change-password.component').then(
+            (m) => m.ChangePasswordComponent,
+          ),
+      },
       { path: '', pathMatch: 'full', redirectTo: 'dashboard' },
       { path: '**', redirectTo: 'dashboard' },
     ],

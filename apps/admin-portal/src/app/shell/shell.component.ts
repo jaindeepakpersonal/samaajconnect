@@ -104,7 +104,7 @@ interface NavGroup {
           }
 
           <div class="profile">
-            <span>{{ auth.user()?.fullName ?? 'Signed in' }}</span>
+            <a routerLink="/change-password">{{ auth.user()?.fullName ?? 'Signed in' }}</a>
             <button class="btn link" type="button" (click)="signOut()">Sign out</button>
           </div>
         </div>

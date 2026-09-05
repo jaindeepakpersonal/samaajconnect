@@ -89,6 +89,12 @@ export interface TenantSummary {
   readonly enabledModules: readonly string[];
 }
 
+/** Mirrors ChangePasswordResponse. No token: the caller keeps the one they have. */
+export interface ChangePasswordResult {
+  readonly userId: string;
+  readonly changedAt: string;
+}
+
 /** One purpose in the consent notice (DPDP s.5). */
 export interface ConsentNoticeItem {
   readonly purpose: string;
