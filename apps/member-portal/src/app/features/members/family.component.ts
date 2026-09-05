@@ -1,6 +1,5 @@
 import { Component, OnInit, computed, inject, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
-import { RouterLink } from '@angular/router';
 import { AuthedImageDirective, AuthService, describeError } from '@samaajconnect/shared';
 import { MembersApi } from './members.api';
 import {
@@ -35,7 +34,7 @@ import {
  */
 @Component({
   selector: 'app-family',
-  imports: [AuthedImageDirective, FormsModule, RouterLink],
+  imports: [AuthedImageDirective, FormsModule],
   styleUrl: './members.css',
   template: `
     <div class="members-page">
@@ -44,7 +43,6 @@ import {
           <h1 class="page-title">My family</h1>
           <p class="subtitle">Create or join a household, and manage the children in it.</p>
         </div>
-        <a class="btn secondary" routerLink="/home">Back to home</a>
       </header>
 
       <!-- Page level, not inside the waiting card, and that is the point.

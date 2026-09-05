@@ -90,11 +90,14 @@ describe('HomeComponent', () => {
     );
   }
 
-  it('greets the member with their Samaaj', () => {
+  it('loads the member and their Samaaj, for the tile filter to use', () => {
+    // The name and Samaaj themselves are shown in the shell's top bar now,
+    // which wraps every screen and is not part of this component's own
+    // render - so this checks the data arrived, not that it is on screen here.
     load();
 
-    expect(text()).toContain('Ravi Shah');
-    expect(text()).toContain('Mahavir Samaaj');
+    expect(component.user()?.fullName).toBe('Ravi Shah');
+    expect(component.samaaj()?.name).toBe('Mahavir Samaaj');
   });
 
   it('shows only the modules this Samaaj has switched on', () => {
@@ -143,7 +146,11 @@ describe('HomeComponent', () => {
     // and straight back to Home, which reads as the button being broken.
     load({ modules: [...AllModuleKeys] });
 
-    const registered = routes.map((route) => `/${route.path}`);
+    // Every signed-in screen is a child of the shell route now, not a
+    // top-level one, so the registered paths have to come from both levels.
+    const registered = routes.flatMap((route) =>
+      (route.children ?? [route]).map((child) => `/${child.path}`),
+    );
 
     for (const tile of component.tiles()) {
       if (tile.route !== null) {

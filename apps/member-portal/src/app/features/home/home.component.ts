@@ -1,6 +1,6 @@
 import { HttpClient } from '@angular/common/http';
 import { Component, OnInit, computed, inject, signal } from '@angular/core';
-import { Router, RouterLink } from '@angular/router';
+import { RouterLink } from '@angular/router';
 import {
   AuthService,
   CurrentUser,
@@ -39,6 +39,11 @@ interface ModuleTile {
  * And the tile list is filtered by the Samaaj's enabled modules, because the
  * gateway already answers 404 for a module a Samaaj has switched off; offering
  * a door that leads to a 404 would be worse than not offering it.
+ *
+ * The Samaaj pill, member name and Sign out button the wireframe drew beside
+ * "Home" moved into the shell's top bar - every screen has one now, not just
+ * this one, so showing them here too would just be the same three things
+ * twice on this particular page.
  */
 @Component({
   selector: 'app-home',
@@ -47,18 +52,8 @@ interface ModuleTile {
   template: `
     <div class="home">
       <header class="home-head">
-        <div>
-          <h1 class="page-title">Home</h1>
-          <p class="subtitle">Choose where you want to go.</p>
-        </div>
-
-        @if (user(); as member) {
-          <div class="home-identity">
-            <span class="pill">{{ samaajName() }}</span>
-            <span class="home-name">{{ member.fullName }}</span>
-            <button class="btn secondary" type="button" (click)="signOut()">Sign out</button>
-          </div>
-        }
+        <h1 class="page-title">Home</h1>
+        <p class="subtitle">Choose where you want to go.</p>
       </header>
 
       @if (loading()) {
@@ -127,15 +122,12 @@ interface ModuleTile {
 export class HomeComponent implements OnInit {
   private readonly auth = inject(AuthService);
   private readonly http = inject(HttpClient);
-  private readonly router = inject(Router);
 
   readonly user = signal<CurrentUser | null>(null);
   readonly samaaj = signal<TenantSummary | null>(null);
   readonly unreadNotifications = signal(0);
   readonly loading = signal(false);
   readonly error = signal<string | null>(null);
-
-  readonly samaajName = computed(() => this.samaaj()?.name ?? this.user()?.tenantSlug ?? '');
 
   /**
    * Every tile the platform can offer. A tile with a module key appears only
@@ -263,16 +255,6 @@ export class HomeComponent implements OnInit {
         this.error.set(describeError(failure));
       },
     });
-  }
-
-  signOut(): void {
-    // Navigates immediately rather than waiting: the tokens are already gone
-    // locally, and holding a member on the page while a network call finishes
-    // would make signing out feel broken on a bad connection. The server call
-    // is what actually revokes the session, so it is fired regardless.
-    this.auth.signOut().subscribe();
-
-    void this.router.navigate(['/login']);
   }
 
   private loadSamaaj(slug: string): void {

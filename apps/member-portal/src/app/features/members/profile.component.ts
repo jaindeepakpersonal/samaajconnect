@@ -1,6 +1,5 @@
 import { Component, OnInit, computed, inject, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
-import { RouterLink } from '@angular/router';
 import { AuthedImageDirective, describeError } from '@samaajconnect/shared';
 import { MembersApi } from './members.api';
 import { Gender, MyProfile, PrivacyLevel } from './members.models';
@@ -40,7 +39,7 @@ import { Gender, MyProfile, PrivacyLevel } from './members.models';
  */
 @Component({
   selector: 'app-profile',
-  imports: [AuthedImageDirective, FormsModule, RouterLink],
+  imports: [AuthedImageDirective, FormsModule],
   styleUrl: './members.css',
   template: `
     <div class="members-page">
@@ -51,7 +50,6 @@ import { Gender, MyProfile, PrivacyLevel } from './members.models';
             Your details, and who in your Samaaj can see each one.
           </p>
         </div>
-        <a class="btn secondary" routerLink="/home">Back to home</a>
       </header>
 
       @if (error(); as message) {

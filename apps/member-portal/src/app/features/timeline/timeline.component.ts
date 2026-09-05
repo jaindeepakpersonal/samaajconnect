@@ -1,6 +1,5 @@
 import { Component, OnInit, computed, inject, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
-import { RouterLink } from '@angular/router';
 import { AuthService, describeError } from '@samaajconnect/shared';
 import { TimelineApi } from './timeline.api';
 import { Comment, Post, ReactionType, Reactions } from './timeline.models';
@@ -31,7 +30,7 @@ import { Comment, Post, ReactionType, Reactions } from './timeline.models';
  */
 @Component({
   selector: 'app-timeline',
-  imports: [FormsModule, RouterLink],
+  imports: [FormsModule],
   styleUrl: './timeline.css',
   template: `
     <div class="timeline-page">
@@ -40,7 +39,6 @@ import { Comment, Post, ReactionType, Reactions } from './timeline.models';
           <h1 class="page-title">Timeline</h1>
           <p class="subtitle">Samaaj announcements and approved public member posts.</p>
         </div>
-        <a class="btn secondary" routerLink="/home">Back to home</a>
       </header>
 
       <!-- Compose ------------------------------------------------------- -->

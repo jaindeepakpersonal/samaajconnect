@@ -19,6 +19,15 @@
   --warn-soft: #fff7dd;
   --warn-line: #f0d889;
 
+  /* The shell's sidebar, from the wireframe's dark left nav - a fixed palette
+     of its own rather than the page tokens above, which is what the wireframe
+     draws too: nothing else on the page is this dark. */
+  --side-bg: #171a21;
+  --side-ink: #dfe3ea;
+  --side-hover: #2a2f3a;
+  --side-group: #9099a8;
+  --side-width: 245px;
+
   --radius-sm: 8px;
   --radius-md: 12px;
   --radius-lg: 14px;

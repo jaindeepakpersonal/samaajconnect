@@ -35,7 +35,6 @@ import { Campaign, stageLabel } from './voting.models';
           <h1 class="page-title">Celebrities of Samaaj</h1>
           <p class="subtitle">Nominate members, and cast your one vote.</p>
         </div>
-        <a class="btn secondary" routerLink="/home">Back to home</a>
       </header>
 
       @if (loading()) {

@@ -41,7 +41,6 @@ import {
           <h1 class="page-title">Social Issues</h1>
           <p class="subtitle">Member submissions are published only after approval.</p>
         </div>
-        <a class="btn secondary" routerLink="/home">Back to home</a>
       </header>
 
       <div class="grid2">

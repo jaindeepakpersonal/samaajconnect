@@ -5,20 +5,5 @@
 }
 
 .home-head {
-  display: flex;
-  justify-content: space-between;
-  align-items: flex-start;
-  gap: var(--space-4);
-  flex-wrap: wrap;
-}
-
-.home-identity {
-  display: flex;
-  align-items: center;
-  gap: var(--space-3);
-  flex-wrap: wrap;
-}
-
-.home-name {
-  font-weight: 600;
+  margin-bottom: var(--space-4);
 }

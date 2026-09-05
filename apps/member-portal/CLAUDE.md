@@ -40,7 +40,10 @@ before translating another screen.
 ```
 apps/member-portal/src/app/
 ├── app.config.ts          providers, interceptor order
-├── app.routes.ts          lazy routes; /home is behind authGuard
+├── app.routes.ts          lazy routes; every signed-in screen is a child of
+│                          the shell route, which carries authGuard once
+├── shell/                 the sidebar, top bar and breadcrumb every signed-in
+│                          screen sits inside
 └── features/{feature}/    one folder per business module
 
 libs/shared/src/           imported as @samaajconnect/shared
@@ -107,6 +110,40 @@ comes from the token rather than the host, but still the right behaviour: the
 services refuse a mismatched token before checking whether the request needed
 authentication at all, so even the anonymous registration directory would fail
 until it is cleared.
+
+**Every signed-in screen sits inside a persistent shell now, and for a long
+time none did.** The wireframe's defining piece of chrome is a fixed dark
+sidebar, grouped Core/Community/Jain Pathshala/Boli/Account, plus a top bar
+naming the current section and carrying the notification bell and the
+member's own chip - present on every one of its screens. Nothing here built
+it: `App` was a bare `<router-outlet />` wrapping whichever feature loaded,
+so the only way from Members to Family was back to Home first, on every
+single visit. `shell/shell.component.ts` is that chrome, added as the
+parent of every signed-in route; `authGuard` moved to that one parent route
+rather than staying on each child, because a route reused across
+navigations does not re-run its own guard and does not need to - a session
+that actually ends is caught by the interceptor's own redirect the next time
+any screen makes a request, which every one of them does on load.
+
+The wireframe's own placement of "Logout / Login" as a sidebar row moved
+into the top bar's user chip instead, matching admin-portal's shell rather
+than inventing a second placement for the same control this platform already
+has one of. And the "Tenant: mahavir-samaj / mahavir-samaj.samaajconnect.com"
+block under the brand is gone rather than translated, for the reason
+`CLAUDE.md` section 6 already gives everywhere else in this app: there is no
+Samaaj subdomain, and the breadcrumb already names the Samaaj on every
+screen without it.
+
+Home's own header carried the Samaaj pill, the member's name and Sign out
+before the shell existed, because it was the only screen that could. It kept
+them afterwards for one cycle too many, which meant Home showed the same
+three things twice - once in its own header, once in the shell wrapping it.
+They are gone from Home now; the shell is where every screen shows them,
+Home included. The twelve list screens' own "Back to home" buttons are gone
+for the same reason: reachable directly from the sidebar now, a button
+whose only job was returning to the one screen with a way out is not
+saving a click, it is clutter the wireframe's own list screens never drew
+either.
 
 **The wireframe's numbers are not in the shipped Home.** It showed 1,248
 members, 4 family, 6 events. Those services do not exist, and the skill is

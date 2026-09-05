@@ -1,5 +1,4 @@
 import { Component, OnInit, computed, inject, signal } from '@angular/core';
-import { RouterLink } from '@angular/router';
 import { describeError } from '@samaajconnect/shared';
 import { NotificationsApi } from './notifications.api';
 import { Notification } from './notifications.models';
@@ -28,7 +27,7 @@ import { Notification } from './notifications.models';
  */
 @Component({
   selector: 'app-notifications',
-  imports: [RouterLink],
+  imports: [],
   styleUrl: './notifications.css',
   template: `
     <div class="notifications-page">
@@ -37,7 +36,6 @@ import { Notification } from './notifications.models';
           <h1 class="page-title">Notifications</h1>
           <p class="subtitle">Approvals, events and updates from your Samaaj.</p>
         </div>
-        <a class="btn secondary" routerLink="/home">Back to home</a>
       </header>
 
       @if (error(); as message) {

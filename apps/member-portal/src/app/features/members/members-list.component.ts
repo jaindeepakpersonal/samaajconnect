@@ -34,7 +34,6 @@ import { Member } from './members.models';
           <h1 class="page-title">Members</h1>
           <p class="subtitle">Your Samaaj's member directory.</p>
         </div>
-        <a class="btn secondary" routerLink="/home">Back to home</a>
       </header>
 
       <div class="card">

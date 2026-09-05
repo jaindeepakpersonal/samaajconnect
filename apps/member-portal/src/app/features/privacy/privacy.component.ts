@@ -1,6 +1,6 @@
 import { Component, OnInit, inject, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
-import { Router, RouterLink } from '@angular/router';
+import { Router } from '@angular/router';
 import { AuthService, describeError } from '@samaajconnect/shared';
 import { forkJoin } from 'rxjs';
 import { PrivacyApi } from './privacy.api';
@@ -43,7 +43,7 @@ import {
  */
 @Component({
   selector: 'app-privacy',
-  imports: [FormsModule, RouterLink],
+  imports: [FormsModule],
   styleUrl: './privacy.css',
   template: `
     <div class="privacy-page">
@@ -54,7 +54,6 @@ import {
             What you agreed to, a copy of what is held, and how to have it erased.
           </p>
         </div>
-        <a class="btn secondary" routerLink="/home">Back to home</a>
       </header>
 
       @if (erased(); as done) {

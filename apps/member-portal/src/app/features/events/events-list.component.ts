@@ -43,7 +43,6 @@ import { SamaajEvent } from './events.models';
           <h1 class="page-title">Events</h1>
           <p class="subtitle">Events organised by the Samaaj or its volunteer groups.</p>
         </div>
-        <a class="btn secondary" routerLink="/home">Back to home</a>
       </header>
 
       @if (loading()) {

@@ -8,7 +8,38 @@ version of the plan; the reasoning behind the ordering lives in
 ## Current Status
 
 - **Stage:** every module has a service and member screens; Phase 5 hardening under way
-- **Last updated:** 2026-09-05 - **the fourth and usually-worst
+- **Last updated:** 2026-09-05 - **member-portal had no persistent
+  navigation at all, and the wireframe review asked for was really a
+  wireframe-fidelity gap the whole session's bug-hunting had not been
+  looking for.**
+
+  The wireframe's every screen sits inside a fixed dark sidebar (Core /
+  Community / Jain Pathshala / Boli / Account) and a top bar naming the
+  section, the bell and the member's chip. `App` was a bare
+  `<router-outlet />`: nothing built that chrome, so the only way from one
+  screen to another was back to Home first, every single visit, on every
+  one of the roughly twenty screens this app has.
+
+  `shell/shell.component.ts` is that chrome now, as the parent of every
+  signed-in route; `authGuard` moved from each child route to that one
+  parent, which a reused route does not re-check on every navigation and
+  does not need to - the interceptor's own redirect on a real 401 already
+  covers a session actually ending. Home's own header dropped the Samaaj
+  pill, member name and Sign out button it carried before the shell
+  existed, because the shell shows them on every screen now and Home
+  showing them too was the same three things twice on one particular
+  page. The twelve list screens' own "Back to home" buttons are gone for
+  the same reason - reachable directly from the sidebar now, and not
+  something the wireframe's own list screens ever drew.
+
+  Verified with full production builds, `tsc --noEmit` against both
+  `tsconfig.app.json` and `tsconfig.spec.json`, all 338 member-portal
+  tests, both CSS-class and table-caption coverage scripts, and a live
+  walkthrough in the browser: registered a fresh member, signed in,
+  confirmed active-link highlighting, breadcrumb naming, the unread badge
+  dropping after reading a notification and refreshing again after
+  navigating away, sign-out, and the mobile stacked layout.
+- **Previously:** 2026-09-05 - **the fourth and usually-worst
   strictness flag, `exactOptionalPropertyTypes` - normally a large,
   invasive change against Angular's `HttpClient` - found exactly one call
   built the way it refuses, anywhere in either app.**

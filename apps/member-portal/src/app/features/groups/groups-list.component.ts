@@ -37,7 +37,6 @@ import { VolunteerGroup } from './groups.models';
           <h1 class="page-title">Volunteer Groups</h1>
           <p class="subtitle">Apply to join; the group president decides and assigns positions.</p>
         </div>
-        <a class="btn secondary" routerLink="/home">Back to home</a>
       </header>
 
       @if (loading()) {

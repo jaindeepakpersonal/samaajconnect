@@ -38,7 +38,6 @@ import { Enrolment, EnrolmentStatusLabels, Pathshala } from './pathshala.models'
           <h1 class="page-title">Jain Pathshala</h1>
           <p class="subtitle">Your children's places, and the Samaaj's Pathshalas.</p>
         </div>
-        <a class="btn secondary" routerLink="/home">Back to home</a>
       </header>
 
       @if (loading()) {

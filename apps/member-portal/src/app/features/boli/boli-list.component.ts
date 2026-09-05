@@ -29,7 +29,6 @@ import { Boli, BoliResult, Occasion, OccasionStatusLabels } from './boli.models'
           <h1 class="page-title">Auctions / Boli</h1>
           <p class="subtitle">Bid on a Boli, and see what the Samaaj has announced.</p>
         </div>
-        <a class="btn secondary" routerLink="/home">Back to home</a>
       </header>
 
       @if (loading()) {
