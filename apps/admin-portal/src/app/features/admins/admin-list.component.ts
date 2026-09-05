@@ -1,5 +1,6 @@
 import { Component, OnInit, computed, inject, signal } from '@angular/core';
 import { DatePipe } from '@angular/common';
+import { FormsModule } from '@angular/forms';
 import { RouterLink } from '@angular/router';
 import { AuthService, describeError } from '@samaajconnect/shared';
 import { AdminApi } from '../../core/admin-api';
@@ -20,7 +21,7 @@ import { ActivationCode, AdminUser, Role } from '../../core/admin.models';
  */
 @Component({
   selector: 'app-admin-list',
-  imports: [RouterLink, DatePipe],
+  imports: [RouterLink, DatePipe, FormsModule],
   template: `
     <h1 class="title">Admin Users &amp; Roles</h1>
     <p class="sub">Role and tenant-scoped access management for {{ samaajLabel() }}.</p>
@@ -114,6 +115,75 @@ import { ActivationCode, AdminUser, Role } from '../../core/admin.models';
                       </div>
                     }
                   }
+
+                  <!--
+                    UserStatus.Suspended has existed since the first migration,
+                    LoginCommandHandler has always refused a suspended account,
+                    and a refresh has always force-revoked the whole session
+                    chain the moment it found anything but Active - the only
+                    thing missing was a way for an administrator to actually
+                    set it, which is what this button and panel are.
+                  -->
+                  @if (admin.status === 'Active') {
+                    <div class="actions">
+                      <button
+                        class="btn alt small"
+                        type="button"
+                        [disabled]="statusBusy() === admin.userId"
+                        [attr.aria-expanded]="confirming() === admin.userId"
+                        (click)="askToConfirm(admin)"
+                      >
+                        Suspend
+                        <span class="sr-only">{{ admin.fullName }}</span>
+                      </button>
+                    </div>
+                  } @else if (admin.status === 'Suspended') {
+                    <div class="actions">
+                      <button
+                        class="btn small"
+                        type="button"
+                        [disabled]="statusBusy() === admin.userId"
+                        (click)="reinstate(admin)"
+                      >
+                        {{ statusBusy() === admin.userId ? 'Reinstating…' : 'Reinstate' }}
+                        <span class="sr-only">{{ admin.fullName }}</span>
+                      </button>
+                    </div>
+                  }
+
+                  @if (confirming() === admin.userId) {
+                    <form class="confirm" (ngSubmit)="confirmSuspend(admin)">
+                      <p class="small">
+                        Suspending {{ admin.fullName }} signs them out immediately and blocks
+                        sign-in until reinstated. Enter your own password to confirm.
+                      </p>
+                      <label [for]="admin.userId + 'pwd'">Your password</label>
+                      <input
+                        class="input"
+                        type="password"
+                        autocomplete="current-password"
+                        [id]="admin.userId + 'pwd'"
+                        [(ngModel)]="password"
+                        name="password"
+                        required
+                      />
+                      @if (confirmError()) {
+                        <p class="small error" role="alert">{{ confirmError() }}</p>
+                      }
+                      <div class="actions">
+                        <button
+                          class="btn small"
+                          type="submit"
+                          [disabled]="statusBusy() === admin.userId"
+                        >
+                          Suspend
+                        </button>
+                        <button class="btn alt small" type="button" (click)="cancelConfirm()">
+                          Cancel
+                        </button>
+                      </div>
+                    </form>
+                  }
                 </td>
                 <td>
                   @if (admin.lastLoginAt) {
@@ -172,6 +242,14 @@ export class AdminListComponent implements OnInit {
   /** Which account a code is being minted for, and the code once it arrives. */
   readonly reissuing = signal<string | null>(null);
   readonly issued = signal<ActivationCode | null>(null);
+
+  /** Which account a suspend/reinstate call is in flight for. */
+  readonly statusBusy = signal<string | null>(null);
+
+  /** Which account's suspend confirmation is open, awaiting a password. */
+  readonly confirming = signal<string | null>(null);
+  readonly confirmError = signal<string | null>(null);
+  password = '';
 
   /**
    * Mints a fresh one-time code for an account still waiting to be activated.
@@ -268,6 +346,65 @@ export class AdminListComponent implements OnInit {
         this.busy.set(null);
       },
     });
+  }
+
+  /** Reinstating is one click - unlike suspending it is reversible by the
+   * very call that undid it, so a step-up here would only teach people to
+   * type a password without reading the screen. */
+  reinstate(admin: AdminUser): void {
+    this.statusBusy.set(admin.userId);
+    this.error.set(null);
+
+    this.api.setUserSuspension(admin.userId, false).subscribe({
+      next: (result) => {
+        this.applyStatus(admin.userId, result.status);
+        this.statusBusy.set(null);
+      },
+      error: (failure: unknown) => {
+        this.error.set(describeError(failure));
+        this.statusBusy.set(null);
+      },
+    });
+  }
+
+  /** Suspending asks before it acts, rather than acting on one click. */
+  askToConfirm(admin: AdminUser): void {
+    this.password = '';
+    this.confirmError.set(null);
+    this.confirming.set(this.confirming() === admin.userId ? null : admin.userId);
+  }
+
+  cancelConfirm(): void {
+    this.password = '';
+    this.confirmError.set(null);
+    this.confirming.set(null);
+  }
+
+  confirmSuspend(admin: AdminUser): void {
+    this.statusBusy.set(admin.userId);
+    this.confirmError.set(null);
+
+    this.api.setUserSuspension(admin.userId, true, this.password).subscribe({
+      next: (result) => {
+        this.applyStatus(admin.userId, result.status);
+        this.cancelConfirm();
+        this.statusBusy.set(null);
+      },
+      error: (failure: unknown) => {
+        // Left open, with the message beside the field - the same reasoning
+        // as tenant deactivation's own confirm panel: closing it on a wrong
+        // password, or on refusing to suspend yourself, would make the admin
+        // start again from nothing to see why.
+        this.confirmError.set(describeError(failure));
+        this.statusBusy.set(null);
+      },
+    });
+  }
+
+  private applyStatus(userId: string, status: string): void {
+    this.admins.set(
+      this.admins().map((a) => (a.userId === userId ? { ...a, status } : a)),
+    );
   }
 
   /** `SamaajAdmin` reads as "Samaaj Admin" to a person. */

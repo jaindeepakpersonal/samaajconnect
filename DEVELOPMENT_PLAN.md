@@ -8,7 +8,42 @@ version of the plan; the reasoning behind the ordering lives in
 ## Current Status
 
 - **Stage:** every module has a service and member screens; Phase 5 hardening under way
-- **Last updated:** 2026-09-05 - **an audit trail that answers "who did this?"
+- **Last updated:** 2026-09-05 - **an administrator had no way to suspend a
+  problem account, and the backend had needed nothing new to let them.**
+
+  `SetUserSuspensionCommand`, its step-up, the self-suspend refusal, the
+  erased-account refusal - all of it landed two cycles ago, all of it was
+  smoke-tested straight through the gateway, and `PUT
+  /admins/{userId}/status` was in `API-CONTRACTS.md` from the day it shipped.
+  `AdminListComponent` never called it. A Samaaj administrator with a
+  problem account had no way to act on it short of asking the platform
+  operator to archive the whole Samaaj.
+
+  Found by `scripts/unreachable-endpoints.sh`, in its own "reached by
+  neither" list, sitting beside the two photo reads and the gateway's own
+  tenant lookup that are always there and always legitimate - this one
+  was not. Unlike the last three cycles this is not a domain-layer or
+  audit-layer gap; it is admin-portal's own recurring shape, named in its
+  CLAUDE.md before this cycle even started: "an endpoint with no caller is
+  where these gaps live."
+
+  The button sits beside the status pill it changes on the Admin Users &
+  Roles screen, next to where re-issuing an activation code already lives
+  for the same reason - both are things a Samaaj does to one account.
+  Suspending asks for the caller's own password first, the same asymmetry
+  the Samaaj status control already draws between taking something out of
+  service and restoring it; reinstating is one click.
+
+  Verified live against the running stack, not only in tests: signed in as
+  Super Admin, scoped to Smoke Samaaj, suspended a live account (password
+  required, pill flips to "Suspended", "Reinstate" appears), then
+  reinstated it in one click back to "Active" - zero console errors either
+  way.
+
+  196 admin-portal tests green, up 7. No backend change and no new smoke
+  check - the endpoint itself was already smoke-tested when it was built;
+  this cycle only gave it a caller.
+- **Previously:** 2026-09-05 - **an audit trail that answers "who did this?"
   for two events, and answered every other event on the platform with a
   blank, including the two that named the answer in their own doc comments.**
 

@@ -13,7 +13,7 @@ screen. The spec is `docs/product/wireframes/admin-panel-wireframes.html`.
 | Dashboard | `/dashboard` | `#dashboard` | built, partial — see below |
 | Samaaj / Tenants | `/tenants` | `#tenants` | built. Status, modules, logo, and the DPDP s.13 grievance contact |
 | Create Samaaj | `/tenants/new` | `#createtenant` | built |
-| Admin Users & Roles | `/admins` | `#admins` | built. Roles, and re-issuing a one-time activation code |
+| Admin Users & Roles | `/admins` | `#admins` | built. Roles, re-issuing a one-time activation code, and suspending or reinstating an account |
 | Invite Admin | `/admins/invite` | `#inviteadmin` | built |
 | Role & Permission Matrix | `/roles` | `#rolematrix` | built, editable per Samaaj |
 | Adult Child Conversion Queue | `/conversions` | `#conversionqueue` | built |
@@ -418,6 +418,20 @@ Data Fiduciary to publish who answers a member's complaint about their data;
 Samaaj to actually name anybody was curl. The Samaaj screen carries the control
 now, and a Samaaj that has named nobody says so on its row without anything
 being opened.
+
+**Suspending an account had no screen at all, not merely no caller.**
+`SetUserSuspensionCommand`, the step-up it requires to suspend, the self-suspend
+refusal and the erased-account refusal were all built and tested against a
+running database, and `PUT /admins/{userId}/status` was in `API-CONTRACTS.md`
+from the day it landed — but `AdminListComponent` never called it, so a Samaaj
+administrator with a problem account had no way to act on it short of asking
+the platform operator to archive the whole Samaaj. The button sits beside the
+status pill it changes, next to where re-issuing a code already lives for the
+same reason: both are things a Samaaj does to one account rather than a
+separate workflow. Suspending asks for the caller's own password first, the
+same asymmetry the Samaaj status control already draws between taking
+something out of service and restoring it; reinstating is one click, because
+it is reversible by the very click that undoes it.
 
 **`issueActivationCode`** is the one that made this file's neighbour lie. The
 Invite screen has told administrators from the day it shipped that "a lost code

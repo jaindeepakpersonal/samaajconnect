@@ -46,6 +46,7 @@ import {
   SocialIssue,
   Tenant,
   TenantStatus,
+  UserStatusResult,
   VolunteerGroup,
 } from './admin.models';
 
@@ -165,6 +166,23 @@ export class AdminApi {
     return this.http.put<AssignRoleResult>(
       `/v1/identity/admins/${userId}/roles/${encodeURIComponent(role)}`,
       { granted },
+    );
+  }
+
+  /**
+   * Suspending re-asks for the caller's own password, the same asymmetry
+   * `changeTenantStatus` draws between taking something out of service and
+   * restoring it; reinstating does not. The server decides which, so
+   * `password` is always sent and ignored where it is not needed.
+   */
+  setUserSuspension(
+    userId: string,
+    suspended: boolean,
+    password?: string,
+  ): Observable<UserStatusResult> {
+    return this.http.put<UserStatusResult>(
+      `/v1/identity/admins/${userId}/status`,
+      { suspended, password },
     );
   }
 

@@ -84,6 +84,13 @@ export interface AdminUser {
   readonly roles: readonly string[];
 }
 
+/** Mirrors `UserStatusResponse`. `changed` is false for a repeated click. */
+export interface UserStatusResult {
+  readonly userId: string;
+  readonly status: string;
+  readonly changed: boolean;
+}
+
 export interface InviteAdminRequest {
   readonly fullName: string;
   readonly mobileOrEmail: string;
