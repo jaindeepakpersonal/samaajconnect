@@ -100,6 +100,31 @@ public sealed class RecordIntegrationEventCommandHandlerTests
     }
 
     [Fact]
+    public async Task A_removed_group_member_is_audited_against_who_removed_them()
+    {
+        // volunteer-groups.member.removed.v1 had no descriptor at all until
+        // this cycle - the derived default would have left both the entity
+        // id and the actor blank on the one row meant to answer "who put
+        // them out?"
+        var memberId = Guid.NewGuid();
+        var removedBy = Guid.NewGuid();
+        var groupId = Guid.NewGuid();
+
+        await Handle(Envelope(
+            topic: "volunteer-groups.member.removed.v1",
+            payload: $$"""
+                {"groupId":"{{groupId}}","tenantId":"{{TenantId}}",
+                 "memberId":"{{memberId}}","removedBy":"{{removedBy}}"}
+                """));
+
+        _auditLogs.Received(1).Add(Arg.Is<AuditLog>(a =>
+            a.Action == "MemberRemoved"
+            && a.EntityName == "GroupMember"
+            && a.EntityId == memberId.ToString()
+            && a.ActorUserId == removedBy));
+    }
+
+    [Fact]
     public async Task A_redelivered_event_is_skipped_rather_than_recorded_twice()
     {
         _auditLogs.AlreadyRecordedAsync(Arg.Any<Guid>(), Arg.Any<CancellationToken>()).Returns(true);

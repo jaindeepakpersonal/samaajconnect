@@ -8,7 +8,47 @@ version of the plan; the reasoning behind the ordering lives in
 ## Current Status
 
 - **Stage:** every module has a service and member screens; Phase 5 hardening under way
-- **Last updated:** 2026-09-05 - **a president who could hand over the group
+- **Last updated:** 2026-09-05 - **an audit trail that answers "who did this?"
+  for two events, and answered every other event on the platform with a
+  blank, including the two that named the answer in their own doc comments.**
+
+  `KnownEvents.Describe`'s fallback for any topic without a descriptor has
+  always been `EntityIdProperty: null` - not a best-effort guess, an explicit
+  null - so every one of the 35 topics on the platform with no entry in
+  `KnownEvents.cs` recorded an audit row with no entity id **and** no actor,
+  every time, since the service was built. Two of those 35 are
+  `volunteer-groups.application.decided.v1` and `.member.removed.v1`, whose
+  own doc comments (the second added last cycle) say recording who acted
+  answers "who let them in?" and "who put them out?" - a promise the domain
+  event kept and the audit row broke.
+
+  Found by comparing every `Topic` string declared across all ten services
+  against `KnownEvents.cs`'s dictionary keys - the same shape of sweep as the
+  last three cycles, aimed at the audit-recording layer instead of the
+  domain layer this time.
+
+  Scoped to volunteer-groups-service's seven topics rather than all 35: the
+  service whose own missing capability the last cycle just finished, so its
+  events were the freshest and best-understood, and two of the seven also
+  correct a wrong derived entity name in passing - `president.changed.v1` and
+  `role-position.assigned.v1` each derive an entity from their topic's second
+  segment ("President", "RolePosition") that is not a thing this platform
+  has; both are facts about a `Group`.
+
+  Verified by fault injection - the `member.removed.v1` descriptor removed
+  entirely, both the unit test asserting its shape and the handler test
+  asserting the recorded row failed - and live: rebuilt and restarted
+  `audit-notification-service` against the running stack, then a smoke check
+  confirms a `MemberRemoved` audit row names both the removed member and the
+  president who removed them.
+
+  364 of 364 smoke checks green through the gateway, which is 363 plus
+  exactly the one added here.
+
+  156 tests green in audit-notification-service (106 unit + 50 integration),
+  up 8. The other 28 undescribed topics are untouched and noted in the
+  service's own `CLAUDE.md` as worth another pass.
+- **Previously:** 2026-09-05 - **a president who could hand over the group
   and could not put anyone out of it, the same gap in both directions at
   once.**
 

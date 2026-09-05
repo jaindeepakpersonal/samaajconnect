@@ -98,6 +98,37 @@ own field is `changedByUserId` rather than `userId`, to say plainly that it
 names the actor and not the account being acted on, and the descriptor points
 there rather than at the account.
 
+**All seven `volunteer-groups.*` topics followed the day after that, at once
+rather than one at a time.** Unlike the two above, none of the seven had ever
+been raised in anger before their own service's president/member/status
+commands existed - so this was not "an event fires and nobody described it",
+it was "an entire service had never once had a reason to check", found by
+re-reading `docs/product/DEVELOPMENT_PLAN.md`'s own account of what that
+service's aggregate could newly do. Two of the seven are worth naming
+specifically: `volunteer-groups.application.decided.v1`'s own doc comment
+says recording who decided answers "who let them in?", and
+`volunteer-groups.member.removed.v1`'s says the same about "who put them out?"
+- so for those two the derived default's blank actor broke a promise the
+domain event had already made about itself, not merely one this service could
+have kept. Two more of the seven also correct a *wrong* derived entity name,
+not just a missing one: `president.changed.v1`'s second topic segment is
+"president", which is not an entity this platform has, and
+`role-position.assigned.v1`'s is "role-position" for the same reason - both
+are facts about a `Group` or the member holding a position in it, and now say
+so. `smoke-through-gateway.sh` checks one of the seven end to end - that a
+`MemberRemoved` row names both the member taken off the roster and the
+president who did it - the same shape the reuse-detection check above uses,
+because this row also arrives over Kafka through the outbox rather than
+inside the request that triggered it.
+
+The other 28 undescribed topics on the platform were not touched this pass.
+Not every one needs a descriptor - a self-action like applying to something
+already gets a usable entity id and actor from the same field, the same shape
+`identity.user.logged-in.v1` uses - but several likely have the same shape as
+these seven: an administrative act with a real "who did this" question and a
+blank answer. Worth another pass, service by service, rather than guessing at
+all 28 in the same sweep that found these seven.
+
 ## API endpoints
 
 | Method | Path | Roles |

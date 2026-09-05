@@ -144,4 +144,92 @@ public sealed class KnownEventsTests
         descriptor.ActorIdProperty.Should().Be(actorProperty);
         descriptor.EntityIdProperty.Should().Be("userId");
     }
+
+    // ---- volunteer-groups-service --------------------------------------
+    //
+    // Both GroupApplicationDecidedDomainEvent and GroupMemberRemovedDomainEvent
+    // name who acted in their own doc comments - "who let them in?" and "who
+    // put them out?" - and neither had a descriptor, so the derived default
+    // answered both questions with a blank actor as well as a blank entity id.
+
+    [Fact]
+    public void A_group_s_creation_is_recorded_against_the_group_it_created()
+    {
+        var descriptor = KnownEvents.Describe("volunteer-groups.group.created.v1");
+
+        descriptor.Action.Should().Be("GroupCreated");
+        descriptor.EntityName.Should().Be("Group");
+        descriptor.EntityIdProperty.Should().Be("groupId");
+    }
+
+    [Fact]
+    public void An_application_is_recorded_against_itself_with_the_applicant_as_actor()
+    {
+        // A member applying to a group is a self-action, the same shape as
+        // identity.user.logged-in.v1: nobody else did this to them.
+        var descriptor = KnownEvents.Describe("volunteer-groups.application.submitted.v1");
+
+        descriptor.EntityIdProperty.Should().Be("applicationId");
+        descriptor.ActorIdProperty.Should().Be("memberId");
+    }
+
+    [Fact]
+    public void A_decided_application_names_the_president_who_decided_it()
+    {
+        // The exact question GroupApplicationDecidedDomainEvent's own doc
+        // comment exists to answer: "who let them in?"
+        var descriptor = KnownEvents.Describe("volunteer-groups.application.decided.v1");
+
+        descriptor.Action.Should().Be("ApplicationDecided");
+        descriptor.EntityIdProperty.Should().Be("applicationId");
+        descriptor.ActorIdProperty.Should().Be("decidedBy");
+    }
+
+    [Fact]
+    public void A_removed_member_names_who_removed_them()
+    {
+        // The other half of the same question: "who put them out?"
+        var descriptor = KnownEvents.Describe("volunteer-groups.member.removed.v1");
+
+        descriptor.Action.Should().Be("MemberRemoved");
+        descriptor.EntityName.Should().Be("GroupMember");
+        descriptor.EntityIdProperty.Should().Be("memberId");
+        descriptor.ActorIdProperty.Should().Be("removedBy");
+    }
+
+    [Fact]
+    public void A_role_position_is_recorded_against_the_member_who_holds_it()
+    {
+        // The derived entity name for this topic's second segment is
+        // "RolePosition", which is not a thing on this platform - a member is.
+        var descriptor = KnownEvents.Describe("volunteer-groups.role-position.assigned.v1");
+
+        descriptor.EntityName.Should().Be("GroupMember");
+        descriptor.EntityIdProperty.Should().Be("memberId");
+    }
+
+    [Fact]
+    public void A_changed_presidency_is_recorded_against_the_group_not_a_president_entity()
+    {
+        // The derived entity name for this topic's second segment is
+        // "President", which does not exist as an entity on this platform -
+        // it is a fact about a Group. The previous holder is kept as the
+        // before-state, per SECURITY-CHECKLIST.md's before/after rule.
+        var descriptor = KnownEvents.Describe("volunteer-groups.president.changed.v1");
+
+        descriptor.EntityName.Should().Be("Group");
+        descriptor.EntityIdProperty.Should().Be("groupId");
+        descriptor.BeforeProperties.Should().BeEquivalentTo(["previousPresidentMemberId"]);
+    }
+
+    [Fact]
+    public void A_group_status_change_keeps_its_previous_status_like_a_tenant_s_does()
+    {
+        var descriptor = KnownEvents.Describe("volunteer-groups.group.status-changed.v1");
+
+        descriptor.Action.Should().Be("GroupStatusChanged");
+        descriptor.EntityName.Should().Be("Group");
+        descriptor.EntityIdProperty.Should().Be("groupId");
+        descriptor.BeforeProperties.Should().BeEquivalentTo(["previousStatus"]);
+    }
 }

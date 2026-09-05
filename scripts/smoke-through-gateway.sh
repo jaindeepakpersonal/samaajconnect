@@ -1868,6 +1868,31 @@ else
   pass=$((pass + 1))
 fi
 
+# volunteer-groups.member.removed.v1 had no KnownEvents descriptor until
+# 2026-09-05, so the derived default recorded this the same way the session
+# reuse and account suspension events once did: no entity id and no actor,
+# on the one row that answers "who put them out?" - the same poll-with-retry
+# shape those two checks use, because the row arrives over Kafka through the
+# outbox rather than inside the request that triggered it.
+member_removal_audited=0
+for attempt in $(seq 1 20); do
+  if curl -s -H "Authorization: Bearer $ADMIN_TOKEN" -H "$ADMIN_TENANT_HEADER" \
+     "$GATEWAY/v1/audit/logs?action=MemberRemoved&limit=200" \
+     | grep -q "\"entityId\":\"$CHILD_USER_ID\",\"actorUserId\":\"$MEMBER_ID\""; then
+    member_removal_audited=1
+    break
+  fi
+  sleep 2
+done
+
+if [ "$member_removal_audited" -eq 1 ]; then
+  echo "  ok    the removal names the president who removed them, not just the group"
+  pass=$((pass + 1))
+else
+  echo "  FAIL  the removal reaches the audit trail with its actor and entity id"
+  fail=$((fail + 1))
+fi
+
 check "the president cannot hand the group to somebody themselves" 403 \
   "$(status -X PATCH "$GATEWAY/v1/volunteer-groups/groups/$GROUP_ID/president" \
      -H 'Content-Type: application/json' -H "Authorization: Bearer $MEMBER_TOKEN" \

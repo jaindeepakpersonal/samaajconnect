@@ -203,6 +203,58 @@ public static class KnownEvents
             EntityIdProperty: "notificationId",
             ActorIdProperty: "sentBy"),
 
+        // volunteer-groups-service's own domain events named who acted in their
+        // doc comments - GroupApplicationDecidedDomainEvent: "who let them in?
+        // is the first question asked when a group turns out to contain
+        // somebody it should not." GroupMemberRemovedDomainEvent: "who removed
+        // them, for the same reason." Neither had a descriptor, so both
+        // promises were kept by the domain event and broken by the audit row -
+        // the derived default left every one of these seven topics with no
+        // entity id and, for the three that carry a distinct actor, no actor
+        // either. `president.changed.v1` and `role-position.assigned.v1`
+        // additionally derive a nonsense entity name from their topic's second
+        // segment ("President", "RolePosition") with nothing named "Group" to
+        // read; these give the readable one.
+        ["volunteer-groups.group.created.v1"] = new(
+            Action: "GroupCreated",
+            EntityName: "Group",
+            EntityIdProperty: "groupId"),
+
+        ["volunteer-groups.application.submitted.v1"] = new(
+            Action: "ApplicationSubmitted",
+            EntityName: "Application",
+            EntityIdProperty: "applicationId",
+            ActorIdProperty: "memberId"),
+
+        ["volunteer-groups.application.decided.v1"] = new(
+            Action: "ApplicationDecided",
+            EntityName: "Application",
+            EntityIdProperty: "applicationId",
+            ActorIdProperty: "decidedBy"),
+
+        ["volunteer-groups.role-position.assigned.v1"] = new(
+            Action: "RolePositionAssigned",
+            EntityName: "GroupMember",
+            EntityIdProperty: "memberId"),
+
+        ["volunteer-groups.member.removed.v1"] = new(
+            Action: "MemberRemoved",
+            EntityName: "GroupMember",
+            EntityIdProperty: "memberId",
+            ActorIdProperty: "removedBy"),
+
+        ["volunteer-groups.president.changed.v1"] = new(
+            Action: "PresidentChanged",
+            EntityName: "Group",
+            EntityIdProperty: "groupId",
+            BeforeProperties: ["previousPresidentMemberId"]),
+
+        ["volunteer-groups.group.status-changed.v1"] = new(
+            Action: "GroupStatusChanged",
+            EntityName: "Group",
+            EntityIdProperty: "groupId",
+            BeforeProperties: ["previousStatus"]),
+
         // Erasure is handled by ErasePersonalDataCommandHandler rather than
         // recorded through this path, and it writes its own row with no actor
         // deliberately. Listed here so the omission reads as a decision.
