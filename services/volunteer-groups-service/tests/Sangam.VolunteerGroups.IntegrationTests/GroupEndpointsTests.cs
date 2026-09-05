@@ -428,4 +428,178 @@ public sealed class GroupEndpointsTests(VolunteerGroupsApiFactory factory)
 
         response.StatusCode.Should().Be(HttpStatusCode.BadRequest);
     }
+
+    // ---- Removing a member -------------------------------------------------
+    //
+    // VolunteerGroup.RemoveMember existed, was unit-tested at the domain level,
+    // and was called from nowhere - a president could accept an application and
+    // give somebody a position, with no way to undo either.
+
+    private async Task<Guid> AcceptedMemberIdAsync(Guid groupId, Guid? memberId = null)
+    {
+        var member = memberId ?? ApplicantId;
+        await ApplyAsync(Member(member), groupId);
+        var applicationId = await PendingApplicationIdAsync(groupId);
+
+        await Manager().PostAsJsonAsync(
+            $"/v1/volunteer-groups/groups/{groupId}/applications/{applicationId}/decide",
+            new { accept = true, rolePosition = (string?)null });
+
+        return member;
+    }
+
+    [Fact]
+    public async Task The_president_removes_a_member()
+    {
+        var id = await CreateGroupAsync();
+        var memberId = await AcceptedMemberIdAsync(id);
+
+        var response = await Manager().DeleteAsync(
+            $"/v1/volunteer-groups/groups/{id}/members/{memberId}");
+
+        response.StatusCode.Should().Be(HttpStatusCode.OK);
+
+        var detail = await Manager().GetFromJsonAsync<JsonElement>(
+            $"/v1/volunteer-groups/groups/{id}");
+
+        detail.GetProperty("members").EnumerateArray()
+            .Select(m => m.GetProperty("memberId").GetGuid())
+            .Should().NotContain(memberId);
+    }
+
+    [Fact]
+    public async Task It_does_not_erase_that_they_were_ever_accepted()
+    {
+        var id = await CreateGroupAsync();
+        var memberId = await AcceptedMemberIdAsync(id);
+
+        await Manager().DeleteAsync($"/v1/volunteer-groups/groups/{id}/members/{memberId}");
+
+        var applications = await Manager().GetFromJsonAsync<JsonElement>(
+            $"/v1/volunteer-groups/groups/{id}/applications?pendingOnly=false");
+
+        applications.EnumerateArray()
+            .Select(a => a.GetProperty("memberId").GetGuid())
+            .Should().Contain(memberId);
+    }
+
+    [Fact]
+    public async Task The_president_cannot_be_removed_through_the_endpoint_either()
+    {
+        var id = await CreateGroupAsync();
+
+        var response = await Manager().DeleteAsync(
+            $"/v1/volunteer-groups/groups/{id}/members/{PresidentId}");
+
+        response.StatusCode.Should().Be(HttpStatusCode.Conflict);
+    }
+
+    [Fact]
+    public async Task Somebody_who_is_not_this_group_s_president_cannot_remove_anybody()
+    {
+        var id = await CreateGroupAsync();
+        var memberId = await AcceptedMemberIdAsync(id);
+
+        var response = await Manager(userId: Guid.NewGuid()).DeleteAsync(
+            $"/v1/volunteer-groups/groups/{id}/members/{memberId}");
+
+        response.StatusCode.Should().Be(HttpStatusCode.NotFound);
+    }
+
+    [Fact]
+    public async Task Removing_somebody_not_in_the_group_says_so()
+    {
+        var id = await CreateGroupAsync();
+
+        var response = await Manager().DeleteAsync(
+            $"/v1/volunteer-groups/groups/{id}/members/{Guid.NewGuid()}");
+
+        response.StatusCode.Should().Be(HttpStatusCode.NotFound);
+    }
+
+    [Fact]
+    public async Task Removing_a_member_reaches_the_outbox_naming_who_removed_them()
+    {
+        var id = await CreateGroupAsync();
+        var memberId = await AcceptedMemberIdAsync(id);
+
+        await Manager().DeleteAsync($"/v1/volunteer-groups/groups/{id}/members/{memberId}");
+
+        var message = await factory.WithDbContextAsync(db =>
+            db.OutboxMessages.AsNoTracking()
+                .Where(m => m.Topic == "volunteer-groups.member.removed.v1")
+                .SingleOrDefaultAsync());
+
+        message.Should().NotBeNull();
+        message!.Payload.Should().Contain($"\"removedBy\": \"{PresidentId}\"");
+    }
+
+    // ---- Changing a group's president --------------------------------------
+    //
+    // VolunteerGroup.ChangePresident existed and was called from nowhere -
+    // GroupPresidentChangedDomainEvent has sat in this service's own CLAUDE.md
+    // "Raised by" column since it was written, naming a method nothing called.
+
+    [Fact]
+    public async Task A_Samaaj_admin_hands_the_group_to_a_different_president()
+    {
+        var id = await CreateGroupAsync();
+        var successor = Guid.NewGuid();
+
+        var response = await Manager().PatchAsJsonAsync(
+            $"/v1/volunteer-groups/groups/{id}/president",
+            new { newPresidentMemberId = successor });
+
+        response.StatusCode.Should().Be(HttpStatusCode.OK);
+
+        var detail = await Manager(userId: successor).GetFromJsonAsync<JsonElement>(
+            $"/v1/volunteer-groups/groups/{id}");
+
+        detail.GetProperty("group").GetProperty("presidentMemberId").GetGuid()
+            .Should().Be(successor);
+    }
+
+    [Fact]
+    public async Task The_outgoing_president_stays_in_the_group_as_an_ordinary_member()
+    {
+        var id = await CreateGroupAsync();
+
+        await Manager().PatchAsJsonAsync(
+            $"/v1/volunteer-groups/groups/{id}/president",
+            new { newPresidentMemberId = Guid.NewGuid() });
+
+        var detail = await Manager().GetFromJsonAsync<JsonElement>(
+            $"/v1/volunteer-groups/groups/{id}");
+
+        var outgoing = detail.GetProperty("members").EnumerateArray()
+            .Single(m => m.GetProperty("memberId").GetGuid() == PresidentId);
+
+        outgoing.GetProperty("rolePosition").ValueKind.Should().Be(JsonValueKind.Null);
+    }
+
+    [Fact]
+    public async Task The_president_cannot_hand_the_group_to_somebody_themselves()
+    {
+        // VolunteerGroups.Manage is a Samaaj admin's permission, not the
+        // president's own - the same split as deactivating a group.
+        var id = await CreateGroupAsync();
+
+        var response = await Member(PresidentId).PatchAsJsonAsync(
+            $"/v1/volunteer-groups/groups/{id}/president",
+            new { newPresidentMemberId = Guid.NewGuid() });
+
+        response.StatusCode.Should().Be(HttpStatusCode.Forbidden);
+    }
+
+    [Fact]
+    public async Task A_group_in_another_Samaaj_cannot_have_its_president_changed()
+    {
+        var id = await CreateGroupAsync();
+
+        var response = await Manager(tenantId: OtherTenantId).PatchAsJsonAsync(
+            $"/v1/volunteer-groups/groups/{id}/president",
+            new { newPresidentMemberId = Guid.NewGuid() });
+
+        response.StatusCode.Should().Be(HttpStatusCode.NotFound);
+    }
 }

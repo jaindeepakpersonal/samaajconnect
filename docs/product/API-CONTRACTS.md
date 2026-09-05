@@ -136,6 +136,8 @@ who never passed the check that produced it.
 | GET | `/groups/{id}/applications` | `VolunteerGroups.Lead` + this group's president | The president's review queue |
 | POST | `/groups/{id}/applications/{applicationId}/decide` | `VolunteerGroups.Lead` + president | `{accept, rolePosition}` |
 | PUT | `/groups/{id}/members/{memberId}/position` | `VolunteerGroups.Lead` + president | Give a position, or clear it |
+| DELETE | `/groups/{id}/members/{memberId}` | `VolunteerGroups.Lead` + president | Remove a member. **409** on the president — see below |
+| PATCH | `/groups/{id}/president` | `VolunteerGroups.Manage` | Hand the group to a different member, who joins it if they were not in it. The outgoing president stays on as an ordinary member |
 
 > The draft gated the president's operations on the `VolunteerGroupPresident`
 > role, which nothing grants. They ship on `VolunteerGroups.Lead`, which every

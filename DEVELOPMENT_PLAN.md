@@ -8,7 +8,61 @@ version of the plan; the reasoning behind the ordering lives in
 ## Current Status
 
 - **Stage:** every module has a service and member screens; Phase 5 hardening under way
-- **Last updated:** 2026-09-05 - **a capability fully built, fully tested, and
+- **Last updated:** 2026-09-05 - **a president who could hand over the group
+  and could not put anyone out of it, the same gap in both directions at
+  once.**
+
+  `VolunteerGroup.RemoveMember` and `VolunteerGroup.ChangePresident` have both
+  existed since the aggregate was written, each unit-tested at the domain
+  level, and neither ever called from an `Application`-layer handler.
+  `ChangePresident` was worse than silent about it: `GroupPresidentChangedDomainEvent`'s
+  own row in this service's `CLAUDE.md` said "Raised by `VolunteerGroup
+  .ChangePresident`" as if the method ran, when nothing on the platform had
+  ever invoked it. A group's members table has had a "Change position" link for
+  cycles with no way to remove somebody or hand the group to somebody else -
+  the president could rename a role, and could not undo who held it.
+
+  Found by the same sweep as the last two cycles: a public domain method that
+  changes real state, called from nowhere outside its own file.
+
+  `RemoveGroupMemberCommand` sits on `VolunteerGroups.Lead`, same as every
+  other action a president takes on their own group, and refuses to remove the
+  president themselves before it even reaches the aggregate - removing the one
+  person who can decide the group's applications would be the same dead end as
+  a group created without one. `ChangeGroupPresidentCommand` sits on
+  `VolunteerGroups.Manage` instead, the admin permission already drawn for
+  standing a group down, because a president handing the group to someone else
+  is not a decision a president should be able to make about themselves -
+  `ChangeGroupStatusCommand` already draws exactly that line. `RemoveMember` now
+  raises `GroupMemberRemovedDomainEvent`, naming who did the removing for the
+  same reason `GroupApplicationDecidedDomainEvent` names who decided: "who let
+  them in, and who put them out" is one question asked about the same group.
+
+  Verified by fault injection, including two that looked like broken tests and
+  were not: pulling the `[RequiresPermission]` attribute off the president
+  command left `TenantAuthorizationBehavior` failing closed on an unannotated
+  request rather than the test that was supposed to catch it - confirmed
+  separately against `security-invariants.sh`, which flagged the same gap, so
+  a wrong-but-valid permission was swapped in instead to get a genuine
+  injection. Neutering the handler's own tenant re-check left the cross-tenant
+  test passing anyway, because the repository's `GetByIdAsync` already applies
+  the EF global query filter on its own - root `CLAUDE.md` §6's two-layer
+  defense catching a mismatched tenant with only one layer standing.
+
+  Verified live in both apps against the running stack, not only against
+  tests: the admin panel's new "Change" link handed a group from one president
+  to another and the member count rose from 2 to 3, confirming the outgoing
+  president stays on as an ordinary member exactly as the panel's notice
+  promises; the member portal's new "Remove" link took a member off a group's
+  roster live, the count dropped from 2 to 1, and the button does not appear
+  next to the president's own row in either state.
+
+  363 of 363 smoke checks green through the gateway, which is 356 plus exactly
+  the seven added here.
+
+  1,766 tests green, up 29 - 8 unit and 11 integration in
+  volunteer-groups-service, 5 in member-portal, 5 in admin-portal.
+- **Previously:** 2026-09-05 - **a capability fully built, fully tested, and
   unreachable, on the same day this file learned to say so about the last
   one.**
 

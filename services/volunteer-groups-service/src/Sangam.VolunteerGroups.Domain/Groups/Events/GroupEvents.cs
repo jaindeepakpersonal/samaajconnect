@@ -60,6 +60,21 @@ public sealed record GroupRolePositionAssignedDomainEvent(
 }
 
 /// <summary>
+/// The president removed a member. Names who removed them for the same reason
+/// <see cref="GroupApplicationDecidedDomainEvent"/> names who decided: "who let
+/// them in, and who put them out?" is one question asked about the same group.
+/// </summary>
+public sealed record GroupMemberRemovedDomainEvent(
+    Guid GroupId,
+    Guid TenantId,
+    Guid MemberId,
+    Guid RemovedBy,
+    DateTimeOffset OccurredAt) : IDomainEvent
+{
+    public string Topic => "volunteer-groups.member.removed.v1";
+}
+
+/// <summary>
 /// The group changed hands. Carries both presidents, so the audit log answers
 /// "who was running this group in March?" without replaying every change.
 /// </summary>

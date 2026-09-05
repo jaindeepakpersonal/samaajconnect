@@ -446,6 +446,22 @@ export class AdminApi {
     );
   }
 
+  /**
+   * Hands the group to a different president.
+   *
+   * A Samaaj admin's decision, not the outgoing president's — the same split
+   * as standing a group down. The service adds the new president to the group
+   * if they were not already in it, and keeps the outgoing one on as an
+   * ordinary member rather than losing the group its most experienced
+   * volunteer as a side effect.
+   */
+  changeGroupPresident(id: string, newPresidentMemberId: string): Observable<VolunteerGroup> {
+    return this.http.patch<VolunteerGroup>(
+      `/v1/volunteer-groups/groups/${id}/president`,
+      { newPresidentMemberId },
+    );
+  }
+
   // ---- Social issues -----------------------------------------------------
 
   /** What a reviewer has to decide about, oldest first. */

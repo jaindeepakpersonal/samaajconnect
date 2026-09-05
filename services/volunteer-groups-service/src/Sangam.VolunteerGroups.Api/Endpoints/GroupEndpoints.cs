@@ -3,9 +3,11 @@ using Sangam.VolunteerGroups.Api.Extensions;
 using Sangam.VolunteerGroups.Application.Groups;
 using Sangam.VolunteerGroups.Application.Groups.Commands.ApplyToGroup;
 using Sangam.VolunteerGroups.Application.Groups.Commands.AssignRolePosition;
+using Sangam.VolunteerGroups.Application.Groups.Commands.ChangeGroupPresident;
 using Sangam.VolunteerGroups.Application.Groups.Commands.ChangeGroupStatus;
 using Sangam.VolunteerGroups.Application.Groups.Commands.CreateGroup;
 using Sangam.VolunteerGroups.Application.Groups.Commands.DecideApplication;
+using Sangam.VolunteerGroups.Application.Groups.Commands.RemoveGroupMember;
 using Sangam.VolunteerGroups.Application.Groups.Queries.GetApplications;
 using Sangam.VolunteerGroups.Application.Groups.Queries.GetGroup;
 using Sangam.VolunteerGroups.Application.Groups.Queries.ListGroups;
@@ -180,6 +182,48 @@ public static class GroupEndpoints
             .ProducesProblem(StatusCodes.Status403Forbidden)
             .ProducesProblem(StatusCodes.Status404NotFound);
 
+        group.MapDelete("/groups/{id:guid}/members/{memberId:guid}", async (
+                Guid id,
+                Guid memberId,
+                ISender sender,
+                CancellationToken cancellationToken) =>
+            {
+                var result = await sender.Send(
+                    new RemoveGroupMemberCommand(id, memberId), cancellationToken);
+
+                return result.ToApiResult();
+            })
+            .RequireAuthorization()
+            .WithName("RemoveGroupMember")
+            .WithSummary("The president removes a member. Never the president themselves.")
+            .Produces<GroupDetailResponse>()
+            .ProducesValidationProblem()
+            .ProducesProblem(StatusCodes.Status401Unauthorized)
+            .ProducesProblem(StatusCodes.Status403Forbidden)
+            .ProducesProblem(StatusCodes.Status404NotFound)
+            .ProducesProblem(StatusCodes.Status409Conflict);
+
+        group.MapPatch("/groups/{id:guid}/president", async (
+                Guid id,
+                ChangePresidentRequest request,
+                ISender sender,
+                CancellationToken cancellationToken) =>
+            {
+                var result = await sender.Send(
+                    new ChangeGroupPresidentCommand(id, request.NewPresidentMemberId),
+                    cancellationToken);
+
+                return result.ToApiResult();
+            })
+            .RequireAuthorization()
+            .WithName("ChangeGroupPresident")
+            .WithSummary("Hand the group to a different president. A Samaaj admin's decision.")
+            .Produces<GroupResponse>()
+            .ProducesValidationProblem()
+            .ProducesProblem(StatusCodes.Status401Unauthorized)
+            .ProducesProblem(StatusCodes.Status403Forbidden)
+            .ProducesProblem(StatusCodes.Status404NotFound);
+
         return app;
     }
 
@@ -203,4 +247,6 @@ public static class GroupEndpoints
 
     /// <summary>A null position clears it.</summary>
     public sealed record PositionRequest(string? RolePosition);
+
+    public sealed record ChangePresidentRequest(Guid NewPresidentMemberId);
 }

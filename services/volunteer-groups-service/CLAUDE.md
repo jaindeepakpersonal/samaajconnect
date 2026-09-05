@@ -26,6 +26,8 @@ module off takes both away.
 | `ApplyToGroupCommand` | `Members.Read` | built |
 | `DecideApplicationCommand` | `VolunteerGroups.Lead` + is this group's president | built |
 | `AssignRolePositionCommand` | `VolunteerGroups.Lead` + is this group's president | built |
+| `RemoveGroupMemberCommand` | `VolunteerGroups.Lead` + is this group's president | built |
+| `ChangeGroupPresidentCommand` | `VolunteerGroups.Manage` | built |
 
 ## Queries
 
@@ -43,8 +45,17 @@ module off takes both away.
 | `GroupApplicationSubmittedDomainEvent` | `volunteer-groups.application.submitted.v1` | `VolunteerGroup.Apply` |
 | `GroupApplicationDecidedDomainEvent` | `volunteer-groups.application.decided.v1` | `VolunteerGroup.DecideApplication` |
 | `GroupRolePositionAssignedDomainEvent` | `volunteer-groups.role-position.assigned.v1` | `VolunteerGroup.AssignRolePosition` |
+| `GroupMemberRemovedDomainEvent` | `volunteer-groups.member.removed.v1` | `VolunteerGroup.RemoveMember` |
 | `GroupPresidentChangedDomainEvent` | `volunteer-groups.president.changed.v1` | `VolunteerGroup.ChangePresident` |
 | `GroupStatusChangedDomainEvent` | `volunteer-groups.group.status-changed.v1` | `VolunteerGroup.ChangeStatus` |
+
+**Both `GroupMemberRemovedDomainEvent` and `GroupPresidentChangedDomainEvent` were
+fiction until 2026-09-05.** This table said "Raised by `VolunteerGroup
+.ChangePresident`" since the row was written, which was true of the method and
+false of the platform: nothing ever called it. `VolunteerGroup.RemoveMember`
+raised no event at all - it was never called either, so there was nothing to
+raise it from. See "The president had no way to remove anyone, and a group
+could never change hands" below.
 
 ## Events consumed
 
@@ -63,6 +74,8 @@ here and no Kafka in its integration tests.
 | GET | `/v1/volunteer-groups/groups/{id}/applications` | `VolunteerGroups.Lead` + president |
 | POST | `/v1/volunteer-groups/groups/{id}/applications/{applicationId}/decide` | `VolunteerGroups.Lead` + president |
 | PUT | `/v1/volunteer-groups/groups/{id}/members/{memberId}/position` | `VolunteerGroups.Lead` + president |
+| DELETE | `/v1/volunteer-groups/groups/{id}/members/{memberId}` | `VolunteerGroups.Lead` + president |
+| PATCH | `/v1/volunteer-groups/groups/{id}/president` | `VolunteerGroups.Manage` |
 | GET | `/health` | anonymous |
 
 ## Authorization: two permissions, and why
@@ -130,11 +143,38 @@ called inside a Seva group grants nothing anywhere and should not need a
 deployment to add. The roles in `AuthorizationCatalog` are what actually gate
 and are a closed list for exactly that reason.
 
+**The president had no way to remove anyone, and a group could never change
+hands, until 2026-09-05.** `VolunteerGroup.RemoveMember` and `.ChangePresident`
+were both complete, both unit-tested at the domain level, and both called from
+nowhere - not from a handler, not from an endpoint, not even from another
+domain method. A president could accept an application and give somebody a
+position; there was no way to undo either, and a group's only president was
+whoever created it, for the entire life of the group.
+
+Found the way the last two cycles found the same shape elsewhere in the
+platform: grepping every service for a public domain method that changes real
+state and has no caller outside its own file. `RemoveGroupMemberCommand`
+follows `AssignRolePositionCommand`'s own template exactly - `VolunteerGroups
+.Lead`, refused as "not found" to a non-president for the reason stated above.
+`ChangeGroupPresidentCommand` follows `ChangeGroupStatusCommand`'s -
+`VolunteerGroups.Manage`, because who runs a group is a Samaaj admin's decision
+about how the Samaaj organises itself, not the outgoing president's about their
+own replacement.
+
 **The president cannot be removed from their own group, and handing over leaves
 the outgoing president in it.** A group whose president is not a member of it
 has nobody able to decide its applications; and removing the outgoing president
 would cost the group its most experienced volunteer as a side effect of an
-administrative change.
+administrative change. Both refusals are enforced twice now - once in the
+command handler, with its own message, and once again inside the aggregate
+itself, which is what still refuses correctly even if a future handler forgets
+to ask first.
+
+**Removing raises the event `AssignRolePosition`'s sibling already did.**
+`GroupApplicationDecidedDomainEvent` names who accepted a member; nothing named
+who put one out, because nothing could. `GroupMemberRemovedDomainEvent` carries
+`RemovedBy` for the same reason - "who let them in, and who put them out?" is
+one question asked about the same group.
 
 **Deactivating keeps the members.** A deactivated group is still visible and
 still has its history; it simply takes no new applications. Deleting it would

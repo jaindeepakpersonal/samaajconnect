@@ -77,7 +77,19 @@ import { isNotFound } from '../../core/http-status';
                       }
                     </td>
                     <td>{{ group.focusArea ?? '—' }}</td>
-                    <td>{{ memberName(group.presidentMemberId) }}</td>
+                    <td>
+                      {{ memberName(group.presidentMemberId) }}
+                      <div>
+                        <button
+                          class="btn link small"
+                          type="button"
+                          [attr.aria-expanded]="presidentFor() === group.id"
+                          (click)="openChangePresident(group)"
+                        >
+                          Change
+                        </button>
+                      </div>
+                    </td>
                     <td>{{ group.memberCount }}</td>
                     <td>
                       <span class="pill" [class.warn]="group.status === 'Inactive'">
@@ -98,6 +110,50 @@ import { isNotFound } from '../../core/http-status';
                       }
                     </td>
                   </tr>
+
+                  @if (presidentFor() === group.id) {
+                    <tr>
+                      <td colspan="6">
+                        <div class="notice" role="status">
+                          <label [for]="group.id + '-newpres'">New president</label>
+                          <select
+                            class="input"
+                            [id]="group.id + '-newpres'"
+                            [(ngModel)]="newPresidentMemberId"
+                          >
+                            <option value="">Choose a member…</option>
+                            @for (member of members(); track member.id) {
+                              <option [value]="member.id">{{ member.fullName }}</option>
+                            }
+                          </select>
+
+                          <p class="small">
+                            The outgoing president, {{ memberName(group.presidentMemberId) }},
+                            stays in the group as an ordinary member rather than being removed
+                            as a side effect of this change.
+                          </p>
+
+                          <div class="actions">
+                            <button
+                              class="btn small"
+                              type="button"
+                              [disabled]="busy() || newPresidentMemberId.length === 0"
+                              (click)="changePresident(group)"
+                            >
+                              Hand over
+                            </button>
+                            <button
+                              class="btn small alt"
+                              type="button"
+                              (click)="presidentFor.set(null)"
+                            >
+                              Cancel
+                            </button>
+                          </div>
+                        </div>
+                      </td>
+                    </tr>
+                  }
                 }
               </tbody>
             </table>
@@ -254,6 +310,31 @@ export class GroupsListComponent implements OnInit {
       status === 'Inactive'
         ? `${group.name} is stood down. Its members and history are kept.`
         : `${group.name} is active again.`,
+    );
+  }
+
+  // ---- Changing a president ----------------------------------------------
+
+  readonly presidentFor = signal<string | null>(null);
+
+  newPresidentMemberId = '';
+
+  openChangePresident(group: VolunteerGroup): void {
+    this.newPresidentMemberId = '';
+    this.presidentFor.set(this.presidentFor() === group.id ? null : group.id);
+  }
+
+  changePresident(group: VolunteerGroup): void {
+    if (this.newPresidentMemberId.length === 0) {
+      return;
+    }
+
+    const newPresident = this.newPresidentMemberId;
+
+    this.act(
+      this.api.changeGroupPresident(group.id, newPresident),
+      `${group.name} is now led by ${this.memberName(newPresident)}.`,
+      () => this.presidentFor.set(null),
     );
   }
 

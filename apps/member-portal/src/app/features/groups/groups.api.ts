@@ -71,4 +71,15 @@ export class GroupsApi {
       { rolePosition },
     );
   }
+
+  /**
+   * Removes a member from the group. Never the president themselves - the
+   * service refuses that with a 409, since a group whose president is not in
+   * it has nobody able to decide its applications.
+   */
+  removeMember(id: string, memberId: string): Observable<GroupDetail> {
+    return this.http.delete<GroupDetail>(
+      `/v1/volunteer-groups/groups/${id}/members/${memberId}`,
+    );
+  }
 }

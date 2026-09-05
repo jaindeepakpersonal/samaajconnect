@@ -225,7 +225,55 @@ public sealed class VolunteerGroupTests
     {
         // A group whose president is not in it has nobody able to decide its
         // applications. Replacing a president is its own decision.
-        Group().RemoveMember(PresidentId).Should().BeFalse();
+        Group().RemoveMember(PresidentId, Guid.NewGuid(), Now).Should().BeFalse();
+    }
+
+    [Fact]
+    public void An_ordinary_member_can_be_removed_and_it_announces_who_removed_them()
+    {
+        // The sibling of "who let them in?" - GroupApplicationDecidedDomainEvent
+        // already names the president who accepted somebody; this is the same
+        // question asked about the other end of a membership.
+        var group = Group();
+        group.Apply(ApplicantId, null, Now);
+        group.DecideApplication(group.Applications.Single().Id, accepted: true, PresidentId, null, Now);
+        group.ClearDomainEvents();
+
+        var removed = group.RemoveMember(ApplicantId, PresidentId, Now.AddDays(1));
+
+        removed.Should().BeTrue();
+        group.HasMember(ApplicantId).Should().BeFalse();
+
+        var raised = group.DomainEvents.OfType<GroupMemberRemovedDomainEvent>().Single();
+        raised.MemberId.Should().Be(ApplicantId);
+        raised.RemovedBy.Should().Be(PresidentId);
+        raised.OccurredAt.Should().Be(Now.AddDays(1));
+    }
+
+    [Fact]
+    public void Removing_somebody_who_was_never_a_member_is_a_no_op()
+    {
+        var group = Group();
+        group.ClearDomainEvents();
+
+        group.RemoveMember(Guid.NewGuid(), PresidentId, Now).Should().BeFalse();
+
+        group.DomainEvents.Should().BeEmpty();
+    }
+
+    [Fact]
+    public void Removing_does_not_erase_that_they_were_ever_accepted()
+    {
+        // "Were they ever accepted?" stays answerable - the class doc's own
+        // reasoning for keeping applications and membership as two lists.
+        var group = Group();
+        group.Apply(ApplicantId, null, Now);
+        var application = group.Applications.Single();
+        group.DecideApplication(application.Id, accepted: true, PresidentId, null, Now);
+
+        group.RemoveMember(ApplicantId, PresidentId, Now.AddDays(1));
+
+        group.Applications.Should().ContainSingle().Which.Id.Should().Be(application.Id);
     }
 
     [Fact]
@@ -241,6 +289,56 @@ public sealed class VolunteerGroupTests
         group.IsPresident(successor).Should().BeTrue();
         group.HasMember(PresidentId).Should().BeTrue();
         group.Members.Single(m => m.MemberId == PresidentId).RolePosition.Should().BeNull();
+    }
+
+    [Fact]
+    public void Handing_over_announces_both_the_outgoing_and_incoming_president()
+    {
+        var group = Group();
+        var successor = Guid.NewGuid();
+        group.ClearDomainEvents();
+
+        group.ChangePresident(successor, Now.AddDays(1));
+
+        var raised = group.DomainEvents.OfType<GroupPresidentChangedDomainEvent>().Single();
+        raised.PreviousPresidentMemberId.Should().Be(PresidentId);
+        raised.PresidentMemberId.Should().Be(successor);
+        raised.OccurredAt.Should().Be(Now.AddDays(1));
+    }
+
+    [Fact]
+    public void Handing_the_group_to_its_own_president_is_a_no_op()
+    {
+        var group = Group();
+        group.ClearDomainEvents();
+
+        group.ChangePresident(PresidentId, Now).Should().BeFalse();
+
+        group.DomainEvents.Should().BeEmpty();
+    }
+
+    [Fact]
+    public void An_empty_successor_id_is_refused_rather_than_clearing_the_presidency()
+    {
+        // A group with no president has nobody to decide its applications -
+        // the same invariant VolunteerGroup.Create enforces at birth.
+        var group = Group();
+
+        group.ChangePresident(Guid.Empty, Now).Should().BeFalse();
+
+        group.IsPresident(PresidentId).Should().BeTrue();
+    }
+
+    [Fact]
+    public void Handing_the_group_to_somebody_not_yet_in_it_adds_them()
+    {
+        var group = Group();
+        var successor = Guid.NewGuid();
+
+        group.ChangePresident(successor, Now);
+
+        group.HasMember(successor).Should().BeTrue();
+        group.Members.Single(m => m.MemberId == successor).RolePosition.Should().Be("President");
     }
 
     [Fact]

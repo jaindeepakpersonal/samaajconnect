@@ -5,7 +5,7 @@ import { ActivatedRoute, provideRouter } from '@angular/router';
 import { API_CONFIG, CurrentUser } from '@samaajconnect/shared';
 import { GroupDetailComponent } from './group-detail.component';
 import { GroupsListComponent } from './groups-list.component';
-import { GroupApplication, GroupDetail, VolunteerGroup } from './groups.models';
+import { GroupApplication, GroupDetail, GroupMember, VolunteerGroup } from './groups.models';
 
 const ME = 'u1';
 const PRESIDENT = 'p1';
@@ -41,7 +41,10 @@ function group(overrides: Partial<VolunteerGroup> = {}): VolunteerGroup {
   };
 }
 
-function detail(overrides: Partial<VolunteerGroup> = {}, members = []): GroupDetail {
+function detail(
+  overrides: Partial<VolunteerGroup> = {},
+  members: GroupMember[] = [],
+): GroupDetail {
   return { group: group(overrides), members };
 }
 
@@ -418,6 +421,85 @@ describe('GroupDetailComponent', () => {
     expect(
       http.expectOne('/v1/volunteer-groups/groups/g1/members/m9/position').request.body,
     ).toEqual({ rolePosition: null });
+  });
+
+  // ---- Removing a member ---------------------------------------------------
+  //
+  // VolunteerGroup.RemoveMember existed and was called from nowhere: a
+  // president could accept an application and give somebody a position, with
+  // no way to undo either.
+
+  it('offers Remove to the president, for an ordinary member', () => {
+    load(
+      detail({ iAmThePresident: true, iAmAMember: true }, [
+        { memberId: 'm9', rolePosition: null, joinedAt: new Date().toISOString() },
+      ]),
+      [],
+    );
+
+    expect(buttonSaying('Remove')).toBeDefined();
+  });
+
+  it('never offers it against the president themselves', () => {
+    load(
+      detail({ iAmThePresident: true, iAmAMember: true }, [
+        { memberId: PRESIDENT, rolePosition: 'President', joinedAt: new Date().toISOString() },
+      ]),
+      [],
+    );
+
+    // The service refuses this with a 409, and a button that always fails is
+    // worse than no button.
+    expect(buttonSaying('Remove')).toBeUndefined();
+  });
+
+  it('does not offer it to anyone but the president', () => {
+    load(
+      detail({ iAmThePresident: false, iAmAMember: true }, [
+        { memberId: 'm9', rolePosition: null, joinedAt: new Date().toISOString() },
+      ]),
+    );
+
+    expect(buttonSaying('Remove')).toBeUndefined();
+  });
+
+  it('removes a member and re-reads the group', () => {
+    load(
+      detail({ iAmThePresident: true, iAmAMember: true }, [
+        { memberId: 'm9', rolePosition: null, joinedAt: new Date().toISOString() },
+      ]),
+      [],
+    );
+
+    component.removeMember('m9');
+
+    const request = http.expectOne('/v1/volunteer-groups/groups/g1/members/m9');
+
+    expect(request.request.method).toBe('DELETE');
+
+    request.flush(detail({ iAmThePresident: true, iAmAMember: true }, []));
+
+    expect(component.detail()!.members).toHaveLength(0);
+  });
+
+  it('shows a refusal rather than pretending it worked', () => {
+    load(
+      detail({ iAmThePresident: true, iAmAMember: true }, [
+        { memberId: PRESIDENT, rolePosition: 'President', joinedAt: new Date().toISOString() },
+      ]),
+      [],
+    );
+
+    component.removeMember(PRESIDENT);
+
+    http.expectOne('/v1/volunteer-groups/groups/g1/members/' + PRESIDENT).flush(
+      { title: 'Conflict', detail: 'The president cannot be removed from their own group.' },
+      { status: 409, statusText: 'Conflict' },
+    );
+
+    fixture.detectChanges();
+
+    expect(text()).toContain('The president cannot be removed from their own group');
   });
 
   // ---- Names it cannot resolve ---------------------------------------------

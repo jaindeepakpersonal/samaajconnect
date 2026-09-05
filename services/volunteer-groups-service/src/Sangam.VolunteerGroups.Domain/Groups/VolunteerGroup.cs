@@ -201,7 +201,7 @@ public sealed class VolunteerGroup : AggregateRoot, ITenantScopedEntity
     /// applications. Replacing a president is a Samaaj admin's job, and is its
     /// own decision - see <see cref="ChangePresident"/>.
     /// </remarks>
-    public bool RemoveMember(Guid memberId)
+    public bool RemoveMember(Guid memberId, Guid removedBy, DateTimeOffset now)
     {
         if (IsPresident(memberId))
         {
@@ -216,6 +216,8 @@ public sealed class VolunteerGroup : AggregateRoot, ITenantScopedEntity
         }
 
         _members.Remove(member);
+
+        Raise(new GroupMemberRemovedDomainEvent(Id, TenantId, memberId, removedBy, now));
 
         return true;
     }

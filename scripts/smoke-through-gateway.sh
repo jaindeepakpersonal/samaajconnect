@@ -1847,6 +1847,57 @@ check "the president assigns a position" 200 \
      -H 'Content-Type: application/json' -H "Authorization: Bearer $MEMBER_TOKEN" \
      -d '{"rolePosition":"Secretary"}')"
 
+# VolunteerGroup.RemoveMember and .ChangePresident both existed and were called
+# from nowhere until 2026-09-05 - a president could accept an application and
+# give somebody a position, with no way to undo either, and a group's only
+# president was whoever created it for the group's entire life.
+check "the president cannot remove themselves" 409 \
+  "$(status -X DELETE "$GATEWAY/v1/volunteer-groups/groups/$GROUP_ID/members/$MEMBER_ID" \
+     -H "Authorization: Bearer $MEMBER_TOKEN")"
+
+check "the president removes the member they just gave a position to" 200 \
+  "$(status -X DELETE "$GATEWAY/v1/volunteer-groups/groups/$GROUP_ID/members/$CHILD_USER_ID" \
+     -H "Authorization: Bearer $MEMBER_TOKEN")"
+
+if curl -s -H "Authorization: Bearer $MEMBER_TOKEN" \
+   "$GATEWAY/v1/volunteer-groups/groups/$GROUP_ID" | grep -q "\"memberId\":\"$CHILD_USER_ID\""; then
+  echo "  FAIL  the removed member is still on the roster"
+  fail=$((fail + 1))
+else
+  echo "  ok    and they are off the roster"
+  pass=$((pass + 1))
+fi
+
+check "the president cannot hand the group to somebody themselves" 403 \
+  "$(status -X PATCH "$GATEWAY/v1/volunteer-groups/groups/$GROUP_ID/president" \
+     -H 'Content-Type: application/json' -H "Authorization: Bearer $MEMBER_TOKEN" \
+     -d "{\"newPresidentMemberId\":\"$CHILD_USER_ID\"}")"
+
+# The successor was just removed as an ordinary member - handing them the
+# group has to add them back, not fail because they are not in it.
+check "a Samaaj admin hands the group to its removed former member" 200 \
+  "$(status -X PATCH "$GATEWAY/v1/volunteer-groups/groups/$GROUP_ID/president" \
+     -H 'Content-Type: application/json' -H "Authorization: Bearer $ADMIN_TOKEN" \
+     -H "$ADMIN_TENANT_HEADER" -d "{\"newPresidentMemberId\":\"$CHILD_USER_ID\"}")"
+
+if curl -s -H "Authorization: Bearer $CHILD_TOKEN" \
+   "$GATEWAY/v1/volunteer-groups/groups/$GROUP_ID" | grep -q '"iAmThePresident":true'; then
+  echo "  ok    who is now its president"
+  pass=$((pass + 1))
+else
+  echo "  FAIL  the new president is not recognised as one"
+  fail=$((fail + 1))
+fi
+
+if curl -s -H "Authorization: Bearer $MEMBER_TOKEN" \
+   "$GATEWAY/v1/volunteer-groups/groups/$GROUP_ID" | grep -q "\"memberId\":\"$MEMBER_ID\""; then
+  echo "  ok    while the outgoing president stays on as an ordinary member"
+  pass=$((pass + 1))
+else
+  echo "  FAIL  the outgoing president was dropped from the group"
+  fail=$((fail + 1))
+fi
+
 check "deactivating the group" 200 \
   "$(status -X PATCH "$GATEWAY/v1/volunteer-groups/groups/$GROUP_ID/status" \
      -H 'Content-Type: application/json' -H "Authorization: Bearer $ADMIN_TOKEN" \

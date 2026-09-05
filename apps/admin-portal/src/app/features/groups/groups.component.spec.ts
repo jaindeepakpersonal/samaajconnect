@@ -145,6 +145,66 @@ describe('GroupsListComponent', () => {
     expect(text()).not.toContain('Stand down');
   });
 
+  // ---- Changing a president -----------------------------------------------
+  //
+  // VolunteerGroup.ChangePresident existed and was called from nowhere - this
+  // service's own CLAUDE.md named GroupPresidentChangedDomainEvent as "Raised
+  // by VolunteerGroup.ChangePresident" the whole time nothing ever called it.
+
+  it('opens a panel to choose the new president', () => {
+    load([group()]);
+
+    component.openChangePresident(group());
+    fixture.detectChanges();
+
+    expect(text()).toContain('New president');
+  });
+
+  it('hands the group over and reports who leads it now', () => {
+    load([group()]);
+
+    component.openChangePresident(group());
+    component.newPresidentMemberId = 'm2';
+    component.changePresident(group());
+
+    const call = http.expectOne('/v1/volunteer-groups/groups/g1/president');
+
+    expect(call.request.method).toBe('PATCH');
+    expect(call.request.body).toEqual({ newPresidentMemberId: 'm2' });
+
+    call.flush(group({ presidentMemberId: 'm2' }));
+    reload();
+
+    expect(text()).toContain('Aarav Jain');
+    expect(component.presidentFor()).toBeNull();
+  });
+
+  it('does nothing until somebody is actually chosen', () => {
+    load([group()]);
+
+    component.openChangePresident(group());
+    component.changePresident(group());
+
+    http.expectNone('/v1/volunteer-groups/groups/g1/president');
+  });
+
+  it('shows a refusal rather than pretending it worked', () => {
+    load([group()]);
+
+    component.openChangePresident(group());
+    component.newPresidentMemberId = 'm2';
+    component.changePresident(group());
+
+    http.expectOne('/v1/volunteer-groups/groups/g1/president').flush(
+      { title: 'Forbidden', detail: 'Only a Samaaj admin may change a group’s president.' },
+      { status: 403, statusText: 'Forbidden' },
+    );
+
+    fixture.detectChanges();
+
+    expect(text()).toContain('Only a Samaaj admin may change');
+  });
+
   function reload() {
     http.expectOne('/v1/volunteer-groups/groups').flush([group()]);
     http.expectOne('/v1/members?limit=100').flush(MEMBERS);

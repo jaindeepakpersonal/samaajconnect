@@ -181,6 +181,21 @@ import { GroupApplication, GroupDetail } from './groups.models';
                         >
                           {{ person.rolePosition ? 'Change position' : 'Give a position' }}
                         </button>
+                        <!--
+                          Never offered for the president's own row: the
+                          service refuses that with a 409, and a button that
+                          always fails is worse than no button.
+                        -->
+                        @if (person.memberId !== found.group.presidentMemberId) {
+                          <button
+                            class="btn link"
+                            type="button"
+                            [disabled]="busy()"
+                            (click)="removeMember(person.memberId)"
+                          >
+                            Remove
+                          </button>
+                        }
                       }
                     </td>
                   }
@@ -464,6 +479,34 @@ export class GroupDetailComponent implements OnInit {
           this.busy.set(false);
         },
       });
+  }
+
+  /**
+   * Removes a member. No confirmation, matching the weight this screen already
+   * gives assigning a position or deciding an application - all three are a
+   * president acting on somebody else's standing in their own group, and none
+   * of the others ask "are you sure?" either. It is also reversible: a removed
+   * member can apply again, the same as anyone rejected.
+   */
+  removeMember(memberId: string): void {
+    const found = this.detail();
+
+    if (found === null) {
+      return;
+    }
+
+    this.busy.set(true);
+
+    this.api.removeMember(found.group.id, memberId).subscribe({
+      next: (updated) => {
+        this.detail.set(updated);
+        this.busy.set(false);
+      },
+      error: (failure: unknown) => {
+        this.error.set(describeError(failure));
+        this.busy.set(false);
+      },
+    });
   }
 
   // ---- Rendering --------------------------------------------------------
