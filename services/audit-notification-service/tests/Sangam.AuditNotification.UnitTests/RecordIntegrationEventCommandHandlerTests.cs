@@ -232,6 +232,31 @@ public sealed class RecordIntegrationEventCommandHandlerTests
     }
 
     [Fact]
+    public async Task An_enrolment_request_is_audited_against_the_parent_not_the_child()
+    {
+        // pathshala.enrolment.requested.v1 had no descriptor at all until
+        // this cycle. A child cannot ask for their own place, so
+        // RequestedByMemberId names a different person from the child the
+        // request is about.
+        var enrolmentId = Guid.NewGuid();
+        var parentId = Guid.NewGuid();
+
+        await Handle(Envelope(
+            topic: "pathshala.enrolment.requested.v1",
+            payload: $$"""
+                {"enrolmentId":"{{enrolmentId}}","tenantId":"{{TenantId}}",
+                 "pathshalaId":"{{Guid.NewGuid()}}","childProfileId":"{{Guid.NewGuid()}}",
+                 "requestedByMemberId":"{{parentId}}"}
+                """));
+
+        _auditLogs.Received(1).Add(Arg.Is<AuditLog>(a =>
+            a.Action == "EnrolmentRequested"
+            && a.EntityName == "Enrolment"
+            && a.EntityId == enrolmentId.ToString()
+            && a.ActorUserId == parentId));
+    }
+
+    [Fact]
     public async Task A_redelivered_event_is_skipped_rather_than_recorded_twice()
     {
         _auditLogs.AlreadyRecordedAsync(Arg.Any<Guid>(), Arg.Any<CancellationToken>()).Returns(true);

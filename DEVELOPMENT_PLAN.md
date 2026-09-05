@@ -8,7 +8,41 @@ version of the plan; the reasoning behind the ordering lives in
 ## Current Status
 
 - **Stage:** every module has a service and member screens; Phase 5 hardening under way
-- **Last updated:** 2026-09-05 - **the platform's own strongest audit promise
+- **Last updated:** 2026-09-05 - **the audit-descriptor sweep finished: every
+  topic on the platform now has a considered entry, not just the ones with a
+  story.**
+
+  Closing out the pass five cycles started: the remaining eighteen topics
+  across boli, celebrity-voting, events and pathshala. Most publish
+  system/timing facts with nobody to credit or blame - a Boli closing, a
+  campaign moving on, an event filling up - so they get an entity id and no
+  actor. Two are worth naming for getting the *non*-actor case right:
+  `boli.result.published.v1`'s `WinningMemberId` and
+  `events.waitlist.promoted.v1`'s `MemberId` each name who benefited, not who
+  acted, so neither gets an `ActorIdProperty`. `boli.extended.v1` and
+  `celebrity-voting.campaign.status-changed.v1` keep a before-state like
+  every other status-change topic already does.
+
+  `pathshala.enrolment.requested.v1` is the one exception and this entry's
+  flagship: a child cannot ask for their own place, so `RequestedByMemberId`
+  - the parent - names a different person from the child the request is
+  about, the same "distinct actor" shape the last five cycles kept finding.
+
+  Verified by fault injection (the `enrolment.requested.v1` descriptor
+  removed entirely fails both the unit test and the handler test) and a new
+  smoke check confirming an `EnrolmentRequested` row names both the
+  enrolment and the parent who asked.
+
+  369 total smoke checks, 368 green - this cycle's own new check passed. The
+  one failure is the same pre-existing, unrelated member-directory volume
+  issue flagged as its own task last cycle (`task_ba64e2ad`), reproducing
+  again as expected since the shared Smoke Samaaj tenant it depends on has
+  not been reset.
+
+  191 tests green in audit-notification-service (141 unit + 50 integration),
+  up 19. **Every one of the platform's 50 topics now has a KnownEvents
+  descriptor** - the backlog opened five cycles ago is at zero.
+- **Previously:** 2026-09-05 - **the platform's own strongest audit promise
   was the one it broke worst: "the weightiest change an administrator can
   make... recorded with who made it and what it was before," kept by nothing.**
 

@@ -196,6 +196,27 @@ it.
 
 16 of the 28 originally-undescribed topics remain untouched.
 
+**The remaining eighteen topics were finished the day after, closing out the
+sweep this pass started five entries ago.** None of them has the "distinct
+actor differs from subject" shape the earlier finds did but one:
+boli-service, celebrity-voting-service and events-service publish
+system/timing facts with nobody to credit or blame - a Boli closing, a
+campaign moving on, an event filling up. `boli.result.published.v1`'s
+`WinningMemberId` and `events.waitlist.promoted.v1`'s `MemberId` are each
+worth naming as the same non-actor case: they name who benefited, not who
+acted, so neither gets an `ActorIdProperty`. `boli.extended.v1` and
+`celebrity-voting.campaign.status-changed.v1` keep a before-state, the same
+as every other status-change topic in this catalogue.
+`pathshala.enrolment.requested.v1` is the exception and the flagship of this
+entry: a child cannot ask for their own place, so `RequestedByMemberId` - the
+parent - names a different person from the child (`ChildProfileId`) the
+request is about, the same shape `members.child-conversion.approved.v1`
+found. `smoke-through-gateway.sh` checks it end to end.
+
+Every topic on the platform now has a considered descriptor. `GET
+/v1/audit/logs` can be searched by entity for all of them, and an actor is
+named everywhere one exists to name.
+
 ## API endpoints
 
 | Method | Path | Roles |

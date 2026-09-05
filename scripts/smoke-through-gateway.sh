@@ -2943,6 +2943,29 @@ else
   fail=$((fail + 1))
 fi
 
+# pathshala.enrolment.requested.v1 had no KnownEvents descriptor until this
+# cycle. A child cannot ask for their own place, so RequestedByMemberId - the
+# parent - names a different person from the child the request is about, the
+# same "distinct actor" shape as the other flagship finds in this pass.
+enrolment_request_audited=0
+for attempt in $(seq 1 20); do
+  if curl -s -H "Authorization: Bearer $ADMIN_TOKEN" -H "$ADMIN_TENANT_HEADER" \
+     "$GATEWAY/v1/audit/logs?action=EnrolmentRequested&limit=200" \
+     | grep -q "\"entityId\":\"$ENROLMENT_ID\",\"actorUserId\":\"$MEMBER_ID\""; then
+    enrolment_request_audited=1
+    break
+  fi
+  sleep 2
+done
+
+if [ "$enrolment_request_audited" -eq 1 ]; then
+  echo "  ok    the request names the enrolment and the parent who asked"
+  pass=$((pass + 1))
+else
+  echo "  FAIL  the request reaches the audit trail with its actor and entity id"
+  fail=$((fail + 1))
+fi
+
 # A parent picking their own child's class is the thing the second step exists
 # to prevent - and it is also the only check this service can make that the
 # child is theirs.

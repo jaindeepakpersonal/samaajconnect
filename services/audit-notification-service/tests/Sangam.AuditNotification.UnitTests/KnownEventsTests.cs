@@ -409,4 +409,82 @@ public sealed class KnownEventsTests
         descriptor.EntityIdProperty.Should().Be("userId");
         descriptor.ActorIdProperty.Should().BeNull();
     }
+
+    // ---- the remaining eighteen: entity ids with no "distinct actor" story,
+    // except two ------------------------------------------------------------
+    //
+    // boli-service, celebrity-voting-service and events-service publish
+    // system/timing facts with no person to credit or blame. Giving them an
+    // entity id is still a real improvement over a blank: GET /v1/audit/logs
+    // can now be searched by entity for every topic on the platform.
+
+    [Theory]
+    [InlineData("boli.occasion.closed.v1", "OccasionClosed", "Occasion", "occasionId")]
+    [InlineData("boli.closed.v1", "BoliClosed", "Boli", "boliId")]
+    [InlineData("boli.result.published.v1", "BoliResultPublished", "Boli", "boliId")]
+    [InlineData("celebrity-voting.campaign.closed.v1", "CampaignClosed", "Campaign", "campaignId")]
+    [InlineData("celebrity-voting.results.published.v1", "ResultsPublished", "Campaign", "campaignId")]
+    [InlineData("events.event.published.v1", "EventPublished", "Event", "eventId")]
+    [InlineData("events.capacity.reached.v1", "CapacityReached", "Event", "eventId")]
+    [InlineData("events.waitlist.promoted.v1", "WaitlistPromoted", "Event", "eventId")]
+    [InlineData("events.event.cancelled.v1", "EventCancelled", "Event", "eventId")]
+    [InlineData("pathshala.created.v1", "PathshalaCreated", "Pathshala", "pathshalaId")]
+    [InlineData("pathshala.session.opened.v1", "AcademicSessionOpened", "AcademicSession", "sessionId")]
+    [InlineData("pathshala.deactivated.v1", "PathshalaDeactivated", "Pathshala", "pathshalaId")]
+    [InlineData("pathshala.student.enrolled.v1", "StudentEnrolled", "Enrolment", "enrolmentId")]
+    [InlineData("pathshala.exam-result.recorded.v1", "ExamResultRecorded", "Enrolment", "enrolmentId")]
+    public void An_entity_id_replaces_the_blank_where_there_is_no_actor_to_carry(
+        string topic, string action, string entity, string entityIdProperty)
+    {
+        var descriptor = KnownEvents.Describe(topic);
+
+        descriptor.Action.Should().Be(action);
+        descriptor.EntityName.Should().Be(entity);
+        descriptor.EntityIdProperty.Should().Be(entityIdProperty);
+        descriptor.ActorIdProperty.Should().BeNull();
+    }
+
+    [Fact]
+    public void A_boli_s_extended_close_keeps_its_previous_end_time()
+    {
+        var descriptor = KnownEvents.Describe("boli.extended.v1");
+
+        descriptor.EntityName.Should().Be("Boli");
+        descriptor.EntityIdProperty.Should().Be("boliId");
+        descriptor.BeforeProperties.Should().BeEquivalentTo(["previousEndAt"]);
+    }
+
+    [Fact]
+    public void A_campaign_status_change_keeps_its_previous_status()
+    {
+        var descriptor = KnownEvents.Describe("celebrity-voting.campaign.status-changed.v1");
+
+        descriptor.EntityName.Should().Be("Campaign");
+        descriptor.EntityIdProperty.Should().Be("campaignId");
+        descriptor.BeforeProperties.Should().BeEquivalentTo(["previousStatus"]);
+    }
+
+    [Fact]
+    public void An_event_registration_is_a_self_action_like_logging_in()
+    {
+        var descriptor = KnownEvents.Describe("events.registration.created.v1");
+
+        descriptor.EntityIdProperty.Should().Be("eventId");
+        descriptor.ActorIdProperty.Should().Be("memberId");
+    }
+
+    [Fact]
+    public void An_enrolment_request_names_the_parent_who_asked_not_the_child()
+    {
+        // A child cannot ask for their own place - RequestedByMemberId is the
+        // parent, a different person from the child (ChildProfileId) the
+        // request is about, the same "distinct actor" shape as the earlier
+        // finds in this pass.
+        var descriptor = KnownEvents.Describe("pathshala.enrolment.requested.v1");
+
+        descriptor.Action.Should().Be("EnrolmentRequested");
+        descriptor.EntityName.Should().Be("Enrolment");
+        descriptor.EntityIdProperty.Should().Be("enrolmentId");
+        descriptor.ActorIdProperty.Should().Be("requestedByMemberId");
+    }
 }

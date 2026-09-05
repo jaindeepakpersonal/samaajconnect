@@ -355,6 +355,127 @@ public static class KnownEvents
             EntityName: "User",
             EntityIdProperty: "userId"),
 
+        // The remaining eighteen topics on the platform, finishing the sweep
+        // this pass started five entries ago. None of these has the "distinct
+        // actor differs from subject" shape the earlier finds did - boli,
+        // celebrity-voting and events publish system/timing facts with no
+        // person to blame or credit, and most of pathshala's are the same.
+        // Giving them an entity id is still a real improvement over the
+        // derived default's blank: `GET /v1/audit/logs` can now be searched
+        // by entity for every topic on the platform, not just the ones with
+        // a story.
+        ["boli.occasion.closed.v1"] = new(
+            Action: "OccasionClosed",
+            EntityName: "Occasion",
+            EntityIdProperty: "occasionId"),
+
+        ["boli.closed.v1"] = new(
+            Action: "BoliClosed",
+            EntityName: "Boli",
+            EntityIdProperty: "boliId"),
+
+        // WinningMemberId names who won, not who acted - the Samaaj Admin who
+        // announced it is not on this event at all - so there is no actor to
+        // carry here, the same reasoning events.waitlist.promoted.v1 below
+        // gets right for the member it promotes rather than acts on.
+        ["boli.result.published.v1"] = new(
+            Action: "BoliResultPublished",
+            EntityName: "Boli",
+            EntityIdProperty: "boliId"),
+
+        ["boli.extended.v1"] = new(
+            Action: "BoliExtended",
+            EntityName: "Boli",
+            EntityIdProperty: "boliId",
+            BeforeProperties: ["previousEndAt"]),
+
+        ["celebrity-voting.campaign.status-changed.v1"] = new(
+            Action: "CampaignStatusChanged",
+            EntityName: "Campaign",
+            EntityIdProperty: "campaignId",
+            BeforeProperties: ["previousStatus"]),
+
+        ["celebrity-voting.campaign.closed.v1"] = new(
+            Action: "CampaignClosed",
+            EntityName: "Campaign",
+            EntityIdProperty: "campaignId"),
+
+        ["celebrity-voting.results.published.v1"] = new(
+            Action: "ResultsPublished",
+            EntityName: "Campaign",
+            EntityIdProperty: "campaignId"),
+
+        ["events.event.published.v1"] = new(
+            Action: "EventPublished",
+            EntityName: "Event",
+            EntityIdProperty: "eventId"),
+
+        // The one self-action in this batch: a member registers themselves.
+        ["events.registration.created.v1"] = new(
+            Action: "RegistrationCreated",
+            EntityName: "Event",
+            EntityIdProperty: "eventId",
+            ActorIdProperty: "memberId"),
+
+        ["events.capacity.reached.v1"] = new(
+            Action: "CapacityReached",
+            EntityName: "Event",
+            EntityIdProperty: "eventId"),
+
+        // MemberId here names who benefited from a place opening up, not who
+        // acted - a waitlisted member did nothing to be promoted, somebody
+        // else gave their place up - so this is not an actor, the same
+        // reasoning boli.result.published.v1's WinningMemberId gets above.
+        ["events.waitlist.promoted.v1"] = new(
+            Action: "WaitlistPromoted",
+            EntityName: "Event",
+            EntityIdProperty: "eventId"),
+
+        ["events.event.cancelled.v1"] = new(
+            Action: "EventCancelled",
+            EntityName: "Event",
+            EntityIdProperty: "eventId"),
+
+        ["pathshala.created.v1"] = new(
+            Action: "PathshalaCreated",
+            EntityName: "Pathshala",
+            EntityIdProperty: "pathshalaId"),
+
+        ["pathshala.session.opened.v1"] = new(
+            Action: "AcademicSessionOpened",
+            EntityName: "AcademicSession",
+            EntityIdProperty: "sessionId"),
+
+        ["pathshala.deactivated.v1"] = new(
+            Action: "PathshalaDeactivated",
+            EntityName: "Pathshala",
+            EntityIdProperty: "pathshalaId"),
+
+        // The one topic in this batch with the same "distinct actor" shape as
+        // the earlier finds: a child cannot ask for their own place, so
+        // RequestedByMemberId - the parent - is a different person from the
+        // child (ChildProfileId) the request is about.
+        ["pathshala.enrolment.requested.v1"] = new(
+            Action: "EnrolmentRequested",
+            EntityName: "Enrolment",
+            EntityIdProperty: "enrolmentId",
+            ActorIdProperty: "requestedByMemberId"),
+
+        // No PlacedBy on this event - placement is a Pathshala administrator's
+        // decision at a point this event does not capture the actor of.
+        ["pathshala.student.enrolled.v1"] = new(
+            Action: "StudentEnrolled",
+            EntityName: "Enrolment",
+            EntityIdProperty: "enrolmentId"),
+
+        // No RecordedBy on this event either, deliberately: the child is
+        // named only by an enrolment id per its own doc comment, and the
+        // teacher who marked it was never added to the payload.
+        ["pathshala.exam-result.recorded.v1"] = new(
+            Action: "ExamResultRecorded",
+            EntityName: "Enrolment",
+            EntityIdProperty: "enrolmentId"),
+
         // Erasure is handled by ErasePersonalDataCommandHandler rather than
         // recorded through this path, and it writes its own row with no actor
         // deliberately. Listed here so the omission reads as a decision.
