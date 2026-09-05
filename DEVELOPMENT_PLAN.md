@@ -8,7 +8,27 @@ version of the plan; the reasoning behind the ordering lives in
 ## Current Status
 
 - **Stage:** every module has a service and member screens; Phase 5 hardening under way
-- **Last updated:** 2026-09-05 - **the platform's single most irreversible
+- **Last updated:** 2026-09-05 - **the smoke suite's own member-directory
+  check had quietly become dependent on how many times the suite itself had
+  run - fixed rather than left as a separately-flagged task.**
+
+  Flagged two cycles ago as a pre-existing, unrelated flake: `GET
+  /v1/members` defaults to `limit=50`, and the shared "Smoke Samaaj" tenant
+  every run of this script has ever used had accumulated well past that, so
+  the admin lookup checking "an administrator still finds an unlisted
+  member" no longer returned the specific member this run cared about - not
+  because the lookup was broken, but because an unqualified list only shows
+  whichever fifty of however many hundred members have piled up.
+
+  The fix is the search endpoint's own `term` parameter, scoped to "Smoke
+  Member" - this account's own fixed, reused `fullName` - rather than an
+  unqualified `GET /v1/members`. Confirmed directly against the running
+  stack first: the unqualified list held 50 members and did not contain this
+  one; the same call with `term=Smoke Member` returned exactly it.
+
+  Verified with a full run of the smoke suite: 369 of 369 checks green,
+  including the one this cycle fixed.
+- **Previously:** 2026-09-05 - **the platform's single most irreversible
   action had the exact keyboard-focus bug an audit had already fixed on
   three other screens, undiscovered because nobody had reason to reopen it.**
 

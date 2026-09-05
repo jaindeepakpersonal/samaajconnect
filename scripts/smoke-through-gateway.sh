@@ -424,7 +424,16 @@ fi
 check "but still reachable by id" 200 \
   "$(status -H "Authorization: Bearer $MEMBER_TOKEN" "$GATEWAY/v1/members/$MEMBER_ID")"
 
-if curl -s -H "Authorization: Bearer $ADMIN_TOKEN" -H "X-Tenant-Override-Id: $TENANT_ID" \
+# Scoped to this member's own name rather than an unqualified GET /v1/members.
+# The Smoke Samaaj is the same tenant every run of this script has ever used,
+# and SearchMembersQuery defaults to limit=50 (capped at 100) - so an
+# unqualified list only returns whichever fifty of however many hundred
+# members have piled up over every prior run, and this specific member falls
+# off that page long before it does. "Smoke Member" is this account's own,
+# fixed fullName, so searching by it finds the one row that matters
+# regardless of how large the directory has grown around it.
+if curl -s -G -H "Authorization: Bearer $ADMIN_TOKEN" -H "X-Tenant-Override-Id: $TENANT_ID" \
+   --data-urlencode "term=Smoke Member" \
    "$GATEWAY/v1/members" | grep -q "$MEMBER_ID"; then
   echo "  ok    and an administrator still finds them"
   pass=$((pass + 1))
