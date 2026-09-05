@@ -8,9 +8,44 @@ version of the plan; the reasoning behind the ordering lives in
 ## Current Status
 
 - **Stage:** every module has a service and member screens; Phase 5 hardening under way
-- **Last updated:** 2026-09-05 - **a compiler warning that has sat unfixed
-  across several cycles' worth of test output turned out to be pointing at a
-  real bug, in the opposite direction its own message suggested.**
+- **Last updated:** 2026-09-05 - **the whole class of bug the last cycle
+  found is now a compile error in both apps, not a warning left to sit -
+  `noUncheckedIndexedAccess: true`, in both `tsconfig.json`.**
+
+  The last cycle's finding was a symptom: `Record<string, string>` and
+  array index access both type as always-present by default, which is
+  exactly what let a genuinely load-bearing `?? ''` look like dead code to
+  the compiler. `noUncheckedIndexedAccess` is the flag that makes every
+  such access `T | undefined` instead, matching the backend's own
+  `Nullable enable` + `TreatWarningsAsErrors` discipline (`Directory.Build.props`)
+  that already makes this class of mistake impossible to ship there.
+
+  Enabling it and running a full production build of both apps (`ng build
+  --configuration production`, the strictest check available - the test
+  runner's transform pipeline does not fully type-check and would have
+  missed this) found exactly one production bug beyond the one already
+  fixed: `issue-detail.component.ts`'s `latestReason` walked a history
+  array backwards by index, safe by the loop's own bounds but not provably
+  so to the compiler - rewritten as a reverse `for...of` over a copied
+  array, which needs no index and no assertion at all.
+
+  Everything else the flag found - 62 sites across 17 spec files in both
+  apps and `libs/shared` - was a test asserting on an array element or
+  `Record` entry it had just populated in the same test, which the
+  compiler cannot know is safe without being told. Each was checked before
+  being asserted safe (the load/fixture that guarantees the entry exists,
+  confirmed by reading it) and fixed with a `!`, the same idiom this
+  codebase's own specs already use for DOM query results
+  (`trigger()!.getAttribute(...)`) - not a new convention, just the first
+  time it was needed on a `Record` or array rather than a `querySelector`.
+
+  Verified with a full production build of both apps (zero errors) and
+  both apps' full test suites (338 member-portal, 198 admin-portal, all
+  green) - not merely the unit-test run, which passes even when the
+  Angular compiler would refuse to build the app for production.
+- **Previously:** 2026-09-05 - **a compiler warning that has sat unfixed
+  across several cycles' worth of test output turned out to be pointing at
+  a real bug, in the opposite direction its own message suggested.**
 
   `issue-queue.component.ts`'s `reason: Record<string, string> = {}` made
   the TypeScript compiler certain `reason[issue.id]` is always a `string`,

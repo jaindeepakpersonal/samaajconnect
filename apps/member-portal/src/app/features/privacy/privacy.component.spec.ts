@@ -127,8 +127,8 @@ describe('PrivacyComponent', () => {
   it('marks where each consent currently stands', () => {
     load();
 
-    expect(component.isGranted(notice().items[1])).toBe(true);
-    expect(component.isGranted(notice().items[2])).toBe(false);
+    expect(component.isGranted(notice().items[1]!)).toBe(true);
+    expect(component.isGranted(notice().items[2]!)).toBe(false);
     expect(text()).toContain('Agreed');
     expect(text()).toContain('Withdrawn');
   });
@@ -138,7 +138,7 @@ describe('PrivacyComponent', () => {
     // tick during registration. A confirmation step would make it harder.
     load();
 
-    component.withdraw(notice().items[1]);
+    component.withdraw(notice().items[1]!);
 
     const request = http.expectOne(`/v1/identity/me/consents/Communications/withdraw`);
 
@@ -147,7 +147,7 @@ describe('PrivacyComponent', () => {
     request.flush(consents({ Communications: false }));
     fixture.detectChanges();
 
-    expect(component.isGranted(notice().items[1])).toBe(false);
+    expect(component.isGranted(notice().items[1]!)).toBe(false);
   });
 
   it('does not offer to withdraw the purpose the account cannot exist without', () => {

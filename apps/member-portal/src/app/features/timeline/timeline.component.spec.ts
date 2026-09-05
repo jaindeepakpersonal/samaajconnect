@@ -193,7 +193,7 @@ describe('TimelineComponent', () => {
     // reaction you already hold removes it.
     load([post({ myReaction: 'Appreciate', reactions: [{ type: 'Appreciate', count: 1 }] })]);
 
-    component.react(component.posts()[0], 'Appreciate');
+    component.react(component.posts()[0]!, 'Appreciate');
 
     const request = http.expectOne('/v1/timeline/posts/p1/reaction');
 
@@ -202,14 +202,14 @@ describe('TimelineComponent', () => {
     request.flush(post({ myReaction: null, reactions: [] }));
     fixture.detectChanges();
 
-    expect(component.posts()[0].myReaction).toBeNull();
+    expect(component.posts()[0]!.myReaction).toBeNull();
   });
 
   it('keeps a failed reaction off the page-level error', () => {
     // A reaction that failed should not replace the feed with an error box.
     load([post()]);
 
-    component.react(component.posts()[0], 'Appreciate');
+    component.react(component.posts()[0]!, 'Appreciate');
 
     http
       .expectOne('/v1/timeline/posts/p1/reaction')
@@ -226,7 +226,7 @@ describe('TimelineComponent', () => {
   it('loads comments only when they are asked for', () => {
     load([post({ commentCount: 1 })]);
 
-    component.toggleComments(component.posts()[0]);
+    component.toggleComments(component.posts()[0]!);
 
     http.expectOne('/v1/timeline/posts/p1').flush({
       post: post({ commentCount: 1 }),
@@ -244,7 +244,7 @@ describe('TimelineComponent', () => {
   it('names the reader as the author of their own comment', () => {
     load([post()]);
 
-    component.toggleComments(component.posts()[0]);
+    component.toggleComments(component.posts()[0]!);
 
     http.expectOne('/v1/timeline/posts/p1').flush({
       post: post(),
@@ -259,12 +259,12 @@ describe('TimelineComponent', () => {
   it('bumps the count when a comment is added rather than re-fetching the feed', () => {
     load([post({ commentCount: 0 })]);
 
-    component.toggleComments(component.posts()[0]);
+    component.toggleComments(component.posts()[0]!);
     http.expectOne('/v1/timeline/posts/p1').flush({ post: post({ commentCount: 0 }), comments: [] });
     fixture.detectChanges();
 
     component.draftComment = 'Well said.';
-    component.addComment(component.posts()[0]);
+    component.addComment(component.posts()[0]!);
 
     http
       .expectOne('/v1/timeline/posts/p1/comments')
@@ -272,7 +272,7 @@ describe('TimelineComponent', () => {
 
     fixture.detectChanges();
 
-    expect(component.posts()[0].commentCount).toBe(1);
+    expect(component.posts()[0]!.commentCount).toBe(1);
     expect(component.draftComment).toBe('');
   });
 
@@ -281,7 +281,7 @@ describe('TimelineComponent', () => {
   it('says a report landed without pretending the post changed', () => {
     load([post()]);
 
-    component.report(component.posts()[0]);
+    component.report(component.posts()[0]!);
 
     http
       .expectOne('/v1/timeline/posts/p1/report')

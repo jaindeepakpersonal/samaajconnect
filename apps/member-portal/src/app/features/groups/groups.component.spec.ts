@@ -98,23 +98,23 @@ describe('GroupsListComponent', () => {
   it('offers a member with no application the wireframe action', () => {
     load([group()]);
 
-    expect(component.standing(component.groups()[0])).toBe('Not a member');
-    expect(component.action(component.groups()[0])).toBe('View / Apply');
+    expect(component.standing(component.groups()[0]!)).toBe('Not a member');
+    expect(component.action(component.groups()[0]!)).toBe('View / Apply');
   });
 
   it('says an application is with the president rather than offering to apply again', () => {
     load([group({ myApplicationStatus: 'Pending' })]);
 
-    expect(component.standing(component.groups()[0])).toBe(
+    expect(component.standing(component.groups()[0]!)).toBe(
       'Your application is with the president',
     );
-    expect(component.action(component.groups()[0])).toBe('View');
+    expect(component.action(component.groups()[0]!)).toBe('View');
   });
 
   it('reports a rejected application honestly', () => {
     load([group({ myApplicationStatus: 'Rejected' })]);
 
-    expect(component.standing(component.groups()[0])).toBe('Your application was not accepted');
+    expect(component.standing(component.groups()[0]!)).toBe('Your application was not accepted');
   });
 
   it('tells a president they lead the group, not that they are a member', () => {
@@ -122,13 +122,13 @@ describe('GroupsListComponent', () => {
     // president would read "You are a member".
     load([group({ iAmThePresident: true, iAmAMember: true })]);
 
-    expect(component.standing(component.groups()[0])).toBe('You lead this group');
+    expect(component.standing(component.groups()[0]!)).toBe('You lead this group');
   });
 
   it('does not offer to apply to a group that takes no new members', () => {
     load([group({ status: 'Inactive' })]);
 
-    expect(component.action(component.groups()[0])).toBe('View');
+    expect(component.action(component.groups()[0]!)).toBe('View');
     expect(text()).toContain('Not taking new members');
   });
 
@@ -150,7 +150,7 @@ describe('GroupsListComponent', () => {
     load([group({ iAmThePresident: true, iAmAMember: true, pendingApplicationCount: 0 })]);
 
     expect(text()).not.toContain('waiting for you');
-    expect(component.action(component.groups()[0])).toBe('Manage');
+    expect(component.action(component.groups()[0]!)).toBe('Manage');
   });
 
   it('does not put a president name on the card it cannot resolve', () => {
@@ -324,7 +324,7 @@ describe('GroupDetailComponent', () => {
     load(detail({ iAmThePresident: true, iAmAMember: true }), [application()]);
 
     component.roleDrafts['a1'] = ' Secretary ';
-    component.decide(component.pending()[0], true);
+    component.decide(component.pending()[0]!, true);
 
     const request = http.expectOne(
       '/v1/volunteer-groups/groups/g1/applications/a1/decide',
@@ -347,7 +347,7 @@ describe('GroupDetailComponent', () => {
   it('sends no position when the president left the box empty', () => {
     load(detail({ iAmThePresident: true, iAmAMember: true }), [application()]);
 
-    component.decide(component.pending()[0], false);
+    component.decide(component.pending()[0]!, false);
 
     expect(
       http.expectOne('/v1/volunteer-groups/groups/g1/applications/a1/decide').request.body,
@@ -360,7 +360,7 @@ describe('GroupDetailComponent', () => {
       application({ id: 'a2' }),
     ]);
 
-    component.decide(component.pending()[0], true);
+    component.decide(component.pending()[0]!, true);
 
     http
       .expectOne('/v1/volunteer-groups/groups/g1/applications/a1/decide')

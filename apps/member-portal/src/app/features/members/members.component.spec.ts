@@ -401,7 +401,7 @@ describe('FamilyComponent', () => {
       }),
     );
 
-    component.decide(component.family()!, component.pendingRequests(component.family()!)[0], true);
+    component.decide(component.family()!, component.pendingRequests(component.family()!)[0]!, true);
 
     http
       .expectOne('/v1/families/f1/join-requests/fm2/decide')
@@ -519,9 +519,9 @@ describe('FamilyComponent', () => {
   it('sends the contact the parent typed and re-reads the children', () => {
     load(family(), [child({ isEligibleForConversion: true })]);
 
-    component.beginConversion(component.children()[0]);
+    component.beginConversion(component.children()[0]!);
     component.contact = '  aarav@example.com  ';
-    component.startConversion(component.children()[0]);
+    component.startConversion(component.children()[0]!);
 
     const request = http.expectOne('/v1/children/c1/conversion');
 
@@ -531,7 +531,7 @@ describe('FamilyComponent', () => {
     http.expectOne('/v1/children').flush([child({ hasPendingConversion: true })]);
     fixture.detectChanges();
 
-    expect(component.children()[0].hasPendingConversion).toBe(true);
+    expect(component.children()[0]!.hasPendingConversion).toBe(true);
   });
 
   it('shows a converted child as having their own account', () => {
@@ -614,7 +614,7 @@ describe('FamilyComponent', () => {
   it('withdraws and re-reads the household', () => {
     load(family(), [withConsent(ME)]);
 
-    component.withdrawConsent(component.children()[0]);
+    component.withdrawConsent(component.children()[0]!);
 
     http.expectOne('/v1/children/c1/parental-consent').flush({ withdrawn: true });
 
@@ -633,7 +633,7 @@ describe('FamilyComponent', () => {
   it('shows a refusal against that child rather than blanking the screen', () => {
     load(family(), [withConsent(ME)]);
 
-    component.withdrawConsent(component.children()[0]);
+    component.withdrawConsent(component.children()[0]!);
 
     http.expectOne('/v1/children/c1/parental-consent').flush(
       { title: 'Conflict', detail: 'This person has their own account now.' },

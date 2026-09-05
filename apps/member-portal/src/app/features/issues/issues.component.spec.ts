@@ -215,7 +215,7 @@ describe('IssuesListComponent', () => {
   it('draws the wireframe strip for an issue on the happy path', () => {
     load([issue({ status: 'Approved' })]);
 
-    const stages = component.mine()[0];
+    const stages = component.mine()[0]!;
 
     expect(component.isOnHappyPath(stages)).toBe(true);
     expect(component.isReached(stages, 'Submitted')).toBe(true);

@@ -232,6 +232,18 @@ session.
   unstyled, and because most layout here comes from `label`/`.input`/flex
   defaults rather than the missing rule, it usually looks close enough that
   nobody notices. `scripts/css-class-coverage.sh` checks it, and CI runs it.
+- **Both apps' `tsconfig.json` set `noUncheckedIndexedAccess: true`.**
+  Without it, `Record<string, string>` and array index access type as
+  always-present, which is how `reason: Record<string, string> = {}` in
+  `issue-queue.component.ts` let the compiler tell a developer that a
+  genuinely load-bearing `?? ''` fallback was "provably dead code" -
+  removing it, as the compiler itself suggested, would have thrown on the
+  first issue nobody had typed a reason for yet. Turning this on found zero
+  production bugs beyond that one; every other hit was a test asserting on
+  an index it had just populated, fixed with a `!` in the same idiom this
+  codebase's specs already used for DOM query results. A `for (const x of
+  arr)` or `.find(...)` needs no such assertion and is preferred over index
+  access wherever the loop doesn't need the position itself.
 
 ## 8. Environment variables & docker-compose convention
 

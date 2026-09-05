@@ -93,7 +93,7 @@ describe('AdminListComponent suspending an account', () => {
   it('asks for a password before it acts', () => {
     start([ACTIVE]);
 
-    component.askToConfirm(component.admins()[0]);
+    component.askToConfirm(component.admins()[0]!);
     fixture.detectChanges();
 
     expect(text()).toContain('Suspending Meera Shah signs them out immediately');
@@ -107,7 +107,7 @@ describe('AdminListComponent suspending an account', () => {
     // unless the warning is a live region.
     start([ACTIVE]);
 
-    component.askToConfirm(component.admins()[0]);
+    component.askToConfirm(component.admins()[0]!);
     fixture.detectChanges();
 
     const warning = (fixture.nativeElement as HTMLElement).querySelector(
@@ -120,9 +120,9 @@ describe('AdminListComponent suspending an account', () => {
   it('suspends with the password once confirmed', () => {
     start([ACTIVE]);
 
-    component.askToConfirm(component.admins()[0]);
+    component.askToConfirm(component.admins()[0]!);
     component.password = 'correct horse battery staple';
-    component.confirmSuspend(component.admins()[0]);
+    component.confirmSuspend(component.admins()[0]!);
 
     const request = http.expectOne('/v1/identity/admins/u1/status');
 
@@ -135,14 +135,14 @@ describe('AdminListComponent suspending an account', () => {
     request.flush({ userId: 'u1', status: 'Suspended', changed: true });
     fixture.detectChanges();
 
-    expect(component.admins()[0].status).toBe('Suspended');
+    expect(component.admins()[0]!.status).toBe('Suspended');
     expect(component.confirming()).toBeNull();
   });
 
   it('reinstates in one click, with no password', () => {
     start([SUSPENDED]);
 
-    component.reinstate(component.admins()[0]);
+    component.reinstate(component.admins()[0]!);
 
     const request = http.expectOne('/v1/identity/admins/u2/status');
 
@@ -152,16 +152,16 @@ describe('AdminListComponent suspending an account', () => {
     request.flush({ userId: 'u2', status: 'Active', changed: true });
     fixture.detectChanges();
 
-    expect(component.admins()[0].status).toBe('Active');
+    expect(component.admins()[0]!.status).toBe('Active');
   });
 
   it('shows a refusal rather than pretending it worked', () => {
     // Suspending yourself, or an already-erased account, both come back 409.
     start([ACTIVE]);
 
-    component.askToConfirm(component.admins()[0]);
+    component.askToConfirm(component.admins()[0]!);
     component.password = 'wrong';
-    component.confirmSuspend(component.admins()[0]);
+    component.confirmSuspend(component.admins()[0]!);
 
     http.expectOne('/v1/identity/admins/u1/status').flush(
       { title: 'Conflict', detail: 'You cannot suspend your own account. Ask another administrator.' },
@@ -179,11 +179,11 @@ describe('AdminListComponent suspending an account', () => {
   it('leaves the panel open across attempts for a different account', () => {
     start([ACTIVE, { ...ACTIVE, userId: 'u3', fullName: 'Anita Shah' }]);
 
-    component.askToConfirm(component.admins()[0]);
+    component.askToConfirm(component.admins()[0]!);
     fixture.detectChanges();
     expect(component.confirming()).toBe('u1');
 
-    component.askToConfirm(component.admins()[1]);
+    component.askToConfirm(component.admins()[1]!);
     fixture.detectChanges();
 
     // Opening a second account's panel replaces the first, rather than

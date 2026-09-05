@@ -365,7 +365,7 @@ describe('EventDetailComponent', () => {
       ],
     );
 
-    expect(component.waitlisted()[0].memberId).toBe('m2');
+    expect(component.waitlisted()[0]!.memberId).toBe('m2');
     expect(text()).toContain('Aarav Jain');
   });
 

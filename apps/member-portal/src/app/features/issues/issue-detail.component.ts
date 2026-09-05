@@ -263,11 +263,9 @@ export class IssueDetailComponent implements OnInit {
   readonly latestReason = computed(() => {
     const history = this.detail()?.history ?? [];
 
-    for (let i = history.length - 1; i >= 0; i--) {
-      const reason = history[i].reason;
-
-      if (reason !== null && reason.length > 0) {
-        return reason;
+    for (const step of [...history].reverse()) {
+      if (step.reason !== null && step.reason.length > 0) {
+        return step.reason;
       }
     }
 

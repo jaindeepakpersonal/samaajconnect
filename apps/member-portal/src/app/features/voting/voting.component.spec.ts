@@ -102,7 +102,7 @@ describe('CampaignsListComponent', () => {
   it('offers a vote while voting is open', () => {
     load([campaign({ acceptsVotes: true, myVoteCandidateId: null })]);
 
-    expect(component.action(component.campaigns()[0])).toBe('Vote');
+    expect(component.action(component.campaigns()[0]!)).toBe('Vote');
   });
 
   it('does not offer a vote on a campaign whose window has passed', () => {
@@ -111,8 +111,8 @@ describe('CampaignsListComponent', () => {
     // acceptsVotes rather than the status.
     load([campaign({ status: 'VotingOpen', acceptsVotes: false })]);
 
-    expect(component.action(component.campaigns()[0])).toBe('View');
-    expect(component.describe(component.campaigns()[0])).toContain('Voting has closed');
+    expect(component.action(component.campaigns()[0]!)).toBe('View');
+    expect(component.describe(component.campaigns()[0]!)).toContain('Voting has closed');
   });
 
   it('does not label a campaign open when nothing on it is open', () => {
@@ -124,7 +124,7 @@ describe('CampaignsListComponent', () => {
       campaign({ status: 'NominationsOpen', acceptsNominations: false, acceptsVotes: false }),
     ]);
 
-    const only = component.campaigns()[0];
+    const only = component.campaigns()[0]!;
 
     expect(component.stage(only)).toBe('Nominations closed');
     expect(component.stage(only)).not.toBe('Nominations open');
@@ -134,21 +134,21 @@ describe('CampaignsListComponent', () => {
   it('labels a campaign open while it actually is', () => {
     load([campaign({ status: 'NominationsOpen', acceptsNominations: true, acceptsVotes: false })]);
 
-    expect(component.stage(component.campaigns()[0])).toBe('Nominations open');
+    expect(component.stage(component.campaigns()[0]!)).toBe('Nominations open');
   });
 
   it('says a member has voted rather than offering again', () => {
     load([campaign({ acceptsVotes: true, myVoteCandidateId: 'cand1' })]);
 
-    expect(component.action(component.campaigns()[0])).toBe('View the ballot');
+    expect(component.action(component.campaigns()[0]!)).toBe('View the ballot');
     expect(text()).toContain('You have voted');
   });
 
   it('offers a nomination while nominations are open', () => {
     load([campaign({ status: 'NominationsOpen', acceptsNominations: true, acceptsVotes: false })]);
 
-    expect(component.action(component.campaigns()[0])).toBe('Nominate');
-    expect(component.describe(component.campaigns()[0])).toContain('Nominations close');
+    expect(component.action(component.campaigns()[0]!)).toBe('Nominate');
+    expect(component.describe(component.campaigns()[0]!)).toContain('Nominations close');
   });
 
   it('separates finished campaigns from live ones', () => {
@@ -165,7 +165,7 @@ describe('CampaignsListComponent', () => {
   it('uses the campaign top-N rather than the wireframe hardcoded ten', () => {
     load([campaign({ status: 'Closed', acceptsVotes: false, topN: 3 })]);
 
-    expect(component.describe(component.campaigns()[0])).toContain('top 3');
+    expect(component.describe(component.campaigns()[0]!)).toContain('top 3');
   });
 
   it('says the Samaaj has run none rather than showing an empty grid', () => {
@@ -268,7 +268,7 @@ describe('CampaignDetailComponent', () => {
   it('casts the vote and re-reads, because the counts have moved', () => {
     load(detail({ acceptsVotes: true }));
 
-    component.vote(component.detail()!.campaign, component.ballot(component.detail()!)[0]);
+    component.vote(component.detail()!.campaign, component.ballot(component.detail()!)[0]!);
 
     const request = http.expectOne('/v1/celebrity-voting/campaigns/c1/votes');
 
@@ -286,7 +286,7 @@ describe('CampaignDetailComponent', () => {
   it('marks the candidate this member voted for', () => {
     load(detail({ myVoteCandidateId: 'cand1' }));
 
-    expect(component.isMyVote(component.ballot(component.detail()!)[0],
+    expect(component.isMyVote(component.ballot(component.detail()!)[0]!,
       component.detail()!.campaign)).toBe(true);
     expect(buttonSaying('Vote')).toBeUndefined();
   });
@@ -314,7 +314,7 @@ describe('CampaignDetailComponent', () => {
   it('keeps a failed vote off the page-level error', () => {
     load(detail({ acceptsVotes: true }));
 
-    component.vote(component.detail()!.campaign, component.ballot(component.detail()!)[0]);
+    component.vote(component.detail()!.campaign, component.ballot(component.detail()!)[0]!);
 
     http
       .expectOne('/v1/celebrity-voting/campaigns/c1/votes')

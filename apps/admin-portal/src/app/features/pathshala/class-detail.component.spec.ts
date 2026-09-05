@@ -317,7 +317,7 @@ describe('ClassDetailComponent', () => {
   it('assigns a teacher and offers only members who are not already teaching it', () => {
     load(
       detail({
-        classes: [{ ...detail().classes[0], teacherMemberIds: ['m1'] }],
+        classes: [{ ...detail().classes[0]!, teacherMemberIds: ['m1'] }],
       }),
       [],
       [],

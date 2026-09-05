@@ -94,7 +94,7 @@ describe('AdminListComponent re-issuing a code', () => {
   it('shows the code once, with what that means', () => {
     start([PENDING]);
 
-    component.reissue(component.admins()[0]);
+    component.reissue(component.admins()[0]!);
 
     const request = http.expectOne('/v1/identity/activations/u2/code');
 
@@ -121,7 +121,7 @@ describe('AdminListComponent re-issuing a code', () => {
   it('shows a refusal instead of a code', () => {
     start([PENDING]);
 
-    component.reissue(component.admins()[0]);
+    component.reissue(component.admins()[0]!);
 
     http.expectOne('/v1/identity/activations/u2/code').flush(
       { title: 'Forbidden', detail: 'You may not issue codes here.' },
@@ -139,7 +139,7 @@ describe('AdminListComponent re-issuing a code', () => {
     // a different name, which is how one gets handed to the wrong person.
     start([PENDING, { ...PENDING, userId: 'u3', fullName: 'Anita Shah' }]);
 
-    component.reissue(component.admins()[0]);
+    component.reissue(component.admins()[0]!);
     http.expectOne('/v1/identity/activations/u2/code').flush({
       userId: 'u2',
       mobileOrEmail: 'rajesh@example.com',
@@ -149,7 +149,7 @@ describe('AdminListComponent re-issuing a code', () => {
     });
     fixture.detectChanges();
 
-    component.reissue(component.admins()[1]);
+    component.reissue(component.admins()[1]!);
     fixture.detectChanges();
 
     expect(component.issued()).toBeNull();

@@ -117,7 +117,7 @@ describe('TenantListComponent logo', () => {
 
   it('uploads the chosen file as multipart and re-reads', () => {
     start();
-    component.openLogo(component.tenants()[0]);
+    component.openLogo(component.tenants()[0]!);
     fixture.detectChanges();
 
     choose(png());
@@ -146,7 +146,7 @@ describe('TenantListComponent logo', () => {
    */
   it('refuses a logo over 2 MB without sending it', () => {
     start();
-    component.openLogo(component.tenants()[0]);
+    component.openLogo(component.tenants()[0]!);
     fixture.detectChanges();
 
     choose(png(2 * 1024 * 1024 + 1));
@@ -157,7 +157,7 @@ describe('TenantListComponent logo', () => {
 
   it('reports a refused upload rather than claiming it worked', () => {
     start();
-    component.openLogo(component.tenants()[0]);
+    component.openLogo(component.tenants()[0]!);
     fixture.detectChanges();
 
     choose(png());
@@ -173,12 +173,12 @@ describe('TenantListComponent logo', () => {
 
   it('offers removal only when there is a logo, and re-reads after', () => {
     start({ ...TENANT, logoUrl: '/v1/identity/tenants/t1/logo' });
-    component.openLogo(component.tenants()[0]);
+    component.openLogo(component.tenants()[0]!);
     fixture.detectChanges();
 
     expect(text()).toContain('Remove logo');
 
-    component.removeLogo(component.tenants()[0]);
+    component.removeLogo(component.tenants()[0]!);
 
     const removal = http.expectOne('/v1/identity/tenants/t1/logo');
     expect(removal.request.method).toBe('DELETE');
@@ -197,7 +197,7 @@ describe('TenantListComponent logo', () => {
    */
   it('says the logo is public', () => {
     start();
-    component.openLogo(component.tenants()[0]);
+    component.openLogo(component.tenants()[0]!);
     fixture.detectChanges();
 
     expect(text()).toContain('served to anyone');

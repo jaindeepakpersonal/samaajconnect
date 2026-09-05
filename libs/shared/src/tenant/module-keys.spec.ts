@@ -30,7 +30,7 @@ describe('ModuleKeys', () => {
 
     const gatewayKeys = [
       ...new Set(
-        [...config.matchAll(/"module"\s*:\s*"([^"]+)"/g)].map((match) => match[1].toLowerCase()),
+        [...config.matchAll(/"module"\s*:\s*"([^"]+)"/g)].map((match) => match[1]!.toLowerCase()),
       ),
     ].sort();
 

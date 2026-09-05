@@ -76,15 +76,15 @@ describe('EventsListComponent', () => {
   it('offers an RSVP on an open event', () => {
     load([event()]);
 
-    expect(component.status(component.events()[0])).toBe('Open');
-    expect(component.action(component.events()[0])).toBe('View / RSVP');
+    expect(component.status(component.events()[0]!)).toBe('Open');
+    expect(component.action(component.events()[0]!)).toBe('View / RSVP');
   });
 
   it('offers the waitlist on a full one', () => {
     load([event({ isFull: true, registeredCount: 200 })]);
 
-    expect(component.status(component.events()[0])).toBe('Full — waitlist');
-    expect(component.action(component.events()[0])).toBe('Join waitlist');
+    expect(component.status(component.events()[0]!)).toBe('Full — waitlist');
+    expect(component.action(component.events()[0]!)).toBe('Join waitlist');
     expect(text()).toContain('Full — waitlist');
   });
 
@@ -95,34 +95,34 @@ describe('EventsListComponent', () => {
     // full; they need to be told they have a place.
     load([event({ isFull: true, myRegistrationStatus: 'Registered' })]);
 
-    expect(component.status(component.events()[0])).toBe('You are going');
+    expect(component.status(component.events()[0]!)).toBe('You are going');
   });
 
   it('reports a waitlisted member as waiting', () => {
     load([event({ isFull: true, myRegistrationStatus: 'Waitlisted' })]);
 
-    expect(component.status(component.events()[0])).toBe('You are on the waitlist');
+    expect(component.status(component.events()[0]!)).toBe('You are on the waitlist');
   });
 
   it('marks a cancelled event cancelled whatever else is true of it', () => {
     load([event({ status: 'Cancelled', myRegistrationStatus: 'Registered' })]);
 
-    expect(component.status(component.events()[0])).toBe('Cancelled');
-    expect(component.pillClass(component.events()[0])).toBe('danger');
+    expect(component.status(component.events()[0]!)).toBe('Cancelled');
+    expect(component.pillClass(component.events()[0]!)).toBe('danger');
   });
 
   it('does not claim an event with no limit is ever full', () => {
     // Null capacity is no limit, which is not a limit of zero.
     load([event({ capacity: null, isFull: false, registeredCount: 900 })]);
 
-    expect(component.status(component.events()[0])).toBe('Open');
+    expect(component.status(component.events()[0]!)).toBe('Open');
   });
 
   it('says an event needs no RSVP when registration is switched off', () => {
     load([event({ registrationEnabled: false })]);
 
-    expect(component.status(component.events()[0])).toBe('No RSVP needed');
-    expect(component.action(component.events()[0])).toBe('View');
+    expect(component.status(component.events()[0]!)).toBe('No RSVP needed');
+    expect(component.action(component.events()[0]!)).toBe('View');
   });
 
   // ---- Ordering -----------------------------------------------------------
@@ -157,7 +157,7 @@ describe('EventsListComponent', () => {
     // Group names live in volunteer-groups-service; the list carries an id.
     load([event({ organizerType: 'VolunteerGroup', organizerId: 'g1' })]);
 
-    expect(component.organiser(component.events()[0])).toBe('A volunteer group');
+    expect(component.organiser(component.events()[0]!)).toBe('A volunteer group');
     expect(text()).not.toContain('g1');
   });
 

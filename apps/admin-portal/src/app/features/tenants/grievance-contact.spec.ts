@@ -94,7 +94,7 @@ describe('TenantListComponent grievance contact', () => {
       grievanceContact: { name: 'Rajesh Jain', email: 'grievance@example.com', phone: null },
     });
 
-    component.openGrievance(component.tenants()[0]);
+    component.openGrievance(component.tenants()[0]!);
     fixture.detectChanges();
 
     expect(component.grievance.name).toBe('Rajesh Jain');
@@ -107,14 +107,14 @@ describe('TenantListComponent grievance contact', () => {
     // name on its own is not a means of redressal.
     start();
 
-    component.openGrievance(component.tenants()[0]);
+    component.openGrievance(component.tenants()[0]!);
     component.grievance = { name: 'Rajesh Jain', email: '', phone: '' };
     fixture.detectChanges();
 
     expect(component.grievanceIncomplete()).toBe(true);
     expect(buttonSaying('Save contact')!.disabled).toBe(true);
 
-    component.saveGrievance(component.tenants()[0]);
+    component.saveGrievance(component.tenants()[0]!);
 
     http.expectNone(`/v1/identity/tenants/t1/grievance-contact`);
   });
@@ -125,7 +125,7 @@ describe('TenantListComponent grievance contact', () => {
       grievanceContact: { name: 'Rajesh Jain', email: 'grievance@example.com', phone: null },
     });
 
-    component.openGrievance(component.tenants()[0]);
+    component.openGrievance(component.tenants()[0]!);
     component.grievance = { name: '', email: '', phone: '' };
     fixture.detectChanges();
 
@@ -137,9 +137,9 @@ describe('TenantListComponent grievance contact', () => {
   it('sends the three fields and blanks as null', () => {
     start();
 
-    component.openGrievance(component.tenants()[0]);
+    component.openGrievance(component.tenants()[0]!);
     component.grievance = { name: 'Rajesh Jain', email: 'grievance@example.com', phone: '  ' };
-    component.saveGrievance(component.tenants()[0]);
+    component.saveGrievance(component.tenants()[0]!);
 
     const request = http.expectOne('/v1/identity/tenants/t1/grievance-contact');
 
@@ -161,9 +161,9 @@ describe('TenantListComponent grievance contact', () => {
   it('shows a refusal rather than closing as though it saved', () => {
     start();
 
-    component.openGrievance(component.tenants()[0]);
+    component.openGrievance(component.tenants()[0]!);
     component.grievance = { name: 'Rajesh Jain', email: 'grievance@example.com', phone: '' };
-    component.saveGrievance(component.tenants()[0]);
+    component.saveGrievance(component.tenants()[0]!);
 
     http.expectOne('/v1/identity/tenants/t1/grievance-contact').flush(
       { title: 'Forbidden', detail: 'Only this Samaaj may set its own contact.' },

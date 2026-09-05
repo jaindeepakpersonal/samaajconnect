@@ -79,7 +79,7 @@ describe('RegisterComponent', () => {
 
     // One placeholder plus one real Samaaj - not the prototype's two samples.
     expect(options.length).toBe(2);
-    expect(options[1].textContent).toContain('Mahavir Samaaj');
+    expect(options[1]!.textContent).toContain('Mahavir Samaaj');
   });
 
   it("offers a retry when the Samaaj list cannot be loaded", () => {

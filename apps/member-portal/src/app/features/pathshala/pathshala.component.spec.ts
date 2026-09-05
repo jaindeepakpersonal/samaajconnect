@@ -267,7 +267,7 @@ describe('PathshalaListComponent', () => {
 
     expect(component.chosenChild['p1']).toBe('');
     expect(select.selectedIndex).toBe(0);
-    expect(select.options[0].textContent).toContain('Choose a child');
+    expect(select.options[0]!.textContent).toContain('Choose a child');
   });
 });
 

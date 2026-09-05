@@ -54,7 +54,7 @@ describe('TenantListComponent deactivation', () => {
   });
 
   function tenant() {
-    return component.tenants()[0];
+    return component.tenants()[0]!;
   }
 
   it('asks before it acts rather than deactivating on one click', () => {
@@ -104,7 +104,7 @@ describe('TenantListComponent deactivation', () => {
     request.flush({ ...TENANT, status: 'Inactive' });
     fixture.detectChanges();
 
-    expect(component.tenants()[0].status).toBe('Inactive');
+    expect(component.tenants()[0]!.status).toBe('Inactive');
     expect(component.confirming()).toBeNull();
   });
 
@@ -127,7 +127,7 @@ describe('TenantListComponent deactivation', () => {
 
     expect(component.confirming()).toBe('t1');
     expect(component.confirmError()).toBeTruthy();
-    expect(component.tenants()[0].status).toBe('Active');
+    expect(component.tenants()[0]!.status).toBe('Active');
   });
 
   it('forgets the password when the panel is cancelled', () => {
