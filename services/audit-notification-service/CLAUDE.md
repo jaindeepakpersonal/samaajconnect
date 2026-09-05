@@ -394,8 +394,19 @@ partition behind one malformed identifier.
 **The welcome message is not contact verification.** `identity.user.registered.v1`
 now sends a welcome to the identifier the member registered with. Nothing checks
 that it arrived or that whoever reads it is the person who registered, so
-`User.IsContactVerified` stays false. OTP is still unbuilt; this is a channel it
-could use, not the thing itself.
+`User.IsContactVerified` stays false. OTP sign-in is what actually verifies it
+now - `identity.login-otp.requested.v1` is the channel, and identity-tenant-service's
+own `LoginWithOtpCommandHandler` is the thing itself, the moment a code is
+successfully redeemed.
+
+**`identity.login-otp.requested.v1` is the one event whose `Notification`
+carries a secret rather than a description of one.** Every other descriptor's
+body is safe to write down because it says what happened, never a credential;
+this one's is the code itself, because there is no admin standing between
+minting it and delivering it the way there is for an activation code - this
+pipeline is the only way it ever reaches the member. `Destination` is always
+set for it, unlike most events, because an in-app notification is invisible to
+someone who by definition is not signed in yet.
 
 **By default the log gets a redacted address and no body.** A notification is
 addressed to one person and written for them, so logging both puts personal data

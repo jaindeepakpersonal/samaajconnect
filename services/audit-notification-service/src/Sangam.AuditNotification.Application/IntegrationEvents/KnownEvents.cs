@@ -122,6 +122,37 @@ public static class KnownEvents
             EntityIdProperty: "userId",
             ActorIdProperty: "userId"),
 
+        // A self-action, the same shape as logging in. Unlike every other
+        // event here, this one's Notification carries a secret rather than a
+        // description of one - there is no admin standing between minting
+        // this code and delivering it the way there is for an activation
+        // code, so the plaintext travelling through this pipeline is the only
+        // way it ever reaches the member at all. Destination is set, because
+        // an in-app notification is invisible to someone who is, by
+        // definition, not signed in yet.
+        ["identity.login-otp.requested.v1"] = new(
+            Action: "LoginOtpRequested",
+            EntityName: "User",
+            EntityIdProperty: "userId",
+            ActorIdProperty: "userId",
+            Notification: payload =>
+            {
+                if (!payload.TryGetProperty("userId", out var userId)
+                    || !userId.TryGetGuid(out var recipientId)
+                    || !payload.TryGetProperty("code", out var code))
+                {
+                    return null;
+                }
+
+                return new NotificationSpec(
+                    recipientId,
+                    "Your sign-in code",
+                    $"Your one-time code is {code.GetString()}. It expires in 10 minutes.",
+                    Destination: payload.TryGetProperty("mobileOrEmail", out var contact)
+                        ? contact.GetString()
+                        : null);
+            }),
+
         // A self-action, the same shape as logging in - nobody else can change
         // your password for you, so the actor is always the subject. The
         // in-app notification is what lets a member notice a change they did

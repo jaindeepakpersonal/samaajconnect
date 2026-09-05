@@ -131,14 +131,101 @@ describe('LoginComponent', () => {
     expect(text()).toContain('Your account is ready');
   });
 
-  it('offers OTP as a disabled choice rather than a broken one', () => {
-    setup();
+  // ---- OTP sign-in --------------------------------------------------------
 
+  function switchToOtp(): void {
     const tabs = (fixture.nativeElement as HTMLElement).querySelectorAll('[role="tab"]');
     const otp = Array.from(tabs).find((tab) => tab.textContent?.includes('OTP')) as HTMLButtonElement;
 
-    expect(otp).toBeTruthy();
-    expect(otp.disabled).toBe(true);
+    otp.click();
+    fixture.detectChanges();
+  }
+
+  it('offers OTP as a real choice, not a disabled one', () => {
+    setup();
+    switchToOtp();
+
+    expect(component.method()).toBe('otp');
+  });
+
+  it('sends a code for whatever identifier is in the field', () => {
+    setup();
+    switchToOtp();
+
+    component.form.controls.mobileOrEmail.setValue('ravi@example.com');
+    component.sendOtp();
+
+    const request = http.expectOne('/v1/identity/otp/request');
+    expect(request.request.body).toEqual({ mobileOrEmail: 'ravi@example.com' });
+
+    request.flush(null);
+    fixture.detectChanges();
+
+    expect(component.otpSent()).toBe(true);
+    expect(text()).toContain('a code has been sent');
+  });
+
+  it('does not request a code with no identifier', () => {
+    setup();
+    switchToOtp();
+
+    component.sendOtp();
+
+    http.expectNone('/v1/identity/otp/request');
+  });
+
+  it('signs in with the code and stores the token, the same as a password', () => {
+    setup();
+    switchToOtp();
+
+    component.form.controls.mobileOrEmail.setValue('ravi@example.com');
+    component.sendOtp();
+    http.expectOne('/v1/identity/otp/request').flush(null);
+
+    component.otpCode.set('482913');
+    component.submit();
+
+    const request = http.expectOne('/v1/identity/otp/login');
+    expect(request.request.body).toEqual({ mobileOrEmail: 'ravi@example.com', code: '482913' });
+
+    request.flush({
+      accessToken: 'signed-token',
+      expiresAt: new Date().toISOString(),
+      userId: 'u1',
+      tenantId: 't1',
+      tenantSlug: '',
+      fullName: 'Ravi Shah',
+      roles: ['Member'],
+    });
+
+    expect(TestBed.inject(TokenStore).token()).toBe('signed-token');
+  });
+
+  it('does not submit an OTP sign-in with no code entered', () => {
+    setup();
+    switchToOtp();
+
+    component.form.controls.mobileOrEmail.setValue('ravi@example.com');
+    component.submit();
+
+    http.expectNone('/v1/identity/otp/login');
+  });
+
+  it('shows a wrong-code failure the same way a wrong password shows one', () => {
+    setup();
+    switchToOtp();
+
+    component.form.controls.mobileOrEmail.setValue('ravi@example.com');
+    component.otpCode.set('000000');
+    component.submit();
+
+    http.expectOne('/v1/identity/otp/login').flush(
+      { title: 'Auth.InvalidCredentials', detail: 'Incorrect mobile/email or password.' },
+      { status: 401, statusText: 'Unauthorized' },
+    );
+    fixture.detectChanges();
+
+    expect(text()).toContain('Incorrect mobile/email or password.');
   });
 
   it('explains that password reset is not available instead of doing nothing', () => {

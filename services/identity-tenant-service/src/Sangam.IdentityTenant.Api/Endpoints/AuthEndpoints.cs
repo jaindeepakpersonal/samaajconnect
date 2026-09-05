@@ -3,7 +3,9 @@ using Sangam.IdentityTenant.Api.Extensions;
 using Sangam.IdentityTenant.Application.Users;
 using Sangam.IdentityTenant.Application.Users.Commands.ChangePassword;
 using Sangam.IdentityTenant.Application.Users.Commands.Login;
+using Sangam.IdentityTenant.Application.Users.Commands.LoginWithOtp;
 using Sangam.IdentityTenant.Application.Users.Commands.RefreshSession;
+using Sangam.IdentityTenant.Application.Users.Commands.RequestLoginOtp;
 using Sangam.IdentityTenant.Application.Users.Commands.SignOut;
 using Sangam.IdentityTenant.Application.Users.Commands.RegisterMember;
 using Sangam.IdentityTenant.Application.Users.Queries.GetCurrentUser;
@@ -54,6 +56,41 @@ public static class AuthEndpoints
             .AllowAnonymous()
             .WithName("Login")
             .WithSummary("Common login. Returns a tenant-scoped token and the Samaaj to redirect to.")
+            .Produces<LoginResponse>()
+            .ProducesValidationProblem()
+            .ProducesProblem(StatusCodes.Status401Unauthorized)
+            .ProducesProblem(StatusCodes.Status403Forbidden);
+
+        group.MapPost("/otp/request", async (
+                OtpRequest request,
+                ISender sender,
+                CancellationToken cancellationToken) =>
+            {
+                var result = await sender.Send(
+                    new RequestLoginOtpCommand(request.MobileOrEmail), cancellationToken);
+
+                return result.ToApiResult();
+            })
+            .AllowAnonymous()
+            .WithName("RequestLoginOtp")
+            .WithSummary(
+                "Sends a one-time sign-in code. Answers the same way whether or not the account exists.")
+            .Produces<RequestLoginOtpResponse>()
+            .ProducesValidationProblem();
+
+        group.MapPost("/otp/login", async (
+                OtpLoginRequest request,
+                ISender sender,
+                CancellationToken cancellationToken) =>
+            {
+                var result = await sender.Send(
+                    new LoginWithOtpCommand(request.MobileOrEmail, request.Code), cancellationToken);
+
+                return result.ToApiResult();
+            })
+            .AllowAnonymous()
+            .WithName("LoginWithOtp")
+            .WithSummary("Sign in with a one-time code instead of a password.")
             .Produces<LoginResponse>()
             .ProducesValidationProblem()
             .ProducesProblem(StatusCodes.Status401Unauthorized)
@@ -142,6 +179,10 @@ public static class AuthEndpoints
         string? NoticeVersion);
 
     public sealed record LoginRequest(string MobileOrEmail, string Password);
+
+    public sealed record OtpRequest(string MobileOrEmail);
+
+    public sealed record OtpLoginRequest(string MobileOrEmail, string Code);
 
     public sealed record RefreshRequest(string RefreshToken);
 

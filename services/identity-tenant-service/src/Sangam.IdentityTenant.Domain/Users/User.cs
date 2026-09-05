@@ -59,6 +59,9 @@ public sealed class User : AggregateRoot, ITenantScopedEntity
     /// <summary>Present only while the account is waiting to be activated.</summary>
     public ActivationCode? ActivationCode { get; private set; }
 
+    /// <summary>Present only while a requested sign-in code has not yet been used or expired.</summary>
+    public LoginOtp? LoginOtp { get; private set; }
+
     public DateTimeOffset? LastLoginAt { get; private set; }
     public int FailedLoginAttempts { get; private set; }
     public DateTimeOffset? LockedOutUntil { get; private set; }
@@ -282,6 +285,47 @@ public sealed class User : AggregateRoot, ITenantScopedEntity
         PasswordHash = newPasswordHash;
 
         Raise(new PasswordChangedDomainEvent(Id, TenantId, now));
+    }
+
+    /// <summary>
+    /// Attaches a freshly issued sign-in code, replacing any earlier one, and
+    /// announces it. Requesting a second code while one is already outstanding
+    /// is normal - codes expire, and messages get lost - so the newer one
+    /// simply wins.
+    /// </summary>
+    /// <remarks>
+    /// Raises the event itself, unlike <see cref="AttachActivationCode"/>: an
+    /// activation code is handed to an admin and returned synchronously, so it
+    /// never needs the Outbox, but nothing stands between this code and the
+    /// member except the notification pipeline - Raise is how the plaintext
+    /// gets there at all.
+    /// </remarks>
+    public void RequestLoginOtp(LoginOtp otp, string plaintext, DateTimeOffset now)
+    {
+        LoginOtp = otp;
+
+        Raise(new LoginOtpRequestedDomainEvent(Id, TenantId, plaintext, MobileOrEmail, now));
+    }
+
+    /// <summary>
+    /// Completes a sign-in by code: spends the code and, if this is the first
+    /// time the member has proven they hold their own contact address, marks
+    /// it verified.
+    /// </summary>
+    /// <remarks>
+    /// Raises nothing itself - the caller still calls
+    /// <see cref="RecordSuccessfulLogin"/> right after, which raises
+    /// <see cref="UserLoggedInDomainEvent"/> regardless of which credential
+    /// got them there.
+    /// </remarks>
+    public void CompleteOtpSignIn()
+    {
+        LoginOtp = null;
+
+        if (!IsContactVerified)
+        {
+            IsContactVerified = true;
+        }
     }
 
     public bool IsLockedOut(DateTimeOffset now) => LockedOutUntil is not null && LockedOutUntil > now;

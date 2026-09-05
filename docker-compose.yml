@@ -100,7 +100,7 @@ services:
       # Creates the first Super Admin on an empty database, then never touches
       # it again. Leave the identifier empty to skip bootstrapping entirely.
       Bootstrap__SuperAdminIdentifier: "${SUPERADMIN_IDENTIFIER:-superadmin@samaajconnect.local}"
-      Bootstrap__SuperAdminPassword: "${SUPERADMIN_PASSWORD:-change-me-immediately}"
+      Bootstrap__SuperAdminPassword: "${SUPERADMIN_PASSWORD:-a-real-superadmin-password}"
       Outbox__PollIntervalSeconds: "5"
       Outbox__BatchSize: "50"
     ports:

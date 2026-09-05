@@ -24,6 +24,8 @@ enforced by `TenantAuthorizationBehavior`, not just UI hiding.
 | POST | `/register` | Anonymous | Member registration into one Samaaj |
 | POST | `/token/refresh` | Anonymous | Exchange a refresh token for a new access token and the next refresh token. Single-use: presenting one twice ends the whole session |
 | POST | `/login` | Anonymous | Common login → returns tenant-scoped JWT |
+| POST | `/otp/request` | Anonymous | Sends a one-time sign-in code. Answers the same way whether or not the identifier belongs to a real, active account |
+| POST | `/otp/login` | Anonymous | Sign in with the code instead of a password. Same response shape as `/login`; a wrong code, an unknown account and an expired code are all the same **401** (`Auth.InvalidCredentials`), and count toward the same lockout a wrong password does |
 | GET | `/activations/pending` | SamaajAdmin | Accounts awaiting activation |
 | POST | `/activations/{userId}/code` | SamaajAdmin | Mint a one-time activation code (returned once) |
 | POST | `/activations/redeem` | Anonymous | Redeem a code and set a first password. The member portal's `/activate` screen; answers with who the account belongs to and **no token**, so the next step is an ordinary sign-in |

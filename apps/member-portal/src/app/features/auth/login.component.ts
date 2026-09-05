@@ -8,11 +8,15 @@ type SignInMethod = 'password' | 'otp';
 /**
  * Login, from the member-portal wireframe's `#login` screen.
  *
- * The wireframe offers a Password/OTP switch. There is no OTP endpoint in
- * API-CONTRACTS.md yet, so the tab is present but disabled with a plain
- * explanation rather than wired to something that does not exist - the
- * wireframe-to-angular skill is explicit that a missing endpoint means build
- * the backend, never fake the call.
+ * The OTP tab is real now. The wireframe's own OTP field has no explicit
+ * "Send" control - only a "Resend OTP" link - which reads as the code going
+ * out the moment the tab is opened. Real accounts do not get free credential
+ * mailings on a tab click, so this app adds the one control the wireframe
+ * left implicit: a "Send code" button, shown until a code has actually been
+ * requested.
+ *
+ * "Forgot password?" is still a stub - that is the separate `#forgot`/`#otp`
+ * reset flow, not this one, and is not built yet.
  */
 @Component({
   selector: 'app-login',
@@ -54,7 +58,7 @@ type SignInMethod = 'password' | 'otp';
             role="tab"
             [class.on]="method() === 'password'"
             [attr.aria-selected]="method() === 'password'"
-            (click)="method.set('password')"
+            (click)="selectMethod('password')"
           >
             Password
           </button>
@@ -63,8 +67,7 @@ type SignInMethod = 'password' | 'otp';
             role="tab"
             [class.on]="method() === 'otp'"
             [attr.aria-selected]="method() === 'otp'"
-            [disabled]="true"
-            title="One-time-code sign-in is not available yet"
+            (click)="selectMethod('otp')"
           >
             OTP
           </button>
@@ -84,18 +87,49 @@ type SignInMethod = 'password' | 'otp';
             <p class="field-error">Enter your mobile number or email.</p>
           }
 
-          <label for="password">Password</label>
-          <input
-            id="password"
-            class="input"
-            type="password"
-            formControlName="password"
-            autocomplete="current-password"
-            placeholder="••••••••"
-            [attr.aria-invalid]="showError('password')"
-          />
-          @if (showError('password')) {
-            <p class="field-error">Enter your password.</p>
+          @if (method() === 'password') {
+            <label for="password">Password</label>
+            <input
+              id="password"
+              class="input"
+              type="password"
+              formControlName="password"
+              autocomplete="current-password"
+              placeholder="••••••••"
+              [attr.aria-invalid]="showError('password')"
+            />
+            @if (showError('password')) {
+              <p class="field-error">Enter your password.</p>
+            }
+          } @else {
+            @if (otpSent()) {
+              <label for="otp-code">OTP</label>
+              <input
+                id="otp-code"
+                class="input"
+                inputmode="numeric"
+                autocomplete="one-time-code"
+                placeholder="6-digit code"
+                [value]="otpCode()"
+                (input)="otpCode.set($any($event.target).value)"
+              />
+              <p class="small auth-footer">
+                <button
+                  class="btn link"
+                  type="button"
+                  [disabled]="otpRequesting()"
+                  (click)="sendOtp()"
+                >
+                  {{ otpRequesting() ? 'Sending…' : 'Resend OTP' }}
+                </button>
+              </p>
+            } @else {
+              <p class="small">We will send a 6-digit code to this identifier.</p>
+            }
+
+            @if (otpNotice(); as message) {
+              <p class="notice info" role="status">{{ message }}</p>
+            }
           }
 
           @if (error(); as message) {
@@ -109,9 +143,20 @@ type SignInMethod = 'password' | 'otp';
           }
 
           <div class="actions">
-            <button class="btn" type="submit" [disabled]="busy()">
-              {{ busy() ? 'Signing in…' : 'Login' }}
-            </button>
+            @if (method() === 'otp' && !otpSent()) {
+              <button
+                class="btn"
+                type="button"
+                [disabled]="otpRequesting()"
+                (click)="sendOtp()"
+              >
+                {{ otpRequesting() ? 'Sending…' : 'Send code' }}
+              </button>
+            } @else {
+              <button class="btn" type="submit" [disabled]="busy()">
+                {{ busy() ? 'Signing in…' : 'Login' }}
+              </button>
+            }
             <a class="btn secondary" routerLink="/register">Register</a>
           </div>
 
@@ -153,6 +198,11 @@ export class LoginComponent {
   readonly justActivated = signal(this.route.snapshot.queryParamMap.get('activated') === 'true');
   readonly otherSamaaj = signal(this.route.snapshot.queryParamMap.get('otherSamaaj') === 'true');
 
+  readonly otpSent = signal(false);
+  readonly otpRequesting = signal(false);
+  readonly otpCode = signal('');
+  readonly otpNotice = signal<string | null>(null);
+
   readonly form = this.formBuilder.nonNullable.group({
     mobileOrEmail: ['', Validators.required],
     password: ['', Validators.required],
@@ -164,7 +214,50 @@ export class LoginComponent {
     return field.invalid && (field.dirty || field.touched);
   }
 
+  selectMethod(method: SignInMethod): void {
+    this.method.set(method);
+    this.error.set(null);
+  }
+
+  /**
+   * Requests a code for whatever identifier is in the shared field. Doubles
+   * as "Resend" once one has already gone out - re-requesting is normal, the
+   * same reasoning `RequestLoginOtpCommand` mints a fresh code rather than
+   * refusing a second request.
+   */
+  sendOtp(): void {
+    const identifier = this.form.controls.mobileOrEmail.value;
+
+    if (!identifier) {
+      this.form.controls.mobileOrEmail.markAsTouched();
+      return;
+    }
+
+    this.otpRequesting.set(true);
+    this.error.set(null);
+
+    this.auth.requestLoginOtp(identifier).subscribe({
+      next: () => {
+        this.otpRequesting.set(false);
+        this.otpSent.set(true);
+        // The same message regardless of whether the identifier turned out to
+        // belong to a real account - the request endpoint answers the same
+        // way either way, and this screen must not say anything it does not.
+        this.otpNotice.set('If that identifier has an account, a code has been sent.');
+      },
+      error: (failure: unknown) => {
+        this.otpRequesting.set(false);
+        this.error.set(describeError(failure));
+      },
+    });
+  }
+
   submit(): void {
+    if (this.method() === 'otp') {
+      this.submitOtp();
+      return;
+    }
+
     if (this.form.invalid) {
       this.form.markAllAsTouched();
       return;
@@ -176,6 +269,29 @@ export class LoginComponent {
     const { mobileOrEmail, password } = this.form.getRawValue();
 
     this.auth.login(mobileOrEmail, password).subscribe({
+      next: () => {
+        this.busy.set(false);
+        this.goHome();
+      },
+      error: (failure: unknown) => {
+        this.busy.set(false);
+        this.error.set(describeError(failure));
+      },
+    });
+  }
+
+  private submitOtp(): void {
+    const identifier = this.form.controls.mobileOrEmail.value;
+
+    if (!identifier || !this.otpCode()) {
+      this.form.controls.mobileOrEmail.markAsTouched();
+      return;
+    }
+
+    this.busy.set(true);
+    this.error.set(null);
+
+    this.auth.loginWithOtp(identifier, this.otpCode()).subscribe({
       next: () => {
         this.busy.set(false);
         this.goHome();

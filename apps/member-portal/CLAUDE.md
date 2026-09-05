@@ -8,7 +8,7 @@ before translating another screen.
 
 | Screen | Route | Wireframe section | Status |
 |---|---|---|---|
-| Login | `/login` | `#login` | built |
+| Login | `/login` | `#login` | built, including OTP sign-in as an alternative to a password |
 | Register | `/register` | `#register` | built |
 | Home | `/home` | `#home` | built |
 | Timeline | `/timeline` | `#timeline` | built |
@@ -174,10 +174,26 @@ by reading the catalogue, and the other two only by opening the screen against a
 running stack. **When a screen compares against a name the backend produced,
 check the enum, and open the page.**
 
-**Screens with no endpoint are disabled and say why.** The OTP tab and the
-forgot-password link are both present, because they are in the signed-off
-wireframe, and both explain that the feature is not available yet. Neither
-calls anything. When the backend lands, wire them; do not fake them sooner.
+**Screens with no endpoint are disabled and say why.** The forgot-password
+link is still one of those — present because it is in the signed-off
+wireframe, explaining the feature is not available yet, and calling nothing.
+The OTP tab was the other one, until `RequestLoginOtpCommand` and
+`LoginWithOtpCommand` landed: a member picks a Samaaj-wide login identifier,
+gets a real 6-digit code delivered through the same notification pipeline the
+welcome message already uses, and the code signs them in exactly like a
+password would - same `LoginResponse`, same lockout, same one indistinguishable
+`Auth.InvalidCredentials` for a wrong code or an unknown account. Successfully
+using a code also verifies the contact address it was sent to, which is the
+same assurance redeeming an activation code already gives, applied to an
+address nobody handed the member out of band. When the next backend lands,
+wire it; do not fake it sooner.
+
+**The wireframe's OTP field has no explicit "Send" control, only "Resend
+OTP" - which reads as the code going out the moment the tab opens.** A real
+account does not get a free credential mailing on a tab click, so this screen
+adds the one control the wireframe left implicit: a "Send code" button, shown
+until a code has actually been requested, after which the field and "Resend
+OTP" appear exactly as drawn.
 
 **A wireframe promise the platform cannot keep is dropped, not printed.** The
 event detail wireframe says "You'll receive a notification reminder 24 hours

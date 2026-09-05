@@ -33,6 +33,8 @@ since those happen *before* a tenant is established.
 | `CreateTenantCommand` | `SuperAdmin` + `Tenant.Manage` | built |
 | `RegisterMemberCommand` | anonymous | built |
 | `LoginCommand` | anonymous | built |
+| `RequestLoginOtpCommand` | anonymous | built |
+| `LoginWithOtpCommand` | anonymous | built |
 | `ChangeTenantStatusCommand` | `SuperAdmin` + `Tenant.Manage` | built |
 | `CreateAccountForConvertedChildCommand` | `[InternalRequest]` | built |
 | `IssueActivationCodeCommand` | `SamaajAdmin` + `AdminUsers.Manage` | built |
@@ -93,6 +95,7 @@ tenant is reported as 404 rather than as a distinct state, for the same reason.
 | `UserRoleRevokedDomainEvent` | `identity.user.role-revoked.v1` | `User.RevokeRole` |
 | `SessionRevokedDomainEvent` | `identity.session.revoked.v1` | `User.RecordSessionRevoked` |
 | `PasswordChangedDomainEvent` | `identity.user.password-changed.v1` | `User.ChangePassword` |
+| `LoginOtpRequestedDomainEvent` | `identity.login-otp.requested.v1` | `User.RequestLoginOtp` |
 | (no aggregate) | `identity.member-data.exported.v1` | `DataExportRecorder` |
 
 Delivery is at-least-once by design (see `Messaging/OutboxDispatcher.cs`).
@@ -122,6 +125,8 @@ offsets for messages it did nothing with.
 | PUT | `/v1/identity/tenants/{id}/modules` | `SuperAdmin` + `Tenant.Manage` |
 | POST | `/v1/identity/register` | anonymous |
 | POST | `/v1/identity/login` | anonymous |
+| POST | `/v1/identity/otp/request` | anonymous |
+| POST | `/v1/identity/otp/login` | anonymous |
 | POST | `/v1/identity/token/refresh` | anonymous |
 | POST | `/v1/identity/logout` | anonymous |
 | GET | `/v1/identity/me` | any authenticated role |
@@ -232,11 +237,40 @@ directory. The slug is resolved server-side against the tenant table, and a
 request arriving with a resolved tenant that disagrees is rejected. This is not
 the "client-supplied TenantId" that SECURITY-CHECKLIST.md forbids.
 
-**OTP verification is deferred.** The wireframe shows registration continuing
-to "Verify Mobile". No notification channel exists yet, and gating login behind
-an OTP nobody can send would make the end-to-end path untestable. Registration
-therefore creates an active account with `IsContactVerified = false`, and
-publishes `UserRegistered`. Close this when a delivery channel lands.
+**OTP sign-in exists now, and closed a second gap along with the one it was
+built for.** This paragraph used to say OTP verification was deferred because
+gating login behind a code nobody could send would make the path untestable -
+true when written, and false since the notification pipeline landed.
+Registration still creates an active account with `IsContactVerified = false`
+and publishes `UserRegistered` with no way to prove the contact address, but
+`LoginWithOtpCommand`'s success path calls `User.CompleteOtpSignIn()`, which
+marks it verified the first time a member actually signs in with a code -
+the same assurance redeeming an activation code already gives, applied to an
+address nobody handed the member out of band.
+
+**A wrong OTP counts against the same lockout a wrong password does, on
+purpose.** `LoginOtp` (`Domain/Users/LoginOtp.cs`) has no attempt counter of
+its own, unlike `ActivationCode`. SECURITY-CHECKLIST.md says to read "any OTP
+endpoint" as "any endpoint that checks a credential" - and an OTP-issuing
+account is already `Active` with a login lockout to share, unlike a
+`PendingActivation` account redeeming an activation code, which has neither.
+`LoginWithOtpCommandHandler` mirrors `LoginCommandHandler` almost exactly:
+same `IFailedLoginRecorder`, same `Auth.InvalidCredentials` for a wrong code
+or an unknown account alike, same `Auth.LockedOut`. A member who signed in
+with a code should not be able to tell, from the outside, that a different
+check ran.
+
+**The code is the one thing this service ever puts in a Kafka payload that
+is not already meant to be read by anyone who can reach the topic.** Every
+other domain event either names an id or, where it carries something
+sensitive, deliberately does not (`UserErasedDomainEvent` carries two ids and
+nothing else). `LoginOtpRequestedDomainEvent` carries the plaintext code
+because there is no admin standing between minting it and delivering it the
+way there is for an activation code - the notification pipeline is the only
+route the code has to the member at all. Accepted for the same reason the
+rest of this service's inter-service traffic is: every consumer is inside the
+same trust boundary, and a real provider replacing `LoggingNotificationChannel`
+does not change what travels through Kafka to get there.
 
 **A converted child's account is created without a password.** Approving a
 conversion establishes that this person is *entitled* to an account; nobody has

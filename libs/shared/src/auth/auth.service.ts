@@ -32,6 +32,22 @@ export class AuthService {
       .pipe(tap((result) => this.tokens.set(result.accessToken, result.refreshToken)));
   }
 
+  /**
+   * Asks for a one-time sign-in code. Answers the same way whether or not the
+   * identifier belongs to a real, active account - there is nothing in the
+   * response to branch on, deliberately.
+   */
+  requestLoginOtp(mobileOrEmail: string): Observable<void> {
+    return this.http.post<void>('/v1/identity/otp/request', { mobileOrEmail });
+  }
+
+  /** Signs in with a one-time code instead of a password. Same shape as `login()`. */
+  loginWithOtp(mobileOrEmail: string, code: string): Observable<LoginResult> {
+    return this.http
+      .post<LoginResult>('/v1/identity/otp/login', { mobileOrEmail, code })
+      .pipe(tap((result) => this.tokens.set(result.accessToken, result.refreshToken)));
+  }
+
   register(request: RegisterRequest): Observable<RegisterResult> {
     return this.http.post<RegisterResult>('/v1/identity/register', request);
   }

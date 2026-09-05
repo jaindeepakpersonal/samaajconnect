@@ -8,7 +8,52 @@ version of the plan; the reasoning behind the ordering lives in
 ## Current Status
 
 - **Stage:** every module has a service and member screens; Phase 5 hardening under way
-- **Last updated:** 2026-09-05 - **no account on the platform could ever
+- **Last updated:** 2026-09-05 - **the member-portal login screen's OTP tab
+  was disabled outright; it signs members in for real now, the first slice
+  of finishing the login page (forgot password is the second, tracked
+  separately below).**
+
+  `RequestLoginOtpCommand` mints a real 6-digit code
+  (`RandomNumberGenerator`, hashed with the same `IPasswordHasher.Hash` a
+  password uses) and delivers it through the notification pipeline that
+  already sends the registration welcome message - the only channel it has,
+  since unlike an admin-issued activation code nobody stands between minting
+  this one and delivering it. `LoginWithOtpCommand` mirrors
+  `LoginCommandHandler` almost line for line, substituting the credential
+  check; a wrong code counts against the **same** account lockout a wrong
+  password already trips, deliberately not a second counter -
+  `SECURITY-CHECKLIST.md` says to read "any OTP endpoint" as "any endpoint
+  that checks a credential," and an OTP-issuing account is already `Active`
+  with a lockout to share, unlike a `PendingActivation` account redeeming an
+  activation code. Signing in with a code also closes a second dangling gap
+  for free: `IsContactVerified` had no way to become true since nothing could
+  ever prove a member holds their own contact address; entering a code sent
+  to it is that proof.
+
+  Also fixed in passing: `/v1/identity/me/password`
+  (`ChangePasswordCommand`, previous cycle) had no gateway rate-limit route at
+  all, an oversight from that cycle - every path that checks a credential
+  belongs on `credential-attempts` per the gateway's own
+  `appsettings.json` comment, and this one had fallen through to the
+  unthrottled catch-all. Fixed alongside the new OTP routes. A second,
+  pre-existing instance of the same gap - `PUT
+  /v1/identity/admins/{userId}/status`, which also takes a password to
+  suspend someone - was noticed but is out of scope here and flagged
+  separately.
+
+  Verified with 231 identity-tenant-service unit tests (20 new) and 189
+  integration tests (7 new, against real Postgres, reading the plaintext code
+  back off its own outbox row - the only way to get it, since it is never
+  returned in any HTTP response), 46 gateway tests, `scripts/audit-descriptor-coverage.sh`
+  (52 topics, one new), `scripts/service-docs.sh`, full production builds and
+  `tsc --noEmit` for member-portal, 349 frontend tests (11 new), and
+  `scripts/css-class-coverage.sh`.
+
+  **Forgot password (the wireframe's separate `#forgot`/`#otp` screens) is
+  the deliberately-deferred second slice** - same shape, redeeming into a new
+  password instead of a session, tracked as a follow-up rather than folded in
+  here.
+- **Previously:** 2026-09-05 - **no account on the platform could ever
   replace a password it already had - not a member's, not a Samaaj Admin's,
   not the bootstrap Super Admin's - until `ChangePasswordCommand`.**
 
