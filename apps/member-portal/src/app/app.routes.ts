@@ -20,6 +20,18 @@ export const routes: Routes = [
       import('./features/auth/activate.component').then((m) => m.ActivateComponent),
   },
   {
+    path: 'forgot',
+    title: 'Reset password - samaajconnect',
+    loadComponent: () =>
+      import('./features/auth/forgot-password.component').then((m) => m.ForgotPasswordComponent),
+  },
+  {
+    path: 'reset',
+    title: 'Enter verification code - samaajconnect',
+    loadComponent: () =>
+      import('./features/auth/reset-password.component').then((m) => m.ResetPasswordComponent),
+  },
+  {
     // Every signed-in screen sits inside the shell (sidebar + top bar); the
     // guard sits here once rather than on each child; `authGuard` reads
     // `state.url`, the URL actually navigated to, so it redirects back to

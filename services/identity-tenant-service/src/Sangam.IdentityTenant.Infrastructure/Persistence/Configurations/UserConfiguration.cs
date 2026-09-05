@@ -51,6 +51,13 @@ public sealed class UserConfiguration : IEntityTypeConfiguration<User>
             otp.Property(c => c.ExpiresAt).HasColumnName("login_otp_expires_at");
         });
 
+        builder.OwnsOne(u => u.PasswordResetCode, code =>
+        {
+            code.Property(c => c.Hash).HasColumnName("password_reset_code_hash").HasMaxLength(512);
+            code.Property(c => c.IssuedAt).HasColumnName("password_reset_code_issued_at");
+            code.Property(c => c.ExpiresAt).HasColumnName("password_reset_code_expires_at");
+        });
+
         // The admin's pending list, and the consumer's idempotency check.
         builder.HasIndex(u => new { u.TenantId, u.Status });
         builder.HasIndex(u => u.ConvertedFromChildProfileId);

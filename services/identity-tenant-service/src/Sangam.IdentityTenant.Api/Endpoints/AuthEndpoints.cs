@@ -4,8 +4,10 @@ using Sangam.IdentityTenant.Application.Users;
 using Sangam.IdentityTenant.Application.Users.Commands.ChangePassword;
 using Sangam.IdentityTenant.Application.Users.Commands.Login;
 using Sangam.IdentityTenant.Application.Users.Commands.LoginWithOtp;
+using Sangam.IdentityTenant.Application.Users.Commands.RedeemPasswordReset;
 using Sangam.IdentityTenant.Application.Users.Commands.RefreshSession;
 using Sangam.IdentityTenant.Application.Users.Commands.RequestLoginOtp;
+using Sangam.IdentityTenant.Application.Users.Commands.RequestPasswordReset;
 using Sangam.IdentityTenant.Application.Users.Commands.SignOut;
 using Sangam.IdentityTenant.Application.Users.Commands.RegisterMember;
 using Sangam.IdentityTenant.Application.Users.Queries.GetCurrentUser;
@@ -162,6 +164,42 @@ public static class AuthEndpoints
             .ProducesProblem(StatusCodes.Status403Forbidden)
             .ProducesProblem(StatusCodes.Status409Conflict);
 
+        group.MapPost("/password-reset/request", async (
+                PasswordResetRequest request,
+                ISender sender,
+                CancellationToken cancellationToken) =>
+            {
+                var result = await sender.Send(
+                    new RequestPasswordResetCommand(request.MobileOrEmail), cancellationToken);
+
+                return result.ToApiResult();
+            })
+            .AllowAnonymous()
+            .WithName("RequestPasswordReset")
+            .WithSummary(
+                "Sends a password reset code. Answers the same way whether or not the account exists.")
+            .Produces<RequestPasswordResetResponse>()
+            .ProducesValidationProblem();
+
+        group.MapPost("/password-reset/redeem", async (
+                PasswordResetRedeemRequest request,
+                ISender sender,
+                CancellationToken cancellationToken) =>
+            {
+                var result = await sender.Send(
+                    new RedeemPasswordResetCommand(request.MobileOrEmail, request.Code, request.NewPassword),
+                    cancellationToken);
+
+                return result.ToApiResult();
+            })
+            .AllowAnonymous()
+            .WithName("RedeemPasswordReset")
+            .WithSummary("Redeem a password reset code and set a new password. No token: sign in normally next.")
+            .Produces<RedeemPasswordResetResponse>()
+            .ProducesValidationProblem()
+            .ProducesProblem(StatusCodes.Status401Unauthorized)
+            .ProducesProblem(StatusCodes.Status403Forbidden);
+
         return app;
     }
 
@@ -193,4 +231,8 @@ public static class AuthEndpoints
     public sealed record SignOutRequest(string RefreshToken, bool Everywhere = false);
 
     public sealed record ChangePasswordRequest(string CurrentPassword, string NewPassword);
+
+    public sealed record PasswordResetRequest(string MobileOrEmail);
+
+    public sealed record PasswordResetRedeemRequest(string MobileOrEmail, string Code, string NewPassword);
 }

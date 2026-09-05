@@ -228,12 +228,17 @@ describe('LoginComponent', () => {
     expect(text()).toContain('Incorrect mobile/email or password.');
   });
 
-  it('explains that password reset is not available instead of doing nothing', () => {
+  it('links forgot password to the real reset flow', () => {
     setup();
 
-    component.resetNotice.set(true);
-    fixture.detectChanges();
+    const link = (fixture.nativeElement as HTMLElement).querySelector('a[href="/forgot"]');
 
-    expect(text()).toContain('Password reset is not available yet');
+    expect(link?.textContent).toContain('Forgot password?');
+  });
+
+  it('confirms a password reset when arriving from the reset screen', () => {
+    setup({ reset: 'true' });
+
+    expect(text()).toContain('Your password has been reset');
   });
 });

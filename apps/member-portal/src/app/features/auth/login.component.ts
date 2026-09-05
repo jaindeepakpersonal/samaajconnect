@@ -15,8 +15,10 @@ type SignInMethod = 'password' | 'otp';
  * left implicit: a "Send code" button, shown until a code has actually been
  * requested.
  *
- * "Forgot password?" is still a stub - that is the separate `#forgot`/`#otp`
- * reset flow, not this one, and is not built yet.
+ * "Forgot password?" is real now too, its own separate `#forgot`/`#otp`
+ * flow (`/forgot`, `/reset`) - redeems into a new password rather than a
+ * session, so it hands back here with a notice rather than signing anybody
+ * in directly.
  */
 @Component({
   selector: 'app-login',
@@ -43,6 +45,10 @@ type SignInMethod = 'password' | 'otp';
 
         @if (justActivated()) {
           <p class="notice info" role="status">Your password is set. Sign in to continue.</p>
+        }
+
+        @if (justReset()) {
+          <p class="notice info" role="status">Your password has been reset. Sign in to continue.</p>
         }
 
         @if (justRegistered()) {
@@ -136,12 +142,6 @@ type SignInMethod = 'password' | 'otp';
             <p class="notice error" role="alert">{{ message }}</p>
           }
 
-          @if (resetNotice()) {
-            <p class="notice info" role="status">
-              Password reset is not available yet. Please contact your Samaaj administrator.
-            </p>
-          }
-
           <div class="actions">
             @if (method() === 'otp' && !otpSent()) {
               <button
@@ -164,9 +164,7 @@ type SignInMethod = 'password' | 'otp';
         </form>
 
         <p class="small auth-footer">
-          <button class="btn link" type="button" (click)="resetNotice.set(true)">
-            Forgot password?
-          </button>
+          <a routerLink="/forgot">Forgot password?</a>
         </p>
 
         <!--
@@ -192,10 +190,10 @@ export class LoginComponent {
   readonly method = signal<SignInMethod>('password');
   readonly busy = signal(false);
   readonly error = signal<string | null>(null);
-  readonly resetNotice = signal(false);
   readonly sessionExpired = signal(this.route.snapshot.queryParamMap.get('expired') === 'true');
   readonly justRegistered = signal(this.route.snapshot.queryParamMap.get('registered') === 'true');
   readonly justActivated = signal(this.route.snapshot.queryParamMap.get('activated') === 'true');
+  readonly justReset = signal(this.route.snapshot.queryParamMap.get('reset') === 'true');
   readonly otherSamaaj = signal(this.route.snapshot.queryParamMap.get('otherSamaaj') === 'true');
 
   readonly otpSent = signal(false);

@@ -32,7 +32,7 @@ before translating another screen.
 | Notifications | `/notifications` | `#notifications` | built |
 | Pathshala events | — | `#pathevents` | not built — no endpoint exists |
 | Set your password | `/activate` | — | built; no wireframe covers redeeming an activation code, and three admin screens told people to do it here |
-| Forgot password / OTP | — | `#forgot`, `#otp` | not built — no endpoint exists |
+| Forgot password | `/forgot`, `/reset` | `#forgot`, `#otp` | built — redeems into a new password, not a session |
 | My Profile | `/profile` | `#profile` | built. Its own "Change your password" card too — no wireframe covers it |
 
 ## Where things live
@@ -174,19 +174,27 @@ by reading the catalogue, and the other two only by opening the screen against a
 running stack. **When a screen compares against a name the backend produced,
 check the enum, and open the page.**
 
-**Screens with no endpoint are disabled and say why.** The forgot-password
-link is still one of those — present because it is in the signed-off
-wireframe, explaining the feature is not available yet, and calling nothing.
-The OTP tab was the other one, until `RequestLoginOtpCommand` and
-`LoginWithOtpCommand` landed: a member picks a Samaaj-wide login identifier,
-gets a real 6-digit code delivered through the same notification pipeline the
-welcome message already uses, and the code signs them in exactly like a
-password would - same `LoginResponse`, same lockout, same one indistinguishable
-`Auth.InvalidCredentials` for a wrong code or an unknown account. Successfully
-using a code also verifies the contact address it was sent to, which is the
-same assurance redeeming an activation code already gives, applied to an
-address nobody handed the member out of band. When the next backend lands,
-wire it; do not fake it sooner.
+**Screens with no endpoint are disabled and say why — until the endpoint
+lands, and then they are wired, not faked a moment sooner.** The OTP tab was
+the first of the login screen's two stubs to close: `RequestLoginOtpCommand`
+and `LoginWithOtpCommand` landed, and a member picks a Samaaj-wide login
+identifier, gets a real 6-digit code delivered through the same notification
+pipeline the welcome message already uses, and the code signs them in
+exactly like a password would - same `LoginResponse`, same lockout, same one
+indistinguishable `Auth.InvalidCredentials` for a wrong code or an unknown
+account. Successfully using a code also verifies the contact address it was
+sent to, the same assurance redeeming an activation code already gives.
+
+**Forgot password is the second, and redeems into a new password rather than
+a session.** `/forgot` (the wireframe's `#forgot`) asks for an identifier and
+answers identically whether or not it belongs to a real account, the same
+anti-enumeration rule the OTP-request endpoint follows; `/reset` (`#otp`,
+reused for a different purpose than the login screen's OTP tab - this one
+sets a password, that one signs in) takes the code and the new password. No
+token comes back from redeeming - proving you hold a contact address a code
+was sent to is weaker than a real password, the same reasoning `/activate`
+already follows for a converted child's first sign-in - so both hand back to
+`/login` with a notice rather than skipping it.
 
 **The wireframe's OTP field has no explicit "Send" control, only "Resend
 OTP" - which reads as the code going out the moment the tab opens.** A real

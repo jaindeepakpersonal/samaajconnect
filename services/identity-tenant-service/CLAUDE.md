@@ -52,6 +52,8 @@ since those happen *before* a tenant is established.
 | `RemoveTenantLogoCommand` | `SuperAdmin`, `SamaajAdmin` + `Tenant.Manage` | built |
 | `SetRolePermissionCommand` | `Roles.Manage` | built |
 | `ChangePasswordCommand` | any authenticated role, self only | built |
+| `RequestPasswordResetCommand` | anonymous | built |
+| `RedeemPasswordResetCommand` | anonymous | built |
 
 A new Samaaj is created **Inactive**. Creating the record and letting it serve
 traffic are two separately audited decisions, so activation is its own command.
@@ -96,6 +98,8 @@ tenant is reported as 404 rather than as a distinct state, for the same reason.
 | `SessionRevokedDomainEvent` | `identity.session.revoked.v1` | `User.RecordSessionRevoked` |
 | `PasswordChangedDomainEvent` | `identity.user.password-changed.v1` | `User.ChangePassword` |
 | `LoginOtpRequestedDomainEvent` | `identity.login-otp.requested.v1` | `User.RequestLoginOtp` |
+| `PasswordResetRequestedDomainEvent` | `identity.password-reset.requested.v1` | `User.RequestPasswordReset` |
+| `PasswordResetDomainEvent` | `identity.password-reset.completed.v1` | `User.ResetPassword` |
 | (no aggregate) | `identity.member-data.exported.v1` | `DataExportRecorder` |
 
 Delivery is at-least-once by design (see `Messaging/OutboxDispatcher.cs`).
@@ -131,6 +135,8 @@ offsets for messages it did nothing with.
 | POST | `/v1/identity/logout` | anonymous |
 | GET | `/v1/identity/me` | any authenticated role |
 | POST | `/v1/identity/me/password` | any authenticated role |
+| POST | `/v1/identity/password-reset/request` | anonymous |
+| POST | `/v1/identity/password-reset/redeem` | anonymous |
 | GET | `/v1/identity/activations/pending` | `SamaajAdmin` + `AdminUsers.Manage` |
 | POST | `/v1/identity/activations/{userId}/code` | `SamaajAdmin` + `AdminUsers.Manage` |
 | POST | `/v1/identity/activations/redeem` | anonymous |
@@ -271,6 +277,27 @@ route the code has to the member at all. Accepted for the same reason the
 rest of this service's inter-service traffic is: every consumer is inside the
 same trust boundary, and a real provider replacing `LoggingNotificationChannel`
 does not change what travels through Kafka to get there.
+`PasswordResetRequestedDomainEvent` (the wireframe's separate `#forgot`/`#otp`
+reset flow) carries a code the same way, for the same reason.
+
+**Forgot password redeems into a new password, not a session - no token in
+the response.** `RedeemPasswordResetCommand` mirrors
+`ActivateAccountCommand`'s own choice: proving you hold a contact address a
+code was sent to is weaker proof than a real password, so the next step is
+signing in normally, not skipping it. It also needs no `ITenantRepository` at
+all, unlike `LoginWithOtpCommand` - it is not issuing a session, only
+checking a code exists and matches, so there is no Samaaj to be a member of
+yet to check.
+
+**`ResetPassword` and `ChangePassword` are two events, not one with a
+flag.** Both replace `PasswordHash`; the difference is what proved the
+request was legitimate - a password the member already knew, or a code sent
+to an address they hold. The audit trail should be able to tell "the member
+changed their own password" from "someone completed a forgot-password flow"
+without inferring it from which endpoint happened to be hit, which is
+exactly the kind of question `UserActivatedFromChildDomainEvent` existing
+separately from `UserRegisteredDomainEvent` already answers for a different
+pair of near-identical facts.
 
 **A converted child's account is created without a password.** Approving a
 conversion establishes that this person is *entitled* to an account; nobody has

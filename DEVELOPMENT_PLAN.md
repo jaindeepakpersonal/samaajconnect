@@ -8,7 +8,28 @@ version of the plan; the reasoning behind the ordering lives in
 ## Current Status
 
 - **Stage:** every module has a service and member screens; Phase 5 hardening under way
-- **Last updated:** 2026-09-05 - **the member-portal login screen's OTP tab
+- **Last updated:** 2026-09-05 - **forgot password, the login screen's second
+  and last stub, closed the same day as the first (OTP sign-in, previous
+  entry) - the member-portal login screen has no unfinished pieces left.**
+
+  `RequestPasswordResetCommand`/`RedeemPasswordResetCommand` are
+  `RequestLoginOtpCommand`/`LoginWithOtpCommand` with one difference at the
+  end: redeeming sets a new password and ends every session
+  (`SessionEndReason.PasswordChanged`, reused rather than adding a fourth
+  event for the same underlying fact) instead of issuing one, and returns no
+  token - the same choice `ActivateAccountCommand` already makes, since
+  holding a contact address a code was sent to is weaker proof than a real
+  password. Two new member-portal screens, `/forgot` and `/reset`, complete
+  the wireframe's separate `#forgot`/`#otp` flow the OTP tab does not touch.
+
+  Verified with 247+196 identity-tenant-service tests (16 new), 46 gateway
+  tests, `scripts/audit-descriptor-coverage.sh` (54 topics, two new),
+  `scripts/service-docs.sh`, full production builds, 363 member-portal tests
+  (14 new), `scripts/css-class-coverage.sh`, and a live walkthrough:
+  requested a reset for a real account, read the code from the database, set
+  a new password through the actual UI, and confirmed the old password fails
+  while the new one works.
+- **Previously:** 2026-09-05 - **the member-portal login screen's OTP tab
   was disabled outright; it signs members in for real now, the first slice
   of finishing the login page (forgot password is the second, tracked
   separately below).**

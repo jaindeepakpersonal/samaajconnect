@@ -160,6 +160,59 @@ public static class KnownEvents
         // (SessionEndReason.PasswordChanged), but the one that made the
         // request is still live for its own token's remaining life, and would
         // otherwise have no way to learn anything happened at all.
+        // The other half of the same shape as identity.login-otp.requested.v1
+        // - a plaintext secret in the Notification body, Destination always
+        // set, because there is no admin standing between minting this code
+        // and delivering it either.
+        ["identity.password-reset.requested.v1"] = new(
+            Action: "PasswordResetRequested",
+            EntityName: "User",
+            EntityIdProperty: "userId",
+            ActorIdProperty: "userId",
+            Notification: payload =>
+            {
+                if (!payload.TryGetProperty("userId", out var userId)
+                    || !userId.TryGetGuid(out var recipientId)
+                    || !payload.TryGetProperty("code", out var code))
+                {
+                    return null;
+                }
+
+                return new NotificationSpec(
+                    recipientId,
+                    "Reset your password",
+                    $"Your password reset code is {code.GetString()}. It expires in 10 minutes.",
+                    Destination: payload.TryGetProperty("mobileOrEmail", out var contact)
+                        ? contact.GetString()
+                        : null);
+            }),
+
+        // Distinct from identity.user.password-changed.v1 - that one is an
+        // authenticated member changing a password they already know; this
+        // one is an anonymous code redeemed instead. In-app only: the member
+        // is not signed in wherever this notification appears, but they are
+        // signed in wherever they still hold a session that has not yet been
+        // revoked, which is exactly who should see it.
+        ["identity.password-reset.completed.v1"] = new(
+            Action: "PasswordReset",
+            EntityName: "User",
+            EntityIdProperty: "userId",
+            ActorIdProperty: "userId",
+            Notification: payload =>
+            {
+                if (!payload.TryGetProperty("userId", out var userId)
+                    || !userId.TryGetGuid(out var recipientId))
+                {
+                    return null;
+                }
+
+                return new NotificationSpec(
+                    recipientId,
+                    "Your password was reset",
+                    "Your password was reset just now. If this wasn't you, contact your "
+                    + "Samaaj administrator.");
+            }),
+
         ["identity.user.password-changed.v1"] = new(
             Action: "PasswordChanged",
             EntityName: "User",

@@ -62,6 +62,9 @@ public sealed class User : AggregateRoot, ITenantScopedEntity
     /// <summary>Present only while a requested sign-in code has not yet been used or expired.</summary>
     public LoginOtp? LoginOtp { get; private set; }
 
+    /// <summary>Present only while a requested password reset code has not yet been used or expired.</summary>
+    public PasswordResetCode? PasswordResetCode { get; private set; }
+
     public DateTimeOffset? LastLoginAt { get; private set; }
     public int FailedLoginAttempts { get; private set; }
     public DateTimeOffset? LockedOutUntil { get; private set; }
@@ -285,6 +288,39 @@ public sealed class User : AggregateRoot, ITenantScopedEntity
         PasswordHash = newPasswordHash;
 
         Raise(new PasswordChangedDomainEvent(Id, TenantId, now));
+    }
+
+    /// <summary>
+    /// Attaches a freshly issued password reset code, replacing any earlier
+    /// one, and announces it - the same shape as
+    /// <see cref="RequestLoginOtp"/>, for the same reason: the notification
+    /// pipeline is the only route this code has to whoever asked for it.
+    /// </summary>
+    public void RequestPasswordReset(PasswordResetCode code, string plaintext, DateTimeOffset now)
+    {
+        PasswordResetCode = code;
+
+        Raise(new PasswordResetRequestedDomainEvent(Id, TenantId, plaintext, MobileOrEmail, now));
+    }
+
+    /// <summary>
+    /// Redeems a password reset code: sets a new password and spends the code.
+    /// </summary>
+    /// <remarks>
+    /// A distinct event from <see cref="ChangePassword"/>'s, because this is
+    /// not the member proving who they are with a password they already
+    /// know - it is proof of the weaker kind, holding the contact address a
+    /// code was sent to - and the audit trail should be able to tell the two
+    /// apart.
+    /// </remarks>
+    public void ResetPassword(string newPasswordHash, DateTimeOffset now)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(newPasswordHash);
+
+        PasswordHash = newPasswordHash;
+        PasswordResetCode = null;
+
+        Raise(new PasswordResetDomainEvent(Id, TenantId, now));
     }
 
     /// <summary>

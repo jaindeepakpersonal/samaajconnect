@@ -115,6 +115,27 @@ export class AuthService {
   }
 
   /**
+   * Asks for a password reset code. Answers the same way whether or not the
+   * identifier belongs to a real, active account.
+   */
+  requestPasswordReset(mobileOrEmail: string): Observable<void> {
+    return this.http.post<void>('/v1/identity/password-reset/request', { mobileOrEmail });
+  }
+
+  /**
+   * Redeems a password reset code and sets a new password. No token: proving
+   * contact-address access is weaker than a real password, so the next step
+   * is signing in normally.
+   */
+  redeemPasswordReset(mobileOrEmail: string, code: string, newPassword: string): Observable<void> {
+    return this.http.post<void>('/v1/identity/password-reset/redeem', {
+      mobileOrEmail,
+      code,
+      newPassword,
+    });
+  }
+
+  /**
    * Sets a new password, given the current one. Ends every other session for
    * the account - the whole point of changing a password is worth nothing if
    * a stolen refresh token is left able to renew forever.
