@@ -511,6 +511,7 @@ probe "members   read A's member"        GET  "/v1/members/$A_MEMBER_ID"        
 # endpoint quietly stopped being probed. `refuses` now says STALE rather than
 # FAIL for a 400, so the next time it is obvious what happened.
 probe "members   correct A's member"     PATCH "/v1/members/$A_MEMBER_ID"            "$B_TOKEN" "" '{"fullName":"probe","privacy":{"mobile":"Private","email":"Private","address":"Private","profession":"Private","dateOfBirth":"Private"},"isListedInDirectory":true}'
+probe "children  withdraw A's child's consent" DELETE "/v1/children/$CHILD_ID/parental-consent" "$B_TOKEN"
 
 echo
 echo "== Samaaj B's ADMINISTRATOR attempts to act on Samaaj A's entities =="
@@ -521,6 +522,7 @@ probe "issues    approve A's issue"       POST "/v1/social-issues/$ISSUE_ID/stat
 probe "groups    change A's group status" PATCH "/v1/volunteer-groups/groups/$GROUP_ID/status" "$SUPER" "$B_ID" '{"status":"Inactive"}'
 probe "groups    hand A's group over"     PATCH "/v1/volunteer-groups/groups/$GROUP_ID/president" "$SUPER" "$B_ID" "{\"newPresidentMemberId\":\"$A_MEMBER_ID\"}"
 probe "identity  suspend A's admin"       PUT  "/v1/identity/admins/$A_MEMBER_ID/status" "$SUPER" "$B_ID" "{\"suspended\":true,\"password\":\"$SUPERADMIN_PASSWORD\"}"
+probe "members   correct A's member's details" PATCH "/v1/members/$A_MEMBER_ID/details" "$SUPER" "$B_ID" '{"fullName":"probe"}'
 probe "events    publish A's event"       POST "/v1/events/$EVENT_ID/publish"         "$SUPER" "$B_ID" '{}'
 probe "events    cancel A's event"        POST "/v1/events/$EVENT_ID/cancel"          "$SUPER" "$B_ID" '{"reason":"probe"}'
 probe "voting    move A's campaign"       POST "/v1/celebrity-voting/campaigns/$CAMPAIGN_ID/status" "$SUPER" "$B_ID" '{"status":"NominationsOpen"}'

@@ -8,7 +8,28 @@ version of the plan; the reasoning behind the ordering lives in
 ## Current Status
 
 - **Stage:** every module has a service and member screens; Phase 5 hardening under way
-- **Last updated:** 2026-09-05 - **three endpoints this session built or
+- **Last updated:** 2026-09-05 - **two more endpoints joined the probe's
+  coverage, both pre-dating this session, closing the non-photo half of what
+  the last cycle left open.**
+
+  `DELETE /children/{id}/parental-consent` (a member acting on their own
+  child, the DPDP-critical withdrawal cycle 86 also gave an audit
+  descriptor) and `PATCH /members/{id}/details` (a Samaaj administrator
+  correcting somebody's profile) were both in the last cycle's list of
+  eleven left unprobed. Both answer 404 to a cross-tenant attempt, confirmed
+  live.
+
+  What is left - photo and logo reads and writes, nine endpoints - is a
+  different shape of gap and left alone rather than forced in: their read
+  side (`GetMemberPhotoQuery`, `GetChildPhotoQuery`) answers `NotFound` for
+  "wrong tenant" and for "no photo uploaded yet" through the exact same code
+  path, so probing an id with no photo would pass with a 404 that proves
+  nothing - the same false-pass shape this script's own `control()` step
+  exists to catch on the read side generally. Making the probe meaningful
+  needs a real photo uploaded to Samaaj A's fixture first, which is
+  multipart plumbing this cycle did not add.
+
+- **Previously:** 2026-09-05 - **three endpoints this session built or
   wired up had never once been asked "can Samaaj B reach Samaaj A through
   you?" - the platform's own cross-tenant IDOR probe does not know about a
   route until somebody adds it, and nobody had.**
