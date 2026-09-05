@@ -76,6 +76,22 @@ describe('TenantListComponent deactivation', () => {
     expect(text).toContain('signs out every one of its members');
   });
 
+  it('announces that warning to a screen reader rather than only showing it', () => {
+    // The panel appears after a click with nothing else on the page changing
+    // focus, so a screen reader user hears nothing unless the warning is a
+    // live region - the same WCAG 4.1.3 concern already fixed for the Boli,
+    // campaign and Pathshala confirmations, missed here because this panel is
+    // the "asks first" shape rather than the "replaces its trigger" one.
+    component.askToConfirm(tenant());
+    fixture.detectChanges();
+
+    const warning = (fixture.nativeElement as HTMLElement).querySelector(
+      'form.confirm p[role="status"]',
+    );
+
+    expect(warning?.textContent).toContain('signs out every one of its members');
+  });
+
   it('sends the password with the status change', () => {
     component.askToConfirm(tenant());
     component.password = 'correct-horse';

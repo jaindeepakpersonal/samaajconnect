@@ -522,6 +522,20 @@ got this right by accident and is now explicit about it.
 seen and not heard otherwise, and what appears here is the warning that the
 action cannot be undone (WCAG 4.1.3).
 
+**A third shape of confirmation had the same gap and was missed on both
+passes, because it gets the *other* rule right.** Tenant deactivation's
+"asks first" panel — and Admin Users & Roles' account-suspension panel,
+copied from it on 2026-09-05 — keeps its trigger in the DOM with
+`aria-expanded`, so neither was caught by the "replaces its own trigger"
+finding above. But the warning paragraph inside (`Deactivating {Samaaj}
+signs out every one of its members…` / `Suspending {name} signs them out
+immediately…`) had no `role="status"` either, so a screen reader user still
+heard nothing when it appeared — the identical WCAG 4.1.3 gap, on a
+differently-shaped panel the first two passes had no reason to re-check.
+Fixed on the warning paragraph itself rather than the surrounding `<form>`,
+so the form keeps its own landmark role rather than trading it for a status
+region.
+
 **Every table has a `<caption class="sr-only">`.** There are 23 of them and none
 had an accessible name; five screens draw three apiece, so a screen reader user
 listing the tables on the class screen got "table, table, table". The caption is

@@ -187,7 +187,7 @@ import { ModuleDescriptor, Tenant, TenantStatus } from '../../core/admin.models'
 
                   @if (confirming() === tenant.id) {
                     <form class="confirm" (ngSubmit)="confirmDeactivate(tenant)">
-                      <p class="small">
+                      <p class="small" role="status">
                         Deactivating {{ tenant.name }} signs out every one of its members and
                         stops the whole Samaaj serving. Enter your own password to confirm.
                       </p>

@@ -8,7 +8,41 @@ version of the plan; the reasoning behind the ordering lives in
 ## Current Status
 
 - **Stage:** every module has a service and member screens; Phase 5 hardening under way
-- **Last updated:** 2026-09-05 - **the cross-tenant probe now covers every
+- **Last updated:** 2026-09-05 - **a screen reader heard nothing when a
+  password-confirmation panel appeared warning that the action about to
+  happen could not be undone - on the one shape of confirmation panel two
+  prior accessibility passes had no reason to re-check.**
+
+  The 2026-09-02 audit fixed three panels that made the opposite mistake -
+  replacing their own trigger and dropping keyboard focus to the page body -
+  and gave each a `role="status"` warning as part of the same fix. Tenant
+  deactivation's "asks first" panel was never one of the three: it already
+  kept its trigger in the DOM correctly, so neither audit had a reason to
+  open it. But the warning text inside it had no `role="status"` either, so
+  the exact same "seen and not heard" gap (WCAG 4.1.3) existed there too,
+  undiscovered because it lives on a differently-shaped panel. This
+  session's own account-suspension panel (cycle 83) copied the pattern
+  faithfully, including the gap.
+
+  Found by testing the live suspend panel's DOM directly rather than by
+  rereading the source - `document.activeElement` after activating it
+  showed the trigger correctly kept focus, but the panel it revealed carried
+  no `role` and no `aria-live` at all.
+
+  Fixed on the warning paragraph itself in both panels, not the surrounding
+  `<form>` - a `<form>` given `role="status"` would trade away its own
+  landmark role for a status region, where the established `<div
+  role="status">` panels elsewhere never had a landmark role to lose in the
+  first place.
+
+  Verified by fault injection (the attribute removed from tenant
+  deactivation's panel, confirmed the new test fails, restored) and live
+  against the running stack: both panels now expose the warning as a
+  `role="status"` element, checked via direct DOM inspection after rebuilding
+  admin-portal.
+
+  198 admin-portal tests green, up 2.
+- **Previously:** 2026-09-05 - **the cross-tenant probe now covers every
   id-taking endpoint on the platform - the photo and logo uploads included -
   and finding out how needed a real photo, not just a fixture id.**
 

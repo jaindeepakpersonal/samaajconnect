@@ -153,7 +153,7 @@ import { ActivationCode, AdminUser, Role } from '../../core/admin.models';
 
                   @if (confirming() === admin.userId) {
                     <form class="confirm" (ngSubmit)="confirmSuspend(admin)">
-                      <p class="small">
+                      <p class="small" role="status">
                         Suspending {{ admin.fullName }} signs them out immediately and blocks
                         sign-in until reinstated. Enter your own password to confirm.
                       </p>

@@ -100,6 +100,23 @@ describe('AdminListComponent suspending an account', () => {
     http.expectNone('/v1/identity/admins/u1/status');
   });
 
+  it('announces that warning to a screen reader rather than only showing it', () => {
+    // The same WCAG 4.1.3 gap as tenant deactivation's own confirm panel,
+    // which this screen's panel was copied from: nothing else on the page
+    // moves focus when this appears, so a screen reader user hears nothing
+    // unless the warning is a live region.
+    start([ACTIVE]);
+
+    component.askToConfirm(component.admins()[0]);
+    fixture.detectChanges();
+
+    const warning = (fixture.nativeElement as HTMLElement).querySelector(
+      'form.confirm p[role="status"]',
+    );
+
+    expect(warning?.textContent).toContain('signs them out immediately');
+  });
+
   it('suspends with the password once confirmed', () => {
     start([ACTIVE]);
 
