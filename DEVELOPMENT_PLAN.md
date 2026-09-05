@@ -8,7 +8,30 @@ version of the plan; the reasoning behind the ordering lives in
 ## Current Status
 
 - **Stage:** every module has a service and member screens; Phase 5 hardening under way
-- **Last updated:** 2026-09-05 - **the audit-descriptor sweep finished: every
+- **Last updated:** 2026-09-05 - **the audit-descriptor gap the last six
+  cycles kept finding by hand now fails CI on the day it happens again.**
+
+  Root `CLAUDE.md` §9's own lesson, applied to a ninth check: "a hand-written
+  list of the ten services is a list something will fall off... every such
+  list should be derived from the directories, or checked against them." The
+  same is true of `KnownEvents.cs` against every service's own `Domain`
+  folder - the last six cycles found the gap five times by rereading both
+  sides against each other, which is exactly the manual re-derivation §9
+  warns does not scale.
+
+  `scripts/audit-descriptor-coverage.sh` reads every `Topic => "..."` string
+  across all ten services and every dictionary key in `KnownEvents.cs`, and
+  fails on any topic missing from the second list - unlike the "declared and
+  never constructed" sweep two of those cycles left as a manual read, this
+  one has no false-positive rate: every topic can trivially get an entity id,
+  so there is no legitimate reason for one to fall through to the derived
+  default forever. Verified by fault injection - one descriptor removed,
+  confirmed the check fails naming exactly that topic, restored, confirmed
+  clean. Wired into the `conventions` CI job alongside the other nine.
+
+  No runtime change this cycle - `KnownEvents.cs` ends exactly where cycle 88
+  left it, so no rebuild or smoke run was needed.
+- **Previously:** 2026-09-05 - **the audit-descriptor sweep finished: every
   topic on the platform now has a considered entry, not just the ones with a
   story.**
 

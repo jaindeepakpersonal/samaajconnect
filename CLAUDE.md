@@ -158,6 +158,20 @@ verbatim from any existing service. (`docs/product/ARCHITECTURE.md`
 §4 has the full rationale for why this repo doesn't use MassTransit
 despite an earlier requirements draft naming it.)
 
+**A new domain event needs an entry in
+`audit-notification-service/.../KnownEvents.cs`, not just a `Topic`
+string.** Every event reaches the audit trail either way — an
+undescribed topic still gets a row, with an action and entity name
+derived from the topic string — but the derived default's
+`EntityIdProperty` is `null`, explicitly, so that row carries no entity
+id and no actor. Five cycles running found the same shape of gap behind
+that line: a domain event whose own doc comment promised the audit
+trail would answer "who did this?", silently unkept because nothing
+fails when a descriptor is missing. **`scripts/audit-descriptor-coverage.sh`
+checks that every topic has one, and CI runs it** — every one of the
+platform's 50 topics does as of 2026-09-05, and this is what keeps a new
+one from quietly joining the derived default instead.
+
 ## 6. Multi-tenancy (global query filter)
 
 Every tenant-owned entity implements `ITenantScopedEntity { Guid
@@ -305,6 +319,7 @@ Neither uses `*service-defaults` — they need no database and no broker.
 | Whether any service is quietly left out | `scripts/service-coverage.sh` |
 | Whether a service documents everything it can be asked to do | `scripts/service-docs.sh` |
 | Whether the module keys still agree in all three places | `scripts/module-keys.sh` |
+| Which domain events fall through to audit-notification-service's derived default | `scripts/audit-descriptor-coverage.sh` |
 | Scaffold a new bounded-context service | `.claude/skills/new-microservice/SKILL.md` |
 | Add a command/query to an existing service | `.claude/skills/add-service-feature/SKILL.md` |
 | Turn a wireframe screen into a real component | `.claude/skills/wireframe-to-angular/SKILL.md` |

@@ -122,7 +122,7 @@ jobs:
     name: Cross-service conventions
     runs-on: ubuntu-latest
 
-    # Rules the repository states in prose and no compiler enforces. All nine
+    # Rules the repository states in prose and no compiler enforces. All ten
     # of these read source rather than running anything, so they are seconds.
     steps:
       - uses: actions/checkout@v4
@@ -206,6 +206,18 @@ jobs:
       # not failed: a method could be reached by a name grep cannot follow.
       - name: API-client methods no screen calls
         run: bash scripts/uncalled-api-methods.sh
+
+      # KnownEvents.Describe's fallback for an undescribed topic is
+      # EntityIdProperty: null, explicitly - not a best-effort guess. Five
+      # cycles running found the same gap behind that line: a domain event
+      # whose own doc comment promised the audit trail would answer "who did
+      # this?", silently unkept because an audit row is written either way and
+      # nothing fails. Every one of the platform's 50 topics has a considered
+      # descriptor as of 2026-09-05; this fails the day a new one ships
+      # without joining them, rather than being found by rereading
+      # KnownEvents.cs against ten services' Domain folders by hand.
+      - name: Every domain event has an audit descriptor
+        run: bash scripts/audit-descriptor-coverage.sh
 
   migrations:
     name: EF migrations are up to date

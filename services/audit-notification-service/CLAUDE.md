@@ -217,6 +217,16 @@ Every topic on the platform now has a considered descriptor. `GET
 /v1/audit/logs` can be searched by entity for all of them, and an actor is
 named everywhere one exists to name.
 
+**`scripts/audit-descriptor-coverage.sh` holds that, and CI runs it.** Unlike
+the "declared and never constructed" sweep that found the session-revocation
+gap two entries above — deliberately left a one-off manual read, because a
+domain event with few call sites looks identical to one nobody ever raises —
+"does this topic have a `KnownEvents` entry" has no false-positive rate at
+all: every topic can trivially get an entity id, so there is no legitimate
+case for the derived default to be the last word. It reads every `Topic =>`
+string across every service's Domain folder and every dictionary key here,
+and fails whichever side gains one the other lacks.
+
 ## API endpoints
 
 | Method | Path | Roles |
