@@ -129,7 +129,7 @@ public sealed class LoginCommandHandlerTests
     [Fact]
     public async Task A_suspended_account_cannot_log_in_even_with_the_right_password()
     {
-        _user.Suspend();
+        _user.Suspend(Guid.NewGuid(), DateTimeOffset.UtcNow);
 
         var result = await Login();
 

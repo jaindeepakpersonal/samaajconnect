@@ -8,7 +8,58 @@ version of the plan; the reasoning behind the ordering lives in
 ## Current Status
 
 - **Stage:** every module has a service and member screens; Phase 5 hardening under way
-- **Last updated:** 2026-09-05 - **the closest thing this platform has to an
+- **Last updated:** 2026-09-05 - **a capability fully built, fully tested, and
+  unreachable, on the same day this file learned to say so about the last
+  one.**
+
+  `UserStatus.Suspended` has existed since the first migration.
+  `LoginCommandHandler` has always refused a suspended account. `SessionService
+  .ContinueAsync` has always re-read status on every refresh and force-revoked
+  the whole chain the moment it found anything but `Active` - which is what
+  makes suspending someone bite within one access token's lifetime rather than
+  at their next sign-in, exactly as `SECURITY-CHECKLIST.md` and this service's
+  own `CLAUDE.md` already claimed, in the same sentence as two things that
+  really were reachable. **`User.Suspend()` was called from nowhere but a unit
+  test's own setup, and `Reinstate()` from nowhere at all.** A Samaaj
+  administrator had no way to act on a problem account short of asking the
+  platform operator to archive the whole Samaaj.
+
+  Found the way cycle 79 found the last one - grepping every service for a
+  public domain method that changes real state and is never called from an
+  Application-layer handler, the mirror of last cycle's "declared and never
+  constructed" sweep for domain events.
+
+  `SetUserSuspensionCommand` is the door in, and its shape follows two
+  precedents this repo already had rather than inventing a third: one command
+  for both directions, like `AssignRoleCommand`'s own `Granted` boolean, and a
+  step-up required only in the direction that takes something out of service,
+  the exact asymmetry `ChangeTenantStatusCommand` draws between deactivating a
+  Samaaj and reactivating one. Two refusals: an erased account, and the
+  caller's own - suspending yourself ends your own session and, unlike
+  reinstating, cannot be undone by the account it happened to.
+
+  `UserStatusChangedDomainEvent` came with it, named and shaped after
+  `TenantStatusChangedDomainEvent` on purpose - the same kind of fact, one
+  account-wide and one Samaaj-wide. `audit-notification-service`'s
+  `KnownEvents` gained a descriptor pointing `changedByUserId` at the actor
+  rather than the account itself, which the derived default would have left
+  blank for precisely the row that answers "who did this?".
+
+  Verified by four injections: the self-suspend guard removed, the no-op
+  detection removed from `Suspend()`, the step-up check skipped, and the
+  Erased guard skipped. All four failed the tests that should have caught
+  them.
+
+  **And the smoke run reached for the wrong id guard a third time.** A JWT
+  passed to `require_id` - written for GUIDs - aborted the run on its first
+  outing here, exactly as it once did for a family code and another member's
+  sign-in token. `require_nonempty` is the correct helper this time, added
+  rather than hand-rolled again, so the fourth time reaches for it first.
+
+  356 of 356 smoke checks green through the gateway, which is 349 plus exactly
+  the seven added here. 1,737 tests green, up 14 - 5 unit and 8 integration in
+  identity-tenant-service, 1 unit in audit-notification-service.
+- **Previously:** 2026-09-05 - **the closest thing this platform has to an
   intrusion signal, declared, documented, and raised nowhere.**
 
   `SessionRevokedDomainEvent` exists in identity-tenant-service's domain layer

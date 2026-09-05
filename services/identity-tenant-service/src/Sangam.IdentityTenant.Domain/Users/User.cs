@@ -319,7 +319,56 @@ public sealed class User : AggregateRoot, ITenantScopedEntity
     /// deleting the row, so the member's history stays intact and the action
     /// stays reversible.
     /// </summary>
-    public void Suspend() => Status = UserStatus.Suspended;
+    /// <remarks>
+    /// Returns false when already suspended, so a caller can report "nothing to
+    /// do" without an event being published for a non-change - the same rule
+    /// <c>Tenant.ChangeStatus</c> follows. Refusing a second suspension as an
+    /// error would also mean the handler has to check current status itself
+    /// before calling this, which is exactly the kind of state the aggregate
+    /// should be the one holding.
+    /// </remarks>
+    public bool Suspend(Guid suspendedBy, DateTimeOffset now)
+    {
+        if (Status == UserStatus.Suspended)
+        {
+            return false;
+        }
+
+        var previous = Status;
+        Status = UserStatus.Suspended;
+
+        Raise(new UserStatusChangedDomainEvent(
+            Id, TenantId, previous.ToString(), Status.ToString(), suspendedBy, now));
+
+        return true;
+    }
+
+    /// <summary>
+    /// Restores an account from suspension. The counterpart to
+    /// <see cref="Suspend"/>, and the reason that one is reversible at all.
+    /// </summary>
+    /// <remarks>
+    /// Clears any lockout as well as the status: a suspended account gains
+    /// nothing from also coming back locked out until fifteen minutes pass, and
+    /// an administrator choosing to reinstate someone plainly intends them to
+    /// be able to sign in again immediately.
+    /// </remarks>
+    public bool Reinstate(Guid reinstatedBy, DateTimeOffset now)
+    {
+        if (Status != UserStatus.Suspended)
+        {
+            return false;
+        }
+
+        Status = UserStatus.Active;
+        FailedLoginAttempts = 0;
+        LockedOutUntil = null;
+
+        Raise(new UserStatusChangedDomainEvent(
+            Id, TenantId, "Suspended", Status.ToString(), reinstatedBy, now));
+
+        return true;
+    }
 
     /// <summary>
     /// Erases the person from this account, keeping only the shell needed to
@@ -354,13 +403,6 @@ public sealed class User : AggregateRoot, ITenantScopedEntity
         _roles.Clear();
 
         Raise(new UserErasedDomainEvent(Id, TenantId, now));
-    }
-
-    public void Reinstate()
-    {
-        Status = UserStatus.Active;
-        FailedLoginAttempts = 0;
-        LockedOutUntil = null;
     }
 
     public void AssignRole(Guid roleId, Guid? tenantScope, DateTimeOffset now)

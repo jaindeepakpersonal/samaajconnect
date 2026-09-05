@@ -39,6 +39,7 @@ enforced by `TenantAuthorizationBehavior`, not just UI hiding.
 | GET | `/admins` | `SuperAdmin`, `SamaajAdmin` + `AdminUsers.Manage` | This Samaaj's administrators and their roles |
 | POST | `/admins` | `SuperAdmin`, `SamaajAdmin` + `AdminUsers.Manage` | Invite an administrator; returns a one-time activation code |
 | PUT | `/admins/{userId}/roles/{role}` | `SuperAdmin`, `SamaajAdmin` + `AdminUsers.Manage` | Grant or revoke one role, body `{"granted":bool}` |
+| PUT | `/admins/{userId}/status` | `SuperAdmin`, `SamaajAdmin` + `AdminUsers.Manage` | Suspend or reinstate an account, body `{"suspended":bool,"password"?:string}`. `password` is the caller's own and required only to suspend — reinstating needs none, the same asymmetry `/tenants/{id}/status` draws. **409** on suspending yourself, or on either direction against an erased account |
 | POST | `/logout` | Anonymous (the refresh token is the credential) | End this session; `everywhere: true` ends every session for the account |
 | GET | `/me` | Authenticated | Current user + roles + tenant |
 

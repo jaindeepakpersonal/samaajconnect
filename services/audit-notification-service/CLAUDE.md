@@ -89,6 +89,15 @@ row no actor and no entity id - exactly the row an administrator reads to
 answer "who did this?", left blank for precisely the event that matters most.
 The descriptor names the session as the entity and the account as the actor.
 
+**`identity.user.status-changed.v1` followed the day after, for the same
+reason.** Suspending or reinstating an account is done *to* it, by an
+administrator, so the derived default's blank actor would have been wrong in
+the same way it was for the session-revocation event: the row that answers
+"who did this?" is exactly the one this event exists to produce. The payload's
+own field is `changedByUserId` rather than `userId`, to say plainly that it
+names the actor and not the account being acted on, and the descriptor points
+there rather than at the account.
+
 ## API endpoints
 
 | Method | Path | Roles |

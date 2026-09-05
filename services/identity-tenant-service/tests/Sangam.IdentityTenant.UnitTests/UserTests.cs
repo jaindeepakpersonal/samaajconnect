@@ -181,4 +181,102 @@ public sealed class UserTests
         user.DomainEvents.OfType<SessionRevokedDomainEvent>()
             .Single().Reason.Should().Be("EndedByAdministrator");
     }
+
+    // ---- Suspending and reinstating ----------------------------------------
+    //
+    // Suspend() and the old parameterless Reinstate() both worked correctly and
+    // were called from nowhere but a unit test's own setup - the domain layer
+    // was complete and there was no way in. These tests are against the door,
+    // not just the lock: they exercise the versions that raise
+    // UserStatusChangedDomainEvent, which is the half that did not exist until
+    // there was finally a command to call it from.
+
+    [Fact]
+    public void Suspending_changes_the_status_and_raises_the_event()
+    {
+        var user = Register();
+        var admin = Guid.NewGuid();
+
+        var changed = user.Suspend(admin, Now);
+
+        changed.Should().BeTrue();
+        user.Status.Should().Be(UserStatus.Suspended);
+
+        var raised = user.DomainEvents.OfType<UserStatusChangedDomainEvent>().Single();
+        raised.UserId.Should().Be(user.Id);
+        raised.TenantId.Should().Be(TenantId);
+        raised.PreviousStatus.Should().Be("Active");
+        raised.Status.Should().Be("Suspended");
+        raised.ChangedByUserId.Should().Be(admin);
+        raised.OccurredAt.Should().Be(Now);
+    }
+
+    [Fact]
+    public void Suspending_an_already_suspended_account_is_a_no_op()
+    {
+        // The same rule Tenant.ChangeStatus follows: reporting "nothing to do"
+        // rather than raising a second event for a repeated click.
+        var user = Register();
+        user.Suspend(Guid.NewGuid(), Now);
+        user.ClearDomainEvents();
+
+        var changed = user.Suspend(Guid.NewGuid(), Now.AddMinutes(1));
+
+        changed.Should().BeFalse();
+        user.DomainEvents.Should().BeEmpty();
+    }
+
+    [Fact]
+    public void Reinstating_restores_Active_and_raises_the_event()
+    {
+        var user = Register();
+        user.Suspend(Guid.NewGuid(), Now);
+        user.ClearDomainEvents();
+
+        var admin = Guid.NewGuid();
+        var changed = user.Reinstate(admin, Now.AddDays(1));
+
+        changed.Should().BeTrue();
+        user.Status.Should().Be(UserStatus.Active);
+
+        var raised = user.DomainEvents.OfType<UserStatusChangedDomainEvent>().Single();
+        raised.PreviousStatus.Should().Be("Suspended");
+        raised.Status.Should().Be("Active");
+        raised.ChangedByUserId.Should().Be(admin);
+    }
+
+    [Fact]
+    public void Reinstating_also_clears_any_lockout()
+    {
+        // An administrator choosing to reinstate someone plainly intends them
+        // to sign in again immediately, not come back suspended in every way
+        // but name for another fifteen minutes.
+        var user = Register();
+
+        for (var i = 0; i < User.MaxFailedAttempts; i++)
+        {
+            user.RecordFailedLogin(Now);
+        }
+
+        user.LockedOutUntil.Should().NotBeNull();
+
+        user.Suspend(Guid.NewGuid(), Now);
+        user.Reinstate(Guid.NewGuid(), Now);
+
+        user.LockedOutUntil.Should().BeNull();
+        user.FailedLoginAttempts.Should().Be(0);
+    }
+
+    [Fact]
+    public void Reinstating_an_account_that_is_not_suspended_is_a_no_op()
+    {
+        var user = Register();
+        user.ClearDomainEvents();
+
+        var changed = user.Reinstate(Guid.NewGuid(), Now);
+
+        changed.Should().BeFalse();
+        user.Status.Should().Be(UserStatus.Active);
+        user.DomainEvents.Should().BeEmpty();
+    }
 }

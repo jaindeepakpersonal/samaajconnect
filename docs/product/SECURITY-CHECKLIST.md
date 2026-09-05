@@ -267,6 +267,16 @@ is the outer gate and grants nothing on its own.
       the session and the account, rather than the blank the derived default
       would have left.
 
+      **Fixed, 2026-09-05: "suspending an account" two sentences up was not
+      actually reachable.** `UserStatus.Suspended` existed, login refused it,
+      and refreshing force-revoked the session the moment it saw anything but
+      `Active` - so this line was true of the mechanism and false of the
+      platform: `User.Suspend()` was called from nowhere but a unit test's own
+      setup, and `Reinstate()` from nowhere at all. `SetUserSuspensionCommand`
+      is the door in, gated the same way `AssignRoleCommand` is, requiring the
+      caller's own password to suspend and refusing to touch an erased account
+      or the caller's own.
+
       **What remains open, precisely.** An access token cannot be withdrawn —
       that is what makes it stateless, and what lets every service authorize
       without calling identity-tenant-service. So a stolen access token, or one

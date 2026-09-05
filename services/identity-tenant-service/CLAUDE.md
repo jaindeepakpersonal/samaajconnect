@@ -43,6 +43,7 @@ since those happen *before* a tenant is established.
 | `RefreshSessionCommand` | anonymous (the refresh token is the credential) | built |
 | `SignOutCommand` | anonymous (same) | built |
 | `AssignRoleCommand` | `SuperAdmin`, `SamaajAdmin` + `AdminUsers.Manage` | built |
+| `SetUserSuspensionCommand` | `SuperAdmin`, `SamaajAdmin` + `AdminUsers.Manage` | built |
 | `InviteAdminCommand` | `SuperAdmin`, `SamaajAdmin` + `AdminUsers.Manage` | built |
 | `SetTenantModulesCommand` | `SuperAdmin` + `Tenant.Manage` | built |
 | `UploadTenantLogoCommand` | `SuperAdmin`, `SamaajAdmin` + `Tenant.Manage` | built |
@@ -87,6 +88,7 @@ tenant is reported as 404 rather than as a distinct state, for the same reason.
 | `TenantModulesChangedDomainEvent` | `identity.tenant.modules-changed.v1` | `Tenant.SetEnabledModules` |
 | `AdminInvitedDomainEvent` | `identity.admin.invited.v1` | `User.Invite` |
 | `UserRoleGrantedDomainEvent` | `identity.user.role-granted.v1` | `User.GrantRole` |
+| `UserStatusChangedDomainEvent` | `identity.user.status-changed.v1` | `User.Suspend` and `.Reinstate` |
 | `UserRoleRevokedDomainEvent` | `identity.user.role-revoked.v1` | `User.RevokeRole` |
 | `SessionRevokedDomainEvent` | `identity.session.revoked.v1` | `User.RecordSessionRevoked` |
 | (no aggregate) | `identity.member-data.exported.v1` | `DataExportRecorder` |
@@ -131,6 +133,7 @@ offsets for messages it did nothing with.
 | GET | `/v1/identity/admins` | `SuperAdmin`, `SamaajAdmin` + `AdminUsers.Manage` |
 | POST | `/v1/identity/admins` | `SuperAdmin`, `SamaajAdmin` + `AdminUsers.Manage` |
 | PUT | `/v1/identity/admins/{userId}/roles/{role}` | `SuperAdmin`, `SamaajAdmin` + `AdminUsers.Manage` |
+| PUT | `/v1/identity/admins/{userId}/status` | `SuperAdmin`, `SamaajAdmin` + `AdminUsers.Manage` |
 | GET | `/v1/identity/me/data-export` | any authenticated role |
 | POST | `/v1/identity/me/erase` | any authenticated role |
 | PUT | `/v1/identity/tenants/{id}/grievance-contact` | `SuperAdmin`, `SamaajAdmin` + `AdminUsers.Manage` |
@@ -509,6 +512,35 @@ a grant with no account behind it.
 administrator that locks everybody out of the screen they are standing on.
 Another admin can still do it, which makes it take two people rather than one
 mis-click.
+
+**Suspending an account was fully built and unreachable, until 2026-09-05.**
+`UserStatus.Suspended` has existed since the first migration.
+`LoginCommandHandler` has always refused it. `SessionService.ContinueAsync`
+has always re-read status on every refresh and force-revoked the whole chain
+the moment it found anything but `Active` - which is what makes suspending
+someone bite within one access token's lifetime rather than at their next
+sign-in, exactly as this file's own Sessions section and
+`SECURITY-CHECKLIST.md` already claimed. What none of that had was a door in:
+`User.Suspend()` was called from nowhere but a unit test's own setup, and
+`Reinstate()` from nowhere at all. A Samaaj administrator had no way to act on
+a problem account short of asking the platform operator to archive the whole
+Samaaj.
+
+`SetUserSuspensionCommand` is that door, one command for both directions like
+`AssignRoleCommand`'s own `Granted` boolean. Suspending needs the caller's own
+password - the same asymmetry `ChangeTenantStatusCommand` draws between taking
+something out of service and restoring it - and refuses two targets outright:
+an erased account, and the caller's own. Suspending yourself ends your own
+session and, unlike reinstating, cannot be undone by the account it happened
+to; the self-revoke guard above is the same reasoning one level further.
+
+`UserStatusChangedDomainEvent` is new alongside it, named and shaped after
+`TenantStatusChangedDomainEvent` on purpose - the same kind of fact, one
+account-wide and one Samaaj-wide, with no reason for their audit rows to look
+different. `audit-notification-service`'s `KnownEvents` names the *account* as
+the actor's target and the *administrator* as the actor, which the derived
+default would have gotten backwards for the one question an audit row like this
+exists to answer.
 
 **Inviting creates the account and issues the code in one command.** An
 invitation that created the account and then failed to issue a code would leave

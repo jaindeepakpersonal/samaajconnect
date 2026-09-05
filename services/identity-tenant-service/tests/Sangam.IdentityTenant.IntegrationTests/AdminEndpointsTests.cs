@@ -558,4 +558,215 @@ public sealed class AdminEndpointsTests(IdentityTenantApiFactory factory)
 
         return notice.GetProperty("version").GetString()!;
     }
+
+    // ---- Suspending and reinstating an account -----------------------------
+    //
+    // Everything downstream of UserStatus.Suspended already worked and was
+    // tested: LoginCommandHandlerTests covers the refusal to sign in, and
+    // SessionEndpointsTests covers the forced session end at next refresh.
+    // What none of that proved is that anybody could ever *set* the status -
+    // User.Suspend() was called from nowhere but a unit test's own setup, and
+    // Reinstate() from nowhere at all.
+
+    private const string RealPassword = "a-long-enough-password";
+
+    /// <summary>
+    /// A genuine SamaajAdmin account with a known password, for the one check
+    /// here that needs to confirm one - step-up verifies the *caller's* own
+    /// password against a real row, which a synthetic token minted by
+    /// <see cref="SamaajAdmin"/> has nothing behind.
+    /// </summary>
+    private async Task<Guid> RealAdminIdAsync(string identifier = "step-up-admin@example.com")
+    {
+        var invited = await InviteAsync(SamaajAdmin(), identifier);
+        var code = (await invited.Content.ReadFromJsonAsync<JsonElement>())
+            .GetProperty("activationCode").GetString();
+
+        (await factory.CreateClient().PostAsJsonAsync("/v1/identity/activations/redeem", new
+        {
+            mobileOrEmail = identifier,
+            code,
+            password = RealPassword,
+        })).StatusCode.Should().Be(HttpStatusCode.OK);
+
+        return await factory.WithDbContextAsync(db => db.Users
+            .IgnoreQueryFilters().AsNoTracking()
+            .Where(u => u.MobileOrEmail == identifier)
+            .Select(u => u.Id)
+            .SingleAsync());
+    }
+
+    private async Task<Guid> RealMemberIdAsync(string identifier = "member@example.com")
+    {
+        (await factory.CreateClient().PostAsJsonAsync("/v1/identity/register", new
+        {
+            tenantSlug = "mumbai-samaaj",
+            fullName = "A Member",
+            mobileOrEmail = identifier,
+            password = "a-different-long-password",
+            consentedPurposes = new[] { "Membership" },
+            noticeVersion = await NoticeVersionAsync(),
+        })).StatusCode.Should().Be(HttpStatusCode.Created);
+
+        return await factory.WithDbContextAsync(db => db.Users
+            .IgnoreQueryFilters().AsNoTracking()
+            .Where(u => u.MobileOrEmail == identifier)
+            .Select(u => u.Id)
+            .SingleAsync());
+    }
+
+    private static string StatusUrl(Guid userId) => $"/v1/identity/admins/{userId}/status";
+
+    [Fact]
+    public async Task Suspending_needs_the_administrators_own_password()
+    {
+        var adminId = await RealAdminIdAsync();
+        var memberId = await RealMemberIdAsync();
+
+        var refused = await SamaajAdmin(adminId).PutAsJsonAsync(
+            StatusUrl(memberId), new { suspended = true });
+
+        refused.StatusCode.Should().Be(HttpStatusCode.Forbidden);
+
+        var confirmed = await SamaajAdmin(adminId).PutAsJsonAsync(
+            StatusUrl(memberId), new { suspended = true, password = RealPassword });
+
+        confirmed.StatusCode.Should().Be(HttpStatusCode.OK);
+    }
+
+    [Fact]
+    public async Task A_suspended_account_can_no_longer_sign_in()
+    {
+        var adminId = await RealAdminIdAsync();
+        var memberId = await RealMemberIdAsync();
+
+        (await SamaajAdmin(adminId).PutAsJsonAsync(
+                StatusUrl(memberId), new { suspended = true, password = RealPassword }))
+            .StatusCode.Should().Be(HttpStatusCode.OK);
+
+        var login = await factory.CreateClient().PostAsJsonAsync("/v1/identity/login", new
+        {
+            mobileOrEmail = "member@example.com",
+            password = "a-different-long-password",
+        });
+
+        // Not 401: the right password was given, so this is "you are not
+        // allowed in", the same distinct refusal LoginCommandHandlerTests
+        // already covers at the unit level.
+        login.StatusCode.Should().Be(HttpStatusCode.Forbidden);
+    }
+
+    [Fact]
+    public async Task Reinstating_needs_no_password_and_restores_sign_in()
+    {
+        var adminId = await RealAdminIdAsync();
+        var memberId = await RealMemberIdAsync();
+
+        await SamaajAdmin(adminId).PutAsJsonAsync(
+            StatusUrl(memberId), new { suspended = true, password = RealPassword });
+
+        var reinstated = await SamaajAdmin(adminId).PutAsJsonAsync(
+            StatusUrl(memberId), new { suspended = false });
+
+        reinstated.StatusCode.Should().Be(HttpStatusCode.OK);
+
+        var login = await factory.CreateClient().PostAsJsonAsync("/v1/identity/login", new
+        {
+            mobileOrEmail = "member@example.com",
+            password = "a-different-long-password",
+        });
+
+        login.StatusCode.Should().Be(HttpStatusCode.OK);
+    }
+
+    [Fact]
+    public async Task Suspending_twice_reports_that_the_second_time_changed_nothing()
+    {
+        var adminId = await RealAdminIdAsync();
+        var memberId = await RealMemberIdAsync();
+
+        await SamaajAdmin(adminId).PutAsJsonAsync(
+            StatusUrl(memberId), new { suspended = true, password = RealPassword });
+
+        var again = await SamaajAdmin(adminId).PutAsJsonAsync(
+            StatusUrl(memberId), new { suspended = true, password = RealPassword });
+
+        (await again.Content.ReadFromJsonAsync<JsonElement>())
+            .GetProperty("changed").GetBoolean().Should().BeFalse();
+    }
+
+    [Fact]
+    public async Task An_administrator_cannot_suspend_their_own_account()
+    {
+        // Suspending yourself ends your own session, and unlike reinstating it
+        // cannot be undone by the account it happened to.
+        var adminId = await RealAdminIdAsync();
+
+        var response = await SamaajAdmin(adminId).PutAsJsonAsync(
+            StatusUrl(adminId), new { suspended = true, password = RealPassword });
+
+        response.StatusCode.Should().Be(HttpStatusCode.Conflict);
+    }
+
+    [Fact]
+    public async Task An_erased_account_can_be_neither_suspended_nor_reinstated()
+    {
+        var adminId = await RealAdminIdAsync();
+        var memberId = await RealMemberIdAsync();
+
+        await factory.WithDbContextAsync(async db =>
+        {
+            var tracked = await db.Users.IgnoreQueryFilters().SingleAsync(u => u.Id == memberId);
+            tracked.Erase(DateTimeOffset.UtcNow);
+            await db.SaveChangesAsync();
+            return true;
+        });
+
+        var response = await SamaajAdmin(adminId).PutAsJsonAsync(
+            StatusUrl(memberId), new { suspended = true, password = RealPassword });
+
+        response.StatusCode.Should().Be(HttpStatusCode.Conflict);
+    }
+
+    [Fact]
+    public async Task An_account_in_another_Samaaj_cannot_be_suspended()
+    {
+        // The IDOR guard. GetByIdAsync is tenant-filtered, and the handler
+        // re-checks anyway, because this write ends somebody's sessions.
+        var adminId = await RealAdminIdAsync();
+        var other = await factory.SeedActiveTenantAsync("adinath-samaaj");
+
+        var elsewhere = factory.CreateClientAs(
+            Guid.NewGuid(), other.Id, [Roles.SamaajAdmin], [PermissionKeys.AdminUsersManage]);
+
+        await InviteAsync(elsewhere, "neha@example.com", [Roles.ContentModerator]);
+
+        var target = await factory.WithDbContextAsync(db =>
+            db.Users.IgnoreQueryFilters().AsNoTracking()
+                .SingleAsync(u => u.MobileOrEmail == "neha@example.com"));
+
+        var response = await SamaajAdmin(adminId).PutAsJsonAsync(
+            StatusUrl(target.Id), new { suspended = true, password = RealPassword });
+
+        response.StatusCode.Should().Be(HttpStatusCode.NotFound);
+    }
+
+    [Fact]
+    public async Task Suspending_announces_who_changed_whose_status_and_from_what()
+    {
+        var adminId = await RealAdminIdAsync();
+        var memberId = await RealMemberIdAsync();
+
+        await SamaajAdmin(adminId).PutAsJsonAsync(
+            StatusUrl(memberId), new { suspended = true, password = RealPassword });
+
+        var outbox = await factory.WithDbContextAsync(db =>
+            db.OutboxMessages.AsNoTracking()
+                .Where(m => m.Topic == "identity.user.status-changed.v1")
+                .ToListAsync());
+
+        outbox.Should().ContainSingle();
+        outbox[0].Payload.Should().Contain("\"previousStatus\": \"Active\"");
+        outbox[0].Payload.Should().Contain($"\"changedByUserId\": \"{adminId}\"");
+    }
 }

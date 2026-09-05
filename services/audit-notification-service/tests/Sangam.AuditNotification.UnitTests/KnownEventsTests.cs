@@ -92,6 +92,24 @@ public sealed class KnownEventsTests
     }
 
     [Fact]
+    public void A_status_change_names_who_changed_it_not_the_account_itself()
+    {
+        // The account is the entity here, not the actor - unlike
+        // identity.user.logged-in.v1, suspending somebody is done *to* an
+        // account, not something it did to itself. The derived default would
+        // have left the actor blank, and the payload's own field is named
+        // changedByUserId rather than userId for exactly this reason.
+        var descriptor = KnownEvents.Describe("identity.user.status-changed.v1");
+
+        descriptor.Action.Should().Be("UserStatusChanged");
+        descriptor.EntityName.Should().Be("User");
+        descriptor.EntityIdProperty.Should().Be("userId");
+        descriptor.ActorIdProperty.Should().Be("changedByUserId");
+        descriptor.BeforeProperties.Should().BeEquivalentTo(["previousStatus"]);
+        descriptor.Notification.Should().BeNull();
+    }
+
+    [Fact]
     public void A_revoked_session_is_recorded_as_its_own_entity_with_the_account_as_actor()
     {
         // Until this descriptor existed, identity.session.revoked.v1 fell to

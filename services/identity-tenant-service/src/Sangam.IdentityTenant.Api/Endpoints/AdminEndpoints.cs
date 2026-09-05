@@ -4,6 +4,7 @@ using Sangam.IdentityTenant.Application.Authorization.Commands.SetRolePermission
 using Sangam.IdentityTenant.Application.Authorization.Queries.ListRoles;
 using Sangam.IdentityTenant.Application.Users.Commands.AssignRole;
 using Sangam.IdentityTenant.Application.Users.Commands.InviteAdmin;
+using Sangam.IdentityTenant.Application.Users.Commands.SetUserSuspension;
 using Sangam.IdentityTenant.Application.Users.Queries.ListAdminUsers;
 
 namespace Sangam.IdentityTenant.Api.Endpoints;
@@ -110,6 +111,33 @@ public static class AdminEndpoints
             .ProducesProblem(StatusCodes.Status404NotFound)
             .ProducesProblem(StatusCodes.Status409Conflict);
 
+        // Suspends or reinstates an account. Everything downstream of the
+        // status already existed and worked - login refuses a suspended
+        // account, and a refresh re-reads status and force-revokes the whole
+        // session chain the moment it finds anything but Active - so this is
+        // the one missing piece: a way for an administrator to actually set it.
+        group.MapPut("/admins/{userId:guid}/status", async (
+                Guid userId,
+                SetUserSuspensionRequest request,
+                ISender sender,
+                CancellationToken cancellationToken) =>
+            {
+                var result = await sender.Send(
+                    new SetUserSuspensionCommand(userId, request.Suspended, request.Password),
+                    cancellationToken);
+
+                return result.ToApiResult();
+            })
+            .RequireAuthorization()
+            .WithName("SetUserSuspension")
+            .WithSummary("Suspend or reinstate an account in this Samaaj.")
+            .Produces<UserStatusResponse>()
+            .ProducesValidationProblem()
+            .ProducesProblem(StatusCodes.Status401Unauthorized)
+            .ProducesProblem(StatusCodes.Status403Forbidden)
+            .ProducesProblem(StatusCodes.Status404NotFound)
+            .ProducesProblem(StatusCodes.Status409Conflict);
+
         return app;
     }
 
@@ -124,6 +152,8 @@ public static class AdminEndpoints
     /// AssignRoleCommandHandler have to be right.
     /// </summary>
     public sealed record AssignRoleRequest(bool Granted);
+
+    public sealed record SetUserSuspensionRequest(bool Suspended, string? Password = null);
 
     /// <summary>Whether the role should carry this permission in this Samaaj.</summary>
     public sealed record SetRolePermissionRequest(bool Granted);

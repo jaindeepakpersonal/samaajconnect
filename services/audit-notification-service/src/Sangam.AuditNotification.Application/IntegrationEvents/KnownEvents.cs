@@ -67,6 +67,19 @@ public static class KnownEvents
             EntityIdProperty: "tenantId",
             BeforeProperties: ["previousStatus"]),
 
+        // The account-level counterpart, added the same day as the command
+        // that raises it. changedByUserId is the actor rather than userId
+        // itself, unlike identity.user.logged-in.v1 - suspending somebody is
+        // an administrative act done *to* an account, not something the
+        // account did to itself, and the derived default leaves the actor
+        // blank for precisely the event where "who did this?" matters most.
+        ["identity.user.status-changed.v1"] = new(
+            Action: "UserStatusChanged",
+            EntityName: "User",
+            EntityIdProperty: "userId",
+            ActorIdProperty: "changedByUserId",
+            BeforeProperties: ["previousStatus"]),
+
         ["identity.user.registered.v1"] = new(
             Action: "UserRegistered",
             EntityName: "User",

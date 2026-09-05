@@ -108,6 +108,25 @@ require_id() {
   esac
 }
 
+# The same guard for a value that is never a GUID - a JWT, a family code - so
+# there is a correct helper to reach for instead of hand-rolling the emptiness
+# check again. This is the third time the wrong one was reached for first:
+# another member's sign-in token, a family code, and a throwaway account's
+# sign-in token here. `require_id` rejecting anything not shaped like a GUID
+# is exactly right for the other thirty-odd call sites and exactly wrong for
+# these three, and the fix each time was to stop using it rather than to make
+# it looser - a shape check that accepted everything would stop catching the
+# bug it exists for.
+require_nonempty() {
+  local name="$1" value="$2"
+
+  if [ -z "$value" ]; then
+    echo
+    echo "  FAIL  nothing extracted for '$name'."
+    exit 1
+  fi
+}
+
 wait_for_stack() {
   # The services have no healthcheck of their own (the aspnet image ships no
   # curl), so readiness is established here rather than by compose --wait.
@@ -2524,6 +2543,65 @@ check "signing out with an unknown token is not an error" 200 \
 check "a refresh token nobody issued is refused" 401 \
   "$(status -X POST "$GATEWAY/v1/identity/token/refresh" -H 'Content-Type: application/json' \
      -d '{"refreshToken":"not-a-real-token"}')"
+
+# ---- Suspending and reinstating an account -------------------------------------
+#
+# UserStatus.Suspended, the login refusal and the force-revoke-on-refresh above
+# have all existed and been tested for a while. What did not exist until
+# 2026-09-05 was a way for an administrator to actually set the status -
+# User.Suspend() was called from nowhere but a unit test's own setup.
+#
+# $SAMAAJ_ADMIN_TOKEN is a real invited-and-redeemed account with a known
+# password ($MEMBER_PASSWORD), which is what suspending needs to step up with -
+# a synthetic token has no real row behind it to confirm a password against.
+# $INVITED_ID is that same account's own id, reused below for the self-suspend
+# check.
+#
+# A throwaway target, registered here rather than reusing $MEMBER: this one
+# gets suspended, and nothing after this block may still need $MEMBER able to
+# sign in.
+SUSPEND_STAMP="$(date +%s)"
+SUSPEND_EMAIL="suspendable-$SUSPEND_STAMP@example.com"
+
+check "an account to suspend registers" 201 \
+  "$(status -X POST "$GATEWAY/v1/identity/register" -H 'Content-Type: application/json' \
+     -d "{\"tenantSlug\":\"$SLUG\",\"fullName\":\"Suspendable Member\",\"mobileOrEmail\":\"$SUSPEND_EMAIL\",\"password\":\"$MEMBER_PASSWORD\",\"consentedPurposes\":[\"Membership\"],\"noticeVersion\":\"$NOTICE_VERSION\"}")"
+
+SUSPEND_TOKEN=$(curl -s -X POST "$GATEWAY/v1/identity/login" -H 'Content-Type: application/json' \
+  -d "{\"mobileOrEmail\":\"$SUSPEND_EMAIL\",\"password\":\"$MEMBER_PASSWORD\"}" | json_field accessToken)
+require_nonempty suspend_token "$SUSPEND_TOKEN"
+
+SUSPEND_USER_ID=$(curl -s -H "Authorization: Bearer $SUSPEND_TOKEN" "$GATEWAY/v1/identity/me" \
+  | json_field userId)
+require_id suspend_user_id "$SUSPEND_USER_ID"
+
+check "suspending needs the administrator's own password" 403 \
+  "$(status -X PUT "$GATEWAY/v1/identity/admins/$SUSPEND_USER_ID/status" \
+     -H 'Content-Type: application/json' -H "Authorization: Bearer $SAMAAJ_ADMIN_TOKEN" \
+     -d '{"suspended":true}')"
+
+check "and with it, suspending succeeds" 200 \
+  "$(status -X PUT "$GATEWAY/v1/identity/admins/$SUSPEND_USER_ID/status" \
+     -H 'Content-Type: application/json' -H "Authorization: Bearer $SAMAAJ_ADMIN_TOKEN" \
+     -d "{\"suspended\":true,\"password\":\"$MEMBER_PASSWORD\"}")"
+
+check "a suspended account cannot sign in" 403 \
+  "$(status -X POST "$GATEWAY/v1/identity/login" -H 'Content-Type: application/json' \
+     -d "{\"mobileOrEmail\":\"$SUSPEND_EMAIL\",\"password\":\"$MEMBER_PASSWORD\"}")"
+
+check "reinstating needs no password" 200 \
+  "$(status -X PUT "$GATEWAY/v1/identity/admins/$SUSPEND_USER_ID/status" \
+     -H 'Content-Type: application/json' -H "Authorization: Bearer $SAMAAJ_ADMIN_TOKEN" \
+     -d '{"suspended":false}')"
+
+check "and afterwards they can sign in again" 200 \
+  "$(status -X POST "$GATEWAY/v1/identity/login" -H 'Content-Type: application/json' \
+     -d "{\"mobileOrEmail\":\"$SUSPEND_EMAIL\",\"password\":\"$MEMBER_PASSWORD\"}")"
+
+check "an administrator cannot suspend their own account" 409 \
+  "$(status -X PUT "$GATEWAY/v1/identity/admins/$INVITED_ID/status" \
+     -H 'Content-Type: application/json' -H "Authorization: Bearer $SAMAAJ_ADMIN_TOKEN" \
+     -d "{\"suspended\":true,\"password\":\"$MEMBER_PASSWORD\"}")"
 
 echo
 echo "Jain Pathshala: enrolment in two steps, a register, an exam"
