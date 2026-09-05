@@ -8,7 +8,45 @@ version of the plan; the reasoning behind the ordering lives in
 ## Current Status
 
 - **Stage:** every module has a service and member screens; Phase 5 hardening under way
-- **Last updated:** 2026-09-05 - **two more endpoints joined the probe's
+- **Last updated:** 2026-09-05 - **the cross-tenant probe now covers every
+  id-taking endpoint on the platform - the photo and logo uploads included -
+  and finding out how needed a real photo, not just a fixture id.**
+
+  The last cycle left nine photo/logo endpoints unprobed on the reasoning
+  that their read side answers `NotFound` for "wrong tenant" and for "no
+  photo uploaded yet" through the same code path, so a fixture member with no
+  photo would pass with a 404 that proved nothing. The fix is exactly what it
+  sounds like: `tenant-isolation-probe.sh` now uploads a real 1x1 PNG (the
+  smallest bytes `ImageContent.Sniff` accepts as one) to Samaaj A's member,
+  A's child and A's own logo before probing any of them, so a 404 for Samaaj
+  B now means the tenant check worked rather than that there was nothing to
+  find.
+
+  Building the upload meant a second curl helper (`upload`/`probe_upload`),
+  because the existing one's fixed `Content-Type: application/json` header
+  breaks a multipart request outright - and a real portability bug on the
+  way there: this repo is developed from Git Bash on Windows as well as run
+  in Linux CI, and Windows's native `curl.exe` cannot resolve a POSIX
+  `/tmp/...` path in `-F "file=@..."` at all, failing every upload with exit
+  26 before a byte reached the gateway. `cygpath -w`, used only when it
+  exists, is the fix - its absence on Linux is exactly the signal that the
+  original path was already right.
+
+  `GET /identity/tenants/{id}/logo` turned out not to need probing at all:
+  its own doc comment says it is `AllowAnonymous` by design, "the one image
+  outside per-request authorization" that `SECURITY-CHECKLIST.md` already
+  records - so it has no wrong answer to probe for and joined the excluded
+  list instead. The upload and delete sides of the same endpoint have their
+  own, different exclusion: `UploadTenantLogoCommandHandler`'s tenant check
+  is explicitly skipped for anyone holding `SuperAdmin` ("a Super Admin
+  belongs to none and may touch any"), so probing it with a Super-Admin
+  override would have scored correct, by-design behaviour as a leak.
+
+  87 of 87 id-taking endpoints on the platform are now either probed (75) or
+  excluded with a documented reason (12) - the coverage audit's own "what
+  this run did not probe" section reports nothing missing, run twice in a
+  row for idempotency.
+- **Previously:** 2026-09-05 - **two more endpoints joined the probe's
   coverage, both pre-dating this session, closing the non-photo half of what
   the last cycle left open.**
 

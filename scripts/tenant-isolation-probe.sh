@@ -56,6 +56,28 @@ leaked=0
 covered=$(mktemp)
 trap 'rm -f "$covered"' EXIT
 
+# The smallest valid PNG there is: an 8-byte signature is all ImageContent.Sniff
+# checks for that format, and this is a real 1x1 transparent pixel rather than
+# just those eight bytes, so it exercises the same code path a real upload
+# does. Needed to probe the photo/logo endpoints at all - a GET or DELETE
+# against a fixture with no photo answers 404 for "wrong tenant" and for "no
+# photo uploaded yet" through the same code path, which is indistinguishable
+# from a pass and proves nothing.
+PROBE_IMAGE=$(mktemp --suffix=.png)
+trap 'rm -f "$covered" "$PROBE_IMAGE"' EXIT
+base64 -d > "$PROBE_IMAGE" <<'PNG'
+iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII=
+PNG
+
+# curl's -F "file=@path" needs a path in the form the curl *binary* understands
+# - Linux CI's curl and a POSIX /tmp path agree, but this repo is also
+# developed from Git Bash on Windows, where curl.exe is a native Windows
+# binary that cannot resolve /tmp/... at all and fails every upload with
+# "couldn't open file" before a single byte reaches the gateway. cygpath only
+# exists in that second environment, so its absence is exactly the signal that
+# the POSIX path was already right.
+PROBE_IMAGE_PATH=$(cygpath -w "$PROBE_IMAGE" 2>/dev/null || printf '%s' "$PROBE_IMAGE")
+
 json_field() {
   { grep -o "\"$1\":\"[^\"]*\"" || true; } | head -1 | cut -d'"' -f4
 }
@@ -120,6 +142,29 @@ probe() {
     | sed 's/?.*//; s|/[0-9a-fA-F]\{8\}-[0-9a-fA-F-]\{27\}|/{id}|g' >> "$covered"
 
   refuses "$1" "$(call "$2" "$3" "$4" "${5:-}" "${6:-}")"
+}
+
+# call()'s fixed 'Content-Type: application/json' header cannot be reused for
+# a file upload - curl then sends two conflicting Content-Type headers, one of
+# them fixed and wrong, and the multipart boundary never reaches the server -
+# so this is call()'s upload-shaped twin rather than an extra argument to it.
+upload() {
+  # upload <path> <token> [tenant-override] -> status code
+  local path="$1" token="$2" override="${3:-}"
+  local args=(-s -o /dev/null -w '%{http_code}' -X POST "$GATEWAY$path"
+              -H "Authorization: Bearer $token" -F "file=@$PROBE_IMAGE_PATH;type=image/png")
+
+  [ -n "$override" ] && args+=(-H "X-Tenant-Override-Id: $override")
+
+  curl "${args[@]}"
+}
+
+probe_upload() {
+  # probe_upload <label> <path> <token> [tenant-override]
+  printf 'POST %s\n' "$2" \
+    | sed 's/?.*//; s|/[0-9a-fA-F]\{8\}-[0-9a-fA-F-]\{27\}|/{id}|g' >> "$covered"
+
+  refuses "$1" "$(upload "$2" "$3" "${4:-}")"
 }
 
 # The probe's own safety catch, and the reason it is not optional.
@@ -256,6 +301,12 @@ ISSUE_ID=$(curl -s "${AA[@]}" -X POST "$GATEWAY/v1/social-issues" \
 
 A_MEMBER_ID=$(curl -s "${AA[@]}" "$GATEWAY/v1/identity/me" | json_field userId)
 
+# A real photo, not just a fixture id, so the photo endpoints below can be
+# probed meaningfully - see PROBE_IMAGE's own comment for why a fixture with no
+# photo would not do.
+curl -s -o /dev/null -X POST "$GATEWAY/v1/members/$A_MEMBER_ID/photo" \
+  -H "Authorization: Bearer $A_TOKEN" -F "file=@$PROBE_IMAGE_PATH;type=image/png"
+
 # A group name is unique within a Samaaj, so a second run gets 409 rather than
 # an id. Falling back to the list keeps the script re-runnable, which matters:
 # the alternative is an empty id, and an empty id probes a list endpoint.
@@ -369,6 +420,15 @@ CHILD_ID=$(curl -s "${AA[@]}" -X POST "$GATEWAY/v1/children" \
   -d "{\"fullName\":\"Probe Child\",\"dateOfBirth\":\"$(date -u -d '-19 years' +%Y-%m-%d)\",\"gender\":\"Female\",\"photoUrl\":null,\"parentalConsentGiven\":true,\"noticeVersion\":\"$NOTICE\"}" \
   | json_field id)
 
+# A real photo for the child too, and A's own logo - same reason as A's member
+# above. A's own token is the household's parent, since it is the one that
+# just created this child.
+curl -s -o /dev/null -X POST "$GATEWAY/v1/children/$CHILD_ID/photo" \
+  -H "Authorization: Bearer $A_TOKEN" -F "file=@$PROBE_IMAGE_PATH;type=image/png"
+curl -s -o /dev/null -X POST "$GATEWAY/v1/identity/tenants/$A_ID/logo" \
+  -H "Authorization: Bearer $SUPER" -H "X-Tenant-Override-Id: $A_ID" \
+  -F "file=@$PROBE_IMAGE_PATH;type=image/png"
+
 CONVERSION_ID=$(curl -s "${AA[@]}" -X POST "$GATEWAY/v1/children/$CHILD_ID/conversion" \
   -d "{\"mobileOrEmail\":\"probe-child-$(date +%s)@example.com\"}" | json_field id)
 
@@ -472,6 +532,12 @@ control "pathshala class roll" "/v1/pathshala/classes/$CLASS_ID/roll"        "$S
 control "pathshala register"   "/v1/pathshala/classes/$CLASS_ID/register?date=2026-01-01" "$SUPER" "$A_ID"
 control "pathshala class exams" "/v1/pathshala/classes/$CLASS_ID/exams"      "$SUPER" "$A_ID"
 control "members   member"    "/v1/members/$A_MEMBER_ID"                     "$A_TOKEN"
+control "members   member photo" "/v1/members/$A_MEMBER_ID/photo"            "$A_TOKEN"
+control "children  child photo"  "/v1/children/$CHILD_ID/photo"              "$A_TOKEN"
+# Tenant logo is deliberately not controlled or probed below - it is
+# AllowAnonymous by design (its own endpoint's doc comment, and
+# SECURITY-CHECKLIST.md records it as the one image outside per-request
+# authorization), so "can B read A's logo" has no wrong answer to probe for.
 
 echo
 echo "== Samaaj B's MEMBER attempts to act on Samaaj A's entities =="
@@ -512,6 +578,12 @@ probe "members   read A's member"        GET  "/v1/members/$A_MEMBER_ID"        
 # FAIL for a 400, so the next time it is obvious what happened.
 probe "members   correct A's member"     PATCH "/v1/members/$A_MEMBER_ID"            "$B_TOKEN" "" '{"fullName":"probe","privacy":{"mobile":"Private","email":"Private","address":"Private","profession":"Private","dateOfBirth":"Private"},"isListedInDirectory":true}'
 probe "children  withdraw A's child's consent" DELETE "/v1/children/$CHILD_ID/parental-consent" "$B_TOKEN"
+probe        "members   read A's member's photo"    GET    "/v1/members/$A_MEMBER_ID/photo"  "$B_TOKEN"
+probe        "members   remove A's member's photo"  DELETE "/v1/members/$A_MEMBER_ID/photo"  "$B_TOKEN"
+probe_upload "members   replace A's member's photo"        "/v1/members/$A_MEMBER_ID/photo"  "$B_TOKEN"
+probe        "children  read A's child's photo"     GET    "/v1/children/$CHILD_ID/photo"    "$B_TOKEN"
+probe        "children  remove A's child's photo"   DELETE "/v1/children/$CHILD_ID/photo"    "$B_TOKEN"
+probe_upload "children  replace A's child's photo"          "/v1/children/$CHILD_ID/photo"    "$B_TOKEN"
 
 echo
 echo "== Samaaj B's ADMINISTRATOR attempts to act on Samaaj A's entities =="
@@ -616,11 +688,14 @@ PUT /v1/identity/admins/{id}/roles/{id}|platform administration, as above
 PUT /v1/identity/roles/{id}/permissions/{id}|platform administration, as above
 POST /v1/identity/activations/{id}/code|platform administration, as above
 POST /v1/identity/me/consents/{id}/withdraw|acts on the caller's own consent; the id names a purpose, not a Samaaj
+GET /v1/identity/tenants/{id}/logo|AllowAnonymous by design - the one image outside per-request authorization, SECURITY-CHECKLIST.md records it
+POST /v1/identity/tenants/{id}/logo|platform administration: the handler's own check skips the tenant comparison entirely for SuperAdmin ("may touch any"), so a Super-Admin-override probe would report correct behaviour as a leak
+DELETE /v1/identity/tenants/{id}/logo|same SuperAdmin bypass as the upload above
 REASONS
 }
 
 routes=$(mktemp)
-trap 'rm -f "$covered" "$routes"' EXIT
+trap 'rm -f "$covered" "$routes" "$PROBE_IMAGE"' EXIT
 
 for file in "$(dirname "$0")/.."/services/*/src/*/Endpoints/*.cs; do
   [ -e "$file" ] || continue
