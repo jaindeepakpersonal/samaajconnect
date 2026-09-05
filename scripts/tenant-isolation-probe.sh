@@ -519,6 +519,8 @@ echo "   (a Super Admin whose override scopes them to B - the IDOR guard's real 
 probe "timeline  moderate A's post"       POST "/v1/timeline/posts/$POST_ID/moderate" "$SUPER" "$B_ID" '{"decision":"Hide","reason":"probe"}'
 probe "issues    approve A's issue"       POST "/v1/social-issues/$ISSUE_ID/status"   "$SUPER" "$B_ID" '{"status":"UnderReview","reason":null}'
 probe "groups    change A's group status" PATCH "/v1/volunteer-groups/groups/$GROUP_ID/status" "$SUPER" "$B_ID" '{"status":"Inactive"}'
+probe "groups    hand A's group over"     PATCH "/v1/volunteer-groups/groups/$GROUP_ID/president" "$SUPER" "$B_ID" "{\"newPresidentMemberId\":\"$A_MEMBER_ID\"}"
+probe "identity  suspend A's admin"       PUT  "/v1/identity/admins/$A_MEMBER_ID/status" "$SUPER" "$B_ID" "{\"suspended\":true,\"password\":\"$SUPERADMIN_PASSWORD\"}"
 probe "events    publish A's event"       POST "/v1/events/$EVENT_ID/publish"         "$SUPER" "$B_ID" '{}'
 probe "events    cancel A's event"        POST "/v1/events/$EVENT_ID/cancel"          "$SUPER" "$B_ID" '{"reason":"probe"}'
 probe "voting    move A's campaign"       POST "/v1/celebrity-voting/campaigns/$CAMPAIGN_ID/status" "$SUPER" "$B_ID" '{"status":"NominationsOpen"}'
@@ -573,6 +575,7 @@ probe "children  convert A's child"       POST "/v1/children/$CHILD_ID/conversio
 probe "children  decide A's conversion"   POST "/v1/children/conversion-requests/$CONVERSION_ID/decide" "$SUPER" "$B_ID" '{"approve":true,"note":"probe"}'
 probe "groups    decide A's application"  POST "/v1/volunteer-groups/groups/$GROUP_ID/applications/$APPLICATION_ID/decide" "$SUPER" "$B_ID" '{"accept":true,"rolePosition":null}'
 probe "groups    reposition A's member"   PUT  "/v1/volunteer-groups/groups/$GROUP_ID/members/$A_MEMBER_ID/position" "$SUPER" "$B_ID" '{"rolePosition":"probe"}'
+probe "groups    remove A's member"       DELETE "/v1/volunteer-groups/groups/$GROUP_ID/members/$A_MEMBER_ID" "$SUPER" "$B_ID"
 probe "voting    decide A's nomination"   POST "/v1/celebrity-voting/campaigns/$OPEN_CAMPAIGN_ID/candidates/$NOMINATION_ID/decide" "$SUPER" "$B_ID" '{"approve":true}'
 probe "notif     read A's notification"   POST "/v1/notifications/$NOTIFICATION_ID/read" "$SUPER" "$B_ID" '{}'
 

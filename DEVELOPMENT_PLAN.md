@@ -8,7 +8,33 @@ version of the plan; the reasoning behind the ordering lives in
 ## Current Status
 
 - **Stage:** every module has a service and member screens; Phase 5 hardening under way
-- **Last updated:** 2026-09-05 - **the audit-descriptor gap the last six
+- **Last updated:** 2026-09-05 - **three endpoints this session built or
+  wired up had never once been asked "can Samaaj B reach Samaaj A through
+  you?" - the platform's own cross-tenant IDOR probe does not know about a
+  route until somebody adds it, and nobody had.**
+
+  `scripts/tenant-isolation-probe.sh` reports its own coverage on every run -
+  which of the platform's id-taking endpoints it probed and, by name, the
+  ones it did not. Running it found three of "the ones it did not" were
+  endpoints from this very session: `DELETE
+  .../groups/{id}/members/{id}` and `PATCH .../groups/{id}/president`
+  (cycle 81, volunteer-groups-service) and `PUT /identity/admins/{id}/status`
+  (cycle 83, wired up in admin-portal though the backend was cycle 80's). A
+  probe script only knows about a route once somebody adds a line for it -
+  the same hand-written-list shape root `CLAUDE.md` §9 keeps naming, just
+  aimed at security coverage instead of CI coverage this time.
+
+  All three needed no fix: each answers **404** to Samaaj B's Super-Admin
+  override attempting it against Samaaj A's data, confirmed live against the
+  running stack. This cycle only closes the gap between "verified once, by
+  hand, during the cycle that built it" (true for all three, at the time)
+  and "verified every run, by the platform's own standing security drill"
+  (true for none of them until now).
+
+  Eleven endpoints remain unprobed - all photo/logo reads and writes plus
+  `PATCH /members/{id}/details` and `DELETE /children/{id}/parental-consent`
+  - left for a future pass rather than folded into this one.
+- **Previously:** 2026-09-05 - **the audit-descriptor gap the last six
   cycles kept finding by hand now fails CI on the day it happens again.**
 
   Root `CLAUDE.md` §9's own lesson, applied to a ninth check: "a hand-written
