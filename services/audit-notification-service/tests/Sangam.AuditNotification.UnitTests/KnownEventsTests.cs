@@ -366,4 +366,47 @@ public sealed class KnownEventsTests
         descriptor.EntityIdProperty.Should().Be("childProfileId");
         descriptor.ActorIdProperty.Should().Be("withdrawnByMemberId");
     }
+
+    // ---- identity-tenant-service's remaining three ----------------------
+    //
+    // RoleMatrixChangedDomainEvent's own doc comment is the strongest promise
+    // in this whole pass: "the weightiest change an administrator can make on
+    // this platform... it is recorded with who made it and what it was
+    // before." The derived default broke every clause of that sentence.
+
+    [Fact]
+    public void A_role_matrix_change_names_who_made_it_and_what_it_was_before()
+    {
+        var descriptor = KnownEvents.Describe("identity.role-matrix.changed.v1");
+
+        descriptor.Action.Should().Be("RoleMatrixChanged");
+        descriptor.EntityName.Should().Be("Role");
+        descriptor.EntityIdProperty.Should().Be("roleId");
+        descriptor.ActorIdProperty.Should().Be("changedBy");
+        descriptor.BeforeProperties.Should().BeEquivalentTo(["previouslyGranted"]);
+    }
+
+    [Fact]
+    public void A_recorded_consent_is_a_self_action_like_logging_in()
+    {
+        var descriptor = KnownEvents.Describe("identity.consent.recorded.v1");
+
+        descriptor.EntityName.Should().Be("ConsentRecord");
+        descriptor.EntityIdProperty.Should().Be("consentRecordId");
+        descriptor.ActorIdProperty.Should().Be("userId");
+    }
+
+    [Fact]
+    public void A_completed_child_conversion_names_no_new_actor()
+    {
+        // The administrator who approved it is already named on
+        // members.child-conversion.approved.v1 - this topic only closes the
+        // loop once the account exists, with nobody new acting.
+        var descriptor = KnownEvents.Describe("identity.child-conversion.completed.v1");
+
+        descriptor.Action.Should().Be("ChildConversionCompleted");
+        descriptor.EntityName.Should().Be("User");
+        descriptor.EntityIdProperty.Should().Be("userId");
+        descriptor.ActorIdProperty.Should().BeNull();
+    }
 }

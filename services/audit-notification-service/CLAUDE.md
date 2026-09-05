@@ -180,6 +180,22 @@ the parent who withdrew consent for it.
 
 19 of the 28 originally-undescribed topics remain untouched.
 
+**identity-tenant-service's own three remaining topics closed out the day
+after, and `identity.role-matrix.changed.v1` is the strongest promise found in
+this whole pass.** Its own doc comment calls this "the weightiest change an
+administrator can make on this platform... it is recorded with who made it
+and what it was before" - a claim the derived default broke on every clause:
+no role id, no actor, no before-state. `identity.consent.recorded.v1` is the
+self-action case, the same shape as logging in. `identity.child-conversion.completed.v1`
+gets an entity id and no actor - the administrator who approved the
+conversion is already named on `members.child-conversion.approved.v1`, and
+this topic only closes the loop once the account exists, with nobody new
+acting. `smoke-through-gateway.sh` checks the flagship one end to end: that a
+`RoleMatrixChanged` row names both the role and the administrator who changed
+it.
+
+16 of the 28 originally-undescribed topics remain untouched.
+
 ## API endpoints
 
 | Method | Path | Roles |

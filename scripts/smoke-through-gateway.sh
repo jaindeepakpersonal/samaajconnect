@@ -1054,6 +1054,34 @@ else
   fail=$((fail + 1))
 fi
 
+# identity.role-matrix.changed.v1 had no KnownEvents descriptor until this
+# cycle, despite its own doc comment calling this "the weightiest change an
+# administrator can make on this platform" and promising it is "recorded with
+# who made it and what it was before." The derived default kept none of that
+# promise: no role id, no actor, no before-state.
+SAMAAJ_ADMIN_ID=$(curl -s -H "Authorization: Bearer $SAMAAJ_ADMIN_TOKEN" "$GATEWAY/v1/identity/me" \
+  | json_field userId)
+require_id samaaj_admin_id "$SAMAAJ_ADMIN_ID"
+
+role_matrix_change_audited=0
+for attempt in $(seq 1 20); do
+  if curl -s -H "Authorization: Bearer $ADMIN_TOKEN" -H "$ADMIN_TENANT_HEADER" \
+     "$GATEWAY/v1/audit/logs?action=RoleMatrixChanged&limit=200" \
+     | grep -q "\"entityId\":\"$STUDENT_ROLE\",\"actorUserId\":\"$SAMAAJ_ADMIN_ID\""; then
+    role_matrix_change_audited=1
+    break
+  fi
+  sleep 2
+done
+
+if [ "$role_matrix_change_audited" -eq 1 ]; then
+  echo "  ok    the change names the role and the administrator who made it"
+  pass=$((pass + 1))
+else
+  echo "  FAIL  the change reaches the audit trail with its actor and entity id"
+  fail=$((fail + 1))
+fi
+
 check "a member without Roles.Manage cannot edit it" 403 \
   "$(status -X PUT "$GATEWAY/v1/identity/roles/$STUDENT_ROLE/permissions/Timeline.Moderate" \
      -H 'Content-Type: application/json' -H "Authorization: Bearer $MEMBER_TOKEN" \

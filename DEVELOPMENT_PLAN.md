@@ -8,7 +8,41 @@ version of the plan; the reasoning behind the ordering lives in
 ## Current Status
 
 - **Stage:** every module has a service and member screens; Phase 5 hardening under way
-- **Last updated:** 2026-09-05 - **a DPDP consent withdrawal's audit row
+- **Last updated:** 2026-09-05 - **the platform's own strongest audit promise
+  was the one it broke worst: "the weightiest change an administrator can
+  make... recorded with who made it and what it was before," kept by nothing.**
+
+  Fifth stop on the service-by-service pass, and back to
+  identity-tenant-service for its three remaining topics.
+  `RoleMatrixChangedDomainEvent`'s own doc comment is that sentence, almost
+  verbatim - and the derived default broke every clause of it: no role id, no
+  actor, no before-state, on the single change this platform considers its
+  weightiest. `identity.consent.recorded.v1` is the self-action case, the
+  same shape as logging in. `identity.child-conversion.completed.v1` gets an
+  entity id and no actor - the approving administrator is already named on
+  a sibling topic from two entries ago, and this one only closes the loop
+  once the account exists.
+
+  Verified by fault injection (the `role-matrix.changed.v1` descriptor
+  removed entirely fails both the unit test and the handler test) and a new
+  smoke check confirming a `RoleMatrixChanged` row names both the role and
+  the administrator who changed it.
+
+  368 total smoke checks, 367 green - the one new check added here passed
+  twice in a row against the running stack. The one failure is unrelated
+  and pre-existing: `GET /v1/members` defaults to `limit=50`, and the
+  shared "Smoke Samaaj" tenant this whole session's smoke runs share has
+  accumulated well over 50 members, so a check relying on a specific member
+  appearing in an unpaginated default page has quietly become
+  volume-dependent. Not a product bug and not caused by this cycle - flagged
+  as its own task rather than folded into this one.
+
+  172 tests green in audit-notification-service (122 unit + 50
+  integration), up 4. 16 of the platform's originally-undescribed 28 topics
+  remain - all five services with a "distinct actor differs from subject"
+  domain event now have descriptors; what is left is weaker-shaped (no
+  actor to carry, or a self-action already like several already done).
+- **Previously:** 2026-09-05 - **a DPDP consent withdrawal's audit row
   could not name the child it was about or the parent who withdrew it - the
   one event whose own doc comment says the audit trail is not an add-on but
   the entire consumer.**

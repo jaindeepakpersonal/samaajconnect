@@ -205,6 +205,33 @@ public sealed class RecordIntegrationEventCommandHandlerTests
     }
 
     [Fact]
+    public async Task A_role_matrix_change_is_audited_with_who_made_it_and_what_it_was_before()
+    {
+        // identity.role-matrix.changed.v1 had no descriptor at all until this
+        // cycle, despite its own doc comment calling this "the weightiest
+        // change an administrator can make on this platform" and promising
+        // it is "recorded with who made it and what it was before." The
+        // derived default kept none of that promise.
+        var roleId = Guid.NewGuid();
+        var changedBy = Guid.NewGuid();
+
+        await Handle(Envelope(
+            topic: "identity.role-matrix.changed.v1",
+            payload: $$"""
+                {"roleId":"{{roleId}}","tenantId":"{{TenantId}}",
+                 "permissionKey":"Members.Write","granted":true,
+                 "previouslyGranted":false,"changedBy":"{{changedBy}}"}
+                """));
+
+        _auditLogs.Received(1).Add(Arg.Is<AuditLog>(a =>
+            a.Action == "RoleMatrixChanged"
+            && a.EntityName == "Role"
+            && a.EntityId == roleId.ToString()
+            && a.ActorUserId == changedBy
+            && a.BeforeState == "{\"previouslyGranted\":false}"));
+    }
+
+    [Fact]
     public async Task A_redelivered_event_is_skipped_rather_than_recorded_twice()
     {
         _auditLogs.AlreadyRecordedAsync(Arg.Any<Guid>(), Arg.Any<CancellationToken>()).Returns(true);

@@ -329,6 +329,32 @@ public static class KnownEvents
             EntityIdProperty: "childProfileId",
             ActorIdProperty: "withdrawnByMemberId"),
 
+        // identity-tenant-service's own three remaining topics. RoleMatrixChangedDomainEvent's
+        // doc comment is the strongest promise found in this whole pass: "the
+        // weightiest change an administrator can make on this platform... it
+        // is recorded with who made it and what it was before" - a claim the
+        // derived default broke completely, on every axis it names.
+        ["identity.role-matrix.changed.v1"] = new(
+            Action: "RoleMatrixChanged",
+            EntityName: "Role",
+            EntityIdProperty: "roleId",
+            ActorIdProperty: "changedBy",
+            BeforeProperties: ["previouslyGranted"]),
+
+        ["identity.consent.recorded.v1"] = new(
+            Action: "ConsentRecorded",
+            EntityName: "ConsentRecord",
+            EntityIdProperty: "consentRecordId",
+            ActorIdProperty: "userId"),
+
+        // The admin who approved the conversion is already named on
+        // members.child-conversion.approved.v1; this topic only closes the
+        // loop once the account exists, with nobody new acting.
+        ["identity.child-conversion.completed.v1"] = new(
+            Action: "ChildConversionCompleted",
+            EntityName: "User",
+            EntityIdProperty: "userId"),
+
         // Erasure is handled by ErasePersonalDataCommandHandler rather than
         // recorded through this path, and it writes its own row with no actor
         // deliberately. Listed here so the omission reads as a decision.
