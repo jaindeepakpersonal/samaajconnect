@@ -1231,6 +1231,32 @@ check "and withdrawing again is success rather than an error" 200 \
   "$(status -X DELETE "$GATEWAY/v1/children/$SECOND_CHILD/parental-consent" \
      -H "Authorization: Bearer $MEMBER_TOKEN")"
 
+# members.child.consent-withdrawn.v1 had no KnownEvents descriptor until this
+# cycle, despite its own doc comment saying the append-only audit trail "is
+# the consumer" for this event - a Fiduciary has to be able to show when a
+# consent stopped standing. The derived default answered that with a blank on
+# both the child and the parent who withdrew it. Same poll-with-retry shape as
+# the other audit checks: the row arrives over Kafka through the outbox
+# rather than inside this request.
+consent_withdrawal_audited=0
+for attempt in $(seq 1 20); do
+  if curl -s -H "Authorization: Bearer $ADMIN_TOKEN" -H "$ADMIN_TENANT_HEADER" \
+     "$GATEWAY/v1/audit/logs?action=ParentalConsentWithdrawn&limit=200" \
+     | grep -q "\"entityId\":\"$SECOND_CHILD\",\"actorUserId\":\"$MEMBER_ID\""; then
+    consent_withdrawal_audited=1
+    break
+  fi
+  sleep 2
+done
+
+if [ "$consent_withdrawal_audited" -eq 1 ]; then
+  echo "  ok    the withdrawal names the child and the parent who withdrew it"
+  pass=$((pass + 1))
+else
+  echo "  FAIL  the withdrawal reaches the audit trail with its actor and entity id"
+  fail=$((fail + 1))
+fi
+
 HOUSEHOLD_CHILDREN=$(curl -s -H "Authorization: Bearer $MEMBER_TOKEN" "$GATEWAY/v1/children")
 
 if printf '%s' "$HOUSEHOLD_CHILDREN" | grep -q "$SECOND_CHILD"; then

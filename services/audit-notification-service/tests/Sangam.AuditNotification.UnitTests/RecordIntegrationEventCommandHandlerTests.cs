@@ -178,6 +178,33 @@ public sealed class RecordIntegrationEventCommandHandlerTests
     }
 
     [Fact]
+    public async Task A_withdrawn_parental_consent_is_audited_against_the_child_and_the_parent()
+    {
+        // members.child.consent-withdrawn.v1 had no descriptor at all until
+        // this cycle, despite its own doc comment saying the append-only
+        // audit trail "is the consumer" for this event - a Fiduciary has to
+        // be able to show when a consent stopped standing. The derived
+        // default answered that with a blank on both the child and the
+        // parent who withdrew it.
+        var childProfileId = Guid.NewGuid();
+        var familyId = Guid.NewGuid();
+        var withdrawnBy = Guid.NewGuid();
+
+        await Handle(Envelope(
+            topic: "members.child.consent-withdrawn.v1",
+            payload: $$"""
+                {"childProfileId":"{{childProfileId}}","tenantId":"{{TenantId}}",
+                 "familyId":"{{familyId}}","withdrawnByMemberId":"{{withdrawnBy}}"}
+                """));
+
+        _auditLogs.Received(1).Add(Arg.Is<AuditLog>(a =>
+            a.Action == "ParentalConsentWithdrawn"
+            && a.EntityName == "ChildProfile"
+            && a.EntityId == childProfileId.ToString()
+            && a.ActorUserId == withdrawnBy));
+    }
+
+    [Fact]
     public async Task A_redelivered_event_is_skipped_rather_than_recorded_twice()
     {
         _auditLogs.AlreadyRecordedAsync(Arg.Any<Guid>(), Arg.Any<CancellationToken>()).Returns(true);

@@ -164,6 +164,22 @@ post it was.
 
 22 of the 28 originally-undescribed topics remain untouched.
 
+**member-family-service's three topics followed the day after, the fourth
+service in this pass.** `ParentalConsentWithdrawnDomainEvent`'s own doc
+comment says the append-only audit trail "is the consumer" for this event -
+"a Fiduciary has to be able to show when a consent stopped standing" - which
+the derived default could not do at all: both the child the consent was about
+and the parent who withdrew it were blank. `child-conversion.approved.v1` is
+the same shape for a different reason: the converted child cannot act for
+themselves at the moment it fires - the whole point of the workflow - so
+`ApprovedBy` (the administrator) is the only actor there ever is to name.
+`family.created.v1` is the self-action case, the same shape as a group
+application. `smoke-through-gateway.sh` checks the DPDP-critical one end to
+end: that a `ParentalConsentWithdrawn` row names both the child profile and
+the parent who withdrew consent for it.
+
+19 of the 28 originally-undescribed topics remain untouched.
+
 ## API endpoints
 
 | Method | Path | Roles |

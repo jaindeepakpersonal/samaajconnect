@@ -323,4 +323,47 @@ public sealed class KnownEventsTests
         descriptor.EntityIdProperty.Should().Be("postId");
         descriptor.ActorIdProperty.Should().BeNull();
     }
+
+    // ---- member-family-service -----------------------------------------
+    //
+    // ParentalConsentWithdrawnDomainEvent's own doc comment says the
+    // append-only audit trail "is the consumer" for this event - a Fiduciary
+    // has to be able to show when a consent stopped standing. The derived
+    // default answered that with a blank on both the child and the parent.
+
+    [Fact]
+    public void A_created_family_is_recorded_against_the_member_who_started_it()
+    {
+        var descriptor = KnownEvents.Describe("members.family.created.v1");
+
+        descriptor.Action.Should().Be("FamilyCreated");
+        descriptor.EntityName.Should().Be("Family");
+        descriptor.EntityIdProperty.Should().Be("familyId");
+        descriptor.ActorIdProperty.Should().Be("familyHeadMemberId");
+    }
+
+    [Fact]
+    public void An_approved_conversion_names_the_administrator_who_approved_it()
+    {
+        // The converted child cannot act for themselves at the moment this
+        // fires - the whole point of the workflow - so ApprovedBy is the only
+        // actor there is to name.
+        var descriptor = KnownEvents.Describe("members.child-conversion.approved.v1");
+
+        descriptor.Action.Should().Be("ChildConversionApproved");
+        descriptor.EntityName.Should().Be("ChildProfile");
+        descriptor.EntityIdProperty.Should().Be("childProfileId");
+        descriptor.ActorIdProperty.Should().Be("approvedBy");
+    }
+
+    [Fact]
+    public void A_withdrawn_consent_names_the_parent_and_the_child_it_was_about()
+    {
+        var descriptor = KnownEvents.Describe("members.child.consent-withdrawn.v1");
+
+        descriptor.Action.Should().Be("ParentalConsentWithdrawn");
+        descriptor.EntityName.Should().Be("ChildProfile");
+        descriptor.EntityIdProperty.Should().Be("childProfileId");
+        descriptor.ActorIdProperty.Should().Be("withdrawnByMemberId");
+    }
 }

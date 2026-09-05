@@ -305,6 +305,30 @@ public static class KnownEvents
             EntityName: "Post",
             EntityIdProperty: "postId"),
 
+        // member-family-service's three topics, the fourth service in this
+        // pass. ParentalConsentWithdrawnDomainEvent's own doc comment says the
+        // append-only audit trail "is the consumer" for this event - "a
+        // Fiduciary has to be able to show when a consent stopped standing" -
+        // which the derived default could not do at all: both the child the
+        // consent was about and the parent who withdrew it were blank.
+        ["members.family.created.v1"] = new(
+            Action: "FamilyCreated",
+            EntityName: "Family",
+            EntityIdProperty: "familyId",
+            ActorIdProperty: "familyHeadMemberId"),
+
+        ["members.child-conversion.approved.v1"] = new(
+            Action: "ChildConversionApproved",
+            EntityName: "ChildProfile",
+            EntityIdProperty: "childProfileId",
+            ActorIdProperty: "approvedBy"),
+
+        ["members.child.consent-withdrawn.v1"] = new(
+            Action: "ParentalConsentWithdrawn",
+            EntityName: "ChildProfile",
+            EntityIdProperty: "childProfileId",
+            ActorIdProperty: "withdrawnByMemberId"),
+
         // Erasure is handled by ErasePersonalDataCommandHandler rather than
         // recorded through this path, and it writes its own row with no actor
         // deliberately. Listed here so the omission reads as a decision.

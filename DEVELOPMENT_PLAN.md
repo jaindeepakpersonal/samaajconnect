@@ -8,7 +8,34 @@ version of the plan; the reasoning behind the ordering lives in
 ## Current Status
 
 - **Stage:** every module has a service and member screens; Phase 5 hardening under way
-- **Last updated:** 2026-09-05 - **a moderated post's audit row could not
+- **Last updated:** 2026-09-05 - **a DPDP consent withdrawal's audit row
+  could not name the child it was about or the parent who withdrew it - the
+  one event whose own doc comment says the audit trail is not an add-on but
+  the entire consumer.**
+
+  Fourth stop on the service-by-service pass:
+  `ParentalConsentWithdrawnDomainEvent`'s doc comment already states the
+  audit trail "is the consumer" for this event - "a Fiduciary has to be able
+  to show when a consent stopped standing" - and the derived default left it
+  unable to say who or what, on the one topic in the whole platform where
+  that gap is a DPDP compliance question rather than only an investigation
+  question. `child-conversion.approved.v1` gets the same treatment for a
+  different reason: the converted child cannot act for themselves at the
+  moment it fires, so `ApprovedBy` is the only actor there ever is to name.
+  `family.created.v1` is the self-action case.
+
+  Verified by fault injection (the `consent-withdrawn.v1` descriptor removed
+  entirely fails both the unit test and the handler test) and a new smoke
+  check confirming a `ParentalConsentWithdrawn` row names both the child
+  profile and the withdrawing parent.
+
+  367 of 367 smoke checks green through the gateway, which is 366 plus
+  exactly the one added here.
+
+  168 tests green in audit-notification-service (118 unit + 50
+  integration), up 4. 19 of the platform's originally-undescribed 28 topics
+  remain.
+- **Previously:** 2026-09-05 - **a moderated post's audit row could not
   tell its author from the administrator who decided its fate - the same
   gap as the issue tracker's, in the third service to have it.**
 
