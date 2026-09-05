@@ -8,7 +8,25 @@ version of the plan; the reasoning behind the ordering lives in
 ## Current Status
 
 - **Stage:** every module has a service and member screens; Phase 5 hardening under way
-- **Last updated:** 2026-09-05 - **the whole class of bug the last cycle
+- **Last updated:** 2026-09-05 - **two more TypeScript strictness flags
+  checked the same way, `noUnusedLocals` and `noUnusedParameters` - a much
+  smaller blast radius this time, and a real if harmless hit anyway.**
+
+  Probed both apps' production builds after the last cycle's
+  `noUncheckedIndexedAccess` addition to see whether these two were also
+  free wins before committing to them. They were, almost: admin-portal was
+  clean outright, and member-portal had exactly one dead import -
+  `computed` in `members-list.component.ts`, never used. Confirmed the
+  finding was real rather than a fluke of which config caught it by fault
+  injection (put it back: `ng build` refuses. Take it out: `ng build
+  --configuration production` and `tsc --noEmit -p tsconfig.spec.json`
+  both pass clean in both apps). Both `tsconfig.json` now list the three
+  new flags in the same order, matching `Directory.Build.props`'s own
+  "ten services can't drift" reasoning applied to two files instead of ten.
+
+  Verified with full production builds and full test suites for both apps
+  (338 member-portal, 198 admin-portal, unaffected).
+- **Previously:** 2026-09-05 - **the whole class of bug the last cycle
   found is now a compile error in both apps, not a warning left to sit -
   `noUncheckedIndexedAccess: true`, in both `tsconfig.json`.**
 

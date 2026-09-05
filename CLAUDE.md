@@ -244,6 +244,11 @@ session.
   codebase's specs already used for DOM query results. A `for (const x of
   arr)` or `.find(...)` needs no such assertion and is preferred over index
   access wherever the loop doesn't need the position itself.
+- **Both apps also set `noUnusedLocals` and `noUnusedParameters`.** Found
+  one real, harmless dead import the day it was enabled — confirmed by
+  fault injection (put it back, `ng build` refused; removed it again, both
+  `ng build --configuration production` and `tsc --noEmit -p
+  tsconfig.spec.json` pass clean in both apps).
 
 ## 8. Environment variables & docker-compose convention
 
