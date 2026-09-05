@@ -23,7 +23,7 @@ export class IssuesApi {
     const params =
       category && category.length > 0 ? new HttpParams().set('category', category) : undefined;
 
-    return this.http.get<Issue[]>('/v1/social-issues', { params });
+    return this.http.get<Issue[]>('/v1/social-issues', params ? { params } : {});
   }
 
   get(id: string): Observable<IssueDetail> {

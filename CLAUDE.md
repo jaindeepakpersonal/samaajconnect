@@ -249,6 +249,15 @@ session.
   fault injection (put it back, `ng build` refused; removed it again, both
   `ng build --configuration production` and `tsc --noEmit -p
   tsconfig.spec.json` pass clean in both apps).
+- **And `exactOptionalPropertyTypes`.** This one is usually a large,
+  invasive change against Angular's `HttpClient` — passing `{ params }`
+  where `params` can be `undefined` is exactly the shape it refuses,
+  because `HttpGetOptions.params` is optional-and-omittable rather than
+  optional-and-`| undefined`. Here it found exactly one call built that
+  way, in `issues.api.ts`, fixed by constructing the options object
+  conditionally (`params ? { params } : {}`) rather than passing the key
+  with an explicit `undefined` value — the difference the flag exists to
+  enforce, not a workaround for it.
 
 ## 8. Environment variables & docker-compose convention
 

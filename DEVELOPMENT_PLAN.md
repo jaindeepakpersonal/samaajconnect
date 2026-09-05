@@ -8,7 +8,32 @@ version of the plan; the reasoning behind the ordering lives in
 ## Current Status
 
 - **Stage:** every module has a service and member screens; Phase 5 hardening under way
-- **Last updated:** 2026-09-05 - **two more TypeScript strictness flags
+- **Last updated:** 2026-09-05 - **the fourth and usually-worst
+  strictness flag, `exactOptionalPropertyTypes` - normally a large,
+  invasive change against Angular's `HttpClient` - found exactly one call
+  built the way it refuses, anywhere in either app.**
+
+  This flag distinguishes "the key is absent" from "the key is present
+  with value `undefined`," which Angular's `HttpClient` typings do not:
+  `HttpGetOptions.params` is optional-and-omittable, not
+  optional-and-`| undefined`, so passing `{ params }` where `params` can be
+  `undefined` is exactly the shape the flag exists to refuse - a
+  well-documented friction point between this flag and Angular
+  specifically, which is why it was probed rather than assumed free like
+  the last two.
+
+  One call was built that way, in `issues.api.ts`'s `list()`: `const
+  params = ... : undefined` then an unconditional `{ params }`. Fixed by
+  building the options object conditionally - `params ? { params } : {}` -
+  rather than passing the key with an explicit `undefined`, which is the
+  actual distinction the flag is for rather than a workaround around it.
+  A repo-wide grep confirmed no other call was built the same way.
+
+  Verified with full production builds and full test suites for both apps
+  (338 member-portal, 198 admin-portal, unaffected). All four strictness
+  flags this pass added are now in both `tsconfig.json`, in the same
+  order.
+- **Previously:** 2026-09-05 - **two more TypeScript strictness flags
   checked the same way, `noUnusedLocals` and `noUnusedParameters` - a much
   smaller blast radius this time, and a real if harmless hit anyway.**
 
