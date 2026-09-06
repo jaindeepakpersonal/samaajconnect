@@ -24,6 +24,7 @@ namespace Sangam.IdentityTenant.Domain.Users;
 /// </remarks>
 public sealed class LoginOtp
 {
+    /// <summary>The platform default, used when a Samaaj has not overridden it.</summary>
     public static readonly TimeSpan Lifetime = TimeSpan.FromMinutes(10);
 
     public string Hash { get; private set; } = null!;
@@ -37,7 +38,13 @@ public sealed class LoginOtp
     /// anywhere on this object - it exists only long enough to be handed to
     /// the notification pipeline.
     /// </summary>
-    public static (LoginOtp Code, string Plaintext) Issue(Func<string, string> hasher, DateTimeOffset now)
+    /// <param name="lifetime">
+    /// Resolved by the caller (<c>ISecurityPolicyResolver</c>) - this class
+    /// has no way to know which tenant is asking, so it never reads
+    /// <see cref="Lifetime"/> itself.
+    /// </param>
+    public static (LoginOtp Code, string Plaintext) Issue(
+        Func<string, string> hasher, DateTimeOffset now, TimeSpan lifetime)
     {
         var plaintext = Generate();
 
@@ -45,7 +52,7 @@ public sealed class LoginOtp
         {
             Hash = hasher(plaintext),
             IssuedAt = now,
-            ExpiresAt = now.Add(Lifetime),
+            ExpiresAt = now.Add(lifetime),
         };
 
         return (code, plaintext);

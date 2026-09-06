@@ -88,7 +88,7 @@ public sealed class LoginCommandHandler(
         // Begun before the save, so the session row and the recorded login
         // commit together. A login that succeeded without leaving a session
         // would hand out an access token nothing could ever renew.
-        var session = sessions.Begin(user.Id, user.TenantId);
+        var session = await sessions.BeginAsync(user.Id, user.TenantId, cancellationToken);
 
         await unitOfWork.SaveChangesAsync(cancellationToken);
 

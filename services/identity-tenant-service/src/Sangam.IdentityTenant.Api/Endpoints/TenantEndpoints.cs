@@ -4,6 +4,8 @@ using Sangam.IdentityTenant.Application.Tenants;
 using Sangam.IdentityTenant.Application.Tenants.Commands.ChangeTenantStatus;
 using Sangam.IdentityTenant.Application.Tenants.Commands.CreateTenant;
 using Sangam.IdentityTenant.Application.Tenants.Commands.SetGrievanceContact;
+using Sangam.IdentityTenant.Application.Tenants.Commands.SetSecurityPolicy;
+using Sangam.IdentityTenant.Application.Tenants.Queries.GetSecurityPolicy;
 using Sangam.IdentityTenant.Application.Tenants.Queries.GetTenantById;
 using Sangam.IdentityTenant.Application.Tenants.Queries.GetTenantBySlug;
 using Sangam.IdentityTenant.Application.Tenants.Commands.SetTenantModules;
@@ -89,6 +91,50 @@ public static class TenantEndpoints
             .WithName("SetGrievanceContact")
             .WithSummary("Name who members complain to about their data (DPDP s.13).")
             .Produces<TenantResponse>()
+            .ProducesValidationProblem()
+            .ProducesProblem(StatusCodes.Status403Forbidden)
+            .ProducesProblem(StatusCodes.Status404NotFound);
+
+        group.MapGet("/{id:guid}/security-policy", async (
+                Guid id,
+                ISender sender,
+                CancellationToken cancellationToken) =>
+            {
+                var result = await sender.Send(new GetSecurityPolicyQuery(id), cancellationToken);
+
+                return result.ToApiResult();
+            })
+            .RequireAuthorization()
+            .WithName("GetSecurityPolicy")
+            .WithSummary("A Samaaj's own security-policy overrides (Super Admin, or that Samaaj's own admin).")
+            .Produces<SecurityPolicyResponse>()
+            .ProducesProblem(StatusCodes.Status403Forbidden)
+            .ProducesProblem(StatusCodes.Status404NotFound);
+
+        group.MapPut("/{id:guid}/security-policy", async (
+                Guid id,
+                SecurityPolicyRequest request,
+                ISender sender,
+                CancellationToken cancellationToken) =>
+            {
+                var command = new SetSecurityPolicyCommand(
+                    id,
+                    request.MinPasswordLength,
+                    request.OtpLifetimeMinutes,
+                    request.MaxFailedLoginAttempts,
+                    request.LockoutDurationMinutes,
+                    request.RefreshTokenLifetimeDays);
+
+                var result = await sender.Send(command, cancellationToken);
+
+                return result.ToApiResult();
+            })
+            .RequireAuthorization()
+            .WithName("SetSecurityPolicy")
+            .WithSummary(
+                "Replace a Samaaj's security-policy overrides, whole. A null field clears "
+                + "that override back to the platform default.")
+            .Produces<SecurityPolicyResponse>()
             .ProducesValidationProblem()
             .ProducesProblem(StatusCodes.Status403Forbidden)
             .ProducesProblem(StatusCodes.Status404NotFound);
@@ -203,6 +249,14 @@ public static class TenantEndpoints
     public sealed record ChangeStatusRequest(string Status, string? Password = null);
 
     public sealed record GrievanceContactRequest(string? Name, string? Email, string? Phone);
+
+    /// <summary>A null field clears that override back to the platform default.</summary>
+    public sealed record SecurityPolicyRequest(
+        int? MinPasswordLength,
+        int? OtpLifetimeMinutes,
+        int? MaxFailedLoginAttempts,
+        int? LockoutDurationMinutes,
+        int? RefreshTokenLifetimeDays);
 
     public sealed record SetModulesRequest(IReadOnlyList<string> EnabledModules);
 

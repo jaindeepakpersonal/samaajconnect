@@ -22,4 +22,16 @@ public static class PermissionKeys
     /// could undo the change.
     /// </remarks>
     public const string RolesManage = "Roles.Manage";
+
+    /// <summary>
+    /// Set a Samaaj's own security-policy overrides.
+    /// </summary>
+    /// <remarks>
+    /// Deliberately its own key rather than <see cref="TenantManage"/>, which
+    /// is Super-Admin-only by its own doc comment ("which modules exist is a
+    /// platform-level decision") - a Samaaj Admin setting their own Samaaj's
+    /// lockout threshold is not that. Not <see cref="AdminUsersManage"/>
+    /// either: that is about administrator accounts, not security policy.
+    /// </remarks>
+    public const string TenantManageSecurityPolicy = "Tenant.ManageSecurityPolicy";
 }

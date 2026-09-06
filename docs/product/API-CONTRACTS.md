@@ -21,6 +21,8 @@ enforced by `TenantAuthorizationBehavior`, not just UI hiding.
 | GET | `/tenants/by-id/{id}` | Anonymous | Resolve id → tenant (used by the gateway on every request) |
 | GET | `/tenants/directory` | Anonymous | Active Samaaj a visitor can register into |
 | PUT | `/tenants/{id}/grievance-contact` | SuperAdmin, SamaajAdmin | Name who members complain to (DPDP s.13) |
+| GET | `/tenants/{id}/security-policy` | SuperAdmin, SamaajAdmin (own Samaaj) | A Samaaj's own overrides to the platform's password/OTP/lockout/session constants, raw and nullable |
+| PUT | `/tenants/{id}/security-policy` | SuperAdmin, SamaajAdmin (own Samaaj) | Replace those overrides, whole. A null field clears that override back to the platform default |
 | POST | `/register` | Anonymous | Member registration into one Samaaj |
 | POST | `/token/refresh` | Anonymous | Exchange a refresh token for a new access token and the next refresh token. Single-use: presenting one twice ends the whole session |
 | POST | `/login` | Anonymous | Common login → returns tenant-scoped JWT |

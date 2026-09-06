@@ -35,7 +35,7 @@ screen. The spec is `docs/product/wireframes/admin-panel-wireframes.html`.
 | Member detail | `/members/:id` | — | built; the wireframe's "View" had no screen behind it. The correction form |
 | Change password | `/change-password` | — | built; no wireframe covers it — the wireframe's sign-in screen has no forgot-password link at all |
 | Reports & Analytics | `/reports` | `#reports` | built — the three per-Samaaj cards only. The wireframe's Super-Admin-only cross-tenant comparison table is a deferred follow-up, see below |
-| Settings | — | various | not built. Samaaj settings live on the Samaaj screen |
+| Settings | `/settings` | `#settings` | built — Security only, see below. Tenant Branding and Module Controls point at the Samaaj screen, which already covers them; Notification Providers stays honestly unbuilt |
 
 The unbuilt screens appear in the nav, disabled, each saying why. That is
 deliberate: the wireframe promised them, and an administrator who cannot see
@@ -171,6 +171,35 @@ Samaaj on the platform instead of one. Asked, the choice was to ship what
 composes cleanly now and scope the comparison table as its own piece of work
 later, rather than pick between inventing a new architectural pattern under
 time pressure and shipping a fan-out already known to be the wrong shape.
+
+**Settings' four wireframe cards turned out to be four different sizes, and
+only one needed new work.** Module Controls and Tenant Branding's logo and
+contact fields are already built, on the Samaaj/Tenants screen — the
+wireframe's own JS even navigates there for Module Controls rather than to a
+second copy, so this screen's cards do the same. "Colors" is not built:
+nothing in either Angular app has a per-tenant theming system to apply one
+to, and a stored colour nothing renders would be exactly the half-finished
+feature this platform's conventions warn against, so it stayed out rather
+than being added as an unused field. Notification Providers stays honestly
+unbuilt — there is no real email, SMS or WhatsApp provider anywhere on this
+platform, only the logging stand-in, and a "Configure" control for a
+provider that does not exist would be a screen promising something untrue,
+the same reasoning this file's own "what they say has to stay true" note
+already states about the nav's disabled items.
+
+**Security is the one real capability this screen adds**, and it needed
+genuinely new work in identity-tenant-service: five platform-wide constants
+(password floor, OTP lifetime, lockout threshold and duration, session
+length) became a Samaaj's own sparse overrides, resolved through one new
+`ISecurityPolicyResolver` rather than five call sites each reading a
+constant directly. This screen's own tenant-scoping is not the dashboard's
+or the Reports screen's: a Samaaj Admin's own tenant never runs through
+`AdminScope`, which only ever holds a Super Admin's *chosen* Samaaj, so the
+Security card falls back to `auth.user()?.tenantId` for anyone who is not a
+Super Admin — reading the platform sentinel `Guid.Empty` off that same field
+for a Super Admin would silently ask the API for a nonexistent tenant's
+policy, which is why that fallback is guarded by `isSuperAdmin()` rather than
+applied unconditionally.
 
 **The role matrix edits now, and the screen still decides nothing.** The
 wireframe always said it should edit; it took per-tenant overrides, an audit

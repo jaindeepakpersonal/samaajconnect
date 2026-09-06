@@ -11,7 +11,8 @@ public sealed class RequestLoginOtpCommandHandler(
     ITenantRepository tenants,
     IPasswordHasher passwordHasher,
     IUnitOfWork unitOfWork,
-    IDateTimeProvider clock)
+    IDateTimeProvider clock,
+    ISecurityPolicyResolver securityPolicy)
     : IRequestHandler<RequestLoginOtpCommand, Result<RequestLoginOtpResponse>>
 {
     public async Task<Result<RequestLoginOtpResponse>> Handle(
@@ -42,7 +43,8 @@ public sealed class RequestLoginOtpCommandHandler(
             }
         }
 
-        var (code, plaintext) = LoginOtp.Issue(passwordHasher.Hash, now);
+        var policy = await securityPolicy.ResolveAsync(user.TenantId, cancellationToken);
+        var (code, plaintext) = LoginOtp.Issue(passwordHasher.Hash, now, policy.OtpLifetime);
 
         user.RequestLoginOtp(code, plaintext, now);
 

@@ -48,6 +48,7 @@ public static class AuthorizationCatalog
         public static readonly Guid VolunteerGroupsLead = new("b0000000-0000-0000-0000-000000000013");
         public static readonly Guid RolesManage = new("b0000000-0000-0000-0000-000000000014");
         public static readonly Guid NotificationsBroadcast = new("b0000000-0000-0000-0000-000000000015");
+        public static readonly Guid TenantManageSecurityPolicy = new("b0000000-0000-0000-0000-000000000016");
     }
 
     public static IReadOnlyList<Role> Roles { get; } =
@@ -86,6 +87,7 @@ public static class AuthorizationCatalog
         new(PermissionIds.VolunteerGroupsLead, "VolunteerGroups.Lead"),
         new(PermissionIds.RolesManage, "Roles.Manage"),
         new(PermissionIds.NotificationsBroadcast, "Notifications.Broadcast"),
+        new(PermissionIds.TenantManageSecurityPolicy, "Tenant.ManageSecurityPolicy"),
     ];
 
     /// <summary>
@@ -128,6 +130,10 @@ public static class AuthorizationCatalog
         // Samaaj that wants to hand the second to a content moderator without
         // the first should be able to - which the role matrix now allows.
         new(RoleIds.SamaajAdmin, PermissionIds.NotificationsBroadcast),
+
+        // Its own Samaaj's security policy, the same self-tenant-only shape
+        // the grievance contact and tenant logo already have.
+        new(RoleIds.SamaajAdmin, PermissionIds.TenantManageSecurityPolicy),
 
         new(RoleIds.Member, PermissionIds.MembersRead),
         new(RoleIds.Member, PermissionIds.TimelinePost),

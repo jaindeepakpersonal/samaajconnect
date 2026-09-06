@@ -2,6 +2,7 @@ using MediatR;
 using Microsoft.Extensions.Logging;
 using Sangam.IdentityTenant.Application.Abstractions;
 using Sangam.IdentityTenant.Application.Common;
+using Sangam.IdentityTenant.Application.Security;
 using Sangam.IdentityTenant.Domain.Tenants;
 using Sangam.IdentityTenant.Domain.Users;
 
@@ -14,6 +15,7 @@ public sealed class ActivateAccountCommandHandler(
     IFailedActivationRecorder failedActivations,
     IUnitOfWork unitOfWork,
     IDateTimeProvider clock,
+    ISecurityPolicyResolver securityPolicy,
     ILogger<ActivateAccountCommandHandler> logger)
     : IRequestHandler<ActivateAccountCommand, Result<ActivateAccountResponse>>
 {
@@ -64,6 +66,13 @@ public sealed class ActivateAccountCommandHandler(
             return Result.Failure<ActivateAccountResponse>(Error.Forbidden(
                 "Auth.SamaajUnavailable",
                 "Your Samaaj is not currently active. Please contact your Samaaj administrator."));
+        }
+
+        var policy = await securityPolicy.ResolveAsync(tenant.Id, cancellationToken);
+
+        if (policy.ValidatePasswordLength(command.Password) is { } lengthError)
+        {
+            return Result.Failure<ActivateAccountResponse>(lengthError);
         }
 
         user.Activate(passwordHasher.Hash(command.Password), now);

@@ -76,7 +76,8 @@ public sealed class ChangePasswordCommandHandler(
     ISessionService sessions,
     IUnitOfWork unitOfWork,
     ICurrentUser currentUser,
-    IDateTimeProvider clock)
+    IDateTimeProvider clock,
+    ISecurityPolicyResolver securityPolicy)
     : IRequestHandler<ChangePasswordCommand, Result<ChangePasswordResponse>>
 {
     public async Task<Result<ChangePasswordResponse>> Handle(
@@ -119,6 +120,13 @@ public sealed class ChangePasswordCommandHandler(
 
             return Result.Failure<ChangePasswordResponse>(Error.Forbidden(
                 IStepUpAuthentication.StepUpFailedCode, "Your current password is not correct."));
+        }
+
+        var policy = await securityPolicy.ResolveAsync(user.TenantId, cancellationToken);
+
+        if (policy.ValidatePasswordLength(command.NewPassword) is { } lengthError)
+        {
+            return Result.Failure<ChangePasswordResponse>(lengthError);
         }
 
         var now = clock.UtcNow;

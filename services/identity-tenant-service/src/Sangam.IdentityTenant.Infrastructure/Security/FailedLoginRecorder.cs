@@ -15,6 +15,7 @@ namespace Sangam.IdentityTenant.Infrastructure.Security;
 public sealed class FailedLoginRecorder(
     IServiceScopeFactory scopeFactory,
     IDateTimeProvider clock,
+    ISecurityPolicyResolver securityPolicy,
     ILogger<FailedLoginRecorder> logger)
     : IFailedLoginRecorder
 {
@@ -32,7 +33,9 @@ public sealed class FailedLoginRecorder(
             return false;
         }
 
-        var lockedOut = user.RecordFailedLogin(clock.UtcNow);
+        var policy = await securityPolicy.ResolveAsync(user.TenantId, cancellationToken);
+
+        var lockedOut = user.RecordFailedLogin(clock.UtcNow, policy.MaxFailedLoginAttempts, policy.LockoutDuration);
 
         await dbContext.SaveChangesAsync(cancellationToken);
 

@@ -36,6 +36,12 @@ export const routes: Routes = [
           import('./features/reports/reports.component').then((m) => m.ReportsComponent),
       },
       {
+        path: 'settings',
+        title: 'Settings - samaajconnect admin',
+        loadComponent: () =>
+          import('./features/settings/settings.component').then((m) => m.SettingsComponent),
+      },
+      {
         path: 'tenants',
         title: 'Samaaj - samaajconnect admin',
         loadComponent: () =>

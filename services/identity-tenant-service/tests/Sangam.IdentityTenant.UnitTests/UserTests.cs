@@ -63,7 +63,7 @@ public sealed class UserTests
 
         for (var attempt = 1; attempt < User.MaxFailedAttempts; attempt++)
         {
-            user.RecordFailedLogin(Now).Should().BeFalse();
+            user.RecordFailedLogin(Now, User.MaxFailedAttempts, User.LockoutDuration).Should().BeFalse();
         }
 
         user.IsLockedOut(Now).Should().BeFalse();
@@ -79,7 +79,7 @@ public sealed class UserTests
 
         for (var attempt = 0; attempt < User.MaxFailedAttempts; attempt++)
         {
-            lockedOut = user.RecordFailedLogin(Now);
+            lockedOut = user.RecordFailedLogin(Now, User.MaxFailedAttempts, User.LockoutDuration);
         }
 
         lockedOut.Should().BeTrue();
@@ -98,7 +98,7 @@ public sealed class UserTests
 
         for (var attempt = 0; attempt < User.MaxFailedAttempts; attempt++)
         {
-            user.RecordFailedLogin(Now);
+            user.RecordFailedLogin(Now, User.MaxFailedAttempts, User.LockoutDuration);
         }
 
         user.IsLockedOut(Now.Add(User.LockoutDuration).AddSeconds(1)).Should().BeFalse();
@@ -108,7 +108,7 @@ public sealed class UserTests
     public void A_successful_login_clears_the_lockout_and_raises_an_event()
     {
         var user = Register();
-        user.RecordFailedLogin(Now);
+        user.RecordFailedLogin(Now, User.MaxFailedAttempts, User.LockoutDuration);
         user.ClearDomainEvents();
 
         var loginAt = Now.AddHours(1);
@@ -255,7 +255,7 @@ public sealed class UserTests
 
         for (var i = 0; i < User.MaxFailedAttempts; i++)
         {
-            user.RecordFailedLogin(Now);
+            user.RecordFailedLogin(Now, User.MaxFailedAttempts, User.LockoutDuration);
         }
 
         user.LockedOutUntil.Should().NotBeNull();

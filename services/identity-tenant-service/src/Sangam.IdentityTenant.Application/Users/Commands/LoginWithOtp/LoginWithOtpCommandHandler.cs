@@ -88,7 +88,7 @@ public sealed class LoginWithOtpCommandHandler(
         user.CompleteOtpSignIn();
         user.RecordSuccessfulLogin(now);
 
-        var session = sessions.Begin(user.Id, user.TenantId);
+        var session = await sessions.BeginAsync(user.Id, user.TenantId, cancellationToken);
 
         await unitOfWork.SaveChangesAsync(cancellationToken);
 

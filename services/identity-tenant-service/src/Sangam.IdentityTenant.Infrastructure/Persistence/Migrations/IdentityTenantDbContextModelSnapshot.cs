@@ -149,6 +149,11 @@ namespace Sangam.IdentityTenant.Infrastructure.Persistence.Migrations
                         {
                             Id = new Guid("b0000000-0000-0000-0000-000000000015"),
                             Key = "Notifications.Broadcast"
+                        },
+                        new
+                        {
+                            Id = new Guid("b0000000-0000-0000-0000-000000000016"),
+                            Key = "Tenant.ManageSecurityPolicy"
                         });
                 });
 
@@ -348,6 +353,11 @@ namespace Sangam.IdentityTenant.Infrastructure.Persistence.Migrations
                         },
                         new
                         {
+                            RoleId = new Guid("a0000000-0000-0000-0000-000000000001"),
+                            PermissionId = new Guid("b0000000-0000-0000-0000-000000000016")
+                        },
+                        new
+                        {
                             RoleId = new Guid("a0000000-0000-0000-0000-000000000002"),
                             PermissionId = new Guid("b0000000-0000-0000-0000-000000000002")
                         },
@@ -435,6 +445,11 @@ namespace Sangam.IdentityTenant.Infrastructure.Persistence.Migrations
                         {
                             RoleId = new Guid("a0000000-0000-0000-0000-000000000002"),
                             PermissionId = new Guid("b0000000-0000-0000-0000-000000000015")
+                        },
+                        new
+                        {
+                            RoleId = new Guid("a0000000-0000-0000-0000-000000000002"),
+                            PermissionId = new Guid("b0000000-0000-0000-0000-000000000016")
                         },
                         new
                         {
@@ -803,6 +818,39 @@ namespace Sangam.IdentityTenant.Infrastructure.Persistence.Migrations
                         .HasDatabaseName("ix_tenants_slug");
 
                     b.ToTable("tenants", (string)null);
+                });
+
+            modelBuilder.Entity("Sangam.IdentityTenant.Domain.Tenants.TenantSecurityPolicy", b =>
+                {
+                    b.Property<Guid>("TenantId")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid")
+                        .HasColumnName("tenant_id");
+
+                    b.Property<int?>("LockoutDurationMinutes")
+                        .HasColumnType("integer")
+                        .HasColumnName("lockout_duration_minutes");
+
+                    b.Property<int?>("MaxFailedLoginAttempts")
+                        .HasColumnType("integer")
+                        .HasColumnName("max_failed_login_attempts");
+
+                    b.Property<int?>("MinPasswordLength")
+                        .HasColumnType("integer")
+                        .HasColumnName("min_password_length");
+
+                    b.Property<int?>("OtpLifetimeMinutes")
+                        .HasColumnType("integer")
+                        .HasColumnName("otp_lifetime_minutes");
+
+                    b.Property<int?>("RefreshTokenLifetimeDays")
+                        .HasColumnType("integer")
+                        .HasColumnName("refresh_token_lifetime_days");
+
+                    b.HasKey("TenantId")
+                        .HasName("pk_tenant_security_policies");
+
+                    b.ToTable("tenant_security_policies", (string)null);
                 });
 
             modelBuilder.Entity("Sangam.IdentityTenant.Domain.Users.RefreshToken", b =>

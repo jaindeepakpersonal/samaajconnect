@@ -1,6 +1,7 @@
 using MediatR;
 using Sangam.IdentityTenant.Application.Abstractions;
 using Sangam.IdentityTenant.Application.Common;
+using Sangam.IdentityTenant.Application.Security;
 using Sangam.IdentityTenant.Domain.Authorization;
 using Sangam.IdentityTenant.Domain.Consents;
 using Sangam.IdentityTenant.Domain.Tenants;
@@ -15,7 +16,8 @@ public sealed class RegisterMemberCommandHandler(
     IUnitOfWork unitOfWork,
     ITenantContext tenantContext,
     IConsentRepository consents,
-    IDateTimeProvider clock)
+    IDateTimeProvider clock,
+    ISecurityPolicyResolver securityPolicy)
     : IRequestHandler<RegisterMemberCommand, Result<RegisterMemberResponse>>
 {
     public async Task<Result<RegisterMemberResponse>> Handle(
@@ -54,6 +56,13 @@ public sealed class RegisterMemberCommandHandler(
         {
             return Result.Failure<RegisterMemberResponse>(
                 Error.Conflict("User.IdentifierTaken", "That mobile number or email is already registered."));
+        }
+
+        var policy = await securityPolicy.ResolveAsync(tenant.Id, cancellationToken);
+
+        if (policy.ValidatePasswordLength(command.Password) is { } lengthError)
+        {
+            return Result.Failure<RegisterMemberResponse>(lengthError);
         }
 
         var user = User.Register(

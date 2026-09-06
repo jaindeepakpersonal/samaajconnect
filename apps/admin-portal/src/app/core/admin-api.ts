@@ -45,6 +45,7 @@ import {
   ResultsVisibility,
   RoleMatrix,
   SamaajEvent,
+  SecurityPolicy,
   SocialIssue,
   Tenant,
   TenantStatus,
@@ -858,5 +859,18 @@ export class AdminApi {
   /** Present/absent/excused across every class this Samaaj runs. */
   attendanceSummary(): Observable<AttendanceSummary> {
     return this.http.get<AttendanceSummary>('/v1/pathshala/attendance-summary');
+  }
+
+  // ---- Settings: Security policy -------------------------------------------
+
+  securityPolicy(tenantId: string): Observable<SecurityPolicy> {
+    return this.http.get<SecurityPolicy>(`/v1/identity/tenants/${tenantId}/security-policy`);
+  }
+
+  /** A null field clears that override back to the platform default. */
+  setSecurityPolicy(tenantId: string, policy: SecurityPolicy): Observable<SecurityPolicy> {
+    return this.http.put<SecurityPolicy>(
+      `/v1/identity/tenants/${tenantId}/security-policy`, policy,
+    );
   }
 }

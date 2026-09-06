@@ -19,12 +19,17 @@ public sealed class SessionService(
     IPasswordHasher hasher,
     IServiceScopeFactory scopeFactory,
     IDateTimeProvider clock,
+    ISecurityPolicyResolver securityPolicy,
     ILogger<SessionService> logger)
     : ISessionService
 {
-    public IssuedSession Begin(Guid userId, Guid tenantId)
+    public async Task<IssuedSession> BeginAsync(
+        Guid userId, Guid tenantId, CancellationToken cancellationToken = default)
     {
-        var (token, plaintext) = RefreshToken.Issue(userId, tenantId, Hash, clock.UtcNow);
+        var policy = await securityPolicy.ResolveAsync(tenantId, cancellationToken);
+
+        var (token, plaintext) = RefreshToken.Issue(
+            userId, tenantId, Hash, clock.UtcNow, policy.RefreshTokenLifetime);
 
         tokens.Add(token);
 
@@ -96,8 +101,10 @@ public sealed class SessionService(
 
         existing.MarkUsed(now);
 
+        var policy = await securityPolicy.ResolveAsync(existing.TenantId, cancellationToken);
+
         var (next, plaintext) = RefreshToken.Issue(
-            existing.UserId, existing.TenantId, Hash, now, existing.SessionId);
+            existing.UserId, existing.TenantId, Hash, now, policy.RefreshTokenLifetime, existing.SessionId);
 
         tokens.Add(next);
 

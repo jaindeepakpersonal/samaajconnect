@@ -29,8 +29,10 @@ public sealed class User : AggregateRoot, ITenantScopedEntity
     /// </summary>
     public static readonly Guid PlatformTenantId = Guid.Empty;
 
+    /// <summary>The platform default, used when a Samaaj has not overridden it.</summary>
     public const int MaxFailedAttempts = 5;
 
+    /// <summary>The platform default, used when a Samaaj has not overridden it.</summary>
     public static readonly TimeSpan LockoutDuration = TimeSpan.FromMinutes(15);
 
     private readonly List<UserRole> _roles = [];
@@ -370,16 +372,21 @@ public sealed class User : AggregateRoot, ITenantScopedEntity
     /// Records a failed password attempt and locks the account once the
     /// threshold is crossed. Returns true if this attempt caused the lockout.
     /// </summary>
-    public bool RecordFailedLogin(DateTimeOffset now)
+    /// <param name="maxAttempts">
+    /// Resolved by the caller (<c>ISecurityPolicyResolver</c>) rather than
+    /// read from <see cref="MaxFailedAttempts"/> directly, the same reason
+    /// <see cref="Users.LoginOtp.Issue"/> takes its lifetime explicitly.
+    /// </param>
+    public bool RecordFailedLogin(DateTimeOffset now, int maxAttempts, TimeSpan lockoutDuration)
     {
         FailedLoginAttempts++;
 
-        if (FailedLoginAttempts < MaxFailedAttempts)
+        if (FailedLoginAttempts < maxAttempts)
         {
             return false;
         }
 
-        LockedOutUntil = now.Add(LockoutDuration);
+        LockedOutUntil = now.Add(lockoutDuration);
         FailedLoginAttempts = 0;
 
         return true;

@@ -1,6 +1,7 @@
 using MediatR;
 using Sangam.IdentityTenant.Application.Abstractions;
 using Sangam.IdentityTenant.Application.Common;
+using Sangam.IdentityTenant.Application.Security;
 using Sangam.IdentityTenant.Domain.Users;
 
 namespace Sangam.IdentityTenant.Application.Users.Commands.RedeemPasswordReset;
@@ -19,7 +20,8 @@ public sealed class RedeemPasswordResetCommandHandler(
     IFailedLoginRecorder failedLoginRecorder,
     ISessionService sessions,
     IUnitOfWork unitOfWork,
-    IDateTimeProvider clock)
+    IDateTimeProvider clock,
+    ISecurityPolicyResolver securityPolicy)
     : IRequestHandler<RedeemPasswordResetCommand, Result<RedeemPasswordResetResponse>>
 {
     private static Result<RedeemPasswordResetResponse> InvalidCode() =>
@@ -53,6 +55,13 @@ public sealed class RedeemPasswordResetCommandHandler(
             await failedLoginRecorder.RecordAsync(user.Id, cancellationToken);
 
             return InvalidCode();
+        }
+
+        var policy = await securityPolicy.ResolveAsync(user.TenantId, cancellationToken);
+
+        if (policy.ValidatePasswordLength(command.NewPassword) is { } lengthError)
+        {
+            return Result.Failure<RedeemPasswordResetResponse>(lengthError);
         }
 
         user.ResetPassword(passwordHasher.Hash(command.NewPassword), now);

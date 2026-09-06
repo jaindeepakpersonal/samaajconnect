@@ -21,6 +21,7 @@ a `Tenant`'s own `Id` **is** the tenant id every other service references.
 | `ConsentRecord` | built | Append-only. One row per decision, per purpose. |
 | `RefreshToken` | built | A session step. Hashed, single-use, rotating. Deliberately not tenant-scoped. |
 | `TenantLogo` | built | A Samaaj mark the platform hosts. Not tenant-scoped, for the reason `Tenant` is not. |
+| `TenantSecurityPolicy` | built | A Samaaj's own overrides to the platform's password/OTP/lockout/session constants. Sparse — no row means no overrides, not zero. |
 
 `Tenant` deliberately does not implement `ITenantScopedEntity`. Applying the
 global query filter to it would make the gateway's own lookups impossible,
@@ -54,6 +55,7 @@ since those happen *before* a tenant is established.
 | `ChangePasswordCommand` | any authenticated role, self only | built |
 | `RequestPasswordResetCommand` | anonymous | built |
 | `RedeemPasswordResetCommand` | anonymous | built |
+| `SetSecurityPolicyCommand` | `SuperAdmin`, `SamaajAdmin` + `Tenant.ManageSecurityPolicy` | built |
 
 A new Samaaj is created **Inactive**. Creating the record and letting it serve
 traffic are two separately audited decisions, so activation is its own command.
@@ -73,6 +75,7 @@ traffic are two separately audited decisions, so activation is its own command.
 | `ListAdminUsersQuery` | `SuperAdmin`, `SamaajAdmin` + `AdminUsers.Manage` | built |
 | `ListRolesQuery` | any authenticated role | built |
 | `GetTenantLogoQuery` | **anonymous** — see below | built |
+| `GetSecurityPolicyQuery` | `SuperAdmin`, `SamaajAdmin` + `Tenant.ManageSecurityPolicy` | built |
 
 `GetTenantBySlugQuery` returns `TenantSummaryResponse`, not `TenantResponse`.
 The endpoint is reachable without a JWT, so it must not hand an anonymous
@@ -154,6 +157,8 @@ offsets for messages it did nothing with.
 | POST | `/v1/identity/tenants/{id}/logo` | `SuperAdmin`, `SamaajAdmin` + `Tenant.Manage` |
 | GET | `/v1/identity/tenants/{id}/logo` | anonymous |
 | DELETE | `/v1/identity/tenants/{id}/logo` | `SuperAdmin`, `SamaajAdmin` + `Tenant.Manage` |
+| GET | `/v1/identity/tenants/{id}/security-policy` | `SuperAdmin`, `SamaajAdmin` + `Tenant.ManageSecurityPolicy` |
+| PUT | `/v1/identity/tenants/{id}/security-policy` | `SuperAdmin`, `SamaajAdmin` + `Tenant.ManageSecurityPolicy` |
 | GET | `/health` | anonymous |
 
 Paths are absolute, not gateway-relative, so the same URL works whether you
@@ -430,6 +435,47 @@ outlives this by fifteen minutes at most, but every refresh token is revoked
 immediately. A stolen refresh token is worth nothing the moment its owner
 changes their password; leaving it live would mean the whole point of changing
 one only bites once that token's own fourteen-day life runs out.
+
+**Five numbers this section names as fixed - the password floor, both OTP
+lifetimes, the lockout threshold and its duration, and the refresh token's
+fourteen days - are now a Samaaj's own choice to tighten or loosen, not just
+the platform's.** `TenantSecurityPolicy` is sparse and override-only, the
+same shape `RolePermissionOverride` already uses for the role matrix: a
+Samaaj that has changed nothing has no row and behaves exactly as it did
+before this existed, and clearing a field (sending it back to `null`) resumes
+tracking the platform default rather than freezing whatever value happened to
+be there.
+
+`ISecurityPolicyResolver` is the one place "a Samaaj's override, or the
+platform default" is decided - every call site that used to read
+`User.MaxFailedAttempts`, `LoginOtp.Lifetime`, `PasswordResetCode.Lifetime` or
+`RefreshToken.Lifetime` directly now resolves a policy and reads a concrete
+value off it instead, and those constants stay exactly where they were,
+now serving as the resolver's own fallback rather than being read by
+five separate call sites each with their own idea of the default.
+
+**The password floor moves in one direction only.** A Samaaj may ask for
+passwords longer than the platform's ten-character minimum; the resolver
+takes `Math.Max(10, override)`, so nothing can ask for shorter ones even if a
+bad row somehow got past `SetSecurityPolicyCommandValidator`'s own 10–64
+range check. This is enforced as a handler-level check
+(`ResolvedSecurityPolicy.ValidatePasswordLength`) in `RegisterMemberCommand`,
+`ActivateAccountCommand`, `ChangePasswordCommand` and
+`RedeemPasswordResetCommand` alike, not as a change to any of their four
+existing `MinimumLength(10)` FluentValidation rules - two of those four are
+anonymous requests with no resolved tenant at validation time, so a
+tenant-aware validator was never an option for all four uniformly. The
+platform floor those validators already enforce has to hold regardless of
+Samaaj, so it stays exactly as it was; a stricter Samaaj asks for more on top
+of it, checked once the handler has loaded the account and can resolve which
+Samaaj it belongs to.
+
+**Setting it is `SuperAdmin`/`SamaajAdmin` self-tenant-only, the same shape
+the grievance contact and the tenant logo already use** - a new permission,
+`Tenant.ManageSecurityPolicy`, rather than reusing `Tenant.Manage` (reserved
+platform-level by its own doc comment: "which modules exist is a
+platform-level decision") or `AdminUsers.Manage` (about administrator
+accounts, not security policy).
 
 ## Consent and the DPDP Act
 

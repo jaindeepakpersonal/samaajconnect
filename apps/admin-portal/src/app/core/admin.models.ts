@@ -696,3 +696,19 @@ export interface AttendanceSummary {
   /** Null when nothing has been marked yet - zero would be a claim. */
   readonly percentage: number | null;
 }
+
+// ---- Settings: Security policy ---------------------------------------------
+
+/**
+ * Mirrors `SecurityPolicyResponse` - a Samaaj's own overrides, raw and
+ * nullable. Null means "using the platform default", not zero and not
+ * "unset in a way that breaks anything" - each field can be cleared back to
+ * the default independently of the others.
+ */
+export interface SecurityPolicy {
+  readonly minPasswordLength: number | null;
+  readonly otpLifetimeMinutes: number | null;
+  readonly maxFailedLoginAttempts: number | null;
+  readonly lockoutDurationMinutes: number | null;
+  readonly refreshTokenLifetimeDays: number | null;
+}

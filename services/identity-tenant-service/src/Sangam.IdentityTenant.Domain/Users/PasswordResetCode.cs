@@ -20,6 +20,7 @@ namespace Sangam.IdentityTenant.Domain.Users;
 /// </remarks>
 public sealed class PasswordResetCode
 {
+    /// <summary>The platform default, used when a Samaaj has not overridden it.</summary>
     public static readonly TimeSpan Lifetime = TimeSpan.FromMinutes(10);
 
     public string Hash { get; private set; } = null!;
@@ -28,7 +29,13 @@ public sealed class PasswordResetCode
 
     private PasswordResetCode() { }
 
-    public static (PasswordResetCode Code, string Plaintext) Issue(Func<string, string> hasher, DateTimeOffset now)
+    /// <param name="lifetime">
+    /// Resolved by the caller (<c>ISecurityPolicyResolver</c>) - see
+    /// <see cref="LoginOtp.Issue"/> for why this class never reads
+    /// <see cref="Lifetime"/> itself.
+    /// </param>
+    public static (PasswordResetCode Code, string Plaintext) Issue(
+        Func<string, string> hasher, DateTimeOffset now, TimeSpan lifetime)
     {
         var plaintext = Generate();
 
@@ -36,7 +43,7 @@ public sealed class PasswordResetCode
         {
             Hash = hasher(plaintext),
             IssuedAt = now,
-            ExpiresAt = now.Add(Lifetime),
+            ExpiresAt = now.Add(lifetime),
         };
 
         return (code, plaintext);

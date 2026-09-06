@@ -17,8 +17,11 @@ namespace Sangam.IdentityTenant.Application.Abstractions;
 /// </remarks>
 public interface ISessionService
 {
-    /// <summary>Begins a session and returns the token to hand to the caller.</summary>
-    IssuedSession Begin(Guid userId, Guid tenantId);
+    /// <summary>
+    /// Begins a session and returns the token to hand to the caller. Async
+    /// because it resolves the tenant's own refresh-token lifetime first.
+    /// </summary>
+    Task<IssuedSession> BeginAsync(Guid userId, Guid tenantId, CancellationToken cancellationToken = default);
 
     /// <summary>
     /// Redeems a refresh token for the next one in its chain.

@@ -18,7 +18,7 @@ public sealed class PasswordResetCodeTests
     [Fact]
     public void Issue_returns_a_six_digit_plaintext_and_a_hash_of_it()
     {
-        var (code, plaintext) = PasswordResetCode.Issue(p => $"hash({p})", Now);
+        var (code, plaintext) = PasswordResetCode.Issue(p => $"hash({p})", Now, PasswordResetCode.Lifetime);
 
         plaintext.Should().MatchRegex("^[0-9]{6}$");
         code.Hash.Should().Be($"hash({plaintext})");
@@ -27,7 +27,7 @@ public sealed class PasswordResetCodeTests
     [Fact]
     public void Is_usable_until_its_ten_minute_lifetime_passes()
     {
-        var (code, _) = PasswordResetCode.Issue(p => p, Now);
+        var (code, _) = PasswordResetCode.Issue(p => p, Now, PasswordResetCode.Lifetime);
 
         code.IsUsable(Now.AddMinutes(9)).Should().BeTrue();
         code.IsUsable(Now.AddMinutes(10)).Should().BeFalse();
@@ -90,6 +90,7 @@ public sealed class RequestPasswordResetCommandHandlerTests
     private readonly IPasswordHasher _hasher = Substitute.For<IPasswordHasher>();
     private readonly IUnitOfWork _unitOfWork = Substitute.For<IUnitOfWork>();
     private readonly IDateTimeProvider _clock = Substitute.For<IDateTimeProvider>();
+    private readonly ISecurityPolicyResolver _securityPolicy = Substitute.For<ISecurityPolicyResolver>();
     private readonly RequestPasswordResetCommandHandler _handler;
 
     private readonly Tenant _tenant;
@@ -108,8 +109,12 @@ public sealed class RequestPasswordResetCommandHandlerTests
 
         _users.FindForLoginAsync("ravi@example.com", Arg.Any<CancellationToken>()).Returns(_user);
         _tenants.GetByIdAsync(_tenant.Id, Arg.Any<CancellationToken>()).Returns(_tenant);
+        _securityPolicy.ResolveAsync(Arg.Any<Guid>(), Arg.Any<CancellationToken>()).Returns(
+            new ResolvedSecurityPolicy(
+                10, PasswordResetCode.Lifetime, User.MaxFailedAttempts, User.LockoutDuration, RefreshToken.Lifetime));
 
-        _handler = new RequestPasswordResetCommandHandler(_users, _tenants, _hasher, _unitOfWork, _clock);
+        _handler = new RequestPasswordResetCommandHandler(
+            _users, _tenants, _hasher, _unitOfWork, _clock, _securityPolicy);
     }
 
     private Task<Result<RequestPasswordResetResponse>> Request(string identifier = "ravi@example.com") =>
@@ -159,6 +164,7 @@ public sealed class RedeemPasswordResetCommandHandlerTests
     private readonly ISessionService _sessions = Substitute.For<ISessionService>();
     private readonly IUnitOfWork _unitOfWork = Substitute.For<IUnitOfWork>();
     private readonly IDateTimeProvider _clock = Substitute.For<IDateTimeProvider>();
+    private readonly ISecurityPolicyResolver _securityPolicy = Substitute.For<ISecurityPolicyResolver>();
     private readonly RedeemPasswordResetCommandHandler _handler;
 
     private readonly Tenant _tenant;
@@ -180,16 +186,19 @@ public sealed class RedeemPasswordResetCommandHandlerTests
         _user = User.Register(_tenant.Id, "ravi@example.com", "Ravi Shah", "old-hash",
             AuthorizationCatalog.RoleIds.Member, Now);
 
-        var (code, plaintext) = PasswordResetCode.Issue(_hasher.Hash, Now);
+        var (code, plaintext) = PasswordResetCode.Issue(_hasher.Hash, Now, PasswordResetCode.Lifetime);
         _correctCode = plaintext;
         _wrongCode = plaintext == "999999" ? "000000" : "999999";
         _user.RequestPasswordReset(code, plaintext, Now);
 
         _users.FindForLoginAsync("ravi@example.com", Arg.Any<CancellationToken>()).Returns(_user);
         _hasher.Verify(_correctCode, $"hash({_correctCode})").Returns(true);
+        _securityPolicy.ResolveAsync(Arg.Any<Guid>(), Arg.Any<CancellationToken>()).Returns(
+            new ResolvedSecurityPolicy(
+                10, PasswordResetCode.Lifetime, User.MaxFailedAttempts, User.LockoutDuration, RefreshToken.Lifetime));
 
         _handler = new RedeemPasswordResetCommandHandler(
-            _users, _hasher, _failedLogins, _sessions, _unitOfWork, _clock);
+            _users, _hasher, _failedLogins, _sessions, _unitOfWork, _clock, _securityPolicy);
     }
 
     private Task<Result<RedeemPasswordResetResponse>> Redeem(
@@ -254,7 +263,7 @@ public sealed class RedeemPasswordResetCommandHandlerTests
     {
         for (var attempt = 0; attempt < User.MaxFailedAttempts; attempt++)
         {
-            _user.RecordFailedLogin(Now);
+            _user.RecordFailedLogin(Now, User.MaxFailedAttempts, User.LockoutDuration);
         }
 
         var result = await Redeem();

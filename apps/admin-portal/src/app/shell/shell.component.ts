@@ -288,7 +288,7 @@ const NAV: readonly NavGroup[] = [
     items: [
       { label: 'Notifications', route: '/notifications' },
       { label: 'Reports & Analytics', route: '/reports' },
-      { label: 'Settings', pending: 'Samaaj settings live on the Samaaj screen for now.' },
+      { label: 'Settings', route: '/settings' },
     ],
   },
 ];

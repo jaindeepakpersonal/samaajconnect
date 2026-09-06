@@ -18,7 +18,7 @@ public sealed class LoginOtpTests
     [Fact]
     public void Issue_returns_a_six_digit_plaintext_and_a_hash_of_it()
     {
-        var (code, plaintext) = LoginOtp.Issue(p => $"hash({p})", Now);
+        var (code, plaintext) = LoginOtp.Issue(p => $"hash({p})", Now, LoginOtp.Lifetime);
 
         plaintext.Should().MatchRegex("^[0-9]{6}$");
         code.Hash.Should().Be($"hash({plaintext})");
@@ -27,7 +27,7 @@ public sealed class LoginOtpTests
     [Fact]
     public void Is_usable_until_its_ten_minute_lifetime_passes()
     {
-        var (code, _) = LoginOtp.Issue(p => p, Now);
+        var (code, _) = LoginOtp.Issue(p => p, Now, LoginOtp.Lifetime);
 
         code.IsUsable(Now.AddMinutes(9)).Should().BeTrue();
         code.IsUsable(Now.AddMinutes(10)).Should().BeFalse();
@@ -60,6 +60,7 @@ public sealed class RequestLoginOtpCommandHandlerTests
     private readonly IPasswordHasher _hasher = Substitute.For<IPasswordHasher>();
     private readonly IUnitOfWork _unitOfWork = Substitute.For<IUnitOfWork>();
     private readonly IDateTimeProvider _clock = Substitute.For<IDateTimeProvider>();
+    private readonly ISecurityPolicyResolver _securityPolicy = Substitute.For<ISecurityPolicyResolver>();
     private readonly RequestLoginOtpCommandHandler _handler;
 
     private readonly Tenant _tenant;
@@ -78,8 +79,10 @@ public sealed class RequestLoginOtpCommandHandlerTests
 
         _users.FindForLoginAsync("ravi@example.com", Arg.Any<CancellationToken>()).Returns(_user);
         _tenants.GetByIdAsync(_tenant.Id, Arg.Any<CancellationToken>()).Returns(_tenant);
+        _securityPolicy.ResolveAsync(Arg.Any<Guid>(), Arg.Any<CancellationToken>()).Returns(
+            new ResolvedSecurityPolicy(10, LoginOtp.Lifetime, User.MaxFailedAttempts, User.LockoutDuration, RefreshToken.Lifetime));
 
-        _handler = new RequestLoginOtpCommandHandler(_users, _tenants, _hasher, _unitOfWork, _clock);
+        _handler = new RequestLoginOtpCommandHandler(_users, _tenants, _hasher, _unitOfWork, _clock, _securityPolicy);
     }
 
     private Task<Result<RequestLoginOtpResponse>> Request(string identifier = "ravi@example.com") =>
@@ -132,7 +135,7 @@ public sealed class RequestLoginOtpCommandHandlerTests
     {
         for (var attempt = 0; attempt < User.MaxFailedAttempts; attempt++)
         {
-            _user.RecordFailedLogin(Now);
+            _user.RecordFailedLogin(Now, User.MaxFailedAttempts, User.LockoutDuration);
         }
 
         var result = await Request();
@@ -212,7 +215,7 @@ public sealed class LoginWithOtpCommandHandlerTests
         _user = User.Register(_tenant.Id, "ravi@example.com", "Ravi Shah", "stored-hash",
             AuthorizationCatalog.RoleIds.Member, Now);
 
-        var (code, plaintext) = LoginOtp.Issue(_hasher.Hash, Now);
+        var (code, plaintext) = LoginOtp.Issue(_hasher.Hash, Now, LoginOtp.Lifetime);
         _correctCode = plaintext;
         _wrongCode = plaintext == "999999" ? "000000" : "999999";
         _user.RequestLoginOtp(code, plaintext, Now);
@@ -227,7 +230,7 @@ public sealed class LoginWithOtpCommandHandlerTests
                 Arg.Any<IReadOnlyCollection<string>>(), Arg.Any<IReadOnlyCollection<string>>())
             .Returns(new AccessToken("signed-token", Now.AddHours(1)));
 
-        _sessions.Begin(Arg.Any<Guid>(), Arg.Any<Guid>()).Returns(
+        _sessions.BeginAsync(Arg.Any<Guid>(), Arg.Any<Guid>(), Arg.Any<CancellationToken>()).Returns(
             new IssuedSession(_user.Id, _tenant.Id, Guid.NewGuid(), "refresh-token", Now.AddDays(14)));
 
         _handler = new LoginWithOtpCommandHandler(
@@ -293,7 +296,7 @@ public sealed class LoginWithOtpCommandHandlerTests
     {
         for (var attempt = 0; attempt < User.MaxFailedAttempts; attempt++)
         {
-            _user.RecordFailedLogin(Now);
+            _user.RecordFailedLogin(Now, User.MaxFailedAttempts, User.LockoutDuration);
         }
 
         var result = await Login();

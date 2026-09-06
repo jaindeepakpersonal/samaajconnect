@@ -48,7 +48,7 @@ public sealed class LoginCommandHandlerTests
                 Arg.Any<IReadOnlyCollection<string>>(), Arg.Any<IReadOnlyCollection<string>>())
             .Returns(new AccessToken("signed-token", Now.AddHours(1)));
 
-        _sessions.Begin(Arg.Any<Guid>(), Arg.Any<Guid>()).Returns(
+        _sessions.BeginAsync(Arg.Any<Guid>(), Arg.Any<Guid>(), Arg.Any<CancellationToken>()).Returns(
             new IssuedSession(_user.Id, _tenant.Id, Guid.NewGuid(), "refresh-token", Now.AddDays(14)));
 
         _handler = new LoginCommandHandler(
@@ -117,7 +117,7 @@ public sealed class LoginCommandHandlerTests
     {
         for (var attempt = 0; attempt < User.MaxFailedAttempts; attempt++)
         {
-            _user.RecordFailedLogin(Now);
+            _user.RecordFailedLogin(Now, User.MaxFailedAttempts, User.LockoutDuration);
         }
 
         var result = await Login();

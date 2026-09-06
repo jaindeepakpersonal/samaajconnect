@@ -97,6 +97,7 @@ public sealed class ChangePasswordCommandHandlerTests
     private readonly IUnitOfWork _unitOfWork = Substitute.For<IUnitOfWork>();
     private readonly ICurrentUser _currentUser = Substitute.For<ICurrentUser>();
     private readonly IDateTimeProvider _clock = Substitute.For<IDateTimeProvider>();
+    private readonly ISecurityPolicyResolver _securityPolicy = Substitute.For<ISecurityPolicyResolver>();
     private readonly ChangePasswordCommandHandler _handler;
     private readonly User _user;
 
@@ -109,6 +110,9 @@ public sealed class ChangePasswordCommandHandlerTests
         _currentUser.UserId.Returns(_user.Id);
         _hasher.Verify("correct-horse", "old-hash").Returns(true);
         _hasher.Hash("a-new-long-password").Returns("new-hash");
+        _securityPolicy.ResolveAsync(Arg.Any<Guid>(), Arg.Any<CancellationToken>()).Returns(
+            new ResolvedSecurityPolicy(
+                10, LoginOtp.Lifetime, User.MaxFailedAttempts, User.LockoutDuration, RefreshToken.Lifetime));
 
         // GetSelfAsync, not GetByIdAsync - the same reason StepUpAuthentication
         // reads past the tenant filter: a Super Admin's own account lives at
@@ -116,7 +120,7 @@ public sealed class ChangePasswordCommandHandlerTests
         _users.GetSelfAsync(_user.Id, Arg.Any<CancellationToken>()).Returns(_user);
 
         _handler = new ChangePasswordCommandHandler(
-            _users, _hasher, _failedLoginRecorder, _sessions, _unitOfWork, _currentUser, _clock);
+            _users, _hasher, _failedLoginRecorder, _sessions, _unitOfWork, _currentUser, _clock, _securityPolicy);
     }
 
     private Task<Result<ChangePasswordResponse>> Handle(string currentPassword, string newPassword = "a-new-long-password") =>
@@ -170,7 +174,7 @@ public sealed class ChangePasswordCommandHandlerTests
     {
         for (var i = 0; i < User.MaxFailedAttempts; i++)
         {
-            _user.RecordFailedLogin(Now);
+            _user.RecordFailedLogin(Now, User.MaxFailedAttempts, User.LockoutDuration);
         }
 
         var result = await Handle("correct-horse");

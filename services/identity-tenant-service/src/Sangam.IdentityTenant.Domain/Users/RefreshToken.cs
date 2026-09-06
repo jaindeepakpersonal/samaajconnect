@@ -37,9 +37,10 @@ namespace Sangam.IdentityTenant.Domain.Users;
 public sealed class RefreshToken
 {
     /// <summary>
-    /// How long a session survives without being used. Long enough that a
-    /// member who opens the app most days is never signed out; short enough
-    /// that a device found in a drawer is not a live session.
+    /// The platform default for how long a session survives without being
+    /// used, when a Samaaj has not overridden it. Long enough that a member
+    /// who opens the app most days is never signed out; short enough that a
+    /// device found in a drawer is not a live session.
     /// </summary>
     public static readonly TimeSpan Lifetime = TimeSpan.FromDays(14);
 
@@ -73,13 +74,17 @@ public sealed class RefreshToken
 
     /// <summary>
     /// Starts a new session. <paramref name="sessionId"/> continues an existing
-    /// chain; omit it to begin one.
+    /// chain; omit it to begin one. <paramref name="lifetime"/> is resolved by
+    /// the caller (<c>ISecurityPolicyResolver</c>) rather than read from
+    /// <see cref="Lifetime"/> directly, the same reason <see cref="LoginOtp.Issue"/>
+    /// takes one explicitly.
     /// </summary>
     public static (RefreshToken Token, string Plaintext) Issue(
         Guid userId,
         Guid tenantId,
         Func<string, string> hash,
         DateTimeOffset now,
+        TimeSpan lifetime,
         Guid? sessionId = null)
     {
         // URL-safe base64 so the value survives a JSON body and a header
@@ -94,7 +99,7 @@ public sealed class RefreshToken
             SessionId = sessionId ?? Guid.NewGuid(),
             TokenHash = hash(plaintext),
             IssuedAt = now,
-            ExpiresAt = now.Add(Lifetime),
+            ExpiresAt = now.Add(lifetime),
         };
 
         return (token, plaintext);

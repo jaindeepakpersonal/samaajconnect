@@ -8,7 +8,38 @@ version of the plan; the reasoning behind the ordering lives in
 ## Current Status
 
 - **Stage:** every module has a service and member screens; Phase 5 hardening under way
-- **Last updated:** 2026-09-06 - **the admin panel's "Reports & Analytics" nav
+- **Last updated:** 2026-09-06 - **the admin panel's Settings screen is real -
+  Security, a Samaaj's own overrides to five platform-wide constants, plus
+  honest pointers or honest gaps for the other three wireframe cards.**
+
+  Password minimum length, OTP lifetime, lockout threshold and duration, and
+  session length were all hardcoded platform-wide constants read directly by
+  five different call sites. `TenantSecurityPolicy` is a new, deliberately
+  sparse entity - no row means no overrides, the same shape
+  `RolePermissionOverride` already uses for the role matrix - and
+  `ISecurityPolicyResolver` is the one place "a Samaaj's override, or the
+  platform default" gets decided, so every one of those five call sites now
+  resolves a policy instead of reading a constant. The password floor moves
+  in one direction only: a Samaaj may ask for longer passwords than the
+  platform's ten-character minimum, never shorter, enforced at the resolver
+  itself (`Math.Max(10, override)`) as well as by the command validator's own
+  10-64 range.
+
+  Module Controls and Tenant Branding's logo/contact fields already lived on
+  the Samaaj/Tenants screen, so the Settings screen's cards for both just
+  point there. Tenant Branding's "colors" and Notification Providers both
+  stayed unbuilt on purpose - no per-tenant theming system exists for the
+  first to render into, and no real email/SMS/WhatsApp provider exists
+  anywhere on the platform for the second to configure.
+
+  Verified with 254 identity-tenant-service unit tests (7 new) and 204
+  integration tests (8 new, including a live walkthrough proving a tenant's
+  own tighter lockout threshold actually locks an account sooner than the
+  platform default), 223 admin-portal component tests (6 new), full builds,
+  `tsc --noEmit`, `scripts/css-class-coverage.sh`, `scripts/service-docs.sh`,
+  `scripts/audit-descriptor-coverage.sh`, `scripts/unreachable-endpoints.sh`,
+  `scripts/uncalled-api-methods.sh`.
+- **Previously:** 2026-09-06 - **the admin panel's "Reports & Analytics" nav
   item is real now - its three per-Samaaj cards, not the wireframe's
   Super-Admin-only tenant comparison table.**
 

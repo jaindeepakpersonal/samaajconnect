@@ -16,7 +16,8 @@ public sealed class RequestPasswordResetCommandHandler(
     ITenantRepository tenants,
     IPasswordHasher passwordHasher,
     IUnitOfWork unitOfWork,
-    IDateTimeProvider clock)
+    IDateTimeProvider clock,
+    ISecurityPolicyResolver securityPolicy)
     : IRequestHandler<RequestPasswordResetCommand, Result<RequestPasswordResetResponse>>
 {
     public async Task<Result<RequestPasswordResetResponse>> Handle(
@@ -43,7 +44,8 @@ public sealed class RequestPasswordResetCommandHandler(
             }
         }
 
-        var (code, plaintext) = PasswordResetCode.Issue(passwordHasher.Hash, now);
+        var policy = await securityPolicy.ResolveAsync(user.TenantId, cancellationToken);
+        var (code, plaintext) = PasswordResetCode.Issue(passwordHasher.Hash, now, policy.OtpLifetime);
 
         user.RequestPasswordReset(code, plaintext, now);
 

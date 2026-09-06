@@ -20,6 +20,7 @@ public sealed class RegisterMemberCommandHandlerTests
     private readonly ITenantContext _tenantContext = Substitute.For<ITenantContext>();
     private readonly IConsentRepository _consents = Substitute.For<IConsentRepository>();
     private readonly IDateTimeProvider _clock = Substitute.For<IDateTimeProvider>();
+    private readonly ISecurityPolicyResolver _securityPolicy = Substitute.For<ISecurityPolicyResolver>();
     private readonly RegisterMemberCommandHandler _handler;
 
     private readonly Tenant _tenant;
@@ -33,9 +34,12 @@ public sealed class RegisterMemberCommandHandlerTests
         _tenant.ChangeStatus(TenantStatus.Active, Now);
 
         _tenants.GetBySlugAsync("mumbai", Arg.Any<CancellationToken>()).Returns(_tenant);
+        _securityPolicy.ResolveAsync(Arg.Any<Guid>(), Arg.Any<CancellationToken>()).Returns(
+            new ResolvedSecurityPolicy(
+                10, LoginOtp.Lifetime, User.MaxFailedAttempts, User.LockoutDuration, RefreshToken.Lifetime));
 
         _handler = new RegisterMemberCommandHandler(
-            _tenants, _users, _passwordHasher, _unitOfWork, _tenantContext, _consents, _clock);
+            _tenants, _users, _passwordHasher, _unitOfWork, _tenantContext, _consents, _clock, _securityPolicy);
     }
 
     private Task<Result<Application.Users.RegisterMemberResponse>> Register(
