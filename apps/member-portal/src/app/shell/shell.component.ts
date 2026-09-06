@@ -92,14 +92,42 @@ const ALL_NAV_ITEMS: readonly NavItem[] = NAV.flatMap((group) => group.items);
   styleUrl: './shell.css',
   template: `
     <div class="shell">
-      <aside class="side">
+      <!--
+        Mobile only (hidden by CSS above 700px). Unconditionally rendered
+        with aria-expanded rather than swapped for a close button, per this
+        app's own rule that a trigger stays in the DOM - the same reasoning
+        the privacy screen's erasure panel already follows, applied to a
+        menu instead of a confirmation.
+      -->
+      <button
+        type="button"
+        class="nav-toggle"
+        [attr.aria-expanded]="navOpen()"
+        aria-controls="shell-nav"
+        (click)="toggleNav()"
+      >
+        <span aria-hidden="true">☰</span>
+        <span class="sr-only">{{ navOpen() ? 'Close menu' : 'Open menu' }}</span>
+      </button>
+
+      @if (navOpen()) {
+        <!-- Closes the menu without also acting as a second way to navigate. -->
+        <button type="button" class="nav-backdrop" aria-hidden="true" (click)="closeNav()"></button>
+      }
+
+      <aside class="side" id="shell-nav" [class.open]="navOpen()">
         <div class="brand">samaajconnect</div>
 
         <nav class="nav" aria-label="Main sections">
           @for (group of visibleNav(); track group.heading) {
             <div class="grp">{{ group.heading }}</div>
             @for (item of group.items; track item.route) {
-              <a [routerLink]="item.route" routerLinkActive="active" [routerLinkActiveOptions]="{ exact: false }">
+              <a
+                [routerLink]="item.route"
+                routerLinkActive="active"
+                [routerLinkActiveOptions]="{ exact: false }"
+                (click)="closeNav()"
+              >
                 {{ item.label }}
                 @if (item.route === '/notifications' && unread() > 0) {
                   <span class="badge">{{ unread() }}</span>
@@ -148,6 +176,10 @@ export class ShellComponent implements OnInit {
   readonly samaaj = signal<TenantSummary | null>(null);
   readonly unread = signal(0);
 
+  /** The mobile nav drawer. Always false above the 700px breakpoint - the
+   *  toggle button is hidden there by CSS, so nothing ever sets it. */
+  readonly navOpen = signal(false);
+
   readonly samaajName = computed(() => this.samaaj()?.name ?? this.auth.user()?.tenantSlug ?? '');
 
   readonly visibleNav = computed(() => {
@@ -195,6 +227,14 @@ export class ShellComponent implements OnInit {
     this.router.events
       .pipe(filter((event): event is NavigationEnd => event instanceof NavigationEnd))
       .subscribe(() => this.loadUnread());
+  }
+
+  toggleNav(): void {
+    this.navOpen.update((open) => !open);
+  }
+
+  closeNav(): void {
+    this.navOpen.set(false);
   }
 
   signOut(): void {

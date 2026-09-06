@@ -3,6 +3,16 @@
   min-height: 100vh;
 }
 
+/* Mobile only - see the media query below. Sits above everything else so it
+   stays reachable however far the page has scrolled. */
+.nav-toggle {
+  display: none;
+}
+
+.nav-backdrop {
+  display: none;
+}
+
 .side {
   width: var(--side-width);
   background: var(--side);
@@ -138,11 +148,49 @@ main {
   }
 }
 
+/* Below this width the sidebar stacking above the page (the old rule here)
+   meant an administrator scrolled past the entire nav - every group, every
+   link - before reaching a single word of the screen they opened the panel
+   for. It is an off-canvas drawer instead: hidden until the toggle button
+   opens it, over the content rather than pushing it down. */
 @media (max-width: 700px) {
+  .nav-toggle {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    position: fixed;
+    top: var(--space-3);
+    left: var(--space-3);
+    z-index: 60;
+    width: 40px;
+    height: 40px;
+    border: 0;
+    border-radius: var(--radius-pill);
+    background: var(--side);
+    color: #fff;
+    font-size: 18px;
+    cursor: pointer;
+  }
+
+  .nav-backdrop {
+    display: block;
+    position: fixed;
+    inset: 0;
+    z-index: 40;
+    border: 0;
+    padding: 0;
+    background: rgb(0 0 0 / 45%);
+  }
+
   .side {
-    position: static;
-    width: 100%;
-    bottom: auto;
+    z-index: 50;
+    width: min(80vw, 300px);
+    transform: translateX(-100%);
+    transition: transform 200ms ease-in-out;
+  }
+
+  .side.open {
+    transform: translateX(0);
   }
 
   .app {
@@ -153,5 +201,14 @@ main {
     margin-left: 0;
     width: 100%;
     padding: var(--space-4);
+    /* Clears the floating toggle button, which would otherwise sit on top
+       of the bar's contents. */
+    padding-top: calc(var(--space-3) * 2 + 40px);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .side {
+    transition: none;
   }
 }

@@ -39,7 +39,28 @@ interface NavGroup {
     <a class="skip-link" href="#main-content">Skip to the main content</a>
 
     <div class="app">
-      <aside class="side">
+      <!--
+        Mobile only (hidden by CSS above 700px). Unconditionally rendered
+        with aria-expanded rather than swapped for a close button, matching
+        member-portal's own shell.
+      -->
+      <button
+        type="button"
+        class="nav-toggle"
+        [attr.aria-expanded]="navOpen()"
+        aria-controls="shell-nav"
+        (click)="toggleNav()"
+      >
+        <span aria-hidden="true">☰</span>
+        <span class="sr-only">{{ navOpen() ? 'Close menu' : 'Open menu' }}</span>
+      </button>
+
+      @if (navOpen()) {
+        <!-- Closes the menu without also acting as a second way to navigate. -->
+        <button type="button" class="nav-backdrop" aria-hidden="true" (click)="closeNav()"></button>
+      }
+
+      <aside class="side" id="shell-nav" [class.open]="navOpen()">
         <div class="brand">samaajconnect<br /><span>Unified Admin</span></div>
         <div class="scope">{{ scopeLabel() }}</div>
 
@@ -52,6 +73,7 @@ interface NavGroup {
                   [routerLink]="item.route"
                   routerLinkActive="active"
                   [routerLinkActiveOptions]="{ exact: false }"
+                  (click)="closeNav()"
                 >
                   {{ item.label }}
                 </a>
@@ -139,6 +161,10 @@ export class ShellComponent implements OnInit {
 
   readonly tenants = signal<readonly Tenant[]>([]);
 
+  /** The mobile nav drawer. Always false above the 700px breakpoint - the
+   *  toggle button is hidden there by CSS, so nothing ever sets it. */
+  readonly navOpen = signal(false);
+
   readonly isSuperAdmin = computed(() => this.auth.roles().includes('SuperAdmin'));
 
   readonly scopeLabel = computed(() => {
@@ -165,6 +191,14 @@ export class ShellComponent implements OnInit {
     // by the time anything renders. The shell only has to fill the Samaaj
     // selector, and only a Super Admin has one.
     this.loadTenantsIfPlatformAdmin();
+  }
+
+  toggleNav(): void {
+    this.navOpen.update((open) => !open);
+  }
+
+  closeNav(): void {
+    this.navOpen.set(false);
   }
 
   pick(event: Event): void {

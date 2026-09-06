@@ -611,5 +611,17 @@ somewhere focusable to land.
 shell, so it has no navigation to skip past, and a skip link that jumps nowhere
 is noise in the tab order rather than a service.
 
+**Below 700px the sidebar is an off-canvas drawer, not a stack, and this was
+member-portal's fix copied rather than a separate finding.** The old mobile
+rule dropped `.side` to `position: static; width: 100%`, so an administrator
+on a phone scrolled past every nav group - Overview through Operations -
+before reaching a single word of the screen they opened the panel for. A
+`navOpen` signal on `ShellComponent` now gates a fixed drawer that transforms
+in over a backdrop, triggered by a floating hamburger button that stays in
+the DOM at every width. It closes on a backdrop click and on any nav link
+click. Both shells had the identical defect because both were built the same
+way - a sidebar sized for desktop with a narrow-viewport rule that only ever
+stacked it, never collapsed it.
+
 Not yet done: a pass with a real screen reader, and a keyboard-only walkthrough
 of the role matrix, which is the widest table in either app.

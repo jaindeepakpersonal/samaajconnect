@@ -8,7 +8,28 @@ version of the plan; the reasoning behind the ordering lives in
 ## Current Status
 
 - **Stage:** every module has a service and member screens; Phase 5 hardening under way
-- **Last updated:** 2026-09-05 - **forgot password, the login screen's second
+- **Last updated:** 2026-09-06 - **both shells' sidebars didn't collapse on
+  mobile, they stacked - a member or administrator on a phone scrolled past
+  every nav group before reaching a single word of the screen they opened
+  the app for.**
+
+  The narrow-viewport rule in both `shell/shell.css` files dropped the
+  sidebar out of the flex layout and let it sit above the page content full
+  width, with no way to get it out of the way. Both shells now gate the
+  sidebar behind a `navOpen` signal: a fixed off-canvas drawer, hidden by a
+  `translateX` transform until a floating hamburger button opens it over a
+  dimmed backdrop, closing on a backdrop click or a nav-link click. The
+  toggle button itself stays in the DOM at every width - the same "trigger
+  never leaves" rule this platform's confirmation panels already follow -
+  rather than being swapped for a close button.
+
+  Verified with the full 363-test member-portal suite and 204-test
+  admin-portal suite (no new tests needed - this is layout, not behaviour),
+  `tsc --noEmit` against both apps' app and spec configs,
+  `scripts/css-class-coverage.sh`, and a live walkthrough of both apps at a
+  375px viewport: the drawer opens, closes via backdrop and via nav-link
+  click, and the desktop layout (≥701px) is pixel-identical to before.
+- **Previously:** 2026-09-05 - **forgot password, the login screen's second
   and last stub, closed the same day as the first (OTP sign-in, previous
   entry) - the member-portal login screen has no unfinished pieces left.**
 

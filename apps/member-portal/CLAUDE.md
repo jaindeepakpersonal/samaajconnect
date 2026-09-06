@@ -150,6 +150,20 @@ members, 4 family, 6 events. Those services do not exist, and the skill is
 explicit that prototype values must not be hardcoded, so a tile carries a count
 only once something can supply one.
 
+**Below 700px the sidebar is an off-canvas drawer, not a stack.** The shell's
+first mobile rule simply let `.side` fall out of the flex row and sit above
+`.content`, so a member on a phone scrolled past every nav group before
+reaching a single word of the screen they opened the app for. `navOpen` (a
+signal on `ShellComponent`) now gates a fixed-position drawer that transforms
+in from the left over a backdrop, triggered by a floating hamburger button
+that stays in the DOM at every width rather than being swapped for a close
+button - the same "trigger never leaves" rule this app already applies to
+confirmation panels. The drawer closes on a backdrop click and on any nav
+link click, so choosing a destination doesn't leave the menu covering it.
+admin-portal's shell had the identical defect and got the identical fix,
+since both shells share this one bug's shape: a sidebar built for desktop
+with only a stacking rule for narrow viewports, never a collapsing one.
+
 **Home hides modules the Samaaj has switched off.** The gateway already answers
 404 for those routes, so offering the tile would be offering a door to a 404.
 The "no modules enabled" notice is keyed off whether any *optional* module is
