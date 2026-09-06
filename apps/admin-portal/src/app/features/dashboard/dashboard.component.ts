@@ -1,5 +1,6 @@
 import { Component, OnInit, computed, inject, signal } from '@angular/core';
 import { RouterLink } from '@angular/router';
+import { forkJoin, map, of, switchMap } from 'rxjs';
 import { AuthService } from '@samaajconnect/shared';
 import { AdminApi } from '../../core/admin-api';
 import { AdminScope } from '../../core/admin-scope';
@@ -8,15 +9,14 @@ import { AdminScope } from '../../core/admin-scope';
  * Dashboard, from the admin wireframe's `#dashboard` screen.
  *
  * The wireframe's six tiles read 12 Samaaj, 18,420 members, 37 pending
- * approvals, 26 events, 2,180 students, 8 auctions. Five of those six have no
- * service behind them, and the wireframe-to-angular skill is explicit that
- * prototype numbers must not be hardcoded - so a tile appears only once
- * something can answer it, and the rest are named as what is still to come
- * rather than quietly dropped.
- *
- * What can be answered today: how many Samaaj there are and how many are
- * active, how many conversion requests are waiting, and how many invited
- * accounts have not yet been activated.
+ * approvals, 26 events, 2,180 students, 8 auctions. A platform-wide member
+ * total has no service behind it - member-family-service's directory is a
+ * cursor page with no count, by design, the same reason the tenant list
+ * dropped its own Members column - so that tile stays "conversions awaiting a
+ * decision" and "invitations not yet redeemed" instead, the two member-shaped
+ * counts this panel can actually answer. Events, Pathshala students and
+ * auctions all *can* be answered now: each is exactly the list its own screen
+ * already loads, counted rather than rendered.
  */
 @Component({
   selector: 'app-dashboard',
@@ -47,6 +47,22 @@ import { AdminScope } from '../../core/admin-scope';
         <div class="num">{{ pendingCount() ?? '—' }}</div>
         <div class="muted">Accounts that cannot be signed into yet</div>
       </a>
+
+      <a class="card tile" routerLink="/events">
+        <div class="muted">Upcoming events</div>
+        <div class="num">{{ eventCount() ?? '—' }}</div>
+      </a>
+
+      <a class="card tile" routerLink="/pathshala">
+        <div class="muted">Students enrolled</div>
+        <div class="num">{{ studentCount() ?? '—' }}</div>
+        <div class="muted">Across every Pathshala this Samaaj runs</div>
+      </a>
+
+      <a class="card tile" routerLink="/boli">
+        <div class="muted">Auctions</div>
+        <div class="num">{{ auctionCount() ?? '—' }}</div>
+      </a>
     </div>
 
     @if (needsSamaaj()) {
@@ -72,19 +88,6 @@ import { AdminScope } from '../../core/admin-scope';
             <a class="btn alt" routerLink="/conversions">Conversion queue</a>
           </div>
         }
-      </div>
-
-      <div class="card">
-        <h2>Not built yet</h2>
-        <p class="muted">
-          The wireframe's dashboard also counts events, Pathshala students and auctions. Those
-          services exist now, but each count is a call into a different one, and this panel does
-          not reach across service boundaries a tile at a time — the tiles arrive with a
-          reporting endpoint that can answer for them.
-        </p>
-        <div class="actions">
-          <a class="btn link" routerLink="/audit">View the audit log →</a>
-        </div>
       </div>
     </div>
   `,
@@ -113,6 +116,9 @@ export class DashboardComponent implements OnInit {
   readonly activeCount = signal<number | null>(null);
   readonly conversionCount = signal<number | null>(null);
   readonly pendingCount = signal<number | null>(null);
+  readonly eventCount = signal<number | null>(null);
+  readonly studentCount = signal<number | null>(null);
+  readonly auctionCount = signal<number | null>(null);
 
   readonly isSuperAdmin = computed(() => this.auth.roles().includes('SuperAdmin'));
 
@@ -151,5 +157,55 @@ export class DashboardComponent implements OnInit {
       next: (pending) => this.pendingCount.set(pending.length),
       error: () => undefined,
     });
+
+    // Each of these three is exactly the call its own screen already makes
+    // to list what a Samaaj runs - counted, not rendered. Not gated behind
+    // isSuperAdmin(): a Samaaj Admin's token already names one Samaaj, and a
+    // Super Admin only reaches this line once they have picked one (see
+    // needsSamaaj() above).
+    this.api.listEvents(true, false).subscribe({
+      next: (events) => this.eventCount.set(events.length),
+      error: () => undefined,
+    });
+
+    this.api.listOccasions().subscribe({
+      next: (occasions) => this.auctionCount.set(occasions.length),
+      error: () => undefined,
+    });
+
+    // No endpoint answers "how many students" directly, and deliberately so:
+    // ListPathshalasQuery is gated on Members.Read alone, which every member
+    // holds, and member-portal's own Pathshala list calls the same endpoint
+    // for a parent - a roll size is a fact about other people's children, so
+    // the response nobody is supposed to see it in stays the response nobody
+    // is supposed to see it in. The class detail *does* carry a per-class
+    // count (active enrolments), reached one Pathshala at a time the way an
+    // administrator already opens one from the directory screen - this tile
+    // is that same call made for every Pathshala the Samaaj runs rather than
+    // one, which costs one request per Pathshala. A Samaaj running many at
+    // once would be the reason to add a manager-only aggregate endpoint
+    // instead; nothing in this platform's seed or smoke data suggests that is
+    // the common case yet.
+    this.api
+      .listPathshalas()
+      .pipe(
+        switchMap((pathshalas) =>
+          pathshalas.length === 0
+            ? of(0)
+            : forkJoin(pathshalas.map((p) => this.api.pathshala(p.id))).pipe(
+                map((details) =>
+                  details.reduce(
+                    (total, detail) =>
+                      total + detail.classes.reduce((sum, c) => sum + c.studentCount, 0),
+                    0,
+                  ),
+                ),
+              ),
+        ),
+      )
+      .subscribe({
+        next: (count) => this.studentCount.set(count),
+        error: () => undefined,
+      });
   }
 }

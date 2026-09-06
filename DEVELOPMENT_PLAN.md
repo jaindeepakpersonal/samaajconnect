@@ -8,7 +8,26 @@ version of the plan; the reasoning behind the ordering lives in
 ## Current Status
 
 - **Stage:** every module has a service and member screens; Phase 5 hardening under way
-- **Last updated:** 2026-09-06 - **both shells' sidebars didn't collapse on
+- **Last updated:** 2026-09-06 - **the admin dashboard's "Not built yet" card
+  is gone - Events, Pathshala students and Auctions all count for real now.**
+
+  None of the three needed a new endpoint. Events and Auctions are each the
+  count of the list its own screen already loads. Students almost got a real
+  `StudentCount` field on `ListPathshalasQuery`'s response instead - until it
+  became clear that endpoint is gated on `Members.Read` alone and is the same
+  one member-portal's own Pathshala list calls for a parent, whose own code
+  comment already says a roll size is not something that screen offers them.
+  Adding the field there would have handed every parent exactly the count
+  that comment exists to withhold. The tile instead sums the per-Pathshala
+  detail call the admin directory screen already makes when somebody opens
+  one Pathshala, made once per Pathshala the Samaaj runs instead of once.
+
+  Verified with 6 new dashboard tests (210 total in admin-portal),
+  `tsc --noEmit`, `scripts/css-class-coverage.sh`,
+  `scripts/unreachable-endpoints.sh`, `scripts/uncalled-api-methods.sh`, and a
+  live walkthrough against a running Samaaj with real events, Pathshalas and
+  Boli occasions.
+- **Previously:** 2026-09-06 - **both shells' sidebars didn't collapse on
   mobile, they stacked - a member or administrator on a phone scrolled past
   every nav group before reaching a single word of the screen they opened
   the app for.**

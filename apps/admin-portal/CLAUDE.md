@@ -10,7 +10,7 @@ screen. The spec is `docs/product/wireframes/admin-panel-wireframes.html`.
 | Screen | Route | Wireframe section | Status |
 |---|---|---|---|
 | Sign in | `/login` | — (the wireframe has none) | built |
-| Dashboard | `/dashboard` | `#dashboard` | built, partial — see below |
+| Dashboard | `/dashboard` | `#dashboard` | built — see below |
 | Samaaj / Tenants | `/tenants` | `#tenants` | built. Status, modules, logo, and the DPDP s.13 grievance contact |
 | Create Samaaj | `/tenants/new` | `#createtenant` | built |
 | Admin Users & Roles | `/admins` | `#admins` | built. Roles, re-issuing a one-time activation code, and suspending or reinstating an account |
@@ -129,6 +129,26 @@ branches on them reads an empty list if it initialises first. That is not
 cosmetic: it made a Super Admin's tenant tile blank and made Samaaj-scoped
 tiles show a confident `0` for a Samaaj nobody had selected. Both look exactly
 like permission bugs.
+
+**The dashboard's three remaining tiles turned out to need no new endpoint at
+all, and one of them nearly cost a privacy rule this platform already has.**
+Events and Auctions are each exactly the count of the list its own screen
+already loads (`listEvents(true, false)`, `listOccasions()`) — no aggregate
+was missing, just a caller. Students very nearly got a real backend field
+(`PathshalaResponse.StudentCount`, computed once per Samaaj instead of per
+Pathshala) before it became clear that response is `ListPathshalasQuery`'s,
+gated on `Members.Read` alone — the same permission every member holds, and
+the same endpoint member-portal's own Pathshala list calls for a parent.
+member-portal's list screen has its own comment explaining why it does not
+show a student count there: *"a roll size is a fact about other people's
+children."* Adding the field to the shared response would have handed every
+parent exactly the number that comment says they should not have. The tile
+instead calls `pathshala(id)` once per Pathshala the Samaaj runs — the same
+per-Pathshala detail call the directory screen already makes when an
+administrator opens one — and sums the classes' student counts across all of
+them. A Samaaj running many Pathshalas at once would be the reason to add a
+manager-only aggregate endpoint later; nothing in this platform's data
+suggests that is the common case yet.
 
 **The role matrix edits now, and the screen still decides nothing.** The
 wireframe always said it should edit; it took per-tenant overrides, an audit
