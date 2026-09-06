@@ -1,6 +1,6 @@
 import { Component, OnInit, inject, signal } from '@angular/core';
 import { FormBuilder, ReactiveFormsModule, Validators } from '@angular/forms';
-import { Router, RouterLink } from '@angular/router';
+import { RouterLink } from '@angular/router';
 import { describeError } from '@samaajconnect/shared';
 import { AdminApi } from '../../core/admin-api';
 import { ModuleDescriptor } from '../../core/admin.models';
@@ -142,7 +142,6 @@ import { ModuleDescriptor } from '../../core/admin.models';
 })
 export class CreateTenantComponent implements OnInit {
   private readonly api = inject(AdminApi);
-  private readonly router = inject(Router);
   private readonly formBuilder = inject(FormBuilder);
 
   readonly modules = signal<readonly ModuleDescriptor[]>([]);
@@ -209,7 +208,18 @@ export class CreateTenantComponent implements OnInit {
       .subscribe({
         next: () => {
           this.busy.set(false);
-          void this.router.navigate(['/tenants'], { queryParams: { created: 'true' } });
+
+          // A full navigation, deliberately - the same reasoning
+          // ShellComponent.pick() already gives for reloading on a scope
+          // change. The shell loads the Super Admin's Samaaj dropdown once,
+          // in its own ngOnInit, and an in-app router.navigate() back to
+          // '/tenants' reuses that already-mounted shell rather than
+          // recreating it - so the list a moment ago fetched a Samaaj shorter
+          // than this one now stays stale in the dropdown until something
+          // else forces a reload. The /tenants screen itself has no such bug
+          // (it is a fresh component instance that fetches its own list on
+          // init); only the shell's top-bar selector was silently behind.
+          window.location.href = '/tenants?created=true';
         },
         error: (failure: unknown) => {
           this.busy.set(false);

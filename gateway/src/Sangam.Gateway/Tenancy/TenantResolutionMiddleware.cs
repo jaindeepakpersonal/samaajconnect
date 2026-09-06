@@ -41,7 +41,7 @@ public sealed class TenantResolutionMiddleware(
         context.Request.Headers.Remove(TenantOverrideHeader);
         context.Request.Headers.Remove(TenantSlugHeader);
 
-        var tenantId = ResolveTenantId(context, requestedOverride, out var isOverride);
+        var tenantId = ResolveTenantId(context, requestedOverride, out var isOverride, out var overrideNeedsReauth);
 
         if (tenantId is null)
         {
@@ -49,11 +49,28 @@ public sealed class TenantResolutionMiddleware(
             {
                 // An override was asked for and refused; ResolveTenantId has
                 // already logged why.
+                //
+                // 401, not 403, when a bearer token was actually presented but
+                // failed authentication - almost always because the 15-minute
+                // access token expired while a Samaaj stayed selected in the
+                // admin panel. That is "sign in again", not "you may not do
+                // this", and both portals' interceptors already renew an
+                // expired token and retry on exactly a 401 - the same "401 not
+                // 404" distinction this gateway already draws for the module
+                // gate, and for the identical reason: a 403 here does not get
+                // retried, so the admin panel keeps resending the same expired
+                // token with the same override on every request forever,
+                // including the next login attempt, which fails the same way
+                // and never gets the chance to clear the stale session. A
+                // caller with no token at all trying to smuggle an override in
+                // still gets the blunt 403 refusal.
                 await WriteProblemAsync(
                     context,
-                    StatusCodes.Status403Forbidden,
-                    "Tenant.OverrideDenied",
-                    "You are not allowed to act on another Samaaj.");
+                    overrideNeedsReauth ? StatusCodes.Status401Unauthorized : StatusCodes.Status403Forbidden,
+                    overrideNeedsReauth ? "Auth.Expired" : "Tenant.OverrideDenied",
+                    overrideNeedsReauth
+                        ? "Your session has expired. Please sign in again."
+                        : "You are not allowed to act on another Samaaj.");
 
                 return;
             }
@@ -116,9 +133,11 @@ public sealed class TenantResolutionMiddleware(
     /// Returns the Samaaj this request should run against, or null when there
     /// is none — which covers both an anonymous caller and a refused override.
     /// </summary>
-    private Guid? ResolveTenantId(HttpContext context, string requestedOverride, out bool isOverride)
+    private Guid? ResolveTenantId(
+        HttpContext context, string requestedOverride, out bool isOverride, out bool needsReauth)
     {
         isOverride = false;
+        needsReauth = false;
 
         if (!string.IsNullOrWhiteSpace(requestedOverride))
         {
@@ -126,6 +145,12 @@ public sealed class TenantResolutionMiddleware(
             // role on the validated token is the whole gate.
             if (!IsSuperAdmin(context.User))
             {
+                // A bearer token was presented and JwtBearerHandler rejected it
+                // (expired is the ordinary case) rather than there being no
+                // token at all - see the 401-vs-403 note where this is used.
+                needsReauth = context.Request.Headers.ContainsKey("Authorization")
+                    && context.User.Identity?.IsAuthenticated != true;
+
                 logger.LogWarning(
                     "Refused tenant override from a caller who is not a Super Admin: {Path}",
                     context.Request.Path);

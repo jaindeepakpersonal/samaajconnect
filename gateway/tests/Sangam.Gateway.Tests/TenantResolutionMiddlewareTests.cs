@@ -212,6 +212,33 @@ public sealed class TenantResolutionMiddlewareTests : IAsyncLifetime
         response.StatusCode.Should().Be(HttpStatusCode.Forbidden);
     }
 
+    /// <summary>
+    /// An expired access token, still carrying an override from before it
+    /// expired, must come back 401 - not the 403 a caller with no token at all
+    /// gets. Both portals' interceptors renew an expired token and retry only
+    /// on a 401; a 403 here is never retried, so the admin panel would keep
+    /// resending the same expired token and the same override forever,
+    /// including on its next login attempt, which fails the same way and never
+    /// gets the chance to clear the stale session. This reproduces exactly
+    /// that: JwtBearerHandler leaves the principal unauthenticated when a
+    /// token fails validation, the same as when there is no token at all - the
+    /// one thing that tells them apart is whether an Authorization header was
+    /// ever presented.
+    /// </summary>
+    [Fact]
+    public async Task An_override_with_an_expired_token_is_a_401_not_a_403()
+    {
+        var client = Client();
+        client.DefaultRequestHeaders.Add("Authorization", "Bearer an-expired-or-otherwise-invalid-token");
+        client.DefaultRequestHeaders.Add(
+            TenantResolutionMiddleware.TenantOverrideHeader, MahavirId.ToString());
+
+        var response = await client.GetAsync("/v1/members");
+
+        response.StatusCode.Should().Be(HttpStatusCode.Unauthorized,
+            "a bearer token was presented and rejected, not merely absent - the client should refresh and retry");
+    }
+
     [Fact]
     public async Task A_Super_Admin_override_is_forwarded_as_an_override_not_as_a_plain_tenant()
     {
