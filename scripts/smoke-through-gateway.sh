@@ -3531,6 +3531,129 @@ boli_checks() {
 boli_checks || echo "  ..    the rest of the Boli checks were skipped"
 
 echo
+echo "Master data"
+
+master_data_checks() {
+
+  # master-data-service is platform infrastructure, unlike Boli above - no
+  # module gate, no toggle, no sleep. ADMIN_TOKEN (SuperAdmin, no Samaaj)
+  # manages the four platform-wide lookups; SAMAAJ_ADMIN_TOKEN manages this
+  # Samaaj's own Gautra list; MEMBER_TOKEN proves reads stay open to an
+  # ordinary member and writes stay closed to one.
+  COUNTRY_CODE="IN-$(date +%s)"
+
+  COUNTRY=$(curl -s -X POST "$GATEWAY/v1/master-data/lookup-items" \
+    -H 'Content-Type: application/json' -H "Authorization: Bearer $ADMIN_TOKEN" \
+    -d "{\"category\":\"Country\",\"code\":\"$COUNTRY_CODE\",\"label\":\"India\",\"sortOrder\":1}")
+
+  COUNTRY_ID=$(printf '%s' "$COUNTRY" | json_field id)
+
+  if [ -n "$COUNTRY_ID" ]; then
+    echo "  ok    a SuperAdmin creates a Country lookup item"
+    pass=$((pass + 1))
+  else
+    echo "  FAIL  creating a Country lookup item"
+    fail=$((fail + 1))
+  fi
+
+  require_id country_id "$COUNTRY_ID"
+
+  check "creating the same country code twice is refused" 409 \
+    "$(status -X POST "$GATEWAY/v1/master-data/lookup-items" \
+       -H 'Content-Type: application/json' -H "Authorization: Bearer $ADMIN_TOKEN" \
+       -d "{\"category\":\"Country\",\"code\":\"$COUNTRY_CODE\",\"label\":\"India again\",\"sortOrder\":2}")"
+
+  check "a member cannot manage master data" 403 \
+    "$(status -X POST "$GATEWAY/v1/master-data/lookup-items" \
+       -H 'Content-Type: application/json' -H "Authorization: Bearer $MEMBER_TOKEN" \
+       -d "{\"category\":\"Country\",\"code\":\"XX\",\"label\":\"Nowhere\",\"sortOrder\":1}")"
+
+  CITY=$(curl -s -X POST "$GATEWAY/v1/master-data/cities" \
+    -H 'Content-Type: application/json' -H "Authorization: Bearer $ADMIN_TOKEN" \
+    -d "{\"countryId\":\"$COUNTRY_ID\",\"name\":\"Udaipur\"}")
+
+  CITY_ID=$(printf '%s' "$CITY" | json_field id)
+
+  if [ -n "$CITY_ID" ]; then
+    echo "  ok    and a City scoped to that Country"
+    pass=$((pass + 1))
+  else
+    echo "  FAIL  creating a City"
+    fail=$((fail + 1))
+  fi
+
+  require_id city_id "$CITY_ID"
+
+  LOCALITY=$(curl -s -X POST "$GATEWAY/v1/master-data/localities" \
+    -H 'Content-Type: application/json' -H "Authorization: Bearer $ADMIN_TOKEN" \
+    -d "{\"cityId\":\"$CITY_ID\",\"name\":\"Hiran Magri\"}")
+
+  LOCALITY_ID=$(printf '%s' "$LOCALITY" | json_field id)
+
+  if [ -n "$LOCALITY_ID" ]; then
+    echo "  ok    and a Locality scoped to that City"
+    pass=$((pass + 1))
+  else
+    echo "  FAIL  creating a Locality"
+    fail=$((fail + 1))
+  fi
+
+  require_id locality_id "$LOCALITY_ID"
+
+  # Anonymous on purpose - the registration form calls these before anyone
+  # holds a token (root CLAUDE.md section 6). No auth header at all here.
+  LOCALITIES=$(curl -s "$GATEWAY/v1/master-data/localities?cityId=$CITY_ID")
+
+  case "$LOCALITIES" in
+    *"Hiran Magri"*)
+      echo "  ok    an anonymous caller lists localities for a city"
+      pass=$((pass + 1))
+      ;;
+    *)
+      echo "  FAIL  an anonymous locality lookup did not include Hiran Magri"
+      fail=$((fail + 1))
+      ;;
+  esac
+
+  # Gautra: the one tenant-scoped aggregate in this service.
+  GAUTRA=$(curl -s -X POST "$GATEWAY/v1/master-data/gautras" \
+    -H 'Content-Type: application/json' -H "Authorization: Bearer $SAMAAJ_ADMIN_TOKEN" \
+    -d '{"name":"Kasliwal"}')
+
+  GAUTRA_ID=$(printf '%s' "$GAUTRA" | json_field id)
+
+  if [ -n "$GAUTRA_ID" ]; then
+    echo "  ok    this Samaaj's own admin adds a Gautra to its list"
+    pass=$((pass + 1))
+  else
+    echo "  FAIL  adding a Gautra"
+    fail=$((fail + 1))
+  fi
+
+  require_id gautra_id "$GAUTRA_ID"
+
+  check "a Super Admin with no Samaaj chosen cannot add one" 403 \
+    "$(status -X POST "$GATEWAY/v1/master-data/gautras" \
+       -H 'Content-Type: application/json' -H "Authorization: Bearer $ADMIN_TOKEN" \
+       -d '{"name":"Nobody'"'"'s Samaaj"}')"
+
+  MEMBER_GAUTRAS=$(curl -s -H "Authorization: Bearer $MEMBER_TOKEN" "$GATEWAY/v1/master-data/gautras")
+
+  case "$MEMBER_GAUTRAS" in
+    *"Kasliwal"*)
+      echo "  ok    a member of the same Samaaj sees the Gautra on their own registration form"
+      pass=$((pass + 1))
+      ;;
+    *)
+      echo "  FAIL  the member's own Samaaj did not see the Gautra just added to it"
+      fail=$((fail + 1))
+      ;;
+  esac
+}
+
+master_data_checks || echo "  ..    the rest of the Master data checks were skipped"
+
+echo
 echo "Step-up: taking a Samaaj out of service re-asks for the password"
 
 # On a throwaway Samaaj, not the one the rest of this script is standing on.

@@ -242,6 +242,20 @@ services:
     ports:
       - "5110:8080"
 
+  master-data-service:
+    <<: *service-defaults
+    build:
+      context: .
+      dockerfile: services/master-data-service/Dockerfile
+    container_name: samaajconnect-master-data
+    environment:
+      <<: *service-environment
+      ConnectionStrings__Default: "Host=postgres;Port=5432;Database=samaajconnect_master_data;Username=samaajconnect;Password=samaajconnect"
+      Jwt__SigningKey: "${JWT_SIGNING_KEY:-local-development-signing-key-do-not-use-in-production}"
+      Outbox__PollIntervalSeconds: "5"
+    ports:
+      - "5111:8080"
+
   gateway:
     build:
       context: .
@@ -270,6 +284,8 @@ services:
       pathshala-service:
         condition: service_started
       boli-service:
+        condition: service_started
+      master-data-service:
         condition: service_started
     environment:
       ASPNETCORE_ENVIRONMENT: Development

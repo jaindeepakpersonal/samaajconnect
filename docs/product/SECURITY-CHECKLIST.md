@@ -130,8 +130,10 @@ anonymous should cost somebody a paragraph explaining why.
 
 #### Requests reachable without authentication
 
-All ten are in `identity-tenant-service`, and that is itself worth keeping true
-— no other service has any business answering an unauthenticated caller.
+Two services now, not one: `identity-tenant-service`, and — since 2026-09-06 —
+`master-data-service`. No other service has any business answering an
+unauthenticated caller, and `scripts/security-invariants.sh` checks the set is
+exactly these two rather than growing a third without a paragraph here first.
 
 | Request | Why it cannot require a token |
 |---|---|
@@ -145,6 +147,14 @@ All ten are in `identity-tenant-service`, and that is itself worth keeping true
 | `GetTenantBySlugQuery` | The gateway resolves the Samaaj before any token has been validated |
 | `GetTenantByIdQuery` | Same, by id. Returns only what the gateway needs to route |
 | `GetTenantLogoQuery` | The registration form draws the Samaaj directory, and a logo that needed a token could not appear on it. **The only image on the platform outside per-request authorization** — see the file-handling section |
+| `ListLookupItemsQuery` (master-data) | Country, ProfessionType, Gender, MaritalStatus — the registration form's dropdowns need these before the person filling them in has an account |
+| `GetLookupItemByIdQuery` (master-data) | Same reasoning |
+| `ListCitiesQuery` (master-data) | Same reasoning, for the City dropdown |
+| `GetCityByIdQuery` (master-data) | Same reasoning |
+| `ListLocalitiesQuery` (master-data) | Same, for the Locality ("locations master") dropdown |
+| `GetLocalityByIdQuery` (master-data) | Same reasoning |
+| `ListGautrasQuery` (master-data) | Same, for the Gautra dropdown — resolved from the gateway's `X-Tenant-Id` header alone, exactly like every other anonymous, tenant-aware request, since the person has already picked their Samaaj from the directory but holds no token yet |
+| `GetGautraByIdQuery` (master-data) | Same reasoning |
 
 #### Requests no HTTP route may reach
 
@@ -189,6 +199,8 @@ existing platform (`Pathshala.Attendance.Write`, `Issue.Approve`):
 | `Boli.PublishResults` | Publish (irreversible without correction flow) |
 | `Audit.Read` | View audit log |
 | `Notifications.Broadcast` | Announce to every member of a Samaaj, and read what has been announced. Its own key rather than folded into an administrative one: managing members and putting a message in front of every one of them are different powers |
+| `MasterData.Manage` | Manage the platform-wide lookups: Country, City, Locality, ProfessionType, Gender, MaritalStatus. SuperAdmin only — reference data every Samaaj shares, not one Samaaj's own list |
+| `Gautra.Manage` | Manage one Samaaj's own Gautra list. Granted to `SamaajAdmin`, scoped to their own tenant the same way every other tenant-scoped write is |
 
 `AuthorizationCatalog` in identity-tenant-service is the executable copy of
 this table, with stable hand-assigned ids so a grant means the same thing in

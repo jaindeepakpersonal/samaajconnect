@@ -23,3 +23,6 @@ synonyms — it keeps the ER diagram, the API, and the UI copy consistent.
 | **Module feature flag** | A per-tenant on/off switch for a business module (e.g. a Samaaj that doesn't run a Pathshala can have that module hidden). |
 | **Tenant context** | The resolved `TenantId` + `SamaajSlug` attached to a request, derived from the subdomain and re-validated server-side — never trusted from the client alone. |
 | **IDOR** | Insecure Direct Object Reference — accessing another tenant's (or another user's) record by guessing/supplying its ID. Prevented by always scoping queries with `TenantId`. |
+| **Gautra** | A clan/lineage name a member identifies with, maintained as each Samaaj's own list — the one piece of master data that is "Samaaj-wise" rather than shared across the whole platform. |
+| **Master data** | Platform-wide reference data — Country, City, Locality, ProfessionType, Gender, MaritalStatus — plus each Samaaj's own Gautra list, owned by master-data-service and consumed by every registration and profile screen's dropdowns. |
+| **Locality** | An area/neighborhood within a City (e.g. Hiran Magri, Surajpole). What the wireframes and this glossary call the "locations master". |

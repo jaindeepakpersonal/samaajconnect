@@ -49,6 +49,20 @@ public static class AuthorizationCatalog
         public static readonly Guid RolesManage = new("b0000000-0000-0000-0000-000000000014");
         public static readonly Guid NotificationsBroadcast = new("b0000000-0000-0000-0000-000000000015");
         public static readonly Guid TenantManageSecurityPolicy = new("b0000000-0000-0000-0000-000000000016");
+
+        /// <summary>
+        /// Manage the platform-wide master data lookups master-data-service
+        /// owns: Country, City, Locality, ProfessionType, Gender,
+        /// MaritalStatus. SuperAdmin only - this is reference data every
+        /// Samaaj shares, not one Samaaj's own list.
+        /// </summary>
+        public static readonly Guid MasterDataManage = new("b0000000-0000-0000-0000-000000000017");
+
+        /// <summary>
+        /// Manage one Samaaj's own Gautra list, the one tenant-scoped
+        /// aggregate master-data-service owns.
+        /// </summary>
+        public static readonly Guid GautraManage = new("b0000000-0000-0000-0000-000000000018");
     }
 
     public static IReadOnlyList<Role> Roles { get; } =
@@ -88,6 +102,8 @@ public static class AuthorizationCatalog
         new(PermissionIds.RolesManage, "Roles.Manage"),
         new(PermissionIds.NotificationsBroadcast, "Notifications.Broadcast"),
         new(PermissionIds.TenantManageSecurityPolicy, "Tenant.ManageSecurityPolicy"),
+        new(PermissionIds.MasterDataManage, "MasterData.Manage"),
+        new(PermissionIds.GautraManage, "Gautra.Manage"),
     ];
 
     /// <summary>
@@ -134,6 +150,12 @@ public static class AuthorizationCatalog
         // Its own Samaaj's security policy, the same self-tenant-only shape
         // the grievance contact and tenant logo already have.
         new(RoleIds.SamaajAdmin, PermissionIds.TenantManageSecurityPolicy),
+
+        // Its own Samaaj's Gautra list - the one tenant-scoped master-data
+        // aggregate. MasterData.Manage (Country/City/Locality/ProfessionType/
+        // Gender/MaritalStatus) stays SuperAdmin-only: that is reference data
+        // every Samaaj shares, not one Samaaj's own list.
+        new(RoleIds.SamaajAdmin, PermissionIds.GautraManage),
 
         new(RoleIds.Member, PermissionIds.MembersRead),
         new(RoleIds.Member, PermissionIds.TimelinePost),

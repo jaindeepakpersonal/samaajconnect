@@ -14,6 +14,7 @@ databases=(
   samaajconnect_pathshala
   samaajconnect_boli
   samaajconnect_audit_notification
+  samaajconnect_master_data
 )
 
 for db in "${databases[@]}"; do

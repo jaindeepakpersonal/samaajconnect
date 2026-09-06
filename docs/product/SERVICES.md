@@ -1,6 +1,6 @@
 # Services
 
-Ten bounded-context services. Each follows the standard shape from the
+Eleven bounded-context services. Each follows the standard shape from the
 `new-microservice` skill (Clean Architecture: Api / Application / Domain
 / Infrastructure, five pipeline behaviors, Outbox → Kafka). When you
 scaffold one, feed the skill the "First aggregate" and "Tenant role(s)"
@@ -213,6 +213,38 @@ and expose its endpoints behind the gateway at the route prefix shown.
   `new-microservice` skill refers to, if it hasn't been scaffolded yet —
   scaffold it early (Phase 1) rather than last, since every other
   service needs an Outbox consumer to publish to from day one.
+
+## 11. master-data-service
+
+- **First / primary aggregate:** `LookupItem` (with `City`, `Locality`,
+  and `Gautra` as supporting aggregates in the same service)
+- **Owns:** LookupItem (one flat table for the `Country`,
+  `ProfessionType`, `Gender` and `MaritalStatus` categories — see the
+  service's own `CLAUDE.md` for why they share one shape), City,
+  Locality, Gautra
+- **Key commands:** `CreateLookupItemCommand`, `UpdateLookupItemCommand`,
+  `DeactivateLookupItemCommand`, `CreateCityCommand`,
+  `CreateLocalityCommand`, `CreateGautraCommand`, `UpdateGautraCommand`,
+  `DeactivateGautraCommand`
+- **Key queries:** `ListLookupItemsQuery`, `ListCitiesQuery`,
+  `ListLocalitiesQuery`, `ListGautrasQuery` — all anonymous, since a
+  registration form's dropdowns need these before the person filling
+  them in has an account
+- **Events published:** `master-data.lookup-item.*.v1`,
+  `master-data.city.*.v1`, `master-data.locality.*.v1`,
+  `master-data.gautra.*.v1` (created/updated/deactivated, twelve topics)
+- **Events consumed:** none (source of master-data truth)
+- **Gateway route prefix:** `/v1/master-data/**`, never module-gated —
+  platform infrastructure, like identity and audit
+- **Tenant role(s):** `SuperAdmin` (`MasterData.Manage` — the four
+  platform-wide lookups and locations, shared by every Samaaj);
+  `SamaajAdmin` (`Gautra.Manage` — their own Samaaj's Gautra list only)
+- **Notes:** `Gautra` is the one tenant-scoped aggregate this service
+  owns, per root `CLAUDE.md` §6's "Samaaj-wise" requirement — everything
+  else here is platform-wide reference data. Every write is a soft
+  delete (`IsActive = false`), never a hard delete: other services hold
+  these rows' ids as plain foreign keys across a service boundary with
+  no referential integrity to enforce it.
 
 ---
 

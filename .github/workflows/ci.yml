@@ -49,6 +49,8 @@ jobs:
             solution: services/pathshala-service/Sangam.Pathshala.sln
           - name: boli-service
             solution: services/boli-service/Sangam.Boli.sln
+          - name: master-data-service
+            solution: services/master-data-service/Sangam.MasterData.sln
           - name: gateway
             solution: gateway/Sangam.Gateway.sln
 
@@ -314,6 +316,12 @@ jobs:
           dotnet dotnet-ef migrations has-pending-model-changes \
             --project services/boli-service/src/Sangam.Boli.Infrastructure \
             --startup-project services/boli-service/src/Sangam.Boli.Api
+
+      - name: Check master-data-service
+        run: |
+          dotnet dotnet-ef migrations has-pending-model-changes \
+            --project services/master-data-service/src/Sangam.MasterData.Infrastructure \
+            --startup-project services/master-data-service/src/Sangam.MasterData.Api
 
   smoke:
     name: Through the gateway

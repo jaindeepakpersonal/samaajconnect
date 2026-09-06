@@ -254,3 +254,26 @@ than about a message.
 
 **NotificationTemplate** — `Id, TenantId (nullable = platform default),
 Key, Subject, Body, Channel`
+
+## 12. Master data
+
+**LookupItem** — `Id, Category (Country/ProfessionType/Gender/MaritalStatus),
+Code, Label, SortOrder, IsActive` — one flat, admin-managed table for four
+platform-wide reference lists, unique on `(Category, Code)`. Not
+tenant-scoped: this is reference data every Samaaj shares.
+
+**City** — `Id, CountryId (a LookupItem where Category == Country), Name,
+IsActive` — not tenant-scoped.
+
+**Locality** — `Id, CityId, Name, IsActive` — not tenant-scoped. This is the
+"locations master"; the member-portal wireframe's existing locality dropdown
+(Hiran Magri, Surajpole, Shobhagpura) is populated from here.
+
+**Gautra** — `Id, TenantId, Name, IsActive` — **the one tenant-scoped entity
+in this service.** A Samaaj's own Gautra (clan/lineage) list, per root
+`CLAUDE.md` §6's "Samaaj-wise" requirement. Unique on `(TenantId, Name)`.
+
+Every write across all four is a soft delete (`IsActive = false`); see
+`services/master-data-service/CLAUDE.md` for why a hard delete is unsafe here
+specifically — other services hold these rows' ids as plain foreign keys with
+no cross-service referential integrity to enforce them.

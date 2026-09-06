@@ -594,6 +594,80 @@ public static class KnownEvents
             Action: "Erased",
             EntityName: "User",
             EntityIdProperty: "userId"),
+
+        // master-data-service, the eleventh service. None of its twelve
+        // topics has an actor to name distinct from the row itself - these are
+        // platform-wide reference data (Country/City/Locality/ProfessionType/
+        // Gender/MaritalStatus, folded into one LookupItem shape - see that
+        // service's own CLAUDE.md for why) and one Samaaj's own Gautra list,
+        // maintained by whichever administrator happened to be signed in
+        // rather than a decision made *about* somebody else. Giving each an
+        // entity id is still the same real improvement over the derived
+        // default that the last eighteen topics found: searchable by entity,
+        // not just present.
+        ["master-data.lookup-item.created.v1"] = new(
+            Action: "LookupItemCreated",
+            EntityName: "LookupItem",
+            EntityIdProperty: "lookupItemId"),
+
+        ["master-data.lookup-item.updated.v1"] = new(
+            Action: "LookupItemUpdated",
+            EntityName: "LookupItem",
+            EntityIdProperty: "lookupItemId"),
+
+        ["master-data.lookup-item.deactivated.v1"] = new(
+            Action: "LookupItemDeactivated",
+            EntityName: "LookupItem",
+            EntityIdProperty: "lookupItemId"),
+
+        ["master-data.city.created.v1"] = new(
+            Action: "CityCreated",
+            EntityName: "City",
+            EntityIdProperty: "cityId"),
+
+        ["master-data.city.updated.v1"] = new(
+            Action: "CityUpdated",
+            EntityName: "City",
+            EntityIdProperty: "cityId"),
+
+        ["master-data.city.deactivated.v1"] = new(
+            Action: "CityDeactivated",
+            EntityName: "City",
+            EntityIdProperty: "cityId"),
+
+        ["master-data.locality.created.v1"] = new(
+            Action: "LocalityCreated",
+            EntityName: "Locality",
+            EntityIdProperty: "localityId"),
+
+        ["master-data.locality.updated.v1"] = new(
+            Action: "LocalityUpdated",
+            EntityName: "Locality",
+            EntityIdProperty: "localityId"),
+
+        ["master-data.locality.deactivated.v1"] = new(
+            Action: "LocalityDeactivated",
+            EntityName: "Locality",
+            EntityIdProperty: "localityId"),
+
+        // Gautra is the one tenant-scoped aggregate here, but that changes
+        // nothing about who the actor is: the event still names only the
+        // Gautra and the Samaaj it belongs to, the same shape as the three
+        // platform-wide aggregates above.
+        ["master-data.gautra.created.v1"] = new(
+            Action: "GautraCreated",
+            EntityName: "Gautra",
+            EntityIdProperty: "gautraId"),
+
+        ["master-data.gautra.updated.v1"] = new(
+            Action: "GautraUpdated",
+            EntityName: "Gautra",
+            EntityIdProperty: "gautraId"),
+
+        ["master-data.gautra.deactivated.v1"] = new(
+            Action: "GautraDeactivated",
+            EntityName: "Gautra",
+            EntityIdProperty: "gautraId"),
     };
 
     public static EventDescriptor Describe(string topic) =>

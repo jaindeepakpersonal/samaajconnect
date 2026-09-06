@@ -154,6 +154,16 @@ namespace Sangam.IdentityTenant.Infrastructure.Persistence.Migrations
                         {
                             Id = new Guid("b0000000-0000-0000-0000-000000000016"),
                             Key = "Tenant.ManageSecurityPolicy"
+                        },
+                        new
+                        {
+                            Id = new Guid("b0000000-0000-0000-0000-000000000017"),
+                            Key = "MasterData.Manage"
+                        },
+                        new
+                        {
+                            Id = new Guid("b0000000-0000-0000-0000-000000000018"),
+                            Key = "Gautra.Manage"
                         });
                 });
 
@@ -358,6 +368,16 @@ namespace Sangam.IdentityTenant.Infrastructure.Persistence.Migrations
                         },
                         new
                         {
+                            RoleId = new Guid("a0000000-0000-0000-0000-000000000001"),
+                            PermissionId = new Guid("b0000000-0000-0000-0000-000000000017")
+                        },
+                        new
+                        {
+                            RoleId = new Guid("a0000000-0000-0000-0000-000000000001"),
+                            PermissionId = new Guid("b0000000-0000-0000-0000-000000000018")
+                        },
+                        new
+                        {
                             RoleId = new Guid("a0000000-0000-0000-0000-000000000002"),
                             PermissionId = new Guid("b0000000-0000-0000-0000-000000000002")
                         },
@@ -450,6 +470,11 @@ namespace Sangam.IdentityTenant.Infrastructure.Persistence.Migrations
                         {
                             RoleId = new Guid("a0000000-0000-0000-0000-000000000002"),
                             PermissionId = new Guid("b0000000-0000-0000-0000-000000000016")
+                        },
+                        new
+                        {
+                            RoleId = new Guid("a0000000-0000-0000-0000-000000000002"),
+                            PermissionId = new Guid("b0000000-0000-0000-0000-000000000018")
                         },
                         new
                         {

@@ -328,6 +328,39 @@ sniping once the people bidding know about it.
 | POST | `/notifications/broadcast` | SamaajAdmin, SuperAdmin + `Notifications.Broadcast` | Announce to every member of **this** Samaaj. In-app only, and never platform-wide - see below |
 | GET | `/notifications/broadcasts` | SamaajAdmin, SuperAdmin + `Notifications.Broadcast` | This Samaaj's announcements, with how many members opened each |
 
+## master-data-service — `/v1/master-data`
+
+Every read below is anonymous — a registration form's dropdowns need these
+before the person filling them in has an account. See root `CLAUDE.md` §6 and
+`services/master-data-service/CLAUDE.md`.
+
+| Method | Path | Permission | Purpose |
+|---|---|---|---|
+| GET | `/lookup-items?category=` | anonymous | One category's list (`Country`, `ProfessionType`, `Gender`, `MaritalStatus`), active first by sort order |
+| GET | `/lookup-items/{id}` | anonymous | One lookup item |
+| POST | `/lookup-items` | `MasterData.Manage` | Add a row to one of the four flat lists. Refuses a duplicate `(category, code)` |
+| PUT | `/lookup-items/{id}` | `MasterData.Manage` | Rename/reorder. Code and category are fixed once created |
+| POST | `/lookup-items/{id}/deactivate` | `MasterData.Manage` | Soft delete |
+| GET | `/cities?countryId=` | anonymous | Cities, optionally narrowed to one country |
+| GET | `/cities/{id}` | anonymous | One city |
+| POST | `/cities` | `MasterData.Manage` | Add a city under a country |
+| PUT | `/cities/{id}` | `MasterData.Manage` | Rename |
+| POST | `/cities/{id}/deactivate` | `MasterData.Manage` | Soft delete |
+| GET | `/localities?cityId=` | anonymous | Localities ("locations master"), optionally narrowed to one city |
+| GET | `/localities/{id}` | anonymous | One locality |
+| POST | `/localities` | `MasterData.Manage` | Add a locality under a city |
+| PUT | `/localities/{id}` | `MasterData.Manage` | Rename |
+| POST | `/localities/{id}/deactivate` | `MasterData.Manage` | Soft delete |
+| GET | `/gautras` | anonymous | The calling Samaaj's own Gautra list, resolved from `X-Tenant-Id` |
+| GET | `/gautras/{id}` | anonymous | One Gautra |
+| POST | `/gautras` | `Gautra.Manage` | Add a Gautra to the caller's own Samaaj |
+| PUT | `/gautras/{id}` | `Gautra.Manage` | Rename, within the caller's own Samaaj |
+| POST | `/gautras/{id}/deactivate` | `Gautra.Manage` | Soft delete, within the caller's own Samaaj |
+
+Every write is a soft delete — other services hold these rows' ids as plain
+foreign keys across a service boundary, with no referential integrity to
+enforce them.
+
 **A broadcast reaches one Samaaj, in the app.** The wireframe's Audience
 dropdown also offers "All Members" across every Samaaj and "Specific Role";
 neither is built. The first is a write that deliberately crosses tenants, which

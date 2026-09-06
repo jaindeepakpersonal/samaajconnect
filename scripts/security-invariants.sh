@@ -174,16 +174,25 @@ compare_set "requests reachable without authentication" \
 compare_set "requests no HTTP route may reach" \
   "$(list_from_checklist 'Requests no HTTP route may reach')" "$INTERNAL_ACTUAL"
 
-# Every anonymous request lives in identity-tenant-service, and the checklist
-# says so. A second service answering unauthenticated callers is a change worth
-# noticing on the day it happens rather than at the next audit.
+# Every anonymous request used to live in identity-tenant-service alone, and
+# this list named it as an invariant rather than reading it from the checklist,
+# specifically so a second service answering unauthenticated callers would be
+# a change worth noticing on the day it happens rather than at the next audit.
+# That day was 2026-09-06: master-data-service's reads (Country, City,
+# Locality, ProfessionType, Gender, MaritalStatus, and a Samaaj's own Gautra
+# list) are the fields a registration form's dropdowns need before the person
+# filling them in holds a token - the same "anonymous by necessity" shape
+# identity-tenant-service's own directory and slug lookups already have,
+# applied to the platform-wide reference data those dropdowns are populated
+# from. SECURITY-CHECKLIST.md's anonymous list says so explicitly.
+ANON_ALLOWED_PREFIXES='^services/identity-tenant-service/|^services/master-data-service/'
 STRAY=$(printf '%s\n' "$REQUESTS" | { grep 'anon,' || true; } \
-  | cut -f3 | grep -v '^services/identity-tenant-service/' || true)
+  | cut -f3 | { grep -vE "$ANON_ALLOWED_PREFIXES" || true; })
 
 if [ -z "$STRAY" ]; then
-  ok "and every anonymous request is in identity-tenant-service"
+  ok "and every anonymous request is in identity-tenant-service or master-data-service"
 else
-  bad "an anonymous request outside identity-tenant-service:"
+  bad "an anonymous request outside identity-tenant-service or master-data-service:"
   printf '%s\n' "$STRAY" | sed 's/^/          /'
 fi
 
