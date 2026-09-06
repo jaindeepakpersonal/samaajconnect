@@ -690,6 +690,24 @@ account is `PendingActivation` with no password, exactly like a converted
 child's, because inviting someone establishes they are entitled to an account
 and nobody has yet proved they are the person asking for it.
 
+**`Activate()` used to raise one event regardless of which flow redeemed the
+code, and an invited admin ended up Active with no profile at all, until
+2026-09-06.** A converted child and an invited admin both redeem an
+`ActivationCode` through the same `ActivateAccountCommand`, and `Activate()`
+raised `UserActivatedFromChildDomainEvent` unconditionally - correct for a
+conversion, since member-family-service's consumer uses it to find the
+waiting `ChildProfile` and link it. An invited admin has no such record, so
+the event carried an empty `ChildProfileId`, which that consumer treats as an
+unusable payload and silently skips (logging a warning and committing the
+offset regardless, per its own doc comment about not stalling the partition).
+The admin's account was `Active` and could sign in; member-family-service had
+simply never heard of them, and the member portal's "still being set up" copy
+was the only visible symptom. `Activate()` now branches on
+`ConvertedFromChildProfileId`: present, raise the child-conversion event as
+before; absent, raise `UserRegisteredDomainEvent` instead - the same event an
+ordinary registration raises, and exactly what `AdminInvitedDomainEvent`'s own
+doc comment already promised would happen "when the invitation is redeemed".
+
 **An identifier already on the platform is refused without saying where.**
 `MobileOrEmail` is unique platform-wide, so the existing account may be in
 another Samaaj; naming it would confirm an identifier is on the platform to

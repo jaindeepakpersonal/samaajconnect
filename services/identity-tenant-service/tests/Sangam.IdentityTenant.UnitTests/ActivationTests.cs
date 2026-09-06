@@ -153,6 +153,35 @@ public sealed class UserActivationTests
     }
 
     [Fact]
+    public void Activating_an_invited_admin_announces_a_registration_instead()
+    {
+        // An invited admin has no ChildProfile in member-family-service, so
+        // there is nothing for a child-conversion event to link to. It needs
+        // the same signal an ordinary registration sends, which is what
+        // creates its MemberProfile.
+        var user = User.Invite(
+            TenantId,
+            "invited-admin@example.com",
+            "Invited Admin",
+            AuthorizationCatalog.RoleIds.Member,
+            [AuthorizationCatalog.RoleIds.SamaajAdmin],
+            Guid.NewGuid(),
+            Now);
+        user.ClearDomainEvents();
+        var (code, _) = ActivationCode.Issue(Guid.NewGuid(), _hasher.Hash, Now);
+        user.AttachActivationCode(code);
+
+        user.Activate(_hasher.Hash("a-long-enough-password"), Now.AddDays(1));
+
+        var raised = user.DomainEvents.Should().ContainSingle()
+            .Which.Should().BeOfType<UserRegisteredDomainEvent>().Subject;
+
+        raised.UserId.Should().Be(user.Id);
+        raised.MobileOrEmail.Should().Be("invited-admin@example.com");
+        raised.Topic.Should().Be("identity.user.registered.v1");
+    }
+
+    [Fact]
     public void Activating_counts_as_verifying_the_contact_detail()
     {
         var user = Converted();

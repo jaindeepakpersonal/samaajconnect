@@ -65,6 +65,31 @@ public sealed class ActivationEndpointsTests(IdentityTenantApiFactory factory)
         return user.Id;
     }
 
+    /// <summary>
+    /// Creates the account the invite consumer would have created - no
+    /// ChildProfile behind it, unlike <see cref="SeedPendingAccountAsync"/>.
+    /// </summary>
+    private async Task<Guid> SeedInvitedAccountAsync(string identifier = "invited-admin@example.com")
+    {
+        await using var scope = factory.Services.CreateAsyncScope();
+        var db = scope.ServiceProvider.GetRequiredService<IdentityTenantDbContext>();
+
+        var user = User.Invite(
+            _tenantId,
+            identifier,
+            "Invited Admin",
+            AuthorizationCatalog.RoleIds.Member,
+            [AuthorizationCatalog.RoleIds.SamaajAdmin],
+            Guid.NewGuid(),
+            DateTimeOffset.UtcNow);
+        user.ClearDomainEvents();
+
+        db.Users.Add(user);
+        await db.SaveChangesAsync();
+
+        return user.Id;
+    }
+
     private async Task<string> IssueCodeAsync(Guid userId)
     {
         var response = await AdminClient().PostAsync($"/v1/identity/activations/{userId}/code", null);
@@ -193,6 +218,32 @@ public sealed class ActivationEndpointsTests(IdentityTenantApiFactory factory)
             db.OutboxMessages.AsNoTracking().Select(m => m.Topic).ToListAsync());
 
         topics.Should().Contain("identity.child-conversion.completed.v1");
+    }
+
+    [Fact]
+    public async Task Activating_an_invited_admin_announces_a_registration_instead()
+    {
+        // An invited admin has no ChildProfile in member-family-service for a
+        // conversion event to link to - it needs the same event an ordinary
+        // registration raises, which is what creates its MemberProfile.
+        // Regression test: this used to raise the child-conversion event with
+        // an empty ChildProfileId, which member-family-service's consumer
+        // silently ignores, leaving the admin with no profile at all.
+        var userId = await SeedInvitedAccountAsync();
+        var code = await IssueCodeAsync(userId);
+
+        await factory.CreateClient().PostAsJsonAsync(RedeemUrl, new
+        {
+            mobileOrEmail = "invited-admin@example.com",
+            code,
+            password = Password,
+        });
+
+        var topics = await factory.WithDbContextAsync(db =>
+            db.OutboxMessages.AsNoTracking().Select(m => m.Topic).ToListAsync());
+
+        topics.Should().Contain("identity.user.registered.v1");
+        topics.Should().NotContain("identity.child-conversion.completed.v1");
     }
 
     [Fact]

@@ -251,6 +251,21 @@ public sealed class User : AggregateRoot, ITenantScopedEntity
     /// <summary>
     /// Completes activation: sets the first password and opens the account.
     /// </summary>
+    /// <remarks>
+    /// <see cref="ActivationCode"/> is redeemed by two unrelated flows -
+    /// a converted child, and an invited admin - and each needs its own
+    /// signal to the rest of the platform. A converted child already has a
+    /// <see cref="ChildProfile"/> waiting in member-family-service, so
+    /// <see cref="UserActivatedFromChildDomainEvent"/> links the new account
+    /// to it. An invited admin has no such record - member-family-service has
+    /// never heard of them - so this raises <see cref="UserRegisteredDomainEvent"/>
+    /// instead, the same event an ordinary registration raises, which is what
+    /// creates their <c>MemberProfile</c>. Raising the child-conversion event
+    /// unconditionally here used to send it with an empty
+    /// <c>ChildProfileId</c> for an invited admin, which member-family-service's
+    /// consumer treats as an unusable payload and silently ignores - the
+    /// admin ended up with an Active account and no profile at all.
+    /// </remarks>
     public void Activate(string passwordHash, DateTimeOffset now)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(passwordHash);
@@ -266,8 +281,14 @@ public sealed class User : AggregateRoot, ITenantScopedEntity
         // would be a second way into the account.
         ActivationCode = null;
 
-        Raise(new UserActivatedFromChildDomainEvent(
-            Id, TenantId, ConvertedFromChildProfileId ?? Guid.Empty, MobileOrEmail, now));
+        if (ConvertedFromChildProfileId is { } childProfileId)
+        {
+            Raise(new UserActivatedFromChildDomainEvent(Id, TenantId, childProfileId, MobileOrEmail, now));
+        }
+        else
+        {
+            Raise(new UserRegisteredDomainEvent(Id, TenantId, MobileOrEmail, FullName, now));
+        }
     }
 
     /// <summary>

@@ -79,7 +79,7 @@ public sealed class ActivateAccountCommandHandler(
 
         await unitOfWork.SaveChangesAsync(cancellationToken);
 
-        logger.LogInformation("Account {UserId} activated from a child conversion", user.Id);
+        logger.LogInformation("Account {UserId} activated", user.Id);
 
         return Result.Success(new ActivateAccountResponse(user.Id, tenant.Slug, user.FullName));
     }
