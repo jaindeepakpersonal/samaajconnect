@@ -287,7 +287,7 @@ const NAV: readonly NavGroup[] = [
     heading: 'Operations',
     items: [
       { label: 'Notifications', route: '/notifications' },
-      { label: 'Reports & Analytics', pending: 'Reporting is a later phase.' },
+      { label: 'Reports & Analytics', route: '/reports' },
       { label: 'Settings', pending: 'Samaaj settings live on the Samaaj screen for now.' },
     ],
   },

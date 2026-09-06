@@ -122,6 +122,14 @@ public interface IEnrolmentRepository
     Task<AttendanceTally> TallyAttendanceAsync(
         Guid enrolmentId, CancellationToken cancellationToken = default);
 
+    /// <summary>
+    /// Present/absent/excused counts across every class in every Pathshala
+    /// this tenant runs, counted in the database. The admin Reports &amp;
+    /// Analytics screen's tenant-wide figure, where every other tally on this
+    /// platform is scoped to one enrolment.
+    /// </summary>
+    Task<AttendanceTally> TallyAttendanceForTenantAsync(CancellationToken cancellationToken = default);
+
     /// <summary>One class's register for one date, as it currently stands.</summary>
     /// <remarks>
     /// <b>The register was writable and not readable, which made amending it a

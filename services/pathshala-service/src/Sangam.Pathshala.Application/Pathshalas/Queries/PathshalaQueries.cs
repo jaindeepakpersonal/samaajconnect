@@ -136,6 +136,32 @@ public sealed class GetClassRollQueryHandler(
     }
 }
 
+/// <summary>
+/// Attendance across every class this tenant runs, for the admin Reports &amp;
+/// Analytics screen. Reuses <see cref="AttendanceTally"/> verbatim - the same
+/// shape <c>GetMyAttendanceQuery</c> already returns per enrolment, just
+/// tenant-wide instead.
+/// </summary>
+/// <remarks>
+/// Gated on <c>Pathshala.Manage</c> alone, unlike <c>ListPathshalasQuery</c>'s
+/// <c>Members.Read</c>: this is a management figure, not something a parent's
+/// own directory call should ever answer with.
+/// </remarks>
+[RequiresPermission(PermissionKeys.PathshalaManage)]
+public sealed record GetAttendanceSummaryQuery : IQuery<AttendanceTally>;
+
+public sealed class GetAttendanceSummaryQueryHandler(IEnrolmentRepository enrolments)
+    : IRequestHandler<GetAttendanceSummaryQuery, Result<AttendanceTally>>
+{
+    public async Task<Result<AttendanceTally>> Handle(
+        GetAttendanceSummaryQuery query, CancellationToken cancellationToken)
+    {
+        var tally = await enrolments.TallyAttendanceForTenantAsync(cancellationToken);
+
+        return Result.Success(tally);
+    }
+}
+
 /// <summary>Every enrolment this member asked for, or holds themselves.</summary>
 [RequiresPermission(PermissionKeys.MembersRead)]
 public sealed record ListMyEnrolmentsQuery : IQuery<IReadOnlyList<EnrolmentResponse>>;

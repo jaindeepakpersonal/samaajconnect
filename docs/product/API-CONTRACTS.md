@@ -81,6 +81,7 @@ enforced by `TenantAuthorizationBehavior`, not just UI hiding.
 | Method | Path | Roles | Purpose |
 |---|---|---|---|
 | GET | `/members` | Member, SamaajAdmin | Search/filter tenant directory |
+| GET | `/members/registration-summary` | `SamaajAdmin`/`SuperAdmin` + `Members.Read` | Registrations in the current 30-day window against the 30 days before it, for the admin Reports & Analytics screen |
 | GET | `/members/{id}` | `Members.Read` | One member, through the same per-field privacy mapper the directory uses |
 | PATCH | `/members/{id}` | Member, **self only** | Update your own profile. Replaces it whole: `privacy` and `isListedInDirectory` are both **required**, because defaulting either would silently reopen something a member had closed. Takes **no** photo field — see below |
 | PATCH | `/members/{id}/details` | `SamaajAdmin` + `Members.Write`, never self | Correct somebody else's factual details. The same fields **minus** `privacy` and `isListedInDirectory`, which are the member's own. **409** on your own id: use the profile screen, which can set them |
@@ -224,6 +225,7 @@ who never passed the check that produced it.
 | Method | Path | Permission | Purpose |
 |---|---|---|---|
 | GET | `/pathshalas` | `Members.Read` | This Samaaj's Pathshalas, with class and teacher counts |
+| GET | `/attendance-summary` | `Pathshala.Manage` | Present/absent/excused across every class this Samaaj runs, for the admin Reports & Analytics screen |
 | POST | `/pathshalas` | SuperAdmin **role** + `Pathshala.Manage` | Create the master record |
 | GET | `/pathshalas/{id}` | `Members.Read` | Sessions and classes |
 | POST | `/pathshalas/{id}/sessions` | `Pathshala.Manage` | Open an academic session; it becomes current |

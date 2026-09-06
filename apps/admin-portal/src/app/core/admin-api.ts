@@ -5,6 +5,7 @@ import {
   ActivationCode,
   Attendee,
   AttendanceStatus,
+  AttendanceSummary,
   AdminMember,
   AdminUser,
   AssignRoleResult,
@@ -40,6 +41,7 @@ import {
   PendingActivation,
   PendingResult,
   RegisterEntry,
+  RegistrationSummary,
   ResultsVisibility,
   RoleMatrix,
   SamaajEvent,
@@ -844,5 +846,17 @@ export class AdminApi {
     return this.http.get<{ id: string; fullName: string }[]>(
       `/v1/children/names?ids=${ids.join(',')}`,
     );
+  }
+
+  // ---- Reports & Analytics ------------------------------------------------
+
+  /** Registrations in the current 30-day window against the 30 days before it. */
+  registrationSummary(): Observable<RegistrationSummary> {
+    return this.http.get<RegistrationSummary>('/v1/members/registration-summary');
+  }
+
+  /** Present/absent/excused across every class this Samaaj runs. */
+  attendanceSummary(): Observable<AttendanceSummary> {
+    return this.http.get<AttendanceSummary>('/v1/pathshala/attendance-summary');
   }
 }

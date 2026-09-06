@@ -294,6 +294,24 @@ public sealed class EnrolmentRepository(
             counts.GetValueOrDefault(AttendanceStatus.Excused));
     }
 
+    /// <summary>Same shape as TallyAttendanceAsync, minus the enrolment filter -
+    /// the global tenant query filter on AttendanceEntry already scopes this
+    /// to one Samaaj.</summary>
+    public async Task<AttendanceTally> TallyAttendanceForTenantAsync(
+        CancellationToken cancellationToken = default)
+    {
+        var counts = await dbContext.Attendance
+            .AsNoTracking()
+            .GroupBy(a => a.Status)
+            .Select(g => new { Status = g.Key, Count = g.Count() })
+            .ToDictionaryAsync(x => x.Status, x => x.Count, cancellationToken);
+
+        return new AttendanceTally(
+            counts.GetValueOrDefault(AttendanceStatus.Present),
+            counts.GetValueOrDefault(AttendanceStatus.Absent),
+            counts.GetValueOrDefault(AttendanceStatus.Excused));
+    }
+
     // ---- Exams ------------------------------------------------------------
 
     public Task<Exam?> GetExamAsync(Guid examId, CancellationToken cancellationToken = default) =>

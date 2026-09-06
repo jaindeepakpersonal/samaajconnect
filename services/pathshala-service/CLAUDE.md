@@ -51,6 +51,7 @@ Two entities in DATA-MODEL.md §9 are deliberately absent. See "Decisions".
 | `ListPathshalasQuery` | `Members.Read` | Counts, not rosters |
 | `GetPathshalaQuery` | `Members.Read` | Sessions and classes |
 | `ListEnrolmentRequestsQuery` | `Pathshala.Manage` | The placement queue |
+| `GetAttendanceSummaryQuery` | `Pathshala.Manage` | Tenant-wide, unlike every other tally here |
 | `GetClassRollQuery` | `Members.Read` + teaching this class | A list of somebody's children |
 | `GetClassRegisterQuery` | `Members.Read` + teaching this class | One date's marks, so amending is not a guess |
 | `ListClassExamsQuery` | `Pathshala.Exams.Write` + teaching this class | The class's exams with their marks |
@@ -233,6 +234,16 @@ answer.
 
 **Class rosters carry member ids, not names.** A name here would be a copy of
 member-family-service's data kept in step by nothing.
+
+**`GetAttendanceSummaryQuery` is the one tally on this platform that is not
+scoped to an enrolment, a class, or a Pathshala.** It answers the admin
+dashboard's Reports & Analytics screen's "average attendance" card, and reuses
+`AttendanceTally` verbatim rather than a new response shape - the same
+`Present`/`Absent`/`Excused`/`Percentage` `GetMyAttendanceQuery` already
+returns per student, computed here with the enrolment filter dropped instead
+of added. It is gated on `Pathshala.Manage` alone, unlike `ListPathshalasQuery`'s
+`Members.Read`: a tenant-wide figure is a management report, not something a
+parent's own directory call should ever be able to answer.
 
 ## Dependencies
 

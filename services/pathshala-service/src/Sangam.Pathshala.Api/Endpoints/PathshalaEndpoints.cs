@@ -1,5 +1,6 @@
 using MediatR;
 using Sangam.Pathshala.Api.Extensions;
+using Sangam.Pathshala.Application.Abstractions;
 using Sangam.Pathshala.Application.Enrolments.Commands;
 using Sangam.Pathshala.Application.Enrolments.Queries;
 using Sangam.Pathshala.Application.Pathshalas;
@@ -110,6 +111,19 @@ public static class PathshalaEndpoints
             .ProducesProblem(StatusCodes.Status401Unauthorized)
             .ProducesProblem(StatusCodes.Status403Forbidden)
             .ProducesProblem(StatusCodes.Status404NotFound);
+
+        group.MapGet("/attendance-summary", async (ISender sender, CancellationToken cancellationToken) =>
+            {
+                var result = await sender.Send(new GetAttendanceSummaryQuery(), cancellationToken);
+
+                return result.ToApiResult();
+            })
+            .RequireAuthorization()
+            .WithName("GetAttendanceSummary")
+            .WithSummary("Present/absent/excused counts across every class this Samaaj runs.")
+            .Produces<AttendanceTally>()
+            .ProducesProblem(StatusCodes.Status401Unauthorized)
+            .ProducesProblem(StatusCodes.Status403Forbidden);
     }
 
     // ---- Classes ---------------------------------------------------------

@@ -64,5 +64,11 @@ public sealed class MemberProfileRepository(MemberFamilyDbContext dbContext) : I
     public Task<MemberProfile?> GetForConsumerAsync(Guid id, CancellationToken cancellationToken = default) =>
         dbContext.MemberProfiles.IgnoreQueryFilters().FirstOrDefaultAsync(p => p.Id == id, cancellationToken);
 
+    public Task<int> CountCreatedBetweenAsync(
+        DateTimeOffset from, DateTimeOffset to, CancellationToken cancellationToken = default) =>
+        dbContext.MemberProfiles
+            .AsNoTracking()
+            .CountAsync(p => p.CreatedAt >= from && p.CreatedAt < to, cancellationToken);
+
     public void Add(MemberProfile profile) => dbContext.MemberProfiles.Add(profile);
 }

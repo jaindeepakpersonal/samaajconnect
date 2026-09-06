@@ -65,6 +65,11 @@ json_field() {
   { grep -o "\"$1\":\"[^\"]*\"" || true; } | head -1 | cut -d'"' -f4
 }
 
+# Same as json_field, for a bare numeric value rather than a quoted string.
+json_number() {
+  { grep -oE "\"$1\":[0-9]+" || true; } | head -1 | cut -d':' -f2
+}
+
 # Stops the run the moment an id extraction comes back empty or malformed.
 #
 # **This is the check the session-id bug went without.** `json_field id` was
@@ -2801,6 +2806,17 @@ check "an administrator cannot suspend their own account" 409 \
      -H 'Content-Type: application/json' -H "Authorization: Bearer $SAMAAJ_ADMIN_TOKEN" \
      -d "{\"suspended\":true,\"password\":\"$MEMBER_PASSWORD\"}")"
 
+# The admin Reports & Analytics screen's registration-growth card. This run
+# has registered, activated and converted several members already, so the
+# current 30-day window is never zero.
+check "the registration summary counts this run's members" 200 \
+  "$(status -H "Authorization: Bearer $SAMAAJ_ADMIN_TOKEN" \
+     "$GATEWAY/v1/members/registration-summary")"
+
+check "a plain member cannot read the registration summary" 403 \
+  "$(status -H "Authorization: Bearer $MEMBER_TOKEN" \
+     "$GATEWAY/v1/members/registration-summary")"
+
 echo
 echo "Jain Pathshala: enrolment in two steps, a register, an exam"
 
@@ -3005,6 +3021,14 @@ check "placing an already-placed child is refused" 409 \
 
 # ---- The register ----------------------------------------------------------
 
+# This tenant is reused across runs of this script (see SLUG at the top), so
+# the attendance summary checked below has to be a before/after delta rather
+# than an absolute count - every previous run's marks are still in it.
+BEFORE_SUMMARY=$(curl -s -H "Authorization: Bearer $SAMAAJ_ADMIN_TOKEN" \
+  "$GATEWAY/v1/pathshala/attendance-summary")
+PRESENT_BEFORE=$(printf '%s' "$BEFORE_SUMMARY" | json_number present)
+EXCUSED_BEFORE=$(printf '%s' "$BEFORE_SUMMARY" | json_number excused)
+
 # The class meets on Sundays, so the register is marked for one that has
 # already passed.
 CLASS_DATE=$(date -u -d 'last Sunday' +%Y-%m-%d 2>/dev/null || date -u +%Y-%m-%d)
@@ -3050,6 +3074,27 @@ else
   echo "  FAIL  the register did not read back (got '$READ_BACK')"
   fail=$((fail + 1))
 fi
+
+# The admin Reports & Analytics screen's tenant-wide figure. The one mark
+# above ended up Excused, not Present, so against the snapshot taken before
+# this run touched anything: Excused up by exactly one, Present unchanged.
+AFTER_SUMMARY=$(curl -s -H "Authorization: Bearer $SAMAAJ_ADMIN_TOKEN" \
+  "$GATEWAY/v1/pathshala/attendance-summary")
+PRESENT_AFTER=$(printf '%s' "$AFTER_SUMMARY" | json_number present)
+EXCUSED_AFTER=$(printf '%s' "$AFTER_SUMMARY" | json_number excused)
+
+if [ "$PRESENT_AFTER" = "$PRESENT_BEFORE" ] \
+   && [ "$EXCUSED_AFTER" = "$((EXCUSED_BEFORE + 1))" ]; then
+  echo "  ok    the tenant-wide attendance summary counts it"
+  pass=$((pass + 1))
+else
+  echo "  FAIL  the attendance summary did not count the mark (before '$BEFORE_SUMMARY', after '$AFTER_SUMMARY')"
+  fail=$((fail + 1))
+fi
+
+check "a member with no Pathshala.Manage cannot read the attendance summary" 403 \
+  "$(status -H "Authorization: Bearer $CHILD_TOKEN" \
+     "$GATEWAY/v1/pathshala/attendance-summary")"
 
 # Empty, not 404 - a day nobody has marked is a normal state of a register.
 EMPTY_DAY=$(curl -s -H "Authorization: Bearer $TEACHER_TOKEN" \

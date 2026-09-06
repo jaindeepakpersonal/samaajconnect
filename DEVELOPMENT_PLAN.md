@@ -8,7 +8,38 @@ version of the plan; the reasoning behind the ordering lives in
 ## Current Status
 
 - **Stage:** every module has a service and member screens; Phase 5 hardening under way
-- **Last updated:** 2026-09-06 - **the admin dashboard's "Not built yet" card
+- **Last updated:** 2026-09-06 - **the admin panel's "Reports & Analytics" nav
+  item is real now - its three per-Samaaj cards, not the wireframe's
+  Super-Admin-only tenant comparison table.**
+
+  Registration growth and average attendance each needed one small, new,
+  admin-only query - `GetRegistrationSummaryQuery` in member-family-service
+  (30-day window against the 30 days before it, gated `SamaajAdmin`/`SuperAdmin`
+  + `Members.Read`) and `GetAttendanceSummaryQuery` in pathshala-service (reuses
+  `AttendanceTally` verbatim, tenant-wide instead of per-enrolment, gated
+  `Pathshala.Manage`). Events registrations this year needed nothing new:
+  `registeredCount` was already on `GET /v1/events`, summed client-side by
+  calendar year the same way the dashboard's own Events tile already sums it
+  by upcoming/past.
+
+  The wireframe's fourth piece - a cross-tenant comparison table, Super Admin
+  only - is deliberately not built. Every query on this platform, including
+  the two new ones here, is scoped to one tenant by the global query filter;
+  a table with one row per Samaaj needs either a genuinely new cross-tenant
+  aggregate endpoint in three services or a fan-out of one
+  `X-Tenant-Override-Id` request per tenant per metric - the same N+1 shape
+  already flagged for the dashboard's Pathshala tile, multiplied across every
+  Samaaj on the platform. Asked, scoped separately rather than built under
+  time pressure.
+
+  Verified with 3 new member-family-service unit tests plus 2 integration
+  tests, 3 new pathshala-service integration tests, 7 new admin-portal
+  component tests (217 total), full builds, `tsc --noEmit`,
+  `scripts/css-class-coverage.sh`, `scripts/service-docs.sh`,
+  `scripts/audit-descriptor-coverage.sh`, `scripts/unreachable-endpoints.sh`,
+  `scripts/uncalled-api-methods.sh`, and a live walkthrough against a running
+  Samaaj with real registrations, marked attendance, and event registrations.
+- **Previously:** 2026-09-06 - **the admin dashboard's "Not built yet" card
   is gone - Events, Pathshala students and Auctions all count for real now.**
 
   None of the three needed a new endpoint. Events and Auctions are each the

@@ -34,7 +34,8 @@ screen. The spec is `docs/product/wireframes/admin-panel-wireframes.html`.
 | Members | `/members` | `#members` | built. Search the Samaaj directory and open somebody |
 | Member detail | `/members/:id` | — | built; the wireframe's "View" had no screen behind it. The correction form |
 | Change password | `/change-password` | — | built; no wireframe covers it — the wireframe's sign-in screen has no forgot-password link at all |
-| Reports, Settings | — | various | not built. Reporting is a later phase; Samaaj settings live on the Samaaj screen |
+| Reports & Analytics | `/reports` | `#reports` | built — the three per-Samaaj cards only. The wireframe's Super-Admin-only cross-tenant comparison table is a deferred follow-up, see below |
+| Settings | — | various | not built. Samaaj settings live on the Samaaj screen |
 
 The unbuilt screens appear in the nav, disabled, each saying why. That is
 deliberate: the wireframe promised them, and an administrator who cannot see
@@ -149,6 +150,27 @@ administrator opens one — and sums the classes' student counts across all of
 them. A Samaaj running many Pathshalas at once would be the reason to add a
 manager-only aggregate endpoint later; nothing in this platform's data
 suggests that is the common case yet.
+
+**Reports & Analytics ships its three per-Samaaj cards and deliberately not
+the wireframe's Super-Admin-only tenant comparison table.** The three cards
+needed one small, genuinely new, admin-only query each in member-family-service
+and pathshala-service (events needed none — `registeredCount` was already on
+the wire). Neither repeats the near-miss the dashboard's Pathshala tile had:
+both are gated `SamaajAdmin`/`SuperAdmin` from the point they were created,
+never routed through a permission a plain member already holds.
+
+The comparison table is a different shape of problem and stayed out of this
+cycle on purpose. Every query on this platform — including these two new
+ones — is scoped to one tenant by the global `ITenantScopedEntity` query
+filter; a table with one row per Samaaj needs either a genuinely new
+cross-tenant aggregate endpoint in three services (bypassing that filter
+under a SuperAdmin-only gate, something this platform has never built) or a
+fan-out of one `X-Tenant-Override-Id` request per tenant per metric — the
+same N+1 shape flagged above for the Pathshala tile, multiplied across every
+Samaaj on the platform instead of one. Asked, the choice was to ship what
+composes cleanly now and scope the comparison table as its own piece of work
+later, rather than pick between inventing a new architectural pattern under
+time pressure and shipping a fan-out already known to be the wrong shape.
 
 **The role matrix edits now, and the screen still decides nothing.** The
 wireframe always said it should edit; it took per-tenant overrides, an audit

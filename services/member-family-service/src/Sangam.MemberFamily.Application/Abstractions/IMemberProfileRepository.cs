@@ -39,5 +39,12 @@ public interface IMemberProfileRepository
     /// <summary>Bypasses the tenant filter, for consumers. See ExistsAsync.</summary>
     Task<MemberProfile?> GetForConsumerAsync(Guid id, CancellationToken cancellationToken = default);
 
+    /// <summary>
+    /// How many profiles were created in <c>[from, to)</c>, counted in the
+    /// database. Tenant-filtered, same as every other reader here.
+    /// </summary>
+    Task<int> CountCreatedBetweenAsync(
+        DateTimeOffset from, DateTimeOffset to, CancellationToken cancellationToken = default);
+
     void Add(MemberProfile profile);
 }

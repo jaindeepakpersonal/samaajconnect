@@ -6,6 +6,7 @@ using Sangam.MemberFamily.Application.Members.Commands.UpdateProfile;
 using Sangam.MemberFamily.Application.Members.Queries.GetMember;
 using Sangam.MemberFamily.Application.Members.Queries.GetMyData;
 using Sangam.MemberFamily.Application.Members.Queries.GetMyProfile;
+using Sangam.MemberFamily.Application.Members.Queries.GetRegistrationSummary;
 using Sangam.MemberFamily.Application.Members.Queries.SearchMembers;
 
 namespace Sangam.MemberFamily.Api.Endpoints;
@@ -55,8 +56,19 @@ public static class MemberEndpoints
             .WithSummary("Everything this service holds about you and your household (DPDP s.11).")
             .Produces<MyMemberDataResponse>();
 
-        // Declared after /me and /me/data-export so those literal routes are
-        // never shadowed by the id parameter.
+        group.MapGet("/registration-summary", async (ISender sender, CancellationToken cancellationToken) =>
+            {
+                var result = await sender.Send(new GetRegistrationSummaryQuery(), cancellationToken);
+
+                return result.ToApiResult();
+            })
+            .WithName("GetRegistrationSummary")
+            .WithSummary("Registration counts for the current 30-day window against the prior one.")
+            .Produces<RegistrationSummaryResponse>()
+            .ProducesProblem(StatusCodes.Status403Forbidden);
+
+        // Declared after /me, /me/data-export and /registration-summary so
+        // those literal routes are never shadowed by the id parameter.
         group.MapGet("/{id:guid}", async (
                 Guid id,
                 ISender sender,

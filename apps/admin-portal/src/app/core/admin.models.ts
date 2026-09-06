@@ -672,3 +672,27 @@ export interface MemberCorrection {
   readonly locality: string | null;
   readonly profession: string | null;
 }
+
+// ---- Reports & Analytics ---------------------------------------------------
+
+/** Mirrors `RegistrationSummaryResponse`. Window is fixed server-side: 30 days
+ *  against the 30 days before that. */
+export interface RegistrationSummary {
+  readonly currentPeriodCount: number;
+  readonly previousPeriodCount: number;
+
+  /** Null when the previous period counted nothing - not zero, which would
+   *  misreport growth from nothing as no growth at all. */
+  readonly growthPercentage: number | null;
+}
+
+/** Mirrors `AttendanceTally`, tenant-wide rather than per-enrolment. */
+export interface AttendanceSummary {
+  readonly present: number;
+  readonly absent: number;
+  readonly excused: number;
+  readonly recorded: number;
+
+  /** Null when nothing has been marked yet - zero would be a claim. */
+  readonly percentage: number | null;
+}

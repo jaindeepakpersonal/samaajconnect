@@ -59,6 +59,7 @@ worked example of a cross-service flow with no synchronous call.
 | `GetChildNamesQuery` | `SamaajAdmin`/`SuperAdmin` + `Members.Read` | built |
 | `GetMemberPhotoQuery` | `Members.Read` | built |
 | `GetChildPhotoQuery` | `Members.Read`, then the child's household | built |
+| `GetRegistrationSummaryQuery` | `SamaajAdmin`/`SuperAdmin` + `Members.Read` | built |
 
 ## Events published
 
@@ -89,6 +90,7 @@ here, which looks exactly like a broker problem and is not one.
 | Method | Path | Roles |
 |---|---|---|
 | GET | `/v1/members` | `Members.Read` |
+| GET | `/v1/members/registration-summary` | `SamaajAdmin`/`SuperAdmin` + `Members.Read` |
 | GET | `/v1/members/me` | any authenticated role |
 | PATCH | `/v1/members/{id}` | self only |
 | PATCH | `/v1/members/{id}/details` | `SamaajAdmin` + `Members.Write`, never self |
@@ -401,6 +403,17 @@ consumer has no request and so no resolved tenant, and the ordinary
 tenant-filtered lookup therefore finds nothing - which reads as "this child was
 deleted" and silently drops the event. Any new consumer path needs the same
 treatment; this caught us twice.
+
+**`GetRegistrationSummaryQuery`'s window is fixed at 30 days against the 30
+days before it, and is not a parameter.** It answers the admin dashboard's
+Reports & Analytics screen, whose wireframe draws one number
+("+8.4% Registration growth") with no control beside it — a caller-supplied
+range would be a configuration screen nobody asked for standing behind a
+report nobody asked to configure. `RegistrationSummaryResponse.GrowthPercentage`
+is null rather than zero when the previous period counted nothing, the same
+reasoning `AttendanceTally.Percentage` already uses in pathshala-service: a
+percentage against zero is not a number, and reporting zero would say "no
+growth" about a Samaaj that has only just started registering members.
 
 ## Adult-child conversion
 
