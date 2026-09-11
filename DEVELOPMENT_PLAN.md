@@ -8,7 +8,27 @@ version of the plan; the reasoning behind the ordering lives in
 ## Current Status
 
 - **Stage:** every module has a service and member screens; Phase 5 hardening under way
-- **Last updated:** 2026-09-06 - **the admin panel's Settings screen is real -
+- **Last updated:** 2026-09-11 - **member-portal lands on Timeline now, not a
+  tile grid that just repeated the sidebar.**
+
+  Home's tiles were every route already on the sidebar, offered a second time
+  on the one screen a member saw most - reported directly. It is gone: `/`,
+  `/home` (redirected rather than 404ing, for old links) and "after signing
+  in" all point at `/timeline` now, and the sidebar's brand wordmark does the
+  same job Home's row used to. Home's three notices moved rather than
+  disappeared - contact verification is Timeline's own now, the unread-
+  notifications banner turned out to already be redundant with the shell's
+  bell badge and was dropped, and "no modules enabled" became Timeline
+  reading its own feed's 404 as "community is off for this Samaaj" (a feed
+  endpoint has no per-item 404 to confuse it with) rather than the generic
+  error box.
+
+  Verified with 348 member-portal component tests (4 new), full build,
+  `tsc --noEmit`, `scripts/css-class-coverage.sh`, and a live walkthrough:
+  registered and signed in as a fresh member, confirmed landing on Timeline
+  with no "Home" row in the nav, confirmed `/home` redirects, confirmed the
+  brand link.
+- **Previously:** 2026-09-06 - **the admin panel's Settings screen is real -
   Security, a Samaaj's own overrides to five platform-wide constants, plus
   honest pointers or honest gaps for the other three wireframe cards.**
 

@@ -305,9 +305,13 @@ export class LoginComponent {
    * The wireframe sent a member to their Samaaj's subdomain after signing in.
    * The platform is single-domain now, so there is nowhere else to go: the
    * token already names the Samaaj and the gateway reads it from there.
+   *
+   * Lands on Timeline, not a tiles page - every tile Home ever offered is
+   * already on the sidebar, so the landing page itself carries something to
+   * read instead of a second copy of the nav.
    */
   private goHome(): void {
     void this.router.navigateByUrl(
-      this.route.snapshot.queryParamMap.get('returnUrl') ?? '/home');
+      this.route.snapshot.queryParamMap.get('returnUrl') ?? '/timeline');
   }
 }

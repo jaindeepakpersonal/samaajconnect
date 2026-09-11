@@ -22,18 +22,17 @@ interface NavGroup {
  * `#children` is `/family`'s own second card, not a nav destination; the five
  * Pathshala screens (`#myclass`/`#attendance`/`#exams`/`#progress`) are one
  * enrolment screen at `/pathshala/:id`, reached from the Pathshala list rather
- * than the nav; and `#pathevents` has no endpoint and stays off it entirely,
- * the same reason Home never offers it as a tile.
+ * than the nav; and `#pathevents` has no endpoint and stays off it entirely.
  *
- * A `moduleKey` of null is core and always shown, matching Home's own tiles -
- * two lists filtering the same way is the risk `ModuleKeys` exists to remove,
- * not a second one to keep in step by hand.
+ * No separate "Home" row. It used to lead to a tile grid that was every one
+ * of these routes offered a second time - see apps/member-portal/CLAUDE.md.
+ * The brand at the top of the sidebar is the way back to Timeline now, the
+ * same "click the logo" pattern as everywhere else on the web.
  */
 const NAV: readonly NavGroup[] = [
   {
     heading: 'Core',
     items: [
-      { label: 'Home', route: '/home', moduleKey: null },
       { label: 'My Profile', route: '/profile', moduleKey: null },
       { label: 'Members', route: '/members', moduleKey: null },
       { label: 'My Family', route: '/family', moduleKey: null },
@@ -116,7 +115,7 @@ const ALL_NAV_ITEMS: readonly NavItem[] = NAV.flatMap((group) => group.items);
       }
 
       <aside class="side" id="shell-nav" [class.open]="navOpen()">
-        <div class="brand">samaajconnect</div>
+        <a class="brand" routerLink="/timeline" (click)="closeNav()">samaajconnect</a>
 
         <nav class="nav" aria-label="Main sections">
           @for (group of visibleNav(); track group.heading) {

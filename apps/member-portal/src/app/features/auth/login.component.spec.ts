@@ -14,7 +14,7 @@ describe('LoginComponent', () => {
     TestBed.configureTestingModule({
       imports: [LoginComponent],
       providers: [
-        provideRouter([{ path: 'home', children: [] }]),
+        provideRouter([{ path: 'timeline', children: [] }]),
         provideHttpClient(),
         provideHttpClientTesting(),
         { provide: API_CONFIG, useValue: { gatewayUrl: '' } },
@@ -98,7 +98,7 @@ describe('LoginComponent', () => {
   });
 
   it("goes to the return url after signing in - there is no subdomain to move to", async () => {
-    setup({ returnUrl: '/home' });
+    setup({ returnUrl: '/timeline' });
 
     const router = TestBed.inject(Router);
     const navigate = vi.spyOn(router, 'navigateByUrl').mockResolvedValue(true);
@@ -116,7 +116,29 @@ describe('LoginComponent', () => {
       roles: ['SuperAdmin'],
     });
 
-    expect(navigate).toHaveBeenCalledWith('/home');
+    expect(navigate).toHaveBeenCalledWith('/timeline');
+  });
+
+  it('lands on Timeline by default - not a tiles page that only duplicates the sidebar', async () => {
+    setup();
+
+    const router = TestBed.inject(Router);
+    const navigate = vi.spyOn(router, 'navigateByUrl').mockResolvedValue(true);
+
+    component.form.setValue({ mobileOrEmail: 'ravi@example.com', password: 'a-long-password' });
+    component.submit();
+
+    http.expectOne('/v1/identity/login').flush({
+      accessToken: 't',
+      expiresAt: new Date().toISOString(),
+      userId: 'u1',
+      tenantId: 't1',
+      tenantSlug: 'mahavir-samaj',
+      fullName: 'Ravi Shah',
+      roles: ['Member'],
+    });
+
+    expect(navigate).toHaveBeenCalledWith('/timeline');
   });
 
   it('tells the member their session ended when redirected by the interceptor', () => {

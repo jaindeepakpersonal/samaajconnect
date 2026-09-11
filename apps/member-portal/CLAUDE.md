@@ -10,8 +10,7 @@ before translating another screen.
 |---|---|---|---|
 | Login | `/login` | `#login` | built, including OTP sign-in as an alternative to a password |
 | Register | `/register` | `#register` | built |
-| Home | `/home` | `#home` | built |
-| Timeline | `/timeline` | `#timeline` | built |
+| Timeline | `/timeline` | `#timeline` | built - also the landing page; `/home` redirects here (see below) |
 | Events | `/events` | `#events` | built |
 | Event detail | `/events/:id` | `#eventdetail` | built |
 | Volunteer Groups | `/groups` | `#groups` | built |
@@ -164,11 +163,40 @@ admin-portal's shell had the identical defect and got the identical fix,
 since both shells share this one bug's shape: a sidebar built for desktop
 with only a stacking rule for narrow viewports, never a collapsing one.
 
-**Home hides modules the Samaaj has switched off.** The gateway already answers
-404 for those routes, so offering the tile would be offering a door to a 404.
-The "no modules enabled" notice is keyed off whether any *optional* module is
-on, not off an empty tile list, because Members and Family are not module-gated
-and are always present.
+**Home hid modules the Samaaj had switched off.** The gateway already answers
+404 for those routes, so offering the tile would have been offering a door to
+a 404. The "no modules enabled" notice was keyed off whether any *optional*
+module was on, not off an empty tile list, because Members and Family were not
+module-gated and were always present.
+
+**Home is gone as of 2026-09-11, and Timeline is the landing page now.** Every
+tile Home ever offered was a route already on the sidebar - the one thing on
+the screen a member saw most often was a second copy of the nav, which is what
+prompted this. Its three notices moved rather than disappeared: the contact-
+verification banner is now Timeline's own (`isContactVerified`, defaulted true
+until `/me` answers, the same reasoning `canModerate` already followed); the
+unread-notifications banner did not move, because the shell's bell badge
+(`shell.component.ts`, present on every screen since the shell was built) had
+made it redundant the moment the shell shipped, not just now; and the
+"no modules enabled" notice became something more specific and more useful.
+
+Timeline is module-gated on `community`, same as Home's own tile for it, but a
+member can now land here even when that module is off - `/`, `/home`, and
+"after signing in" all point here unconditionally, there being no meaningful
+narrower fallback once Home's tiles were all sidebar duplicates regardless of
+which modules were on. `TimelineComponent.load()` tells a 404 on the feed apart
+from every other failure and shows "Timeline is not switched on for your
+Samaaj yet" instead of the generic error box - a distinction that is not a
+guess: a feed is a list, so nothing about `GET /v1/timeline/posts` can 404 for
+a per-item reason, which means a 404 there can only mean the module gate. The
+compose form and feed are hidden in that state rather than shown broken.
+
+`/home` redirects to `/timeline` rather than 404ing, and the sidebar's brand
+wordmark is now a link to `/timeline` - the "click the logo" pattern this app
+had never needed while Home held that job. There is no separate "Home" row in
+the sidebar any more; Timeline's own row is the only way there from the nav,
+and having two rows point at variations of the same destination would be the
+exact redundancy this change removes, reintroduced one level down.
 
 **A module key is `ModuleKeys.X`, never a string literal.** Home filtered its
 Events and Volunteer tiles on `Events` and `VolunteerGroups`, neither of which
@@ -548,9 +576,9 @@ it: the pill rendered in the wrong colour, which is exactly the kind of thing
 nobody notices. Every one of those pill variants sets a text colour as well as a
 background, so a state is never carried by hue alone.
 
-**After signing in the portal simply navigates to Home.** The wireframe sent a
-member to their Samaaj's subdomain; there is no subdomain now, so there is
-nowhere else to go.
+**After signing in the portal simply navigates to Timeline.** The wireframe
+sent a member to their Samaaj's subdomain; there is no subdomain now, so there
+is nowhere else to go but the one screen with something on it to read.
 
 **Login and Register are client-rendered, not prerendered.** They are forms
 whose server-rendered output would be an empty shell, and Home is behind the

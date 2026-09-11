@@ -42,10 +42,13 @@ export const routes: Routes = [
     loadComponent: () => import('./shell/shell.component').then((m) => m.ShellComponent),
     children: [
       {
+        // Home's tile grid was every route already on the sidebar, offered a
+        // second time on the one screen a member landed on most - see
+        // apps/member-portal/CLAUDE.md. This keeps old bookmarks and links
+        // working rather than 404ing them.
         path: 'home',
-        title: 'Home - samaajconnect',
-        loadComponent: () =>
-          import('./features/home/home.component').then((m) => m.HomeComponent),
+        pathMatch: 'full',
+        redirectTo: 'timeline',
       },
       {
         path: 'notifications',
@@ -180,11 +183,11 @@ export const routes: Routes = [
         loadComponent: () =>
           import('./features/privacy/privacy.component').then((m) => m.PrivacyComponent),
       },
-      { path: '', pathMatch: 'full', redirectTo: 'home' },
+      { path: '', pathMatch: 'full', redirectTo: 'timeline' },
     ],
   },
 
-  // Anything unrecognised goes to Home, which sends signed-out visitors to
+  // Anything unrecognised goes to Timeline, which sends signed-out visitors to
   // Login via the guard. A dedicated 404 screen is not in the wireframes.
-  { path: '**', redirectTo: 'home' },
+  { path: '**', redirectTo: 'timeline' },
 ];

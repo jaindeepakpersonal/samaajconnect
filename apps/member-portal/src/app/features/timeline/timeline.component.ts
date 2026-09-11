@@ -1,3 +1,4 @@
+import { HttpErrorResponse } from '@angular/common/http';
 import { Component, OnInit, computed, inject, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { AuthService, describeError } from '@samaajconnect/shared';
@@ -6,6 +7,19 @@ import { Comment, Post, ReactionType, Reactions } from './timeline.models';
 
 /**
  * Timeline, from the member-portal wireframe's `#timeline` screen.
+ *
+ * This is also where a member lands after signing in, and on `/` - see
+ * apps/member-portal/CLAUDE.md. There used to be a Home in between, a grid of
+ * tiles for every route already on the sidebar; it carried three notices this
+ * screen has kept (contact verification below, and the module-disabled state
+ * this screen's own 404 handling covers) and nothing a member could not
+ * already reach from the nav.
+ *
+ * `community`, Timeline's own module, can be switched off for a Samaaj that
+ * has landed here anyway - the gateway answers 404 for the feed, not a
+ * missing post, since a feed endpoint has no per-item 404 of its own. `load()`
+ * tells the two apart and this screen says so plainly rather than showing the
+ * generic error box a member has no way to act on.
  *
  * The wireframe shows three posts in three states - a Samaaj announcement, an
  * approved member post with a Report button, and the reader's own post awaiting
@@ -41,174 +55,187 @@ import { Comment, Post, ReactionType, Reactions } from './timeline.models';
         </div>
       </header>
 
-      <!-- Compose ------------------------------------------------------- -->
-      <form class="card compose" (ngSubmit)="submit()">
-        <label class="sr-only" for="post-title">Title</label>
-        <input
-          class="input"
-          id="post-title"
-          name="title"
-          [(ngModel)]="title"
-          placeholder="A short title"
-          maxlength="200"
-          required
-        />
-
-        <label class="sr-only" for="post-body">Your post</label>
-        <textarea
-          class="input"
-          id="post-body"
-          name="body"
-          [(ngModel)]="body"
-          placeholder="Share something with the Samaaj..."
-          rows="3"
-          maxlength="5000"
-          required
-        ></textarea>
-
-        @if (canModerate()) {
-          <label class="announce">
-            <input type="checkbox" name="announce" [(ngModel)]="asAnnouncement" />
-            Publish as a Samaaj announcement, without review
-          </label>
-        }
-
-        @if (composeError(); as message) {
-          <p class="notice error" role="alert">{{ message }}</p>
-        }
-
-        @if (justPosted()) {
-          <p class="notice info" role="status">
-            {{
-              asAnnouncement
-                ? 'Your announcement is live.'
-                : 'Your post has gone to the moderators. It appears below, marked as awaiting review.'
-            }}
-          </p>
-        }
-
-        <div class="actions">
-          <button class="btn secondary" type="button" disabled>Attach Photo</button>
-          <span class="small">
-            Photos are not switched on yet - the platform has no file storage.
-          </span>
-
-          <button class="btn" type="submit" [disabled]="!canPost() || posting()">
-            {{ posting() ? 'Posting…' : asAnnouncement ? 'Publish' : 'Post for Review' }}
-          </button>
-        </div>
-      </form>
-
-      <!-- The feed ------------------------------------------------------ -->
-      @if (loading()) {
-        <p role="status">Loading the timeline…</p>
-      } @else if (error(); as message) {
-        <div class="notice error" role="alert">
-          {{ message }}
-          <button class="btn link" type="button" (click)="load()">Try again</button>
-        </div>
-      } @else if (posts().length === 0) {
+      @if (!isContactVerified()) {
         <p class="notice info" role="status">
-          Nothing has been posted yet. Yours would be the first.
+          Your mobile number is not verified yet. Verification messages are not switched on yet;
+          nothing is blocked in the meantime.
+        </p>
+      }
+
+      @if (moduleDisabled()) {
+        <p class="notice info" role="status">
+          Timeline is not switched on for your Samaaj yet. Your administrator can enable it.
         </p>
       } @else {
-        <div class="feed">
-          @for (post of posts(); track post.id) {
-            <article class="post card">
-              <div class="meta">
-                <span class="pill" [class.warn]="isAwaitingReview(post)">{{ label(post) }}</span>
-                <span>{{ when(post.createdAt) }}</span>
-              </div>
+        <!-- Compose ----------------------------------------------------- -->
+        <form class="card compose" (ngSubmit)="submit()">
+          <label class="sr-only" for="post-title">Title</label>
+          <input
+            class="input"
+            id="post-title"
+            name="title"
+            [(ngModel)]="title"
+            placeholder="A short title"
+            maxlength="200"
+            required
+          />
 
-              <h2 class="post-title">{{ post.title }}</h2>
-              <p class="post-body">{{ post.body }}</p>
+          <label class="sr-only" for="post-body">Your post</label>
+          <textarea
+            class="input"
+            id="post-body"
+            name="body"
+            [(ngModel)]="body"
+            placeholder="Share something with the Samaaj..."
+            rows="3"
+            maxlength="5000"
+            required
+          ></textarea>
 
-              @if (isAwaitingReview(post)) {
-                <p class="small">
-                  Only you can see this. A moderator will decide whether it goes to the Samaaj.
-                </p>
-              } @else if (post.status === 'Rejected') {
-                <p class="small">
-                  This was not published. Only you can see it.
-                </p>
-              }
+          @if (canModerate()) {
+            <label class="announce">
+              <input type="checkbox" name="announce" [(ngModel)]="asAnnouncement" />
+              Publish as a Samaaj announcement, without review
+            </label>
+          }
 
-              @if (isReadable(post)) {
-                <div class="post-actions">
-                  @for (reaction of reactions; track reaction.type) {
-                    <button
-                      class="btn link"
-                      type="button"
-                      [class.mine]="post.myReaction === reaction.type"
-                      [attr.aria-pressed]="post.myReaction === reaction.type"
-                      [disabled]="busyId() === post.id"
-                      (click)="react(post, reaction.type)"
-                    >
-                      {{ reaction.label }}
-                      @if (countOf(post, reaction.type); as count) {
-                        <span class="count">{{ count }}</span>
-                      }
-                    </button>
-                  }
+          @if (composeError(); as message) {
+            <p class="notice error" role="alert">{{ message }}</p>
+          }
 
-                  <button class="btn link" type="button" (click)="toggleComments(post)">
-                    {{ post.commentCount === 1 ? '1 comment' : post.commentCount + ' comments' }}
-                  </button>
+          @if (justPosted()) {
+            <p class="notice info" role="status">
+              {{
+                asAnnouncement
+                  ? 'Your announcement is live.'
+                  : 'Your post has gone to the moderators. It appears below, marked as awaiting review.'
+              }}
+            </p>
+          }
 
-                  @if (!isMine(post)) {
-                    <button
-                      class="btn link"
-                      type="button"
-                      [disabled]="busyId() === post.id || reported().includes(post.id)"
-                      (click)="report(post)"
-                    >
-                      {{ reported().includes(post.id) ? 'Reported' : 'Report' }}
-                    </button>
-                  }
+          <div class="actions">
+            <button class="btn secondary" type="button" disabled>Attach Photo</button>
+            <span class="small">
+              Photos are not switched on yet - the platform has no file storage.
+            </span>
+
+            <button class="btn" type="submit" [disabled]="!canPost() || posting()">
+              {{ posting() ? 'Posting…' : asAnnouncement ? 'Publish' : 'Post for Review' }}
+            </button>
+          </div>
+        </form>
+
+        <!-- The feed ----------------------------------------------------- -->
+        @if (loading()) {
+          <p role="status">Loading the timeline…</p>
+        } @else if (error(); as message) {
+          <div class="notice error" role="alert">
+            {{ message }}
+            <button class="btn link" type="button" (click)="load()">Try again</button>
+          </div>
+        } @else if (posts().length === 0) {
+          <p class="notice info" role="status">
+            Nothing has been posted yet. Yours would be the first.
+          </p>
+        } @else {
+          <div class="feed">
+            @for (post of posts(); track post.id) {
+              <article class="post card">
+                <div class="meta">
+                  <span class="pill" [class.warn]="isAwaitingReview(post)">{{ label(post) }}</span>
+                  <span>{{ when(post.createdAt) }}</span>
                 </div>
-              }
 
-              @if (postError()[post.id]; as message) {
-                <p class="notice error" role="alert">{{ message }}</p>
-              }
+                <h2 class="post-title">{{ post.title }}</h2>
+                <p class="post-body">{{ post.body }}</p>
 
-              @if (openComments() === post.id) {
-                <div class="comments">
-                  @if (loadingComments()) {
-                    <p role="status">Loading comments…</p>
-                  } @else {
-                    @for (comment of comments(); track comment.id) {
-                      <div class="comment">
-                        <div class="meta">
-                          <span>{{ authorLabel(comment.authorMemberId) }}</span>
-                          <span>{{ when(comment.createdAt) }}</span>
-                        </div>
-                        <p>{{ comment.body }}</p>
-                      </div>
-                    } @empty {
-                      <p class="small">No comments yet.</p>
+                @if (isAwaitingReview(post)) {
+                  <p class="small">
+                    Only you can see this. A moderator will decide whether it goes to the Samaaj.
+                  </p>
+                } @else if (post.status === 'Rejected') {
+                  <p class="small">
+                    This was not published. Only you can see it.
+                  </p>
+                }
+
+                @if (isReadable(post)) {
+                  <div class="post-actions">
+                    @for (reaction of reactions; track reaction.type) {
+                      <button
+                        class="btn link"
+                        type="button"
+                        [class.mine]="post.myReaction === reaction.type"
+                        [attr.aria-pressed]="post.myReaction === reaction.type"
+                        [disabled]="busyId() === post.id"
+                        (click)="react(post, reaction.type)"
+                      >
+                        {{ reaction.label }}
+                        @if (countOf(post, reaction.type); as count) {
+                          <span class="count">{{ count }}</span>
+                        }
+                      </button>
                     }
 
-                    <form class="add-comment" (ngSubmit)="addComment(post)">
-                      <label class="sr-only" [for]="'comment-' + post.id">Add a comment</label>
-                      <input
-                        class="input"
-                        [id]="'comment-' + post.id"
-                        name="comment"
-                        [(ngModel)]="draftComment"
-                        placeholder="Add a comment"
-                        maxlength="2000"
-                      />
-                      <button class="btn" type="submit" [disabled]="!draftComment.trim()">
-                        Comment
+                    <button class="btn link" type="button" (click)="toggleComments(post)">
+                      {{ post.commentCount === 1 ? '1 comment' : post.commentCount + ' comments' }}
+                    </button>
+
+                    @if (!isMine(post)) {
+                      <button
+                        class="btn link"
+                        type="button"
+                        [disabled]="busyId() === post.id || reported().includes(post.id)"
+                        (click)="report(post)"
+                      >
+                        {{ reported().includes(post.id) ? 'Reported' : 'Report' }}
                       </button>
-                    </form>
-                  }
-                </div>
-              }
-            </article>
-          }
-        </div>
+                    }
+                  </div>
+                }
+
+                @if (postError()[post.id]; as message) {
+                  <p class="notice error" role="alert">{{ message }}</p>
+                }
+
+                @if (openComments() === post.id) {
+                  <div class="comments">
+                    @if (loadingComments()) {
+                      <p role="status">Loading comments…</p>
+                    } @else {
+                      @for (comment of comments(); track comment.id) {
+                        <div class="comment">
+                          <div class="meta">
+                            <span>{{ authorLabel(comment.authorMemberId) }}</span>
+                            <span>{{ when(comment.createdAt) }}</span>
+                          </div>
+                          <p>{{ comment.body }}</p>
+                        </div>
+                      } @empty {
+                        <p class="small">No comments yet.</p>
+                      }
+
+                      <form class="add-comment" (ngSubmit)="addComment(post)">
+                        <label class="sr-only" [for]="'comment-' + post.id">Add a comment</label>
+                        <input
+                          class="input"
+                          [id]="'comment-' + post.id"
+                          name="comment"
+                          [(ngModel)]="draftComment"
+                          placeholder="Add a comment"
+                          maxlength="2000"
+                        />
+                        <button class="btn" type="submit" [disabled]="!draftComment.trim()">
+                          Comment
+                        </button>
+                      </form>
+                    }
+                  </div>
+                }
+              </article>
+            }
+          </div>
+        }
       }
     </div>
   `,
@@ -222,6 +249,14 @@ export class TimelineComponent implements OnInit {
   readonly posts = signal<readonly Post[]>([]);
   readonly loading = signal(true);
   readonly error = signal<string | null>(null);
+
+  /**
+   * True once `load()` has seen a 404 on the feed itself. A feed is a list -
+   * nothing about `GET /v1/timeline/posts` can 404 for a per-item reason - so
+   * a 404 here means `community` is off for this Samaaj, not that something
+   * is missing.
+   */
+  readonly moduleDisabled = signal(false);
 
   /** Which post a request is in flight for, so only its buttons disable. */
   readonly busyId = signal<string | null>(null);
@@ -259,6 +294,13 @@ export class TimelineComponent implements OnInit {
   );
 
   /**
+   * Defaults to true (nothing to warn about) until `/me` has actually loaded,
+   * the same reasoning `canModerate` follows - a screen should not flash a
+   * false claim about a member's account before it knows anything.
+   */
+  readonly isContactVerified = computed(() => this.auth.user()?.isContactVerified ?? true);
+
+  /**
    * A method, not a `computed`.
    *
    * `title` and `body` are plain fields bound with `[(ngModel)]`, so a computed
@@ -284,6 +326,7 @@ export class TimelineComponent implements OnInit {
   load(): void {
     this.loading.set(true);
     this.error.set(null);
+    this.moduleDisabled.set(false);
 
     this.api.feed().subscribe({
       next: (found) => {
@@ -292,6 +335,12 @@ export class TimelineComponent implements OnInit {
       },
       error: (failure: unknown) => {
         this.loading.set(false);
+
+        if (failure instanceof HttpErrorResponse && failure.status === 404) {
+          this.moduleDisabled.set(true);
+          return;
+        }
+
         this.error.set(describeError(failure));
       },
     });

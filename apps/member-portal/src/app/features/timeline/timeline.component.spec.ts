@@ -317,6 +317,38 @@ describe('TimelineComponent', () => {
     expect(text()).toContain('Try again');
   });
 
+  it('reads a 404 on the feed as the module being off, not a missing post', () => {
+    // The feed is a list - nothing about it can 404 per item - so a 404 here
+    // means the Samaaj has not switched community on, and the screen should
+    // say that rather than showing the generic "something went wrong" box.
+    fixture.detectChanges();
+
+    http.expectOne('/v1/identity/me').flush(member);
+    http.expectOne('/v1/timeline/posts').flush({}, { status: 404, statusText: 'Not Found' });
+    fixture.detectChanges();
+
+    expect(text()).toContain('not switched on for your Samaaj');
+    expect(text()).not.toContain('Try again');
+    expect(buttonSaying('Post for Review')).toBeUndefined();
+  });
+
+  it('warns an unverified member, and says nothing once they are verified', () => {
+    load([], { ...member, isContactVerified: false });
+
+    expect(text()).toContain('not verified yet');
+  });
+
+  it('says nothing about verification before /me has answered', () => {
+    fixture.detectChanges();
+
+    // Only the feed has answered so far - /me has not, so the screen must not
+    // flash a false claim about the member's account before it knows one.
+    expect(text()).not.toContain('not verified yet');
+
+    http.expectOne('/v1/identity/me').flush(member);
+    http.expectOne('/v1/timeline/posts').flush([]);
+  });
+
   it('still shows the feed when the profile call fails', () => {
     // Without /me the screen cannot offer the announcement option, but a member
     // should still be able to read their Samaaj timeline.
