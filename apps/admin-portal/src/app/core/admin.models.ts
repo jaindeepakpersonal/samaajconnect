@@ -712,3 +712,46 @@ export interface SecurityPolicy {
   readonly lockoutDurationMinutes: number | null;
   readonly refreshTokenLifetimeDays: number | null;
 }
+
+// ---- Master data ------------------------------------------------------------
+
+/** The four flat lists behind `LookupItem`. Code and category are fixed once created. */
+export type LookupCategory =
+  | 'Country'
+  | 'ProfessionType'
+  | 'Gender'
+  | 'MaritalStatus'
+  | 'Qualification';
+
+/** Mirrors master-data-service's `LookupItemResponse`. Every write is a soft delete. */
+export interface LookupItem {
+  readonly id: string;
+  readonly category: LookupCategory;
+  readonly code: string;
+  readonly label: string;
+  readonly sortOrder: number;
+  readonly isActive: boolean;
+}
+
+/** Mirrors `CityResponse`. Scoped to a country - `countryId` names a `LookupItem` of category `Country`. */
+export interface City {
+  readonly id: string;
+  readonly countryId: string;
+  readonly name: string;
+  readonly isActive: boolean;
+}
+
+/** Mirrors `LocalityResponse`. Scoped to a city. */
+export interface Locality {
+  readonly id: string;
+  readonly cityId: string;
+  readonly name: string;
+  readonly isActive: boolean;
+}
+
+/** Mirrors `GautraResponse` - the calling Samaaj's own list. */
+export interface Gautra {
+  readonly id: string;
+  readonly name: string;
+  readonly isActive: boolean;
+}

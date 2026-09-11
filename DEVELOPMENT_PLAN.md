@@ -8,7 +8,38 @@ version of the plan; the reasoning behind the ordering lives in
 ## Current Status
 
 - **Stage:** every module has a service and member screens; Phase 5 hardening under way
-- **Last updated:** 2026-09-11 - **member-portal's per-field directory privacy
+- **Last updated:** 2026-09-11 - **admin-portal has a Master Data screen -
+  master-data-service's sixteen commands were all curl-only until now, the
+  same shape of gap as Pathshala, Boli and moderation before their screens.**
+
+  One screen, split by permission rather than by role checkbox: the
+  platform-wide lists (Country, Profession, Gender, Marital status, Cities,
+  Localities) are `MasterData.Manage` and render only for a Super Admin;
+  Gautra is `Gautra.Manage` and renders for a Samaaj Admin's own Samaaj, or a
+  Super Admin's once one is chosen in the top bar - the same "choose one in
+  the top bar" refusal the Pathshala create form already teaches, since
+  `CreateGautraCommand` has nowhere to put a Gautra with no scope selected.
+  Cities cascade from a chosen Country and Localities cascade from a chosen
+  City, both read from the same active-Country list the Lookup Lists card's
+  own Country tab uses.
+
+  Deactivating here has no undo, unlike a volunteer group or a Pathshala:
+  every write in this service is a soft delete, but no command exists to
+  reverse one, so the confirmation panel says what actually happens - the row
+  stops appearing as a choice - rather than implying a "bring back" that
+  isn't there. The Edit and Deactivate triggers stay in the DOM with
+  `aria-expanded` rather than being swapped for a Save/Cancel or a confirm
+  panel, the exact WCAG 2.4.3 focus-drop finding this file's own admin-portal
+  accessibility passes already document and fixed twice elsewhere.
+
+  Verified with 8 new admin-portal component tests (231 total, all passing),
+  full production build, `tsc --noEmit -p tsconfig.spec.json`,
+  `scripts/css-class-coverage.sh`, and `scripts/table-caption-coverage.sh`.
+  `scripts/unreachable-endpoints.sh` still lists the four master-data
+  `GetById` endpoints as uncalled - expected, since the list responses this
+  screen reads already carry everything the table and forms need, the same
+  shape as every other list-only admin screen's ungathered detail endpoint.
+- **Previously:** 2026-09-11 - **member-portal's per-field directory privacy
   card moved from My Profile to Privacy settings (`/privacy`), which the
   previous change's user menu already called by that name.**
 

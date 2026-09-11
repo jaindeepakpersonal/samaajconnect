@@ -48,6 +48,12 @@ export const routes: Routes = [
           import('./features/tenants/tenant-list.component').then((m) => m.TenantListComponent),
       },
       {
+        path: 'master-data',
+        title: 'Master Data - samaajconnect admin',
+        loadComponent: () =>
+          import('./features/master-data/master-data.component').then((m) => m.MasterDataComponent),
+      },
+      {
         path: 'tenants/new',
         title: 'Create Samaaj - samaajconnect admin',
         loadComponent: () =>

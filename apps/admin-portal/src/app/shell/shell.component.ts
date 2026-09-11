@@ -254,6 +254,7 @@ const NAV: readonly NavGroup[] = [
     heading: 'Platform',
     items: [
       { label: 'Samaaj / Tenants', route: '/tenants', roles: ['SuperAdmin'] },
+      { label: 'Master Data', route: '/master-data' },
       { label: 'Admin Users & Roles', route: '/admins' },
       { label: 'Audit Logs', route: '/audit' },
     ],

@@ -30,7 +30,12 @@ import {
   CreateTenantRequest,
   InviteAdminRequest,
   InviteAdminResult,
+  City,
+  Gautra,
   IssueStatus,
+  Locality,
+  LookupCategory,
+  LookupItem,
   MemberCorrection,
   ModuleDescriptor,
   OrganizerGroup,
@@ -872,5 +877,105 @@ export class AdminApi {
     return this.http.put<SecurityPolicy>(
       `/v1/identity/tenants/${tenantId}/security-policy`, policy,
     );
+  }
+
+  // ---- Master data --------------------------------------------------------
+  //
+  // Platform infrastructure, never module-gated (root CLAUDE.md §8) - a Samaaj
+  // cannot switch off the dropdowns its own registration form depends on.
+  // Country/ProfessionType/Gender/MaritalStatus/City/Locality are
+  // `MasterData.Manage`, SuperAdmin only. Gautra is `Gautra.Manage`, a Samaaj
+  // Admin's own list (or a Super Admin's, once a Samaaj is chosen).
+
+  listLookupItems(category: LookupCategory, includeInactive = false): Observable<LookupItem[]> {
+    const params = new HttpParams().set('category', category).set('includeInactive', includeInactive);
+
+    return this.http.get<LookupItem[]>('/v1/master-data/lookup-items', { params });
+  }
+
+  createLookupItem(
+    category: LookupCategory,
+    code: string,
+    label: string,
+    sortOrder: number,
+  ): Observable<LookupItem> {
+    return this.http.post<LookupItem>('/v1/master-data/lookup-items', {
+      category,
+      code,
+      label,
+      sortOrder,
+    });
+  }
+
+  /** Code and category are fixed once created - only the label and sort order move. */
+  updateLookupItem(id: string, label: string, sortOrder: number): Observable<LookupItem> {
+    return this.http.put<LookupItem>(`/v1/master-data/lookup-items/${id}`, { label, sortOrder });
+  }
+
+  deactivateLookupItem(id: string): Observable<LookupItem> {
+    return this.http.post<LookupItem>(`/v1/master-data/lookup-items/${id}/deactivate`, {});
+  }
+
+  listCities(countryId?: string | null, includeInactive = false): Observable<City[]> {
+    let params = new HttpParams().set('includeInactive', includeInactive);
+
+    if (countryId) {
+      params = params.set('countryId', countryId);
+    }
+
+    return this.http.get<City[]>('/v1/master-data/cities', { params });
+  }
+
+  createCity(countryId: string, name: string): Observable<City> {
+    return this.http.post<City>('/v1/master-data/cities', { countryId, name });
+  }
+
+  updateCity(id: string, name: string): Observable<City> {
+    return this.http.put<City>(`/v1/master-data/cities/${id}`, { name });
+  }
+
+  deactivateCity(id: string): Observable<City> {
+    return this.http.post<City>(`/v1/master-data/cities/${id}/deactivate`, {});
+  }
+
+  listLocalities(cityId?: string | null, includeInactive = false): Observable<Locality[]> {
+    let params = new HttpParams().set('includeInactive', includeInactive);
+
+    if (cityId) {
+      params = params.set('cityId', cityId);
+    }
+
+    return this.http.get<Locality[]>('/v1/master-data/localities', { params });
+  }
+
+  createLocality(cityId: string, name: string): Observable<Locality> {
+    return this.http.post<Locality>('/v1/master-data/localities', { cityId, name });
+  }
+
+  updateLocality(id: string, name: string): Observable<Locality> {
+    return this.http.put<Locality>(`/v1/master-data/localities/${id}`, { name });
+  }
+
+  deactivateLocality(id: string): Observable<Locality> {
+    return this.http.post<Locality>(`/v1/master-data/localities/${id}/deactivate`, {});
+  }
+
+  /** This Samaaj's own list, resolved from `X-Tenant-Id` (or the Super Admin's chosen scope). */
+  listGautras(includeInactive = false): Observable<Gautra[]> {
+    const params = new HttpParams().set('includeInactive', includeInactive);
+
+    return this.http.get<Gautra[]>('/v1/master-data/gautras', { params });
+  }
+
+  createGautra(name: string): Observable<Gautra> {
+    return this.http.post<Gautra>('/v1/master-data/gautras', { name });
+  }
+
+  updateGautra(id: string, name: string): Observable<Gautra> {
+    return this.http.put<Gautra>(`/v1/master-data/gautras/${id}`, { name });
+  }
+
+  deactivateGautra(id: string): Observable<Gautra> {
+    return this.http.post<Gautra>(`/v1/master-data/gautras/${id}/deactivate`, {});
   }
 }
