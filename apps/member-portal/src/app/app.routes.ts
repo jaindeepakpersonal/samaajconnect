@@ -123,6 +123,16 @@ export const routes: Routes = [
           import('./features/members/profile.component').then((m) => m.ProfileComponent),
       },
       {
+        // Reachable from the top bar's user menu, not the sidebar - see
+        // shell.component.ts and apps/member-portal/CLAUDE.md.
+        path: 'change-password',
+        title: 'Change your password - samaajconnect',
+        loadComponent: () =>
+          import('./features/members/change-password.component').then(
+            (m) => m.ChangePasswordComponent,
+          ),
+      },
+      {
         path: 'family',
         title: 'My Family - samaajconnect',
         loadComponent: () =>

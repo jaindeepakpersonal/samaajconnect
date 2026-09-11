@@ -119,17 +119,70 @@
   border-radius: 50%;
 }
 
+.user-menu {
+  position: relative;
+}
+
 .user-chip {
   background: var(--panel);
   border: 1px solid var(--line);
   padding: var(--space-2) var(--space-3);
   border-radius: var(--radius-pill);
   color: var(--ink);
-  text-decoration: none;
+  font: inherit;
   font-size: 14px;
+  cursor: pointer;
 }
 
 .user-chip:hover {
+  background: var(--soft);
+}
+
+/* Not display:none by default like .nav-backdrop - this one is a top-bar
+   feature at every width, not only below the mobile breakpoint. */
+.user-menu-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 40;
+  border: 0;
+  padding: 0;
+  background: transparent;
+}
+
+.user-menu-list {
+  position: absolute;
+  top: calc(100% + var(--space-2));
+  right: 0;
+  z-index: 50;
+  min-width: 200px;
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-md);
+  box-shadow: 0 8px 24px rgb(0 0 0 / 15%);
+  padding: var(--space-2);
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.user-menu-list a,
+.user-menu-list button {
+  display: block;
+  width: 100%;
+  border: 0;
+  background: transparent;
+  color: var(--ink);
+  text-align: left;
+  text-decoration: none;
+  font: inherit;
+  font-size: 14px;
+  padding: var(--space-2) var(--space-3);
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+}
+
+.user-menu-list a:hover,
+.user-menu-list button:hover {
   background: var(--soft);
 }
 

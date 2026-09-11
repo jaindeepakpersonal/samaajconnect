@@ -8,7 +8,38 @@ version of the plan; the reasoning behind the ordering lives in
 ## Current Status
 
 - **Stage:** every module has a service and member screens; Phase 5 hardening under way
-- **Last updated:** 2026-09-11 - **member-portal lands on Timeline now, not a
+- **Last updated:** 2026-09-11 - **member-portal's sidebar has a "Home" row
+  again (Timeline, relabelled, first in the list), and Change password /
+  Privacy settings / Sign out are one menu under the user's name now instead
+  of three separate destinations.**
+
+  The Home retirement below got the redundancy right and the label wrong:
+  `/timeline` is what a member lands on, which is what "Home" means to a
+  sidebar row, and naming it "Timeline" said what the screen shows instead of
+  what it is. The row is back - once, at the top of Core - pointed at the
+  same `/timeline` the brand wordmark already goes to; that is still one
+  route with two ways in, an ordinary pattern, not the one-screen-two-nav-
+  entries redundancy the retirement removed.
+
+  Change password (a card on My Profile) and Your data and privacy (its own
+  sidebar row) both moved into a dropdown behind the top bar's user chip,
+  joined by Sign out, which moved out of its own standalone button into the
+  same menu. `change-password.component.ts` is a new, small screen at
+  `/change-password` holding exactly the form `profile.component.ts` used to
+  - same validation, same request, same copy - reachable now from account
+  actions rather than inline under Save. My Profile kept its own sidebar row;
+  editing profile fields is not the occasional, not-tied-to-any-screen kind
+  of action the other three are.
+
+  Verified with 348 member-portal component tests (net unchanged - 6 password
+  tests moved to their own spec file, no new behaviour beyond the move to
+  test), full build, `tsc --noEmit`, `scripts/css-class-coverage.sh`, and a
+  live walkthrough: registered and signed in as a fresh member, confirmed
+  "Home" leads the sidebar and the old "Your data and privacy" row is gone,
+  opened the user menu and confirmed all three items, followed Change
+  password to its own screen, confirmed My Profile no longer carries that
+  form.
+- **Previously:** 2026-09-11 - **member-portal lands on Timeline now, not a
   tile grid that just repeated the sidebar.**
 
   Home's tiles were every route already on the sidebar, offered a second time

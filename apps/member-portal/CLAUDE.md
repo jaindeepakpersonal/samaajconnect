@@ -10,7 +10,7 @@ before translating another screen.
 |---|---|---|---|
 | Login | `/login` | `#login` | built, including OTP sign-in as an alternative to a password |
 | Register | `/register` | `#register` | built |
-| Timeline | `/timeline` | `#timeline` | built - also the landing page; `/home` redirects here (see below) |
+| Home (Timeline) | `/timeline` | `#timeline` | built - the landing page, labelled "Home" in the sidebar; `/home` redirects here (see below) |
 | Events | `/events` | `#events` | built |
 | Event detail | `/events/:id` | `#eventdetail` | built |
 | Volunteer Groups | `/groups` | `#groups` | built |
@@ -22,7 +22,7 @@ before translating another screen.
 | My Family | `/family` | `#family` + `#children` | built as one screen |
 | Celebrities of Samaaj | `/voting` | `#celebrity` | built |
 | Campaign detail | `/voting/:id` | `#celebrity` + `#celebrityresults` | built as one screen |
-| Your data and privacy | `/privacy` | — | built; no wireframe covers the DPDP rights, and endpoints reachable only with curl are not rights a member has |
+| Your data and privacy | `/privacy` | — | built; no wireframe covers the DPDP rights, and endpoints reachable only with curl are not rights a member has. Reachable from the top bar's user menu, not the sidebar |
 | Jain Pathshala | `/pathshala` | `#pathshala` | built |
 | Pathshala enrolment | `/pathshala/:id` | `#myclass` + `#attendance` + `#exams` + `#progress` | built as one screen |
 | Auctions / Boli | `/boli` | `#boli` | built |
@@ -32,7 +32,8 @@ before translating another screen.
 | Pathshala events | — | `#pathevents` | not built — no endpoint exists |
 | Set your password | `/activate` | — | built; no wireframe covers redeeming an activation code, and three admin screens told people to do it here |
 | Forgot password | `/forgot`, `/reset` | `#forgot`, `#otp` | built — redeems into a new password, not a session |
-| My Profile | `/profile` | `#profile` | built. Its own "Change your password" card too — no wireframe covers it |
+| My Profile | `/profile` | `#profile` | built |
+| Change your password | `/change-password` | — | built; no wireframe covers it. Its own screen now, reachable from the top bar's user menu, not a card on My Profile |
 
 ## Where things live
 
@@ -163,6 +164,28 @@ admin-portal's shell had the identical defect and got the identical fix,
 since both shells share this one bug's shape: a sidebar built for desktop
 with only a stacking rule for narrow viewports, never a collapsing one.
 
+**The top bar's user chip opens a menu now, as of 2026-09-11 - it used to
+navigate straight to `/profile`.** Change password (a card on My Profile
+until the same change) and Your data and privacy (its own sidebar row until
+then) both moved into it, alongside Sign out, which moved out of its own
+standalone button beside the chip into the same menu. All three are account-
+level actions a member reaches rarely and that are not tied to whichever
+screen they happen to be on - grouping them under the member's own name reads
+better than three destinations competing with the feature nav for space, and
+matches the "avatar menu" pattern most sites already put exactly these three
+kinds of things behind. My Profile itself stayed a sidebar row: editing
+profile fields is not an occasional account action, it is what that whole
+screen is for, so it did not belong in the same menu as the other three.
+
+The trigger is a `<button>` with `aria-haspopup`, `aria-controls` and
+`[attr.aria-expanded]`, the same accessible shape this app's confirmation
+panels already use - `toggleUserMenu()` flips a signal rather than only
+opening one, so pressing the chip again closes what is already open. Unlike
+those panels the menu also gets a backdrop, the mobile nav drawer's own
+pattern: a menu that floats over the page rather than expanding inline reads
+as still-open until something closes it, and a member clicking anywhere else
+on the screen expects that click to do that.
+
 **Home hid modules the Samaaj had switched off.** The gateway already answers
 404 for those routes, so offering the tile would have been offering a door to
 a 404. The "no modules enabled" notice was keyed off whether any *optional*
@@ -192,11 +215,20 @@ a per-item reason, which means a 404 there can only mean the module gate. The
 compose form and feed are hidden in that state rather than shown broken.
 
 `/home` redirects to `/timeline` rather than 404ing, and the sidebar's brand
-wordmark is now a link to `/timeline` - the "click the logo" pattern this app
-had never needed while Home held that job. There is no separate "Home" row in
-the sidebar any more; Timeline's own row is the only way there from the nav,
-and having two rows point at variations of the same destination would be the
-exact redundancy this change removes, reintroduced one level down.
+wordmark is a link to `/timeline` too - the "click the logo" pattern this app
+had never needed while Home held that job.
+
+**A "Home" sidebar row came back four days later, relabelled rather than
+rebuilt.** The paragraph above said Timeline's own row was the only way there
+from the nav, on the reasoning that a second row pointing at the same
+destination would be the exact redundancy retiring Home had just removed. That
+reasoning was about *two rows to one destination*, and stands; what changed is
+that the row is now named "Home" - what `/timeline` *is* to a member signing in
+is the landing page, and the label says that plainly rather than naming the
+screen's content. It also moved first in the Core group, ahead of My Profile,
+matching where a "way back to the start" row reads as belonging. There is
+still exactly one row for it, so the redundancy this whole change exists to
+avoid has not returned - only its name and position did.
 
 **A module key is `ModuleKeys.X`, never a string literal.** Home filtered its
 Events and Volunteer tiles on `Events` and `VolunteerGroups`, neither of which
@@ -294,17 +326,22 @@ was text somebody typed. Choosing a picture takes effect immediately, which is
 what people expect of a profile photo, and a failed upload cannot lose an address
 somebody was halfway through editing.
 
-**Change your password is a third, separate form on this screen, not a third
-field on Save.** Nothing on the platform could ever replace a working
-password before this - not a member's, not a Samaaj Admin's, not the bootstrap
-Super Admin's - and it is not directory data, so folding it into the same
-submission as a locality edit would make the two the same request for no
-reason. A wrong current password answers the same 403 `Auth.StepUpFailed` the
-privacy screen's erasure panel already handles, shown inline rather than
-signing the member out, since they are still who they say they are - they
-simply mistyped. Every other signed-in device is signed out the moment it
-succeeds, which the screen says plainly rather than leaving a member to
-wonder why a different tab suddenly asks them to sign in again.
+**Change your password was a third, separate form on this screen, not a third
+field on Save - and moved to its own screen entirely on 2026-09-11.** Nothing
+on the platform could ever replace a working password before this existed -
+not a member's, not a Samaaj Admin's, not the bootstrap Super Admin's - and it
+is not directory data, so folding it into the same submission as a locality
+edit would have made the two the same request for no reason; that reasoning
+did not change when the form did. What moved is where it lives:
+`change-password.component.ts` now, reachable from the top bar's user menu
+alongside Privacy settings and Sign out rather than inline under Save on My
+Profile - see the shell's own note on the user menu, above. A wrong current password still answers
+the same 403 `Auth.StepUpFailed` the privacy screen's erasure panel handles,
+shown inline rather than signing the member out, since they are still who
+they say they are - they simply mistyped. Every other signed-in device is
+still signed out the moment it succeeds, which the screen still says plainly
+rather than leaving a member to wonder why a different tab suddenly asks them
+to sign in again.
 
 **A photo is fetched, never linked.** `photoUrl` is a path on this platform and
 authorized per request, so an `<img src>` would fail — the browser sends no

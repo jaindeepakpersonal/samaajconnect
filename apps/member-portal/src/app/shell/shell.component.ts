@@ -24,19 +24,21 @@ interface NavGroup {
  * enrolment screen at `/pathshala/:id`, reached from the Pathshala list rather
  * than the nav; and `#pathevents` has no endpoint and stays off it entirely.
  *
- * No separate "Home" row. It used to lead to a tile grid that was every one
- * of these routes offered a second time - see apps/member-portal/CLAUDE.md.
- * The brand at the top of the sidebar is the way back to Timeline now, the
- * same "click the logo" pattern as everywhere else on the web.
+ * "Home" is Timeline under its landing-page name, first in the Core group
+ * because that is where a member expects the way back to the start - see
+ * apps/member-portal/CLAUDE.md for the fuller history (it was a tile grid,
+ * then Timeline with no row of its own, and is Timeline-labelled-Home now).
+ * The brand wordmark is a second way to the same place, which is an ordinary
+ * "click the logo" affordance rather than a duplicate of this row.
  */
 const NAV: readonly NavGroup[] = [
   {
     heading: 'Core',
     items: [
+      { label: 'Home', route: '/timeline', moduleKey: ModuleKeys.Community },
       { label: 'My Profile', route: '/profile', moduleKey: null },
       { label: 'Members', route: '/members', moduleKey: null },
       { label: 'My Family', route: '/family', moduleKey: null },
-      { label: 'Timeline', route: '/timeline', moduleKey: ModuleKeys.Community },
     ],
   },
   {
@@ -58,14 +60,26 @@ const NAV: readonly NavGroup[] = [
   },
   {
     heading: 'Account',
-    items: [
-      { label: 'Notifications', route: '/notifications', moduleKey: null },
-      { label: 'Your data and privacy', route: '/privacy', moduleKey: null },
-    ],
+    items: [{ label: 'Notifications', route: '/notifications', moduleKey: null }],
   },
 ];
 
-const ALL_NAV_ITEMS: readonly NavItem[] = NAV.flatMap((group) => group.items);
+/**
+ * Routes with a breadcrumb label but no sidebar row of their own - reachable
+ * from the user menu instead (Change password, Privacy settings). Kept apart
+ * from `NAV` rather than folded in with a `hidden` flag, since `NAV` also
+ * drives `visibleNav()`'s module filtering and rendering, neither of which
+ * these need.
+ */
+const EXTRA_CRUMB_ITEMS: readonly NavItem[] = [
+  { label: 'Change password', route: '/change-password', moduleKey: null },
+  { label: 'Your data and privacy', route: '/privacy', moduleKey: null },
+];
+
+const ALL_NAV_ITEMS: readonly NavItem[] = [
+  ...NAV.flatMap((group) => group.items),
+  ...EXTRA_CRUMB_ITEMS,
+];
 
 /**
  * The chrome every signed-in screen sits inside: the wireframe's fixed dark
@@ -84,6 +98,17 @@ const ALL_NAV_ITEMS: readonly NavItem[] = NAV.flatMap((group) => group.items);
  * chip, matching the one other shell this platform already has -
  * admin-portal's - rather than inventing a second placement for the same
  * control.
+ *
+ * **The chip opened a menu instead of navigating straight to /profile, as of
+ * 2026-09-11.** Change password and Your data and privacy both used to be
+ * their own sidebar rows (the first inline on the profile screen, the second
+ * its own page); account-level actions taken rarely and not tied to any one
+ * screen read better as one menu under the member's own name than as three
+ * separate destinations competing with the feature nav for space. Sign out
+ * joined them there rather than staying a separate button beside the chip,
+ * since it is exactly that kind of action too. My Profile itself stayed a
+ * sidebar row - editing profile fields is not an occasional account action,
+ * it is what that whole screen is for.
  */
 @Component({
   selector: 'app-shell',
@@ -155,9 +180,39 @@ const ALL_NAV_ITEMS: readonly NavItem[] = NAV.flatMap((group) => group.items);
               }
             </a>
 
-            <a class="user-chip" routerLink="/profile">{{ auth.user()?.fullName ?? 'Signed in' }}</a>
+            <div class="user-menu">
+              <button
+                type="button"
+                class="user-chip"
+                aria-haspopup="true"
+                aria-controls="user-menu-list"
+                [attr.aria-expanded]="userMenuOpen()"
+                (click)="toggleUserMenu()"
+              >
+                {{ auth.user()?.fullName ?? 'Signed in' }}
+              </button>
 
-            <button class="btn secondary" type="button" (click)="signOut()">Sign out</button>
+              @if (userMenuOpen()) {
+                <!-- Closes the menu without also acting as a second way to
+                     act - the same role the nav drawer's own backdrop plays. -->
+                <button
+                  type="button"
+                  class="user-menu-backdrop"
+                  aria-hidden="true"
+                  (click)="closeUserMenu()"
+                ></button>
+
+                <div class="user-menu-list" id="user-menu-list" role="menu">
+                  <a role="menuitem" routerLink="/change-password" (click)="closeUserMenu()">
+                    Change password
+                  </a>
+                  <a role="menuitem" routerLink="/privacy" (click)="closeUserMenu()">
+                    Privacy settings
+                  </a>
+                  <button role="menuitem" type="button" (click)="signOut()">Sign out</button>
+                </div>
+              }
+            </div>
           </div>
         </div>
 
@@ -178,6 +233,9 @@ export class ShellComponent implements OnInit {
   /** The mobile nav drawer. Always false above the 700px breakpoint - the
    *  toggle button is hidden there by CSS, so nothing ever sets it. */
   readonly navOpen = signal(false);
+
+  /** The user chip's dropdown: Change password, Privacy settings, Sign out. */
+  readonly userMenuOpen = signal(false);
 
   readonly samaajName = computed(() => this.samaaj()?.name ?? this.auth.user()?.tenantSlug ?? '');
 
@@ -234,6 +292,14 @@ export class ShellComponent implements OnInit {
 
   closeNav(): void {
     this.navOpen.set(false);
+  }
+
+  toggleUserMenu(): void {
+    this.userMenuOpen.update((open) => !open);
+  }
+
+  closeUserMenu(): void {
+    this.userMenuOpen.set(false);
   }
 
   signOut(): void {
