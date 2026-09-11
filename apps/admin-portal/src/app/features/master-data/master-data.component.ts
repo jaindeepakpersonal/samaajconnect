@@ -741,7 +741,14 @@ export class MasterDataComponent implements OnInit {
   }
 
   askDeactivateLookup(id: string): void {
-    this.confirmingLookupId.set(this.confirmingLookupId() === id ? null : id);
+    if (this.confirmingLookupId() === id) {
+      this.confirmingLookupId.set(null);
+
+      return;
+    }
+
+    this.editingLookupId.set(null);
+    this.confirmingLookupId.set(id);
   }
 
   confirmDeactivateLookup(item: LookupItem): void {
@@ -833,7 +840,14 @@ export class MasterDataComponent implements OnInit {
   }
 
   askDeactivateCity(id: string): void {
-    this.confirmingCityId.set(this.confirmingCityId() === id ? null : id);
+    if (this.confirmingCityId() === id) {
+      this.confirmingCityId.set(null);
+
+      return;
+    }
+
+    this.editingCityId.set(null);
+    this.confirmingCityId.set(id);
   }
 
   confirmDeactivateCity(city: City): void {
@@ -937,7 +951,14 @@ export class MasterDataComponent implements OnInit {
   }
 
   askDeactivateLocality(id: string): void {
-    this.confirmingLocalityId.set(this.confirmingLocalityId() === id ? null : id);
+    if (this.confirmingLocalityId() === id) {
+      this.confirmingLocalityId.set(null);
+
+      return;
+    }
+
+    this.editingLocalityId.set(null);
+    this.confirmingLocalityId.set(id);
   }
 
   confirmDeactivateLocality(locality: Locality): void {
@@ -1007,7 +1028,14 @@ export class MasterDataComponent implements OnInit {
   }
 
   askDeactivateGautra(id: string): void {
-    this.confirmingGautraId.set(this.confirmingGautraId() === id ? null : id);
+    if (this.confirmingGautraId() === id) {
+      this.confirmingGautraId.set(null);
+
+      return;
+    }
+
+    this.editingGautraId.set(null);
+    this.confirmingGautraId.set(id);
   }
 
   confirmDeactivateGautra(gautra: Gautra): void {

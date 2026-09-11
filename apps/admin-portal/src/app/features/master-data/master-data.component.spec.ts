@@ -170,6 +170,27 @@ describe('MasterDataComponent', () => {
     expect(component.editingLookupId()).toBe('country-1');
   });
 
+  it('closes editing when the deactivate confirm opens on the same row, and vice versa', () => {
+    // Regression: askDeactivateLookup used to leave editingLookupId set, so
+    // Edit's inputs and the Deactivate confirm could show at once - and after
+    // confirming, the edit panel stayed open against an item that no longer
+    // renders the Edit/Deactivate buttons that would let it be closed again.
+    configure(['SuperAdmin'], 't1');
+    build();
+    loadAsSuperAdmin(true);
+
+    component.toggleEditLookup(country());
+    expect(component.editingLookupId()).toBe('country-1');
+
+    component.askDeactivateLookup('country-1');
+    expect(component.confirmingLookupId()).toBe('country-1');
+    expect(component.editingLookupId()).toBeNull();
+
+    component.toggleEditLookup(country());
+    expect(component.editingLookupId()).toBe('country-1');
+    expect(component.confirmingLookupId()).toBeNull();
+  });
+
   it('loads a country\'s cities once one is chosen', () => {
     configure(['SuperAdmin'], 't1');
     build();
