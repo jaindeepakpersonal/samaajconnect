@@ -3,6 +3,7 @@ import { HttpTestingController, provideHttpClientTesting } from '@angular/common
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { provideRouter } from '@angular/router';
 import { API_CONFIG } from '@samaajconnect/shared';
+import { MyProfile } from '../members/members.models';
 import { PrivacyComponent } from './privacy.component';
 import { ConsentNotice, ConsentState, IdentityExport } from './privacy.models';
 
@@ -11,6 +12,34 @@ const IDENTITY = '/v1/identity/me/data-export';
 const MEMBERS = '/v1/members/me/data-export';
 const AUDIT = '/v1/audit/me/data-export';
 const ERASE = '/v1/identity/me/erase';
+const ME = '/v1/members/me';
+
+function profile(overrides: Partial<MyProfile> = {}): MyProfile {
+  return {
+    id: 'm1',
+    tenantId: 't1',
+    fullName: 'Deepak Jain',
+    photoUrl: null,
+    dateOfBirth: '1990-05-14',
+    gender: 'Male',
+    mobile: '+919812345678',
+    email: 'member@example.com',
+    address: null,
+    locality: 'Udaipur',
+    profession: null,
+    privacy: {
+      mobile: 'SamaajOnly',
+      email: 'Private',
+      address: 'Private',
+      profession: 'SamaajOnly',
+      dateOfBirth: 'SamaajOnly',
+    },
+    isListedInDirectory: true,
+    createdAt: '2026-01-01T10:00:00Z',
+    updatedAt: null,
+    ...overrides,
+  };
+}
 
 function notice(): ConsentNotice {
   return {
@@ -103,11 +132,12 @@ describe('PrivacyComponent', () => {
 
   afterEach(() => http.verify());
 
-  function load(held: IdentityExport = identityExport()): void {
+  function load(held: IdentityExport = identityExport(), me: MyProfile = profile()): void {
     fixture.detectChanges();
 
     http.expectOne(NOTICE).flush(notice());
     http.expectOne(IDENTITY).flush(held);
+    http.expectOne(ME).flush(me);
 
     fixture.detectChanges();
   }
@@ -357,5 +387,74 @@ describe('PrivacyComponent', () => {
     expect(text()).not.toContain('Notice version');
     expect(text()).not.toContain('Erase my account');
     expect(text()).toContain('Close and sign out');
+  });
+
+  // ---- Directory privacy --------------------------------------------------
+
+  it('says the directory setting does not hide a member everywhere', () => {
+    // A control that read as "hide me from the platform" would be promising
+    // something it does not do: an unlisted profile is still reachable by id.
+    // Moved here from My Profile on 2026-09-11.
+    load();
+
+    expect(text()).toContain('does not hide you');
+  });
+
+  it('fills the directory privacy form from what the server holds', () => {
+    load(identityExport(), profile({ privacy: { mobile: 'Public', email: 'SamaajOnly', address: 'Private', profession: 'Public', dateOfBirth: 'Private' }, isListedInDirectory: false }));
+
+    expect(component.privacyForm.privacy.mobile).toBe('Public');
+    expect(component.privacyForm.privacy.email).toBe('SamaajOnly');
+    expect(component.privacyForm.isListedInDirectory).toBe(false);
+  });
+
+  it('sends the whole profile unchanged besides the edited privacy fields', () => {
+    // updateMe replaces the profile whole, and this screen never touched the
+    // member's name, mobile or any other basic-information field - they have
+    // to travel with the request exactly as the server sent them.
+    load(identityExport(), profile({ fullName: 'Deepak Jain', locality: 'Udaipur' }));
+
+    component.privacyForm.privacy = { ...component.privacyForm.privacy, mobile: 'Public' };
+    component.privacyForm.isListedInDirectory = false;
+    component.saveDirectoryPrivacy();
+
+    const request = http.expectOne('/v1/members/m1');
+
+    expect(request.request.method).toBe('PATCH');
+    expect(request.request.body.fullName).toBe('Deepak Jain');
+    expect(request.request.body.locality).toBe('Udaipur');
+    expect(request.request.body.privacy.mobile).toBe('Public');
+    expect(request.request.body.isListedInDirectory).toBe(false);
+
+    request.flush(profile({ privacy: { ...profile().privacy, mobile: 'Public' }, isListedInDirectory: false }));
+  });
+
+  it('reports the directory privacy save separately from the other actions on this page', () => {
+    load();
+
+    component.saveDirectoryPrivacy();
+
+    expect(component.savingPrivacy()).toBe(true);
+    expect(component.busy()).toBe(false);
+
+    http.expectOne('/v1/members/m1').flush(profile());
+    fixture.detectChanges();
+
+    expect(text()).toContain('Your privacy settings have been saved');
+  });
+
+  it('shows the server error on a failed directory privacy save', () => {
+    load();
+
+    component.saveDirectoryPrivacy();
+
+    http.expectOne('/v1/members/m1').flush(
+      { detail: 'Something went wrong.' },
+      { status: 500, statusText: 'Server Error' },
+    );
+    fixture.detectChanges();
+
+    expect(component.privacyError()).not.toBeNull();
+    expect(component.error()).toBeNull();
   });
 });

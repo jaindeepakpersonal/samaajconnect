@@ -8,7 +8,34 @@ version of the plan; the reasoning behind the ordering lives in
 ## Current Status
 
 - **Stage:** every module has a service and member screens; Phase 5 hardening under way
-- **Last updated:** 2026-09-11 - **member-portal's sidebar has a "Home" row
+- **Last updated:** 2026-09-11 - **member-portal's per-field directory privacy
+  card moved from My Profile to Privacy settings (`/privacy`), which the
+  previous change's user menu already called by that name.**
+
+  The card - the five Private/My Samaaj/Anyone selects plus "Listed in the
+  member directory" - is `PrivacyComponent`'s own section now, first, ahead
+  of the three DPDP rights: it is the one a member reaches for more often and
+  it is not one of the rights the rest of that screen is organised around.
+  The underlying request did not change - `PATCH /v1/members/{id}` still
+  replaces the whole profile - so the new section loads the profile
+  alongside the consent notice and data export it already fetched, and saves
+  by spreading that profile back with only the two edited fields changed,
+  the same pattern My Profile's own `save()` already used. `.privacy-row`,
+  `.privacy-select` and `.listing-row` moved from members.css to the shared
+  `styles.css` along with it - a second screen needing them is exactly the
+  condition root CLAUDE.md's own rule for promoting a feature style to shared
+  is written around. My Profile kept a one-line pointer to where the setting
+  went, not a stub of the old card.
+
+  Verified with 353 member-portal component tests (7 new: 4 on the new
+  section, 2 moved from profile.component.spec.ts, 1 replacing a stale
+  assertion the move left failing), full build, `tsc --noEmit`,
+  `scripts/css-class-coverage.sh`, `scripts/uncalled-api-methods.sh`, and a
+  live walkthrough: registered and signed in as a fresh member, changed the
+  mobile number's privacy level on `/privacy`, confirmed the PATCH request
+  and the confirmation notice, confirmed My Profile no longer carries the
+  card and its note links to Privacy settings.
+- **Previously:** 2026-09-11 - **member-portal's sidebar has a "Home" row
   again (Timeline, relabelled, first in the list), and Change password /
   Privacy settings / Sign out are one menu under the user's name now instead
   of three separate destinations.**

@@ -180,12 +180,12 @@ describe('ProfileComponent', () => {
     expect(text()).toContain('needs a name');
   });
 
-  it('says the directory setting does not hide a member everywhere', () => {
-    // A control that read as "hide me from the platform" would be promising
-    // something it does not do: an unlisted profile is still reachable by id.
+  it('points to Privacy settings for who can see each field', () => {
+    // The per-field privacy card moved to /privacy on 2026-09-11 - this
+    // screen no longer says anything about hiding a member, it points there.
     load();
 
-    expect(text()).toContain('does not hide you');
+    expect(text()).toContain('Privacy settings');
   });
 
   it('shows the failure rather than a blank form', () => {

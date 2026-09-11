@@ -1,5 +1,6 @@
 import { Component, OnInit, computed, inject, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
+import { RouterLink } from '@angular/router';
 import { AuthedImageDirective, describeError } from '@samaajconnect/shared';
 import { MembersApi } from './members.api';
 import { Gender, MyProfile, PrivacyLevel } from './members.models';
@@ -12,17 +13,19 @@ import { Gender, MyProfile, PrivacyLevel } from './members.models';
  * notification, and there was nowhere to do it. `PATCH /v1/members/{id}` and
  * even `MembersApi.updateMe` existed; no screen called either.
  *
- * **The privacy card is the point of the screen, not decoration.** Every field
- * a member fills in here is visible to their Samaaj unless they say otherwise,
- * so the levels sit beside the fields rather than behind a separate settings
- * page.
- *
- * **"Profile listed in directory" is a real setting now.** The wireframe drew a
- * checkbox for it and per-field privacy could not express it: a member who marks
- * every field Private is still in the directory under their name, because a
- * listing is a name. It hides them from the directory search and from nothing
- * else — the screen says so, because a control that reads as "hide me from the
- * platform" would be promising something it does not do.
+ * **Per-field privacy and "listed in directory" moved to Privacy settings
+ * (`/privacy`) on 2026-09-11.** This screen used to carry them itself, on the
+ * reasoning that every field a member fills in here is visible to their
+ * Samaaj unless they say otherwise, so the levels belonged beside the fields
+ * rather than behind a separate settings page. That stopped being where a
+ * member would look for them once the top bar's user menu started calling
+ * the destination "Privacy settings" - a member following that link and
+ * finding nothing about who sees what would have been the mismatch, not the
+ * page it used to be on. `form.privacy` and `form.isListedInDirectory` are
+ * still here and still sent on every save, unedited - `save()`'s request
+ * still replaces the whole profile, so both have to travel with it - but
+ * nothing on this screen offers to change them any more, and the note above
+ * the Save button says where to.
  *
  * **The photo is a real upload now, and it is saved on its own.** It used to be
  * a link field, because the platform hosted no images and the honest control was
@@ -39,7 +42,7 @@ import { Gender, MyProfile, PrivacyLevel } from './members.models';
  */
 @Component({
   selector: 'app-profile',
-  imports: [AuthedImageDirective, FormsModule],
+  imports: [AuthedImageDirective, FormsModule, RouterLink],
   styleUrl: './members.css',
   template: `
     <div class="members-page">
@@ -63,7 +66,7 @@ import { Gender, MyProfile, PrivacyLevel } from './members.models';
       @if (loading()) {
         <p class="notice info" role="status">Loading your profile…</p>
       } @else if (profile(); as me) {
-        <form class="grid2" (ngSubmit)="save()">
+        <form (ngSubmit)="save()">
           <!-- Basic information ------------------------------------------- -->
           <div class="card">
             <h2>Basic information</h2>
@@ -199,49 +202,11 @@ import { Gender, MyProfile, PrivacyLevel } from './members.models';
                 </button>
               </div>
             }
-          </div>
-
-          <!-- Privacy ------------------------------------------------------ -->
-          <div class="card">
-            <h2>Privacy settings</h2>
-            <p class="small">Choose who can see each field in the member directory.</p>
-
-            @for (field of privacyFields; track field.key) {
-              <div class="privacy-row">
-                <label [attr.for]="'privacy-' + field.key">{{ field.label }}</label>
-                <select
-                  class="input privacy-select"
-                  [id]="'privacy-' + field.key"
-                  [name]="'privacy-' + field.key"
-                  [(ngModel)]="form.privacy[field.key]"
-                >
-                  @for (level of levels; track level.value) {
-                    <option [value]="level.value">{{ level.label }}</option>
-                  }
-                </select>
-              </div>
-            }
-
-            <div class="privacy-row listing-row">
-              <label for="listed">Listed in the member directory</label>
-              <input
-                id="listed"
-                name="isListedInDirectory"
-                type="checkbox"
-                [(ngModel)]="form.isListedInDirectory"
-              />
-            </div>
-
-            <p class="small">
-              Unticking this takes you out of the directory search. It does not hide you
-              everywhere: your name still appears where you have taken part — on a post you
-              wrote, in your family, and to the president of a group you apply to. Your Samaaj's
-              administrators can still find you.
-            </p>
 
             <p class="small">
               Changes to your profile are recorded in your account activity, including which
-              fields changed.
+              fields changed. Who can see each field is set on
+              <a routerLink="/privacy">Privacy settings</a>.
             </p>
 
             <div class="actions">
@@ -286,25 +251,6 @@ export class ProfileComponent implements OnInit {
     { value: 'Female', label: 'Female' },
     { value: 'Male', label: 'Male' },
     { value: 'Other', label: 'Other' },
-  ];
-
-  /**
-   * The five fields that carry a level, in the order the wireframe lists them
-   * with date of birth added — it has a level in the domain and leaving it off
-   * the screen would mean a setting a member cannot see or change.
-   */
-  readonly privacyFields = [
-    { key: 'mobile', label: 'Mobile number' },
-    { key: 'email', label: 'Email' },
-    { key: 'address', label: 'Address' },
-    { key: 'profession', label: 'Profession' },
-    { key: 'dateOfBirth', label: 'Date of birth' },
-  ] as const;
-
-  readonly levels: { value: PrivacyLevel; label: string }[] = [
-    { value: 'Private', label: 'Only me' },
-    { value: 'SamaajOnly', label: 'My Samaaj' },
-    { value: 'Public', label: 'Anyone' },
   ];
 
   /**
