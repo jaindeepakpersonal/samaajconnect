@@ -3574,7 +3574,7 @@ matrimony_checks() {
   refresh_tokens
 
   NOTICE=$(curl -s -H "Authorization: Bearer $MEMBER_TOKEN" "$GATEWAY/v1/matrimony/consent-notice")
-  NOTICE_VERSION=$(printf '%s' "$NOTICE" | json_field currentVersion)
+  NOTICE_VERSION=$(printf '%s' "$NOTICE" | json_field version)
 
   if [ -n "$NOTICE_VERSION" ]; then
     echo "  ok    a member reads the consent notice before opting in"
