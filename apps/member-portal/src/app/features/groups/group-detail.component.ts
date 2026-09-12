@@ -2,6 +2,7 @@ import { Component, OnInit, computed, inject, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { ActivatedRoute, RouterLink } from '@angular/router';
 import { AuthService, describeError } from '@samaajconnect/shared';
+import { MembersApi } from '../members/members.api';
 import { GroupsApi } from './groups.api';
 import { GroupApplication, GroupDetail } from './groups.models';
 
@@ -9,9 +10,10 @@ import { GroupApplication, GroupDetail } from './groups.models';
  * Group detail, from the member-portal wireframe's `#groupdetail` screen.
  *
  * The wireframe's two cards are both here: About, with the Apply button, and
- * "My Application Status". Its subtitle - "President: Rajesh Jain • 82 members
- * • Social Service" - drops the president's name for the same reason the list
- * does, and keeps the count and the focus area, which the group does carry.
+ * "My Application Status". Its subtitle keeps the count and the focus area,
+ * which the group does carry, and drops the president's name from that one
+ * line the same way the rest of this screen used to drop every name - see
+ * below for why that changed.
  *
  * The **president's review queue** is the substantial addition. The wireframe
  * has no screen for it, but the endpoint exists, deciding an application is
@@ -23,6 +25,19 @@ import { GroupApplication, GroupDetail } from './groups.models';
  * Assigning a position is here for the same reason - the wireframe's own
  * subtitle promises "Group President assigns roles/positions" and nothing else
  * in the portal does it.
+ *
+ * **Every member and applicant is named and linked to their profile.**
+ * volunteer-groups-service's own response only ever carries a member id -
+ * this screen used to render every id but the reader's own as "The
+ * president" or "A member", which left a president reviewing several
+ * applications at once unable to tell them apart, or look the applicant up,
+ * without opening curl. `MembersApi.get(id)` resolves each distinct id this
+ * screen shows, once, the same "the client resolves names once, in the
+ * response" pattern this codebase already uses elsewhere - a handful of
+ * calls bounded by this one group's own roster, not the whole Samaaj
+ * directory, so it stays correct however large the Samaaj is. A name still
+ * reads as "You" for the viewer's own row, and falls back to "A member"
+ * only while a name is still loading or if that one lookup fails.
  */
 @Component({
   selector: 'app-group-detail',
@@ -145,7 +160,13 @@ import { GroupApplication, GroupDetail } from './groups.models';
               </tr>
               @for (person of found.members; track person.memberId) {
                 <tr>
-                  <td>{{ nameFor(person.memberId, found) }}</td>
+                  <td>
+                    @if (person.memberId === me()) {
+                      {{ nameFor(person.memberId, found) }}
+                    } @else {
+                      <a [routerLink]="['/members', person.memberId]">{{ nameFor(person.memberId, found) }}</a>
+                    }
+                  </td>
                   <td>{{ person.rolePosition ?? '—' }}</td>
                   <td>{{ date(person.joinedAt) }}</td>
 
@@ -217,8 +238,12 @@ import { GroupApplication, GroupDetail } from './groups.models';
             <div class="queue">
               @for (application of pending(); track application.id) {
                 <div class="card">
-                  <p><b>{{ nameFor(application.memberId, found) }}</b> asked to join
-                    {{ date(application.createdAt) }}.</p>
+                  <p>
+                    <a [routerLink]="['/members', application.memberId]">
+                      <b>{{ nameFor(application.memberId, found) }}</b>
+                    </a>
+                    asked to join {{ date(application.createdAt) }}.
+                  </p>
 
                   @if (application.note; as note) {
                     <p class="group-body">{{ note }}</p>
@@ -271,6 +296,7 @@ import { GroupApplication, GroupDetail } from './groups.models';
 })
 export class GroupDetailComponent implements OnInit {
   private readonly api = inject(GroupsApi);
+  private readonly members = inject(MembersApi);
   private readonly auth = inject(AuthService);
   private readonly route = inject(ActivatedRoute);
 
@@ -290,11 +316,14 @@ export class GroupDetailComponent implements OnInit {
 
   readonly editingPosition = signal<string | null>(null);
 
+  /** Resolved names, by member id - see this component's own doc comment on why. */
+  readonly names = signal<Record<string, string>>({});
+
   note = '';
   positionDraft = '';
   roleDrafts: Record<string, string> = {};
 
-  private readonly me = computed(() => this.auth.user()?.userId ?? null);
+  readonly me = computed(() => this.auth.user()?.userId ?? null);
 
   /**
    * Only what is still waiting.
@@ -332,6 +361,7 @@ export class GroupDetailComponent implements OnInit {
       next: (found) => {
         this.detail.set(found);
         this.loading.set(false);
+        this.resolveNames(found.members.map((person) => person.memberId));
 
         // Only the president may read these, and the endpoint answers 404 to
         // anyone else - asking speculatively would mean a 404 on every
@@ -354,6 +384,7 @@ export class GroupDetailComponent implements OnInit {
       next: (found) => {
         this.applications.set(found);
         this.loadingApplications.set(false);
+        this.resolveNames(found.map((application) => application.memberId));
       },
       error: () => {
         // The group is still readable without its queue, so this does not
@@ -362,6 +393,29 @@ export class GroupDetailComponent implements OnInit {
         this.loadingApplications.set(false);
       },
     });
+  }
+
+  /**
+   * Resolves a member's own full name, one call per not-yet-resolved id.
+   * Bounded by this one group's own roster and applications - not the whole
+   * Samaaj directory - so it stays cheap and correct regardless of how large
+   * the Samaaj is. A failed lookup is left unresolved rather than raised as
+   * a page-level error: `nameFor` already has a fallback for that.
+   */
+  private resolveNames(memberIds: readonly string[]): void {
+    const known = this.names();
+    const me = this.me();
+
+    const toResolve = [...new Set(memberIds)].filter((id) => id !== me && !(id in known));
+
+    for (const id of toResolve) {
+      this.members.get(id).subscribe({
+        next: (member) => this.names.update((current) => ({ ...current, [id]: member.fullName })),
+        error: () => {
+          // Left unresolved; nameFor() falls back to a generic label.
+        },
+      });
+    }
   }
 
   // ---- Applying ---------------------------------------------------------
@@ -512,15 +566,20 @@ export class GroupDetailComponent implements OnInit {
   // ---- Rendering --------------------------------------------------------
 
   /**
-   * What to call somebody.
-   *
-   * Ids, not names - names live in member-family-service. The reader is named
-   * "You", which is the one identity this screen can resolve and the one that
-   * matters most on it.
+   * What to call somebody. The reader is named "You". Everyone else's real
+   * name comes from `resolveNames()` once it has loaded; until then, or if
+   * that one lookup failed, this falls back to a generic label rather than
+   * showing nothing.
    */
   nameFor(memberId: string, detail: GroupDetail): string {
     if (memberId === this.me()) {
       return 'You';
+    }
+
+    const resolved = this.names()[memberId];
+
+    if (resolved) {
+      return resolved;
     }
 
     return memberId === detail.group.presidentMemberId ? 'The president' : 'A member';

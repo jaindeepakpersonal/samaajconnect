@@ -6,6 +6,7 @@ import { API_CONFIG, CurrentUser } from '@samaajconnect/shared';
 import { GroupDetailComponent } from './group-detail.component';
 import { GroupsListComponent } from './groups-list.component';
 import { GroupApplication, GroupDetail, GroupMember, VolunteerGroup } from './groups.models';
+import { Member } from '../members/members.models';
 
 const ME = 'u1';
 const PRESIDENT = 'p1';
@@ -46,6 +47,24 @@ function detail(
   members: GroupMember[] = [],
 ): GroupDetail {
   return { group: group(overrides), members };
+}
+
+/** A minimal member-family-service response, for the name-resolution calls `group-detail.component.ts` now makes. */
+function apiMember(id: string, fullName = 'Some Member'): Member {
+  return {
+    id,
+    fullName,
+    photoUrl: null,
+    gautraId: null,
+    dateOfBirth: null,
+    mobile: null,
+    email: null,
+    permanentAddress: { line: null, cityId: null, localityId: null },
+    temporaryAddress: null,
+    professionId: null,
+    qualificationId: null,
+    gender: 'Unspecified',
+  };
 }
 
 function application(overrides: Partial<GroupApplication> = {}): GroupApplication {
@@ -198,6 +217,18 @@ describe('GroupDetailComponent', () => {
 
   afterEach(() => http.verify());
 
+  /**
+   * Flushes every pending name-resolution call the component makes for a
+   * member or applicant id it does not already know - see this component's
+   * own doc comment on why it now resolves these instead of falling back to
+   * "A member".
+   */
+  function flushMemberLookups(): void {
+    for (const req of http.match((r) => r.method === 'GET' && r.url.startsWith('/v1/members/'))) {
+      req.flush(apiMember(req.request.url.split('/').pop()!));
+    }
+  }
+
   /** Answers /me and the group; the queue only when the reader leads it. */
   function load(found: GroupDetail, applications: GroupApplication[] | null = null): void {
     fixture.detectChanges();
@@ -209,6 +240,7 @@ describe('GroupDetailComponent', () => {
       http.expectOne('/v1/volunteer-groups/groups/g1/applications').flush(applications);
     }
 
+    flushMemberLookups();
     fixture.detectChanges();
   }
 
@@ -502,9 +534,9 @@ describe('GroupDetailComponent', () => {
     expect(text()).toContain('The president cannot be removed from their own group');
   });
 
-  // ---- Names it cannot resolve ---------------------------------------------
+  // ---- Names -----------------------------------------------------------
 
-  it('names the reader but nobody else', () => {
+  it('falls back to a generic label before a name has resolved', () => {
     const found = detail({ iAmThePresident: true, iAmAMember: true });
 
     load(found, []);
@@ -512,6 +544,42 @@ describe('GroupDetailComponent', () => {
     expect(component.nameFor(ME, found)).toBe('You');
     expect(component.nameFor(PRESIDENT, found)).toBe('The president');
     expect(component.nameFor('somebody-else', found)).toBe('A member');
+  });
+
+  it('resolves an applicant own name and links it to their profile', () => {
+    load(detail({ iAmThePresident: true, iAmAMember: true }), [
+      application({ memberId: 'm9' }),
+    ]);
+
+    expect(component.names()['m9']).toBe('Some Member');
+    expect(text()).toContain('Some Member');
+
+    const link = (fixture.nativeElement as HTMLElement).querySelector(
+      'a[href="/members/m9"]',
+    ) as HTMLAnchorElement | null;
+
+    expect(link).toBeTruthy();
+    expect(link?.textContent).toContain('Some Member');
+  });
+
+  it('resolves a group member own name too, linked to their profile, but never the readers own', () => {
+    load(
+      detail({ iAmThePresident: true, iAmAMember: true }, [
+        { memberId: ME, rolePosition: null, joinedAt: new Date().toISOString() },
+        { memberId: 'm9', rolePosition: null, joinedAt: new Date().toISOString() },
+      ]),
+      [],
+    );
+
+    expect(component.names()['m9']).toBe('Some Member');
+    expect(component.names()['u1']).toBeUndefined();
+
+    const links = Array.from(
+      (fixture.nativeElement as HTMLElement).querySelectorAll('a[href="/members/m9"]'),
+    );
+
+    expect(links).toHaveLength(1);
+    expect((fixture.nativeElement as HTMLElement).querySelector('a[href="/members/u1"]')).toBeNull();
   });
 
   it('says there is no notification channel rather than implying one', () => {
