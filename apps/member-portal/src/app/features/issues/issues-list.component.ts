@@ -11,11 +11,17 @@ import {
   StatusLabels,
 } from './issues.models';
 
+type IssuesTab = 'published' | 'raise' | 'mine';
+
 /**
  * Social Issues, from the member-portal wireframe's `#issues` screen.
  *
- * The wireframe has three panels and all three are here: a submission form, the
- * published list, and "My Submissions" with a progress strip.
+ * The wireframe's three panels - a submission form, the published list, and
+ * "My Submissions" with a progress strip - are now `role="tablist"` tabs
+ * rather than stacked cards, the same horizontal-tab pattern My Profile and
+ * Matrimony's Proposals screen already use. All three were already fetching
+ * from one `IssuesApi.list()` call; switching tabs is a signal flip, not a
+ * new request.
  *
  * The strip is the interesting one. The wireframe draws four fixed steps -
  * Submitted, Under Review, Approved, Published - with the reached ones marked.
@@ -43,11 +49,72 @@ import {
         </div>
       </header>
 
-      <div class="grid2">
-        <!-- Raise one ---------------------------------------------------- -->
-        <form class="card" (ngSubmit)="submit(true)">
-          <h2>Raise a social issue</h2>
+      <div class="tabs" role="tablist" aria-label="Social issues">
+        <button
+          type="button"
+          role="tab"
+          [class.on]="activeTab() === 'published'"
+          [attr.aria-selected]="activeTab() === 'published'"
+          (click)="activeTab.set('published')"
+        >
+          Published issues
+        </button>
+        <button
+          type="button"
+          role="tab"
+          [class.on]="activeTab() === 'raise'"
+          [attr.aria-selected]="activeTab() === 'raise'"
+          (click)="activeTab.set('raise')"
+        >
+          Raise an issue
+        </button>
+        <button
+          type="button"
+          role="tab"
+          [class.on]="activeTab() === 'mine'"
+          [attr.aria-selected]="activeTab() === 'mine'"
+          (click)="activeTab.set('mine')"
+        >
+          My submissions
+        </button>
+      </div>
 
+      @if (activeTab() === 'published') {
+        <div class="card">
+          <label for="filter-category">Filter by category</label>
+          <select
+            class="input"
+            id="filter-category"
+            name="filter"
+            [(ngModel)]="filter"
+            (ngModelChange)="load()"
+          >
+            <option value="">All categories</option>
+            @for (option of categories; track option) {
+              <option [value]="option">{{ option }}</option>
+            }
+          </select>
+
+          @if (loading()) {
+            <p role="status">Loading…</p>
+          } @else if (published().length === 0) {
+            <p class="small">Nothing has been published yet.</p>
+          } @else {
+            @for (issue of published(); track issue.id) {
+              <div class="issue-row">
+                <a [routerLink]="['/issues', issue.id]">{{ issue.title }}</a>
+                <div class="badges">
+                  <span class="pill">{{ label(issue.status) }}</span>
+                  <span class="pill">{{ issue.category }}</span>
+                </div>
+              </div>
+            }
+          }
+        </div>
+      }
+
+      @if (activeTab() === 'raise') {
+        <form class="card" (ngSubmit)="submit(true)">
           <div class="form-grid">
             <div class="field">
               <label for="issue-title">Title</label>
@@ -132,93 +199,59 @@ import {
             </div>
           </div>
         </form>
+      }
 
-        <!-- Published ---------------------------------------------------- -->
+      @if (activeTab() === 'mine') {
         <div class="card">
-          <h2>Published issues</h2>
-
-          <label for="filter-category">Filter by category</label>
-          <select
-            class="input"
-            id="filter-category"
-            name="filter"
-            [(ngModel)]="filter"
-            (ngModelChange)="load()"
-          >
-            <option value="">All categories</option>
-            @for (option of categories; track option) {
-              <option [value]="option">{{ option }}</option>
-            }
-          </select>
-
-          @if (loading()) {
+          @if (error(); as message) {
+            <div class="notice error" role="alert">
+              {{ message }}
+              <button class="btn link" type="button" (click)="load()">Try again</button>
+            </div>
+          } @else if (loading()) {
             <p role="status">Loading…</p>
-          } @else if (published().length === 0) {
-            <p class="small">Nothing has been published yet.</p>
+          } @else if (mine().length === 0) {
+            <p class="small">You have not raised anything yet.</p>
           } @else {
-            @for (issue of published(); track issue.id) {
-              <div class="issue-row">
-                <a [routerLink]="['/issues', issue.id]">{{ issue.title }}</a>
-                <div class="badges">
-                  <span class="pill">{{ label(issue.status) }}</span>
-                  <span class="pill">{{ issue.category }}</span>
-                </div>
+            @for (issue of mine(); track issue.id) {
+              <div class="submission">
+                <a [routerLink]="['/issues', issue.id]"><b>{{ issue.title }}</b></a>
+
+                @if (isOnHappyPath(issue)) {
+                  <div class="step" role="list" [attr.aria-label]="'Progress'">
+                    @for (stage of steps; track stage) {
+                      <span
+                        role="listitem"
+                        [class.done]="isReached(issue, stage)"
+                        [class.on]="issue.status === stage"
+                      >
+                        {{ label(stage) }}
+                      </span>
+                    }
+                  </div>
+                } @else {
+                  <!-- Off the path. A strip here would say the issue is partway
+                       to publication when it is not going there. -->
+                  <div class="badges">
+                    <span class="pill" [class]="pillClass(issue.status)">
+                      {{ label(issue.status) }}
+                    </span>
+                  </div>
+                }
+
+                <p class="small">{{ describe(issue) }}</p>
               </div>
             }
           }
         </div>
-      </div>
-
-      <!-- Mine ------------------------------------------------------------ -->
-      <div class="card mine">
-        <h2>My submissions</h2>
-
-        @if (error(); as message) {
-          <div class="notice error" role="alert">
-            {{ message }}
-            <button class="btn link" type="button" (click)="load()">Try again</button>
-          </div>
-        } @else if (loading()) {
-          <p role="status">Loading…</p>
-        } @else if (mine().length === 0) {
-          <p class="small">You have not raised anything yet.</p>
-        } @else {
-          @for (issue of mine(); track issue.id) {
-            <div class="submission">
-              <a [routerLink]="['/issues', issue.id]"><b>{{ issue.title }}</b></a>
-
-              @if (isOnHappyPath(issue)) {
-                <div class="step" role="list" [attr.aria-label]="'Progress'">
-                  @for (stage of steps; track stage) {
-                    <span
-                      role="listitem"
-                      [class.done]="isReached(issue, stage)"
-                      [class.on]="issue.status === stage"
-                    >
-                      {{ label(stage) }}
-                    </span>
-                  }
-                </div>
-              } @else {
-                <!-- Off the path. A strip here would say the issue is partway
-                     to publication when it is not going there. -->
-                <div class="badges">
-                  <span class="pill" [class]="pillClass(issue.status)">
-                    {{ label(issue.status) }}
-                  </span>
-                </div>
-              }
-
-              <p class="small">{{ describe(issue) }}</p>
-            </div>
-          }
-        }
-      </div>
+      }
     </div>
   `,
 })
 export class IssuesListComponent implements OnInit {
   private readonly api = inject(IssuesApi);
+
+  readonly activeTab = signal<IssuesTab>('published');
 
   readonly categories = IssueCategories;
   readonly steps = ProgressSteps;

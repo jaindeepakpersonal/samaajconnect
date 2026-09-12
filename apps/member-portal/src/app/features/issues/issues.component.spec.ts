@@ -128,6 +128,8 @@ describe('IssuesListComponent', () => {
 
   it('sends what was typed, trimmed, and keeps the new issue on screen', () => {
     load([]);
+    component.activeTab.set('raise');
+    fixture.detectChanges();
 
     component.title = '  Community park lighting  ';
     component.description = '  The path is dark by six.  ';
@@ -165,6 +167,8 @@ describe('IssuesListComponent', () => {
 
   it('saves a draft without submitting it', () => {
     load([]);
+    component.activeTab.set('raise');
+    fixture.detectChanges();
 
     component.title = 'Half-written';
     component.description = 'Coming back to this.';
@@ -231,6 +235,8 @@ describe('IssuesListComponent', () => {
     }
 
     load([issue({ status: 'Rejected' })]);
+    component.activeTab.set('mine');
+    fixture.detectChanges();
 
     expect((fixture.nativeElement as HTMLElement).querySelector('.step')).toBeNull();
     expect(text()).toContain('Not accepted');
@@ -251,6 +257,8 @@ describe('IssuesListComponent', () => {
 
   it('disables Attach Evidence and says why instead of faking an upload', () => {
     load([]);
+    component.activeTab.set('raise');
+    fixture.detectChanges();
 
     const attach = Array.from(
       (fixture.nativeElement as HTMLElement).querySelectorAll('button'),
@@ -258,6 +266,30 @@ describe('IssuesListComponent', () => {
 
     expect(attach.disabled).toBe(true);
     expect(text()).toContain('no file storage');
+  });
+
+  // ---- Tabs -----------------------------------------------------------------
+
+  it('shows Published issues first', () => {
+    load([]);
+
+    expect(component.activeTab()).toBe('published');
+    expect(text()).toContain('Nothing has been published yet');
+  });
+
+  it('switches to Raise an issue and back without losing the published list', () => {
+    load([]);
+
+    component.activeTab.set('raise');
+    fixture.detectChanges();
+
+    expect(text()).toContain('Submit for approval');
+    expect(text()).not.toContain('Nothing has been published yet');
+
+    component.activeTab.set('published');
+    fixture.detectChanges();
+
+    expect(text()).toContain('Nothing has been published yet');
   });
 });
 
