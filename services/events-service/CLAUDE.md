@@ -144,7 +144,7 @@ lifecycle - so unlike `BusinessCategory` (an id `Business` fields can be
 changed on) this one simply has nowhere to be revised once set. A Samaaj that
 has not seeded any `EventType` lookup values yet can still create events; the
 field is null until it does. It is a `string` on the wire, not a `Guid?` -
-the same defense-in-depth `OptIntoMatrimonyCommand` already established, so a
+the same defense-in-depth matrimony-service's own opt-in command already established, so a
 malformed id fails FluentValidation rather than crashing the JSON model
 binder with an unhandled 400 before validation runs. Requires an additive
 migration (`AddEventTypeId`, 2026-09-12) since, unlike `LookupItem.Category`,
