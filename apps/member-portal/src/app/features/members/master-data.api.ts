@@ -40,6 +40,17 @@ export class MasterDataApi {
     });
   }
 
+  /**
+   * The MaritalStatus category - another of the platform's original four flat
+   * lookup lists, first called from here by the matrimony feature's opt-in
+   * form and search filter.
+   */
+  listMaritalStatuses(): Observable<LookupItem[]> {
+    return this.http.get<LookupItem[]>('/v1/master-data/lookup-items', {
+      params: new HttpParams().set('category', 'MaritalStatus').set('includeInactive', false),
+    });
+  }
+
   listCities(countryId?: string | null): Observable<City[]> {
     let params = new HttpParams().set('includeInactive', false);
 

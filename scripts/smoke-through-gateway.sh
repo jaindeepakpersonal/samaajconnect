@@ -397,12 +397,38 @@ profile_body() {
 
   [ "$listed" = "omit" ] && listing=""
 
-  printf '{"fullName":"Smoke Member","gender":"Male","mobile":"+919812345678","locality":"Udaipur","privacy":{"mobile":"SamaajOnly","email":"Private","address":"Private","profession":"SamaajOnly","dateOfBirth":"Private"}%s}' "$listing"
+  # `locality` stopped being free text on 2026-09-11: an address is now a
+  # `permanentAddress`/`temporaryAddress` pair, each a line plus master-data
+  # City/Locality ids. `permanentAddress` is required - the validator refuses
+  # a whole-profile update with none at all - so this always sends one, with
+  # no City/Locality id: this section runs before master_data_checks creates
+  # any, and the free-text line alone is enough to exercise the field. Privacy
+  # gained a sixth field, `qualification`, alongside the original five - an
+  # object missing it fails validation the same way one missing `address`
+  # always has.
+  printf '{"fullName":"Smoke Member","gender":"Male","mobile":"+919812345678","gautraId":null,"qualificationId":null,"permanentAddress":{"line":"12 MG Road, Udaipur","cityId":null,"localityId":null},"temporaryAddress":null,"privacy":{"mobile":"SamaajOnly","email":"Private","address":"Private","profession":"SamaajOnly","dateOfBirth":"Private","qualification":"SamaajOnly"}%s}' "$listing"
 }
+
+MEMBER_PROFILE_UPDATE=$(curl -s -X PATCH "$GATEWAY/v1/members/$MEMBER_ID" -H 'Content-Type: application/json' \
+  -H "Authorization: Bearer $MEMBER_TOKEN" -d "$(profile_body true)")
 
 check "a member edits their own profile" 200 \
   "$(status -X PATCH "$GATEWAY/v1/members/$MEMBER_ID" -H 'Content-Type: application/json' \
      -H "Authorization: Bearer $MEMBER_TOKEN" -d "$(profile_body true)")"
+
+# The structured-address rewrite's whole point: the line sent comes back on
+# the very next read, through the owner mapper this time rather than the
+# directory one.
+case "$MEMBER_PROFILE_UPDATE" in
+  *'"permanentAddress":{"line":"12 MG Road, Udaipur"'*)
+    echo "  ok    and the permanent address line it returns is the one just sent"
+    pass=$((pass + 1))
+    ;;
+  *)
+    echo "  FAIL  the permanent address line did not round-trip"
+    fail=$((fail + 1))
+    ;;
+esac
 
 # Not defaulted to true. A client that does not know about the field would
 # otherwise put a member who had opted out back into the directory, silently,
@@ -465,7 +491,7 @@ check "an administrator corrects a member's details" 200 \
   "$(status -X PATCH "$GATEWAY/v1/members/$MEMBER_ID/details" \
      -H 'Content-Type: application/json' -H "Authorization: Bearer $ADMIN_TOKEN" \
      -H "$ADMIN_SCOPE" \
-     -d '{"fullName":"Smoke Member Corrected","gender":"Male","mobile":"+919800000000","locality":"Udaipur"}')"
+     -d '{"fullName":"Smoke Member Corrected","gender":"Male","mobile":"+919800000000","permanentAddress":{"line":"Udaipur","cityId":null,"localityId":null}}')"
 
 CORRECTED=$(curl -s -H "Authorization: Bearer $ADMIN_TOKEN" -H "$ADMIN_SCOPE" \
   "$GATEWAY/v1/members/$MEMBER_ID")
@@ -521,7 +547,7 @@ check "the member's name is put back" 200 \
   "$(status -X PATCH "$GATEWAY/v1/members/$MEMBER_ID/details" \
      -H 'Content-Type: application/json' -H "Authorization: Bearer $ADMIN_TOKEN" \
      -H "$ADMIN_SCOPE" \
-     -d '{"fullName":"Smoke Member","gender":"Male","mobile":"+919812345678","locality":"Udaipur"}')"
+     -d '{"fullName":"Smoke Member","gender":"Male","mobile":"+919812345678","permanentAddress":{"line":"Udaipur","cityId":null,"localityId":null}}')"
 
 
 # ---- Photos the platform hosts ------------------------------------------------
@@ -3531,6 +3557,174 @@ boli_checks() {
 boli_checks || echo "  ..    the rest of the Boli checks were skipped"
 
 echo
+echo "Matrimony: an opt-in, a search, a proposal, a response"
+
+# Wrapped in a function for the same reason boli_checks is: a missing id can
+# return rather than exit, so one broken extraction here does not blame the
+# sections that run after it.
+matrimony_checks() {
+
+  check "switching the matrimony module on" 200 \
+    "$(status -X PUT "$GATEWAY/v1/identity/tenants/$TENANT_ID/modules" \
+       -H 'Content-Type: application/json' -H "Authorization: Bearer $ADMIN_TOKEN" -H "$ADMIN_TENANT_HEADER" \
+       -d '{"enabledModules":["community","matrimony"]}')"
+
+  sleep 62
+
+  refresh_tokens
+
+  NOTICE=$(curl -s -H "Authorization: Bearer $MEMBER_TOKEN" "$GATEWAY/v1/matrimony/consent-notice")
+  NOTICE_VERSION=$(printf '%s' "$NOTICE" | json_field currentVersion)
+
+  if [ -n "$NOTICE_VERSION" ]; then
+    echo "  ok    a member reads the consent notice before opting in"
+    pass=$((pass + 1))
+  else
+    echo "  FAIL  reading the consent notice (got '$NOTICE')"
+    fail=$((fail + 1))
+    return 1
+  fi
+
+  check "nobody has opted in yet, so it reads as 204" 204 \
+    "$(status -H "Authorization: Bearer $MEMBER_TOKEN" "$GATEWAY/v1/matrimony/biodata/me")"
+
+  check "opting in without consent is refused" 400 \
+    "$(status -X POST "$GATEWAY/v1/matrimony/biodata/me/opt-in" \
+       -H 'Content-Type: application/json' -H "Authorization: Bearer $MEMBER_TOKEN" \
+       -d "{\"fullName\":\"Smoke Member\",\"gender\":\"Male\",\"dateOfBirth\":\"1995-04-02\",
+            \"consentGiven\":false,\"noticeVersion\":\"$NOTICE_VERSION\"}")"
+
+  BIODATA=$(curl -s -X POST "$GATEWAY/v1/matrimony/biodata/me/opt-in" \
+    -H 'Content-Type: application/json' -H "Authorization: Bearer $MEMBER_TOKEN" \
+    -d "{\"fullName\":\"Smoke Member\",\"gender\":\"Male\",\"dateOfBirth\":\"1995-04-02\",
+         \"aboutMe\":\"Enjoys community service.\",
+         \"consentGiven\":true,\"noticeVersion\":\"$NOTICE_VERSION\"}")
+
+  if printf '%s' "$BIODATA" | grep -q '"isActive":true'; then
+    echo "  ok    a member opts into matrimony search"
+    pass=$((pass + 1))
+  else
+    echo "  FAIL  opting in (got '$BIODATA')"
+    fail=$((fail + 1))
+    return 1
+  fi
+
+  CANDIDATE=$(curl -s -X POST "$GATEWAY/v1/matrimony/biodata/me/opt-in" \
+    -H 'Content-Type: application/json' -H "Authorization: Bearer $CHILD_TOKEN" \
+    -d "{\"fullName\":\"Smoke Candidate\",\"gender\":\"Female\",\"dateOfBirth\":\"1997-01-15\",
+         \"aboutMe\":\"Loves to travel.\",
+         \"consentGiven\":true,\"noticeVersion\":\"$NOTICE_VERSION\"}")
+
+  CANDIDATE_ID=$(printf '%s' "$CANDIDATE" | json_field id)
+
+  if [ -n "$CANDIDATE_ID" ]; then
+    echo "  ok    and a second member opts in too"
+    pass=$((pass + 1))
+  else
+    echo "  FAIL  the second member's opt-in (got '$CANDIDATE')"
+    fail=$((fail + 1))
+    return 1
+  fi
+
+  SEARCH=$(curl -s -H "Authorization: Bearer $MEMBER_TOKEN" "$GATEWAY/v1/matrimony/biodata/search?gender=Female")
+
+  if printf '%s' "$SEARCH" | grep -q "$CANDIDATE_ID" \
+     && ! printf '%s' "$SEARCH" | grep -q "$MEMBER_ID"; then
+    echo "  ok    searching finds the opted-in candidate and excludes the caller"
+    pass=$((pass + 1))
+  else
+    echo "  FAIL  search is the wrong shape (got '$SEARCH')"
+    fail=$((fail + 1))
+  fi
+
+  PROPOSAL=$(curl -s -X POST "$GATEWAY/v1/matrimony/proposals" \
+    -H 'Content-Type: application/json' -H "Authorization: Bearer $MEMBER_TOKEN" \
+    -d "{\"toMemberId\":\"$CANDIDATE_ID\",\"message\":\"Would love to connect.\"}")
+
+  PROPOSAL_ID=$(printf '%s' "$PROPOSAL" | json_field id)
+
+  if [ -n "$PROPOSAL_ID" ]; then
+    echo "  ok    a member sends a proposal"
+    pass=$((pass + 1))
+  else
+    echo "  FAIL  sending a proposal (got '$PROPOSAL')"
+    fail=$((fail + 1))
+    return 1
+  fi
+
+  check "a second proposal to the same pending candidate is refused" 409 \
+    "$(status -X POST "$GATEWAY/v1/matrimony/proposals" \
+       -H 'Content-Type: application/json' -H "Authorization: Bearer $MEMBER_TOKEN" \
+       -d "{\"toMemberId\":\"$CANDIDATE_ID\",\"message\":\"Again.\"}")"
+
+  RECEIVED=$(curl -s -H "Authorization: Bearer $CHILD_TOKEN" "$GATEWAY/v1/matrimony/proposals/received")
+
+  if printf '%s' "$RECEIVED" | grep -q "$PROPOSAL_ID"; then
+    echo "  ok    the recipient sees it in their received list"
+    pass=$((pass + 1))
+  else
+    echo "  FAIL  the received list is missing the proposal (got '$RECEIVED')"
+    fail=$((fail + 1))
+  fi
+
+  check "only the recipient may respond" 404 \
+    "$(status -X POST "$GATEWAY/v1/matrimony/proposals/$PROPOSAL_ID/respond" \
+       -H 'Content-Type: application/json' -H "Authorization: Bearer $MEMBER_TOKEN" \
+       -d '{"accept":true}')"
+
+  check "the recipient accepts" 200 \
+    "$(status -X POST "$GATEWAY/v1/matrimony/proposals/$PROPOSAL_ID/respond" \
+       -H 'Content-Type: application/json' -H "Authorization: Bearer $CHILD_TOKEN" \
+       -d '{"accept":true}')"
+
+  SENT=$(curl -s -H "Authorization: Bearer $MEMBER_TOKEN" "$GATEWAY/v1/matrimony/proposals/sent")
+
+  if printf '%s' "$SENT" | grep -q '"status":"Accepted"'; then
+    echo "  ok    and the sender's own list shows the outcome"
+    pass=$((pass + 1))
+  else
+    echo "  FAIL  the sent list does not show the accepted outcome (got '$SENT')"
+    fail=$((fail + 1))
+  fi
+
+  check "withdrawing consent takes the caller's profile out of search" 200 \
+    "$(status -X DELETE "$GATEWAY/v1/matrimony/biodata/me/consent" \
+       -H "Authorization: Bearer $MEMBER_TOKEN")"
+
+  AFTER_WITHDRAW=$(curl -s -H "Authorization: Bearer $CHILD_TOKEN" "$GATEWAY/v1/matrimony/biodata/search?gender=Male")
+
+  if ! printf '%s' "$AFTER_WITHDRAW" | grep -q "$MEMBER_ID"; then
+    echo "  ok    the withdrawn profile no longer appears in search"
+    pass=$((pass + 1))
+  else
+    echo "  FAIL  the withdrawn profile is still searchable (got '$AFTER_WITHDRAW')"
+    fail=$((fail + 1))
+  fi
+
+  STILL_SENT=$(curl -s -H "Authorization: Bearer $MEMBER_TOKEN" "$GATEWAY/v1/matrimony/proposals/sent")
+
+  if printf '%s' "$STILL_SENT" | grep -q '"status":"Accepted"'; then
+    echo "  ok    but the proposal history survives the withdrawal"
+    pass=$((pass + 1))
+  else
+    echo "  FAIL  proposal history did not survive withdrawal (got '$STILL_SENT')"
+    fail=$((fail + 1))
+  fi
+
+  check "switching the matrimony module off" 200 \
+    "$(status -X PUT "$GATEWAY/v1/identity/tenants/$TENANT_ID/modules" \
+       -H 'Content-Type: application/json' -H "Authorization: Bearer $ADMIN_TOKEN" -H "$ADMIN_TENANT_HEADER" \
+       -d '{"enabledModules":["community"]}')"
+
+  sleep 62
+
+  check "the matrimony route then answers 404" 404 \
+    "$(status -H "Authorization: Bearer $MEMBER_TOKEN" "$GATEWAY/v1/matrimony/biodata/search")"
+}
+
+matrimony_checks || echo "  ..    the rest of the Matrimony checks were skipped"
+
+echo
 echo "Master data"
 
 master_data_checks() {
@@ -3602,7 +3796,10 @@ master_data_checks() {
 
   # Anonymous on purpose - the registration form calls these before anyone
   # holds a token (root CLAUDE.md section 6). No auth header at all here.
-  LOCALITIES=$(curl -s "$GATEWAY/v1/master-data/localities?cityId=$CITY_ID")
+  # `includeInactive` has no default on this endpoint's own binding, so a
+  # caller that omits it gets a 500 rather than "active only" - both apps'
+  # API clients already always send it; this call now does too.
+  LOCALITIES=$(curl -s "$GATEWAY/v1/master-data/localities?cityId=$CITY_ID&includeInactive=false")
 
   case "$LOCALITIES" in
     *"Hiran Magri"*)
@@ -3637,7 +3834,7 @@ master_data_checks() {
        -H 'Content-Type: application/json' -H "Authorization: Bearer $ADMIN_TOKEN" \
        -d '{"name":"Nobody'"'"'s Samaaj"}')"
 
-  MEMBER_GAUTRAS=$(curl -s -H "Authorization: Bearer $MEMBER_TOKEN" "$GATEWAY/v1/master-data/gautras")
+  MEMBER_GAUTRAS=$(curl -s -H "Authorization: Bearer $MEMBER_TOKEN" "$GATEWAY/v1/master-data/gautras?includeInactive=false")
 
   case "$MEMBER_GAUTRAS" in
     *"Kasliwal"*)
@@ -3646,6 +3843,78 @@ master_data_checks() {
       ;;
     *)
       echo "  FAIL  the member's own Samaaj did not see the Gautra just added to it"
+      fail=$((fail + 1))
+      ;;
+  esac
+
+  # Qualification: `LookupCategory`'s fifth value, added 2026-09-11 for My
+  # Profile's educational card. It needed no migration - `Category` is
+  # `HasConversion<string>()` and every command/query already operates
+  # generically per category - so it round-trips exactly the way Country does
+  # above, through the same anonymous read.
+  QUALIFICATION_CODE="GRAD-$(date +%s)"
+
+  QUALIFICATION=$(curl -s -X POST "$GATEWAY/v1/master-data/lookup-items" \
+    -H 'Content-Type: application/json' -H "Authorization: Bearer $ADMIN_TOKEN" \
+    -d "{\"category\":\"Qualification\",\"code\":\"$QUALIFICATION_CODE\",\"label\":\"Graduate\",\"sortOrder\":1}")
+
+  QUALIFICATION_ID=$(printf '%s' "$QUALIFICATION" | json_field id)
+
+  if [ -n "$QUALIFICATION_ID" ]; then
+    echo "  ok    a SuperAdmin creates a Qualification lookup item"
+    pass=$((pass + 1))
+  else
+    echo "  FAIL  creating a Qualification lookup item"
+    fail=$((fail + 1))
+  fi
+
+  require_id qualification_id "$QUALIFICATION_ID"
+
+  check "a member cannot manage the Qualification list either" 403 \
+    "$(status -X POST "$GATEWAY/v1/master-data/lookup-items" \
+       -H 'Content-Type: application/json' -H "Authorization: Bearer $MEMBER_TOKEN" \
+       -d '{"category":"Qualification","code":"XX","label":"Nowhere","sortOrder":1}')"
+
+  # Anonymous, same as every other lookup read - the registration form and My
+  # Profile's educational card both need this list before anyone necessarily
+  # holds a token.
+  QUALIFICATIONS=$(curl -s "$GATEWAY/v1/master-data/lookup-items?category=Qualification&includeInactive=false")
+
+  case "$QUALIFICATIONS" in
+    *"Graduate"*)
+      echo "  ok    an anonymous caller lists the Qualification category and sees it"
+      pass=$((pass + 1))
+      ;;
+    *)
+      echo "  FAIL  an anonymous Qualification lookup did not include Graduate"
+      fail=$((fail + 1))
+      ;;
+  esac
+
+  # And the point of the whole addition: a member can put that id on their own
+  # profile and read it back, the same as `permanentAddress` above.
+  QUALIFICATION_PROFILE=$(curl -s -X PATCH "$GATEWAY/v1/members/$MEMBER_ID" \
+    -H 'Content-Type: application/json' -H "Authorization: Bearer $MEMBER_TOKEN" \
+    -d "{\"fullName\":\"Smoke Member\",\"gender\":\"Male\",\"mobile\":\"+919812345678\",\"gautraId\":\"$GAUTRA_ID\",\"qualificationId\":\"$QUALIFICATION_ID\",\"permanentAddress\":{\"line\":\"12 MG Road, Udaipur\",\"cityId\":\"$CITY_ID\",\"localityId\":\"$LOCALITY_ID\"},\"temporaryAddress\":null,\"privacy\":{\"mobile\":\"SamaajOnly\",\"email\":\"Private\",\"address\":\"Private\",\"profession\":\"SamaajOnly\",\"dateOfBirth\":\"Private\",\"qualification\":\"SamaajOnly\"},\"isListedInDirectory\":true}")
+
+  case "$QUALIFICATION_PROFILE" in
+    *"\"qualificationId\":\"$QUALIFICATION_ID\""*)
+      echo "  ok    and the member's own profile carries the Qualification id back"
+      pass=$((pass + 1))
+      ;;
+    *)
+      echo "  FAIL  the Qualification id did not round-trip onto the member's profile"
+      fail=$((fail + 1))
+      ;;
+  esac
+
+  case "$QUALIFICATION_PROFILE" in
+    *"\"cityId\":\"$CITY_ID\""*"\"localityId\":\"$LOCALITY_ID\""*)
+      echo "  ok    and the City/Locality ids on the permanent address round-trip too"
+      pass=$((pass + 1))
+      ;;
+    *)
+      echo "  FAIL  the permanent address City/Locality ids did not round-trip"
       fail=$((fail + 1))
       ;;
   esac

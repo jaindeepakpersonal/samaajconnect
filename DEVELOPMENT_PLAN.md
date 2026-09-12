@@ -8,7 +8,52 @@ version of the plan; the reasoning behind the ordering lives in
 ## Current Status
 
 - **Stage:** every module has a service and member screens; Phase 5 hardening under way
-- **Last updated:** 2026-09-12 - **member-portal's My Profile became five tabs
+- **Last updated:** 2026-09-12 - **a new module, matrimony-service: biodata,
+  search and proposals within a Samaaj, module-gated off by default.**
+
+  End to end: a member opts into matrimony with their own explicit DPDP
+  consent (separate from membership consent, own withdrawal path, own notice
+  version), prepares a biodata profile prefilled once from their existing
+  base profile, searches other opted-in members of their own Samaaj, sends
+  a proposal, and accepts or declines the ones they receive. Withdrawing
+  consent deactivates - takes the profile out of search - rather than
+  erasing, because a `Proposal` is a joint record two members each have a
+  stake in; full erasure only happens through the `identity.user.erased.v1`
+  consumer on account deletion, which de-identifies proposals rather than
+  deleting them so the other party's own history survives.
+
+  New service `matrimony-service` (`BiodataProfile`, `Proposal`, the usual
+  CQRS/outbox/tenant-filter shape copied from volunteer-groups-service),
+  wired into the module catalogue, the gateway, docker-compose (port 5112),
+  CI's build/test matrix and migrations job, `scripts/smoke-through-gateway.sh`,
+  and `audit-notification-service`'s `KnownEvents.cs` (5 new descriptors).
+  New member-portal feature folder: My Biodata (`/matrimony`), Search
+  (`/matrimony/search`), Candidate detail (`/matrimony/candidates/:id`),
+  Proposals (`/matrimony/proposals`, Sent/Received tabs), gated in the shell
+  nav on the new `matrimony` module key.
+
+  One design gap surfaced only by a live walkthrough rather than by any
+  test: `MyBiodataResponse` originally carried no date of birth at all -
+  only the derived `Age` that `BiodataResponse` gives a searcher - so the
+  edit form had nothing to prefill it with and a member would have had to
+  retype their own birth date on every edit. Fixed by adding `DateOfBirth`
+  to the owner-only response.
+
+  Verified with matrimony-service's full unit+integration suite (20 + 16,
+  both green after the DTO fix), 19 new member-portal component specs (380
+  total, all green), both apps' production builds, `tsc --noEmit`,
+  `scripts/css-class-coverage.sh`, `scripts/uncalled-api-methods.sh`,
+  `scripts/unreachable-endpoints.sh`, `scripts/module-keys.sh`,
+  `scripts/service-coverage.sh`, `scripts/audit-descriptor-coverage.sh`,
+  `scripts/pipeline-order.sh`, `scripts/service-docs.sh`, and a full live
+  walkthrough through the running gateway: a Samaaj Admin turned the module
+  on, two real members opted in, searched, sent and accepted a proposal
+  through curl, then through the actual member-portal UI in a browser
+  against the same running stack; withdrawing consent dropped the profile
+  from search while the accepted proposal survived; toggling the module off
+  answered 404 on every matrimony route while the data stayed intact, and
+  toggling it back on found the same proposal exactly where it was left.
+- **Previously:** 2026-09-12 - **member-portal's My Profile became five tabs
   instead of five stacked cards, and Profession became a master-data-service
   dropdown instead of free text - across member-family-service, member-portal
   and admin-portal.**

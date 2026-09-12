@@ -1,0 +1,109 @@
+/* Only what is specific to the four matrimony screens. The pill colours, the
+   grid, the back link, and the notice/card/btn primitives are shared and
+   live in `src/styles.css`. Tabs have no shared component (see this app's
+   own note on the pattern) - the same rules My Profile keeps in its own
+   stylesheet, copied here. */
+
+.matrimony-page {
+  max-width: 900px;
+  margin: 0 auto;
+  padding: var(--space-6) var(--space-4);
+}
+
+.page-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: var(--space-4);
+  flex-wrap: wrap;
+  margin-bottom: var(--space-4);
+}
+
+.badges {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+  margin: var(--space-2) 0;
+}
+
+.group-body {
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+.queue {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+
+.filters {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  margin-bottom: var(--space-4);
+}
+
+.candidate-photo {
+  max-width: 200px;
+  border-radius: 8px;
+  margin: var(--space-2) 0;
+}
+
+.candidate-photo.small {
+  max-width: 64px;
+}
+
+.details {
+  display: grid;
+  grid-template-columns: max-content 1fr;
+  gap: var(--space-1) var(--space-3);
+  margin: var(--space-3) 0;
+}
+
+.details dt {
+  font-weight: 600;
+  color: var(--muted);
+}
+
+.details dd {
+  margin: 0;
+}
+
+.consent-line {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-2);
+  margin: var(--space-3) 0;
+}
+
+.tabs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  border-bottom: 1px solid var(--line);
+  margin-bottom: var(--space-4);
+}
+
+.tabs button {
+  border: 0;
+  background: transparent;
+  padding: 10px 16px;
+  font-family: inherit;
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--muted);
+  cursor: pointer;
+  border-bottom: 2px solid transparent;
+  margin-bottom: -1px;
+}
+
+.tabs button.on {
+  color: var(--ink);
+  border-bottom-color: var(--accent);
+  font-weight: 700;
+}
+
+.tabs button:hover:not(.on) {
+  color: var(--ink);
+}

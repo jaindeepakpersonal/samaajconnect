@@ -81,6 +81,37 @@ by not doing any of those things. Keep it that way.
 parental consent for a community organisation whose members know each other in
 person.
 
+### Matrimony consent — its own purpose, not folded into membership
+
+Opting into matrimony search is a second, separate consent from the one
+given at registration, deliberately not bundled with it. §6 requires
+consent to be *specific*: agreeing to be a member of a Samaaj is not the
+same choice as agreeing to have a biodata profile searchable by every other
+member of it, and treating the second as implied by the first would make
+neither valid — the same reasoning that already keeps membership and
+"send me Samaaj news" as separate ticks.
+
+`MatrimonyConsent` is matrimony-service's own record, structurally the same
+shape as `ParentalConsent`: `GivenAt`, the `NoticeVersion` and `Attestation`
+captured verbatim, and a nullable `WithdrawnAt`. It is not modelled on
+identity-tenant-service's `ConsentRecord`/`ConsentPurpose` even though that
+service already has an append-only per-purpose consent log with an
+existing opt-in-by-default purpose to compare against — matrimony-service
+owns the record this consent is about, so it owns the notice for it too,
+the same reasoning that keeps `ChildDataNotice` inside member-family-service
+rather than centralised.
+
+**Withdrawal here deactivates rather than erases, which is a deliberate
+departure from `ParentalConsent`'s destructive withdrawal.** A `Proposal` is
+a joint record between two members — each has a legitimate interest in
+their own history, whether they proposed and whether they were accepted —
+so taking a profile out of search cannot mean deleting a fact the other
+party has their own stake in. Full erasure of a matrimony biodata still
+happens, unconditionally, on the member's own account erasure below; a
+withdrawal is the same "as easy as giving" right §6(4) already applies to
+every other consent on this platform, exercised through one call
+(`DELETE /v1/matrimony/biodata/me/consent`) with no admin in the way.
+
 ### Data export
 
 Each service answers for what it holds:
@@ -216,6 +247,7 @@ because audit-notification-service records every payload verbatim.
 | identity-tenant-service | Clears name, contact, password hash, roles and any outstanding activation code; status becomes `Erased` |
 | member-family-service | Clears the profile and closes its privacy settings; erases the children held on this member's own parental consent, wherever they now sit; removes their household membership |
 | audit-notification-service | Deletes their notifications; de-identifies the audit rows where they were the actor; records the erasure itself |
+| matrimony-service | Erases their biodata profile outright (not merely deactivates); de-identifies every proposal they sent or received, keeping the row so the other party's own history survives |
 
 Three decisions inside that are worth knowing:
 

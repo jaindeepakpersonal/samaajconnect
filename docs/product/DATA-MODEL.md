@@ -71,6 +71,10 @@ erDiagram
 
     TENANT ||--o{ AUDIT_LOG : "scopes"
     TENANT ||--o{ NOTIFICATION : "scopes"
+
+    MEMBER_PROFILE ||--o| BIODATA_PROFILE : "opts into"
+    BIODATA_PROFILE ||--o{ PROPOSAL : "sends"
+    BIODATA_PROFILE ||--o{ PROPOSAL : "receives"
 ```
 
 ## 2. Platform-level entities (Identity & Tenant)
@@ -277,3 +281,32 @@ Every write across all four is a soft delete (`IsActive = false`); see
 `services/master-data-service/CLAUDE.md` for why a hard delete is unsafe here
 specifically — other services hold these rows' ids as plain foreign keys with
 no cross-service referential integrity to enforce them.
+
+## 13. Matrimony
+
+**BiodataProfile** — `Id (=MemberId), TenantId, FullName, Gender, DateOfBirth,
+GautraId, ProfessionId, QualificationId, CityId, LocalityId, HeightCm,
+MaritalStatusId, Diet (enum), FamilyType (enum), FatherOccupation,
+MotherOccupation, SiblingsCount, Manglik, HoroscopeNotes, AboutMe,
+PreferredAgeMin, PreferredAgeMax, PartnerPreferenceNotes, ConsentGivenAt,
+ConsentNoticeVersion, ConsentAttestation, ConsentWithdrawnAt (nullable),
+IsActive, CreatedAt, UpdatedAt` — `Id` is the member's own id, the same
+"no dedupe table, the id is the identity" convention `MemberProfile` itself
+uses. `FullName` through `LocalityId` are a one-time copy from the base
+profile, captured at opt-in and never re-synced. `IsActive` gates search
+visibility; withdrawing consent sets it false without touching any other
+field, which is what lets a member's own proposal history keep meaning
+something after they leave.
+
+**Proposal** — `Id, TenantId, FromMemberId, ToMemberId, Status
+(Pending/Accepted/Declined/Withdrawn), Message, SentAt, RespondedAt
+(nullable)` — a peer-to-peer fact between two `BiodataProfile`s, not owned
+by either one. At most one `Pending`-or-`Accepted` row may exist between the
+same two members in either direction at a time.
+
+Not tenant-crossing: every search, proposal and response is scoped to the
+caller's own Samaaj, with no exception. Full account erasure
+(`identity.user.erased.v1`) erases `BiodataProfile` outright and
+de-identifies (strips the message from, and closes out if still `Pending`)
+every `Proposal` the erased member was part of, keeping the row so the other
+party's own history is not silently broken.

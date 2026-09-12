@@ -193,6 +193,37 @@ export const routes: Routes = [
         loadComponent: () =>
           import('./features/privacy/privacy.component').then((m) => m.PrivacyComponent),
       },
+      {
+        path: 'matrimony',
+        title: 'Matrimony - samaajconnect',
+        loadComponent: () =>
+          import('./features/matrimony/opt-in.component').then((m) => m.MatrimonyOptInComponent),
+      },
+      {
+        path: 'matrimony/search',
+        title: 'Matrimony search - samaajconnect',
+        loadComponent: () =>
+          import('./features/matrimony/candidates-search.component').then(
+            (m) => m.MatrimonySearchComponent,
+          ),
+      },
+      {
+        path: 'matrimony/proposals',
+        title: 'My proposals - samaajconnect',
+        loadComponent: () =>
+          import('./features/matrimony/proposals.component').then((m) => m.ProposalsComponent),
+      },
+      {
+        // Declared after the literal 'matrimony/search'/'matrimony/proposals'
+        // segments, the same reasoning 'boli/occasions/:id' before 'boli/:id'
+        // follows.
+        path: 'matrimony/candidates/:id',
+        title: 'Candidate - samaajconnect',
+        loadComponent: () =>
+          import('./features/matrimony/candidate-detail.component').then(
+            (m) => m.CandidateDetailComponent,
+          ),
+      },
       { path: '', pathMatch: 'full', redirectTo: 'timeline' },
     ],
   },

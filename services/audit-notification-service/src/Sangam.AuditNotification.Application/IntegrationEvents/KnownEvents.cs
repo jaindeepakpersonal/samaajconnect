@@ -668,6 +668,45 @@ public static class KnownEvents
             Action: "GautraDeactivated",
             EntityName: "Gautra",
             EntityIdProperty: "gautraId"),
+
+        // matrimony-service, the twelfth service. Opting in and withdrawing are
+        // both self-actions - the same shape as family.created.v1 - so neither
+        // carries a distinct actor. A proposal's own two topics are the
+        // opposite: EntityId names the Proposal, but the sender and recipient
+        // are two different people, so each event's actor is whichever of them
+        // performed that particular act rather than the proposal's own id.
+        ["matrimony.biodata.created.v1"] = new(
+            Action: "BiodataCreated",
+            EntityName: "BiodataProfile",
+            EntityIdProperty: "memberId"),
+
+        ["matrimony.consent.withdrawn.v1"] = new(
+            Action: "MatrimonyConsentWithdrawn",
+            EntityName: "BiodataProfile",
+            EntityIdProperty: "memberId"),
+
+        ["matrimony.proposal.sent.v1"] = new(
+            Action: "ProposalSent",
+            EntityName: "Proposal",
+            EntityIdProperty: "proposalId",
+            ActorIdProperty: "fromMemberId"),
+
+        // Outcome ("Accepted"/"Declined") is the fact worth keeping as
+        // before/after context - the row already carries the new state as its
+        // action name, so BeforeProperties would only repeat "Pending", which
+        // every proposal starts as. ActorIdProperty is the recipient: deciding
+        // is their act, not the sender's.
+        ["matrimony.proposal.responded.v1"] = new(
+            Action: "ProposalResponded",
+            EntityName: "Proposal",
+            EntityIdProperty: "proposalId",
+            ActorIdProperty: "toMemberId"),
+
+        ["matrimony.proposal.withdrawn.v1"] = new(
+            Action: "ProposalWithdrawn",
+            EntityName: "Proposal",
+            EntityIdProperty: "proposalId",
+            ActorIdProperty: "fromMemberId"),
     };
 
     public static EventDescriptor Describe(string topic) =>

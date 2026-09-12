@@ -59,6 +59,10 @@ const NAV: readonly NavGroup[] = [
     items: [{ label: 'Auctions / Boli', route: '/boli', moduleKey: ModuleKeys.Boli }],
   },
   {
+    heading: 'Matrimony',
+    items: [{ label: 'Matrimony', route: '/matrimony', moduleKey: ModuleKeys.Matrimony }],
+  },
+  {
     heading: 'Account',
     items: [{ label: 'Notifications', route: '/notifications', moduleKey: null }],
   },

@@ -46,6 +46,9 @@ public static class ModuleCatalog
     /// <summary>Auctions. Off by default - most Samaaj do not run one.</summary>
     public const string Boli = "boli";
 
+    /// <summary>Matrimony biodata and proposals. Off by default - see Boli's own note.</summary>
+    public const string Matrimony = "matrimony";
+
     public static IReadOnlyList<ModuleDescriptor> All { get; } =
     [
         new(Community, "Timeline & Volunteer Groups", DefaultOn: true),
@@ -56,6 +59,10 @@ public static class ModuleCatalog
         // The admin wireframe leaves this one unticked. A Samaaj that does not
         // run auctions should not have to notice the feature to turn it off.
         new(Boli, "Auctions / Boli", DefaultOn: false),
+
+        // Same reasoning as Boli: not every Samaaj wants a matrimony module
+        // running, and opting in should be a visible admin decision.
+        new(Matrimony, "Matrimony", DefaultOn: false),
     ];
 
     public static IReadOnlyList<string> DefaultKeys { get; } =

@@ -30,6 +30,9 @@ export const ModuleKeys = {
 
   /** Off by default; most Samaaj do not run auctions. */
   Boli: 'boli',
+
+  /** Off by default; not every Samaaj wants a matrimony module running. */
+  Matrimony: 'matrimony',
 } as const;
 
 export type ModuleKey = (typeof ModuleKeys)[keyof typeof ModuleKeys];

@@ -380,3 +380,31 @@ thousand people each read separately.** `readAt` on a notification is always
 *the caller's*, never anyone else's. The unique index on
 `(notification_id, user_id)` is what makes opening the same notification in two
 tabs a no-op rather than an error.
+
+## matrimony-service — `/v1/matrimony`
+
+Module-gated on `matrimony`, off by default. Roles below are the same
+self-scoped list member-family-service's own profile-update command
+uses (`Member, FamilyHead, VolunteerGroupPresident, PathshalaTeacher,
+PathshalaStudent, ContentModerator, BoliManager, SamaajAdmin, SuperAdmin`)
+for every write, and `Members.Read` for every read — no permission key of
+its own.
+
+| Method | Path | Roles | Purpose |
+|---|---|---|---|
+| GET | `/consent-notice` | `Members.Read` | What a member is shown before opting in |
+| GET | `/biodata/me` | `Members.Read` | The caller's own biodata, active or not. **204**, not 200 with a null body, if never opted in |
+| POST | `/biodata/me/opt-in` | role list above | Opt in, or rejoin after a withdrawal. 400 without `consentGiven` |
+| PATCH | `/biodata/me` | role list above | Edit an already-opted-in profile |
+| DELETE | `/biodata/me/consent` | role list above | Withdraw — deactivates, does not erase. Proposal history is kept |
+| GET | `/biodata/search` | `Members.Read` | Active candidates in the caller's own Samaaj, filtered; excludes the caller; capped at 50 |
+| GET | `/biodata/{memberId}` | `Members.Read` | One candidate's full biodata. 404 if inactive or in a different Samaaj |
+| POST | `/proposals` | role list above | Send a proposal. 409 if a Pending/Accepted one already exists between the same two members |
+| GET | `/proposals/sent` | `Members.Read` | The caller's own sent proposals, with the other party resolved |
+| GET | `/proposals/received` | `Members.Read` | The caller's own received proposals, with the other party resolved |
+| POST | `/proposals/{id}/respond` | role list above, recipient only | Accept or decline. 404 for anyone else |
+| POST | `/proposals/{id}/withdraw` | role list above, sender only | Withdraw while still Pending. 404 for anyone else |
+
+No photo or contact endpoints — biodata reuses the member's existing photo
+route and never carries Mobile or Email. Search is within the caller's own
+Samaaj only; there is no cross-tenant variant.

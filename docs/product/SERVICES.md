@@ -246,6 +246,35 @@ and expose its endpoints behind the gateway at the route prefix shown.
   these rows' ids as plain foreign keys across a service boundary with
   no referential integrity to enforce it.
 
+## 12. matrimony-service
+
+- **First / primary aggregate:** `BiodataProfile` (`Id` is the member's
+  own id), with `Proposal` as a second, peer-to-peer aggregate
+- **Owns:** BiodataProfile, Proposal
+- **Key commands:** `OptIntoMatrimonyCommand`, `UpdateBiodataCommand`,
+  `WithdrawMatrimonyConsentCommand`, `SendProposalCommand`,
+  `RespondToProposalCommand`, `WithdrawProposalCommand`
+- **Key queries:** `GetMatrimonyConsentNoticeQuery`, `GetMyBiodataQuery`,
+  `GetBiodataQuery`, `SearchBiodataQuery`, `ListSentProposalsQuery`,
+  `ListReceivedProposalsQuery`
+- **Events published:** `matrimony.biodata.created.v1`,
+  `matrimony.consent.withdrawn.v1`, `matrimony.proposal.sent.v1`,
+  `matrimony.proposal.responded.v1`, `matrimony.proposal.withdrawn.v1`
+- **Events consumed:** `identity.user.erased.v1` — erases the member's
+  biodata and de-identifies (not deletes) every proposal they were part
+  of, so the other party's own history survives
+- **Gateway route prefix:** `/v1/matrimony/**`, module-gated on
+  `matrimony` (off by default, the same stance as `boli`)
+- **Tenant role(s):** the same self-scoped role list
+  member-family-service's own profile-update command uses, for every
+  write; `Members.Read` for every read
+- **Notes:** biodata's starting values (name, DOB, Gautra, profession,
+  qualification, city, locality) are supplied by the client at opt-in
+  time — a one-time copy from member-portal's own `GET /v1/members/me`
+  call, never a live link back to the base profile, and never a
+  synchronous call from this service to member-family-service. Visibility
+  is within the caller's own Samaaj only; there is no cross-tenant search.
+
 ---
 
 ## Inter-service data access rule

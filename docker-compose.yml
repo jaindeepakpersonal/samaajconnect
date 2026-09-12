@@ -256,6 +256,20 @@ services:
     ports:
       - "5111:8080"
 
+  matrimony-service:
+    <<: *service-defaults
+    build:
+      context: .
+      dockerfile: services/matrimony-service/Dockerfile
+    container_name: samaajconnect-matrimony
+    environment:
+      <<: *service-environment
+      ConnectionStrings__Default: "Host=postgres;Port=5432;Database=samaajconnect_matrimony;Username=samaajconnect;Password=samaajconnect"
+      Jwt__SigningKey: "${JWT_SIGNING_KEY:-local-development-signing-key-do-not-use-in-production}"
+      Outbox__PollIntervalSeconds: "5"
+    ports:
+      - "5112:8080"
+
   gateway:
     build:
       context: .
@@ -286,6 +300,8 @@ services:
       boli-service:
         condition: service_started
       master-data-service:
+        condition: service_started
+      matrimony-service:
         condition: service_started
     environment:
       ASPNETCORE_ENVIRONMENT: Development
