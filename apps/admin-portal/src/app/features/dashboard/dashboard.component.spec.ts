@@ -61,6 +61,7 @@ function samaajEvent(id: string): SamaajEvent {
     startAt: '2026-09-05T10:00:00Z',
     endAt: null,
     venue: 'Jain Bhavan',
+    eventTypeId: null,
     organizerType: 'Samaaj',
     organizerId: null,
     status: 'Draft',

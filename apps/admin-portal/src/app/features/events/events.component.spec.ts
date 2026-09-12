@@ -17,6 +17,7 @@ function anEvent(overrides: Partial<SamaajEvent> = {}): SamaajEvent {
     startAt: '2026-09-05T10:00:00Z',
     endAt: null,
     venue: 'Jain Bhavan',
+    eventTypeId: null,
     organizerType: 'Samaaj',
     organizerId: null,
     status: 'Draft',
@@ -75,6 +76,9 @@ describe('EventsListComponent', () => {
       .expectOne(`/v1/events?includeDrafts=true&includePast=${past}`)
       .flush(events);
     http.expectOne('/v1/volunteer-groups/groups').flush(groups);
+    http
+      .expectOne('/v1/master-data/lookup-items?category=EventType&includeInactive=false')
+      .flush([]);
     fixture.detectChanges();
   }
 
@@ -92,6 +96,9 @@ describe('EventsListComponent', () => {
     http
       .expectOne('/v1/events?includeDrafts=true&includePast=false')
       .flush({}, { status: 404, statusText: 'Not Found' });
+    http
+      .expectOne('/v1/master-data/lookup-items?category=EventType&includeInactive=false')
+      .flush([]);
     fixture.detectChanges();
 
     expect(text()).toContain('does not run the community module');
@@ -309,6 +316,9 @@ describe('EventDetailComponent', () => {
   ) {
     fixture.detectChanges();
     http.expectOne(`/v1/events/${EVENT_ID}`).flush(subject);
+    http
+      .expectOne('/v1/master-data/lookup-items?category=EventType&includeInactive=false')
+      .flush([]);
     http.expectOne(`/v1/events/${EVENT_ID}/attendees`).flush(list);
     http.expectOne('/v1/members?limit=100').flush(members);
     fixture.detectChanges();
@@ -398,6 +408,9 @@ describe('EventDetailComponent', () => {
   it('explains a 404 as no such event rather than as an error', () => {
     fixture.detectChanges();
     http.expectOne(`/v1/events/${EVENT_ID}`).flush({}, { status: 404, statusText: 'Not Found' });
+    http
+      .expectOne('/v1/master-data/lookup-items?category=EventType&includeInactive=false')
+      .flush([]);
     fixture.detectChanges();
 
     expect(text()).toContain('No such event');

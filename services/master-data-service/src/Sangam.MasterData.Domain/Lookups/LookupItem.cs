@@ -109,4 +109,11 @@ public enum LookupCategory
     /// seeds actual values through the existing Master Data screen.
     /// </summary>
     BusinessCategory = 6,
+
+    /// <summary>
+    /// A Samaaj event's type (Religious, Cultural, Social, ...). Added
+    /// 2026-09-12 for events-service's own `EventTypeId`, the same
+    /// zero-migration story as every category before it.
+    /// </summary>
+    EventType = 7,
 }

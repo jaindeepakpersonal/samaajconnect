@@ -340,6 +340,22 @@ it. Capacity is nullable and the service refuses zero, so a blank box is sent as
 null: `capacity || null` rather than `capacity ?? 0`, which would turn "no limit"
 into the one value that means an event nobody can attend.
 
+**Event type is optional, resolved to a label here rather than left an id.**
+`SamaajEvent.eventTypeId` names a master-data-service `LookupItem`
+(`Category == EventType`), added 2026-09-12 alongside the same
+`BusinessCategory` zero-migration pattern — except this one needed its own
+additive migration on `events-service`'s own table, since a `LookupItem`
+category is free but a *consumer* storing the id still needs a column for
+it. The create form's dropdown and the detail screen's own label both call
+`AdminApi.listLookupItems('EventType')` directly; a Samaaj that has not
+seeded any values yet gets an empty list rather than a broken form — the
+field stays optional for exactly that reason. Cover photos for events were
+scoped out of this pass: every other stored image on this platform (member
+photos, children's photos, Samaaj logos) needed its own `ImageContent`
+sniffing type, storage table and upload/get endpoints built per service
+from scratch, and bundling that alongside a zero-migration lookup category
+would have been a second, much larger feature riding on this one's name.
+
 **Cancelling asks for a reason, and the reason is not a formality.** The service
 requires one because everybody registered is told it, and a cancelled event
 cannot be republished. The registrations survive on purpose — an attendee list

@@ -15,6 +15,10 @@ public sealed record EventResponse(
     DateTimeOffset StartAt,
     DateTimeOffset? EndAt,
     string? Venue,
+
+    /// <summary>A master-data-service LookupItem id, or null. Never a name -
+    /// resolving one is the portal's job, the same as OrganizerId below.</summary>
+    Guid? EventTypeId,
     string OrganizerType,
     Guid? OrganizerId,
     string Status,

@@ -21,6 +21,7 @@ function event(overrides: Partial<SamaajEvent> = {}): SamaajEvent {
     startAt: SOON,
     endAt: null,
     venue: 'Community Hall',
+    eventTypeId: null,
     organizerType: 'Samaaj',
     organizerId: null,
     status: 'Published',

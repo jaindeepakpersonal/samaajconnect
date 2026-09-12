@@ -99,6 +99,10 @@ namespace Sangam.Events.Infrastructure.Migrations
                         .HasColumnType("timestamp with time zone")
                         .HasColumnName("end_at");
 
+                    b.Property<Guid?>("EventTypeId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("event_type_id");
+
                     b.Property<Guid?>("OrganizerId")
                         .HasColumnType("uuid")
                         .HasColumnName("organizer_id");

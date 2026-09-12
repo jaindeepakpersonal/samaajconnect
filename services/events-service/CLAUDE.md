@@ -13,7 +13,7 @@ button on a full event, and both are real states rather than labels.
 
 | Entity | Status | Notes |
 |---|---|---|
-| `SamaajEvent` | built | Tenant-scoped. Named this, not `Event`, because `event` is a C# keyword and `Event` beside `IDomainEvent` reads as the wrong thing. |
+| `SamaajEvent` | built | Tenant-scoped. Named this, not `Event`, because `event` is a C# keyword and `Event` beside `IDomainEvent` reads as the wrong thing. Carries an optional `EventTypeId` (a master-data-service `LookupItem`, `Category == EventType`) as of 2026-09-12 - see below. |
 | `EventRegistration` | built | A place, or a place in the queue for one. |
 
 ## Commands
@@ -137,6 +137,19 @@ other people, and a Samaaj is a place where that matters.
 
 **Domain-assigned keys are `ValueGeneratedNever`.** Both of them, as everywhere
 else on this platform.
+
+**`EventTypeId` is set only at creation, and only optionally.** There is no
+update command for an event at all - `Create`/`Publish`/`Cancel` are the whole
+lifecycle - so unlike `BusinessCategory` (an id `Business` fields can be
+changed on) this one simply has nowhere to be revised once set. A Samaaj that
+has not seeded any `EventType` lookup values yet can still create events; the
+field is null until it does. It is a `string` on the wire, not a `Guid?` -
+the same defense-in-depth `OptIntoMatrimonyCommand` already established, so a
+malformed id fails FluentValidation rather than crashing the JSON model
+binder with an unhandled 400 before validation runs. Requires an additive
+migration (`AddEventTypeId`, 2026-09-12) since, unlike `LookupItem.Category`,
+this is a genuinely new column on an existing table, not a new value inside
+an existing `HasConversion<string>()` one.
 
 ## Dependencies
 

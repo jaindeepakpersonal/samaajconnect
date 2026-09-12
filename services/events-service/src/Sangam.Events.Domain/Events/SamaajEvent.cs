@@ -32,6 +32,14 @@ public sealed class SamaajEvent : AggregateRoot, ITenantScopedEntity
     public DateTimeOffset? EndAt { get; private set; }
     public string? Venue { get; private set; }
 
+    /// <summary>
+    /// A master-data-service `LookupItem` id (`Category == EventType`), or null
+    /// - a Samaaj that has not seeded any event types yet can still create
+    /// events. Added 2026-09-12; set only at creation, the same as
+    /// <see cref="Capacity"/>, since there is no update command for an event.
+    /// </summary>
+    public Guid? EventTypeId { get; private set; }
+
     /// <summary>Whether the Samaaj itself or one of its volunteer groups is holding this.</summary>
     public OrganizerType OrganizerType { get; private set; }
 
@@ -67,6 +75,7 @@ public sealed class SamaajEvent : AggregateRoot, ITenantScopedEntity
         DateTimeOffset startAt,
         DateTimeOffset? endAt,
         string? venue,
+        Guid? eventTypeId,
         OrganizerType organizerType,
         Guid? organizerId,
         Guid createdByMemberId,
@@ -85,6 +94,7 @@ public sealed class SamaajEvent : AggregateRoot, ITenantScopedEntity
             StartAt = startAt,
             EndAt = endAt,
             Venue = Normalize(venue),
+            EventTypeId = eventTypeId,
             OrganizerType = organizerType,
             OrganizerId = organizerType == OrganizerType.VolunteerGroup ? organizerId : null,
             CreatedByMemberId = createdByMemberId,

@@ -19,6 +19,7 @@ public sealed class SamaajEventTests
             StartAt,
             StartAt.AddHours(2),
             "Community Hall",
+            eventTypeId: null,
             OrganizerType.Samaaj,
             organizerId: null,
             OrganiserId,

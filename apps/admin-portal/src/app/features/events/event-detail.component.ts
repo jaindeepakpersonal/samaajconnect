@@ -4,7 +4,7 @@ import { ActivatedRoute, RouterLink } from '@angular/router';
 import { describeError } from '@samaajconnect/shared';
 import { AdminApi } from '../../core/admin-api';
 import { AdminScope } from '../../core/admin-scope';
-import { Attendee, SamaajEvent } from '../../core/admin.models';
+import { Attendee, LookupItem, SamaajEvent } from '../../core/admin.models';
 import { isNotFound } from '../../core/http-status';
 
 /**
@@ -45,6 +45,7 @@ import { isNotFound } from '../../core/http-status';
       <p class="sub">
         {{ subject.startAt | date: 'd MMM y, h:mm a' }}
         @if (subject.venue) { · {{ subject.venue }} }
+        @if (eventTypeLabel(subject); as type) { · {{ type }} }
         · {{ subject.status }}
       </p>
 
@@ -183,6 +184,7 @@ export class EventDetailComponent implements OnInit {
   readonly error = signal<string | null>(null);
 
   private readonly names = signal<ReadonlyMap<string, string>>(new Map());
+  private readonly eventTypes = signal<readonly LookupItem[]>([]);
 
   readonly registered = computed(() => this.attendees().filter((a) => a.status === 'Registered'));
   readonly waitlisted = computed(() => this.attendees().filter((a) => a.status === 'Waitlisted'));
@@ -194,10 +196,23 @@ export class EventDetailComponent implements OnInit {
 
   ngOnInit(): void {
     this.load();
+    this.api.listLookupItems('EventType').subscribe({
+      next: (found) => this.eventTypes.set(found),
+      error: () => this.eventTypes.set([]),
+    });
   }
 
   memberName(memberId: string): string {
     return this.names().get(memberId) ?? 'A member';
+  }
+
+  /** Null when the event has none, or the type has since been deactivated. */
+  eventTypeLabel(event: SamaajEvent): string | null {
+    if (!event.eventTypeId) {
+      return null;
+    }
+
+    return this.eventTypes().find((t) => t.id === event.eventTypeId)?.label ?? null;
   }
 
   private load(): void {

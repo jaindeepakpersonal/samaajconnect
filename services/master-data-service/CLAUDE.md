@@ -18,23 +18,27 @@ for where it sits among the other ten.
 
 | Entity | Notes |
 |---|---|
-| `LookupItem` | One flat, admin-managed reference list, discriminated by `Category`: `Country`, `ProfessionType`, `Gender`, `MaritalStatus`, `Qualification`, or `BusinessCategory`. Platform-wide, not tenant-scoped |
+| `LookupItem` | One flat, admin-managed reference list, discriminated by `Category`: `Country`, `ProfessionType`, `Gender`, `MaritalStatus`, `Qualification`, `BusinessCategory`, or `EventType`. Platform-wide, not tenant-scoped |
 | `City` | Scoped to a country (`LookupItem.CountryId`, where `Category == Country`). Own aggregate because it carries a parent id the flat `LookupItem` shape has none for |
 | `Locality` | Scoped to a city. The "locations master" — this is the member-portal wireframe's existing locality dropdown (Hiran Magri, Surajpole, Shobhagpura) |
 | `Gautra` | The one **tenant-scoped** entity here (`ITenantScopedEntity`). A Samaaj's own Gautra list, per root CLAUDE.md §6's "Samaaj-wise" requirement |
 
-**Why one `LookupItem` table for six categories, not six aggregates.**
-Country, ProfessionType, Gender, MaritalStatus, Qualification and
-BusinessCategory are structurally identical — a code, a label, a sort
-position, an active flag — and nothing on the platform reasons about them
-differently from one to the next. Qualification joined on 2026-09-11 for
-member-family-service's My Profile screen's educational card;
-BusinessCategory joined on 2026-09-12 for the new Businesses module's
-directory filter. Neither needed a migration: `Category` is already
+**Why one `LookupItem` table for seven categories, not seven aggregates.**
+Country, ProfessionType, Gender, MaritalStatus, Qualification,
+BusinessCategory and EventType are structurally identical — a code, a
+label, a sort position, an active flag — and nothing on the platform
+reasons about them differently from one to the next. Qualification joined
+on 2026-09-11 for member-family-service's My Profile screen's educational
+card; BusinessCategory and EventType both joined on 2026-09-12, for the new
+Businesses module's directory filter and events-service's `EventTypeId`
+respectively. None needed a migration here: `Category` is already
 `HasConversion<string>()`, and every command and query already operates
-generically per category. Six separate CRUD stacks would be six copies of
-the same file with the words changed — not a handful of similar lines worth
-leaving alone, but the same table, six times. `City`, `Locality` and `Gautra` are deliberately kept
+generically per category — though the *consuming* service can still need
+one of its own, as events-service's `AddEventTypeId` shows, when the new
+category needs a column somewhere else to point at it from. Seven separate
+CRUD stacks would be seven copies of the same file with the words changed —
+not a handful of similar lines worth leaving alone, but the same table,
+seven times. `City`, `Locality` and `Gautra` are deliberately kept
 out of it: the first two carry a parent id this flat shape has no column for,
 and folding a tenant id into it to accommodate `Gautra` would put every read
 of every global lookup through the tenant query filter for data that belongs

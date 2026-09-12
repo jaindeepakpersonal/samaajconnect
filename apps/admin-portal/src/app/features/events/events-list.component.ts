@@ -5,7 +5,7 @@ import { RouterLink } from '@angular/router';
 import { describeError } from '@samaajconnect/shared';
 import { AdminApi } from '../../core/admin-api';
 import { AdminScope } from '../../core/admin-scope';
-import { OrganizerGroup, OrganizerType, SamaajEvent } from '../../core/admin.models';
+import { LookupItem, OrganizerGroup, OrganizerType, SamaajEvent } from '../../core/admin.models';
 import { isNotFound } from '../../core/http-status';
 
 /**
@@ -200,6 +200,16 @@ import { isNotFound } from '../../core/http-status';
             </div>
 
             <div class="field">
+              <label for="event-type">Event type</label>
+              <select id="event-type" class="input" name="eventType" [(ngModel)]="eventTypeId">
+                <option value="">Not specified</option>
+                @for (option of eventTypes(); track option.id) {
+                  <option [value]="option.id">{{ option.label }}</option>
+                }
+              </select>
+            </div>
+
+            <div class="field">
               <label for="event-organiser">Organiser</label>
               <select id="event-organiser" class="input" name="organiser" [(ngModel)]="organizerId">
                 <option value="">{{ scope.label() }} itself</option>
@@ -263,6 +273,7 @@ export class EventsListComponent implements OnInit {
 
   readonly events = signal<readonly SamaajEvent[]>([]);
   readonly groups = signal<readonly OrganizerGroup[]>([]);
+  readonly eventTypes = signal<readonly LookupItem[]>([]);
   readonly loading = signal(true);
   readonly busy = signal(false);
   readonly moduleOff = signal(false);
@@ -278,6 +289,7 @@ export class EventsListComponent implements OnInit {
   venue = '';
   startAt = '';
   endAt = '';
+  eventTypeId = '';
   organizerId = '';
   registrationEnabled = true;
   capacity: number | null = null;
@@ -290,6 +302,7 @@ export class EventsListComponent implements OnInit {
 
   ngOnInit(): void {
     this.load();
+    this.loadEventTypes();
   }
 
   canCreate(): boolean {
@@ -369,6 +382,14 @@ export class EventsListComponent implements OnInit {
     });
   }
 
+  /** Optional: a Samaaj that has not seeded any event types yet gets an empty list. */
+  private loadEventTypes(): void {
+    this.api.listLookupItems('EventType').subscribe({
+      next: (found) => this.eventTypes.set(found),
+      error: () => this.eventTypes.set([]),
+    });
+  }
+
   create(): void {
     if (!this.canCreate()) {
       return;
@@ -384,6 +405,7 @@ export class EventsListComponent implements OnInit {
         startAt: new Date(this.startAt).toISOString(),
         endAt: this.endAt ? new Date(this.endAt).toISOString() : null,
         venue: blankToNull(this.venue),
+        eventTypeId: this.eventTypeId || null,
         organizerType,
         organizerId: this.organizerId || null,
         registrationEnabled: this.registrationEnabled,
@@ -398,6 +420,7 @@ export class EventsListComponent implements OnInit {
         this.venue = '';
         this.startAt = '';
         this.endAt = '';
+        this.eventTypeId = '';
         this.organizerId = '';
         this.capacity = null;
       },

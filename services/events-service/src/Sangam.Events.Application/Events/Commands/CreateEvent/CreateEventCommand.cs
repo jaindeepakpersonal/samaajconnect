@@ -23,6 +23,11 @@ public sealed record CreateEventCommand(
     DateTimeOffset StartAt,
     DateTimeOffset? EndAt,
     string? Venue,
+    // A string, not Guid? - a Guid-typed wire field crashes ASP.NET Core's
+    // own JSON model binding with an unhandled 400 the moment it cannot be
+    // parsed, the same trap OptIntoMatrimonyCommand already avoids for every
+    // master-data id it accepts. Validated and parsed below.
+    string? EventTypeId,
     string OrganizerType,
     Guid? OrganizerId,
     bool RegistrationEnabled,
@@ -35,6 +40,7 @@ public sealed class CreateEventCommandValidator : AbstractValidator<CreateEventC
         RuleFor(x => x.Title).NotEmpty().MaximumLength(200);
         RuleFor(x => x.Description).MaximumLength(5000);
         RuleFor(x => x.Venue).MaximumLength(300);
+        RuleFor(x => x.EventTypeId).Must(BeNullOrAGuid).WithMessage("Event type is not valid.");
 
         RuleFor(x => x.OrganizerType)
             .NotEmpty()
@@ -61,6 +67,8 @@ public sealed class CreateEventCommandValidator : AbstractValidator<CreateEventC
             .WithMessage("Capacity must be at least one. Leave it empty for no limit.")
             .When(x => x.Capacity.HasValue);
     }
+
+    private static bool BeNullOrAGuid(string? value) => value is null || Guid.TryParse(value, out _);
 }
 
 public sealed class CreateEventCommandHandler(
@@ -94,6 +102,8 @@ public sealed class CreateEventCommandHandler(
             command.StartAt,
             command.EndAt,
             command.Venue,
+            // Guaranteed null-or-parseable by CreateEventCommandValidator.
+            command.EventTypeId is null ? null : Guid.Parse(command.EventTypeId),
             Enum.Parse<OrganizerType>(command.OrganizerType, ignoreCase: true),
             command.OrganizerId,
             memberId,

@@ -454,6 +454,9 @@ export interface SamaajEvent {
   readonly startAt: string;
   readonly endAt: string | null;
   readonly venue: string | null;
+
+  /** A master-data-service LookupItem id (Category EventType), or null. */
+  readonly eventTypeId: string | null;
   readonly organizerType: OrganizerType;
 
   /** The group's id when the organiser is one. Names live in another service. */
@@ -737,7 +740,8 @@ export type LookupCategory =
   | 'Gender'
   | 'MaritalStatus'
   | 'Qualification'
-  | 'BusinessCategory';
+  | 'BusinessCategory'
+  | 'EventType';
 
 /** Mirrors master-data-service's `LookupItemResponse`. Every write is a soft delete. */
 export interface LookupItem {

@@ -15,6 +15,7 @@ internal static class EventMappings
         samaajEvent.StartAt,
         samaajEvent.EndAt,
         samaajEvent.Venue,
+        samaajEvent.EventTypeId,
         samaajEvent.OrganizerType.ToString(),
         samaajEvent.OrganizerId,
         samaajEvent.Status.ToString(),

@@ -25,6 +25,9 @@ export interface SamaajEvent {
   readonly startAt: string;
   readonly endAt: string | null;
   readonly venue: string | null;
+
+  /** A master-data-service LookupItem id, or null. Never a name - see below. */
+  readonly eventTypeId: string | null;
   readonly organizerType: OrganizerType;
 
   /**

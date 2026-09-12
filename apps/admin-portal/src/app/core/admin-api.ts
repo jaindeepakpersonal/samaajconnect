@@ -628,6 +628,7 @@ export class AdminApi {
     startAt: string;
     endAt: string | null;
     venue: string | null;
+    eventTypeId: string | null;
     organizerType: OrganizerType;
     organizerId: string | null;
     registrationEnabled: boolean;
