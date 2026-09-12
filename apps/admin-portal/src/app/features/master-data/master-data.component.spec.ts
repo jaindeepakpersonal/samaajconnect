@@ -58,7 +58,10 @@ describe('MasterDataComponent', () => {
 
   const text = () => fixture.nativeElement.textContent as string;
 
-  /** A Super Admin's `ngOnInit`: the platform lists, the country dropdown, and Gautra if scoped. */
+  /**
+   * A Super Admin's `ngOnInit`: the default Country tab's items, the country
+   * dropdown shared by Cities/Localities, and Gautra if scoped.
+   */
   function loadAsSuperAdmin(scoped: boolean) {
     fixture.detectChanges();
 
@@ -78,7 +81,7 @@ describe('MasterDataComponent', () => {
 
   afterEach(() => http.verify());
 
-  it('offers a Samaaj Admin only the Gautra section', () => {
+  it('offers a Samaaj Admin only the Gautra tab', () => {
     configure(['SamaajAdmin'], null);
     build();
     fixture.detectChanges();
@@ -86,8 +89,9 @@ describe('MasterDataComponent', () => {
     http.expectOne('/v1/master-data/gautras?includeInactive=true').flush([gautra()]);
     fixture.detectChanges();
 
-    expect(text()).not.toContain('Lookup lists');
-    expect(text()).not.toContain('Cities');
+    const tabs = Array.from(fixture.nativeElement.querySelectorAll('[role="tab"]')) as HTMLElement[];
+
+    expect(tabs.map((t) => t.textContent?.trim())).toEqual(['Gautra']);
     expect(text()).toContain('Gautra — Mahavir Samaaj');
     expect(text()).toContain('Kataria');
   });
@@ -99,38 +103,64 @@ describe('MasterDataComponent', () => {
     build();
     loadAsSuperAdmin(false);
 
+    component.selectTab('Gautra');
+    fixture.detectChanges();
+
     expect(text()).toContain('Choose one in the top bar');
     expect(component.canManageGautra()).toBe(false);
   });
 
-  it('gives a Super Admin scoped into a Samaaj the Gautra section too', () => {
+  it('gives a Super Admin scoped into a Samaaj the Gautra tab too', () => {
     configure(['SuperAdmin'], 't1');
     build();
     loadAsSuperAdmin(true);
+
+    component.selectTab('Gautra');
+    fixture.detectChanges();
 
     expect(component.canManageGautra()).toBe(true);
     expect(text()).toContain('Gautra — Mahavir Samaaj');
   });
 
-  it('shows the platform-wide lists to a Super Admin', () => {
+  it('shows all eight tabs to a Super Admin, one type of data at a time', () => {
     configure(['SuperAdmin'], 't1');
     build();
     loadAsSuperAdmin(true);
 
-    expect(text()).toContain('Lookup lists');
+    const tabs = Array.from(fixture.nativeElement.querySelectorAll('[role="tab"]')) as HTMLElement[];
+
+    expect(tabs.map((t) => t.textContent?.trim())).toEqual([
+      'Country',
+      'Profession',
+      'Gender',
+      'Marital status',
+      'Qualification',
+      'Cities',
+      'Localities',
+      'Gautra',
+    ]);
+
+    // The default tab is Country, so its items show and nothing from another
+    // tab does - one type of master data at a time, not everything stacked.
     expect(text()).toContain('India');
-    expect(text()).toContain('Cities');
+    expect(text()).not.toContain('Choose a country to see its cities.');
   });
 
-  it('adds a lookup item to the selected category, sending no blanks around it', () => {
+  it('adds a lookup item to the active tab through the modal, sending no blanks around it', () => {
     configure(['SuperAdmin'], 't1');
     build();
     loadAsSuperAdmin(true);
 
-    component.newCode = ' US ';
-    component.newLabel = ' United States ';
-    component.newSortOrder = 1;
-    component.createLookupItem();
+    component.openAddLookup(new MouseEvent('click'));
+    fixture.detectChanges();
+
+    expect(component.modalOpen()).toBe(true);
+    expect(component.modalMode()).toBe('add');
+
+    component.lookupFormCode = ' US ';
+    component.lookupFormLabel = ' United States ';
+    component.lookupFormSortOrder = 1;
+    component.submitLookupModal();
 
     const call = http.expectOne('/v1/master-data/lookup-items');
 
@@ -148,54 +178,55 @@ describe('MasterDataComponent', () => {
       .flush([country(), country({ id: 'country-2', code: 'US', label: 'United States' })]);
     fixture.detectChanges();
 
+    expect(component.modalOpen()).toBe(false);
     expect(text()).toContain('United States added.');
   });
 
-  it('keeps the Edit trigger in the DOM instead of swapping it away', () => {
-    // This app's own CLAUDE.md documents the bug this guards against: a
-    // confirmation that replaces its own trigger drops keyboard focus to the
-    // body (WCAG 2.4.3). Toggling edit mode must not remove the button.
+  it('opens the edit modal pre-filled, and Code is fixed rather than editable', () => {
     configure(['SuperAdmin'], 't1');
     build();
     loadAsSuperAdmin(true);
 
-    component.toggleEditLookup(country());
+    component.openEditLookup(country(), new MouseEvent('click'));
     fixture.detectChanges();
 
-    const buttons = Array.from(
-      fixture.nativeElement.querySelectorAll('button'),
-    ) as HTMLButtonElement[];
-
-    expect(buttons.some((b) => b.textContent?.trim() === 'Edit')).toBe(true);
-    expect(component.editingLookupId()).toBe('country-1');
+    expect(component.modalMode()).toBe('edit');
+    expect(component.lookupFormCode).toBe('IN');
+    expect(component.lookupFormLabel).toBe('India');
+    expect(fixture.nativeElement.querySelector('#modal-code')).toBeNull();
+    expect(text()).toContain('Code: IN (fixed once created)');
   });
 
-  it('closes editing when the deactivate confirm opens on the same row, and vice versa', () => {
-    // Regression: askDeactivateLookup used to leave editingLookupId set, so
-    // Edit's inputs and the Deactivate confirm could show at once - and after
-    // confirming, the edit panel stayed open against an item that no longer
-    // renders the Edit/Deactivate buttons that would let it be closed again.
+  it('returns focus to the button that opened the modal once it closes', () => {
+    // The same "don't drop keyboard focus" rule this app already holds every
+    // confirmation panel to (root CLAUDE.md's accessibility notes).
     configure(['SuperAdmin'], 't1');
     build();
     loadAsSuperAdmin(true);
 
-    component.toggleEditLookup(country());
-    expect(component.editingLookupId()).toBe('country-1');
+    const trigger = document.createElement('button');
+    document.body.appendChild(trigger);
+    trigger.focus();
 
-    component.askDeactivateLookup('country-1');
-    expect(component.confirmingLookupId()).toBe('country-1');
-    expect(component.editingLookupId()).toBeNull();
+    component.openAddLookup({ currentTarget: trigger } as unknown as MouseEvent);
+    fixture.detectChanges();
 
-    component.toggleEditLookup(country());
-    expect(component.editingLookupId()).toBe('country-1');
-    expect(component.confirmingLookupId()).toBeNull();
+    component.closeModal();
+
+    expect(component.modalOpen()).toBe(false);
+
+    return fixture.whenStable().then(() => {
+      expect(document.activeElement).toBe(trigger);
+      trigger.remove();
+    });
   });
 
-  it('loads a country\'s cities once one is chosen', () => {
+  it("loads a country's cities once one is chosen, on the Cities tab", () => {
     configure(['SuperAdmin'], 't1');
     build();
     loadAsSuperAdmin(true);
 
+    component.selectTab('Cities');
     component.onCountryChange('country-1');
 
     http
@@ -211,6 +242,7 @@ describe('MasterDataComponent', () => {
     build();
     loadAsSuperAdmin(true);
 
+    component.selectTab('Cities');
     component.onCountryChange('country-1');
     http
       .expectOne('/v1/master-data/cities?includeInactive=true&countryId=country-1')

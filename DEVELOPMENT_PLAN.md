@@ -8,7 +8,98 @@ version of the plan; the reasoning behind the ordering lives in
 ## Current Status
 
 - **Stage:** every module has a service and member screens; Phase 5 hardening under way
-- **Last updated:** 2026-09-11 - **admin-portal has a Master Data screen -
+- **Last updated:** 2026-09-12 - **admin-portal's Master Data screen redesigned
+  as a horizontal tab bar, one type of data at a time, with Add and Edit moved
+  into a modal.**
+
+  The screen used to stack four cards - Lookup lists (Country/Profession/
+  Gender/Marital status/Qualification behind an internal `<select>`), Cities,
+  Localities, Gautra - all visible together, each with an always-open inline
+  Add form and in-row-swap editing. It is now eight horizontal tabs, one per
+  data type (the five lookup categories promoted out from behind their shared
+  dropdown, plus Cities, Localities, Gautra), with only the active tab's table
+  rendered. Add and Edit both open a modal dialog instead of an always-visible
+  form or an in-row swap; Deactivate stays an inline confirmation, since it was
+  never the part of the screen that was hard to find.
+
+  The modal is a first for this app: `role="dialog"`/`aria-modal`, Escape and a
+  backdrop click both close it, Tab cycles focus within it, and closing returns
+  focus to the button that opened it - the same "don't drop keyboard focus"
+  rule this app's own accessibility notes already hold every confirmation
+  panel to. Its CSS lives local to `master-data.component.ts` for now, since
+  this is the first screen in either app to need a true floating overlay
+  (`.modal-card` in the shared stylesheet was always a centred full-page card,
+  never a popup) - it moves to the shared stylesheet the day a second screen
+  needs the same pattern.
+
+  Verified with 9 admin-portal component tests (232 total, all passing),
+  `tsc --noEmit`, full production build, `scripts/css-class-coverage.sh`,
+  `scripts/table-caption-coverage.sh`, and a live walkthrough through the
+  rebuilt container: all eight tabs render for a Super Admin with the correct
+  data type each, added a country through the modal, edited it with Code shown
+  fixed and Label pre-filled, confirmed Escape closes the modal and returns
+  focus to the triggering Edit button, and confirmed the Cities tab's
+  Country → city cascade and its own Add-city modal.
+- **Previously:** 2026-09-11 - **My Profile split into five cards (Basic,
+  Professional, Educational, Address, Photo), and gained Gautra, Qualification,
+  and a structured Permanent/Temporary address sourced from master-data-service
+  — across master-data-service, member-family-service, member-portal and
+  admin-portal.**
+
+  `Qualification = 5` joined master-data-service's `LookupCategory` enum,
+  needing no migration at all - `Category` is `HasConversion<string>()` and
+  every command/query already operates generically per category.
+  member-family-service's `MemberProfile` gained `GautraId`, `QualificationId`
+  and a `PermanentAddress`/`TemporaryAddress` pair (`ProfileAddress`: line,
+  city id, locality id), replacing the old free-text `Address`/`Locality`
+  columns; the migration renames `address` into `permanent_address_line`
+  (a member's one address always meant their permanent one) and adds
+  `temporary_address_line` fresh - `LocalityId` cannot be recovered from old
+  free text and starts null on every migrated row. `SearchMembersQuery`'s
+  `locality` substring filter became an exact `localityId` match, since there
+  is no longer a string to substring-match once Locality is a dropdown pick.
+
+  Privacy: the existing `Address` level now gates only the free-text `Line` of
+  both addresses (one level, not two); City/Locality on both addresses and
+  `GautraId` stay ungated, extending the "name, photo and locality are what a
+  directory is for" precedent; `TemporaryAddress` is gated as a whole rather
+  than field by field; `Qualification` got its own new `PrivacyLevel`,
+  defaulting `SamaajOnly` like its closest sibling `Profession`.
+
+  Both apps' correction/edit forms followed: member-portal's `profile.component.ts`
+  rewritten as five cards with a Gautra/Qualification `<select>` each and a
+  City→Locality cascade per address (Permanent and Temporary can name
+  different cities); a "Same as permanent" checkbox does a one-time client-side
+  copy into Temporary, not a persisted link, per the user's own "copy shortcut"
+  choice. admin-portal's member correction form (`CorrectMemberDetailsCommand`,
+  no privacy fields) got the identical cascade and selects, reusing
+  `AdminApi`'s existing master-data client methods. Both apps' member-list and
+  member-detail screens resolve Locality/Gautra/Qualification ids to names
+  from the same master-data lists rather than showing raw ids.
+
+  Verified with member-family-service's full unit+integration suite (119 +
+  121, both green, including two new locality-exact-match tests), 358
+  member-portal tests, 232 admin-portal tests, both apps' production builds,
+  `tsc --noEmit`, `scripts/css-class-coverage.sh`,
+  `scripts/unreachable-endpoints.sh`, `scripts/uncalled-api-methods.sh`, and
+  `scripts/service-docs.sh` across all services. `scripts/smoke-through-gateway.sh`
+  extended with the permanent-address and Gautra/Qualification round-trip on a
+  profile update, and a Qualification lookup item round-tripping through
+  master-data-service the same way Gautra already did — run clean against a
+  rebuilt stack, after fixing three of the script's own list-endpoint calls
+  (`localities`, `gautras`, the new Qualification read) that omitted
+  `includeInactive`, a required query parameter on those three endpoints that
+  both apps' real API clients already always send. Live walkthrough through
+  both apps' rebuilt containers: as a member, registered fresh, opened My
+  Profile, confirmed all five cards, picked a Gautra and a Qualification,
+  filled a Permanent address with the City→Locality cascade, ticked "Same as
+  permanent" and confirmed the Temporary fields copied, unticked and edited
+  them independently, saved, reloaded and confirmed everything persisted; as
+  the Super Admin scoped into the Samaaj, opened the same member's correction
+  form, confirmed it showed the identical fields pre-filled and resolved
+  (Gautra, Qualification, City, Locality), edited Profession and saved
+  successfully.
+- **Previously:** 2026-09-11 - **admin-portal has a Master Data screen -
   master-data-service's sixteen commands were all curl-only until now, the
   same shape of gap as Pathshala, Boli and moderation before their screens.**
 

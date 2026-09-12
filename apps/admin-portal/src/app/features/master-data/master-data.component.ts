@@ -1,16 +1,25 @@
-import { Component, OnInit, computed, inject, signal } from '@angular/core';
+import { Component, ElementRef, OnInit, ViewChild, computed, inject, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { AuthService, describeError } from '@samaajconnect/shared';
 import { AdminApi } from '../../core/admin-api';
 import { AdminScope } from '../../core/admin-scope';
 import { City, Gautra, Locality, LookupCategory, LookupItem } from '../../core/admin.models';
 
-const CATEGORIES: readonly { value: LookupCategory; label: string }[] = [
+type TabKey = LookupCategory | 'Cities' | 'Localities' | 'Gautra';
+
+const LOOKUP_TABS: readonly { value: LookupCategory; label: string }[] = [
   { value: 'Country', label: 'Country' },
   { value: 'ProfessionType', label: 'Profession' },
   { value: 'Gender', label: 'Gender' },
   { value: 'MaritalStatus', label: 'Marital status' },
   { value: 'Qualification', label: 'Qualification' },
+];
+
+const ALL_TABS: readonly { value: TabKey; label: string }[] = [
+  ...LOOKUP_TABS,
+  { value: 'Cities', label: 'Cities' },
+  { value: 'Localities', label: 'Localities' },
+  { value: 'Gautra', label: 'Gautra' },
 ];
 
 /**
@@ -20,18 +29,39 @@ const CATEGORIES: readonly { value: LookupCategory; label: string }[] = [
  * Outbox events and its audit descriptors shipped with no screen calling any
  * of the sixteen commands behind them.
  *
+ * **One type of master data at a time, chosen from a horizontal tab bar.**
+ * The eight tabs - the five `LookupCategory` values, Cities, Localities and
+ * Gautra - used to be four cards stacked and all visible together, with the
+ * five lookup categories sharing one of those cards behind a `<select>`.
+ * Redesigned 2026-09-12 into one tab per data type: a SuperAdmin managing
+ * Marital status no longer scrolls past Countries, Cities and Localities to
+ * reach it, and switching data types is a tab click rather than a dropdown
+ * change buried inside a card.
+ *
+ * **Add and Edit are a modal, not an always-open inline form or an
+ * in-row-swap.** The inline form sat under every list whether or not anyone
+ * was about to use it, and editing swapped a table row's cells for inputs in
+ * place - both readable once you knew the screen, neither obvious to a first
+ * visit. A modal makes "add" and "edit" a deliberate, focused action with
+ * nothing else competing for attention, and returns focus to the button that
+ * opened it on close - the same "don't drop keyboard focus" rule this app's
+ * own accessibility notes already hold every confirmation panel to.
+ * Deactivate stays an inline confirmation: it was never the part of this
+ * screen that was hard to find, only add and edit were.
+ *
  * **Never module-gated.** A Samaaj cannot switch off the Country/Gender/Gautra
  * dropdowns its own registration form depends on (root `CLAUDE.md` §8), so
  * this screen has no "module is off" state the way most others do.
  *
- * **Two permissions split the screen in two.** `MasterData.Manage` is
- * SuperAdmin-only and covers the platform-wide lists - Country, Profession,
- * Gender, Marital status, Cities and Localities. `Gautra.Manage` is a Samaaj's
- * own list: a Samaaj Admin manages theirs, and a Super Admin manages
- * whichever Samaaj is chosen in the top bar, refused with `Gautra.NoSamaaj`
- * otherwise - the same "choose one in the top bar" shape the Pathshala create
- * form already uses, because `CreateGautraCommand` has nowhere to put a
- * Gautra with no scope selected.
+ * **Two permissions split the tabs in two.** `MasterData.Manage` is
+ * SuperAdmin-only and covers the seven platform-wide tabs - the five lookup
+ * categories, Cities and Localities. `Gautra.Manage` is a Samaaj's own list: a
+ * Samaaj Admin manages theirs, and a Super Admin manages whichever Samaaj is
+ * chosen in the top bar, refused with `Gautra.NoSamaaj` otherwise - the same
+ * "choose one in the top bar" shape the Pathshala create form already uses,
+ * because `CreateGautraCommand` has nowhere to put a Gautra with no scope
+ * selected. The Gautra tab is always shown; its content is either the
+ * managed list or the "choose a Samaaj" notice.
  *
  * **Deactivating here has no undo.** Every write in this service is a soft
  * delete, but no service in the platform exposes a way back from it - unlike
@@ -57,22 +87,27 @@ const CATEGORIES: readonly { value: LookupCategory; label: string }[] = [
       <p class="notice ok" role="status">{{ message }}</p>
     }
 
-    @if (isSuperAdmin()) {
-      <!-- Lookup lists ----------------------------------------------------- -->
-      <div class="card">
-        <h2>Lookup lists</h2>
-
-        <label for="lookup-category">List</label>
-        <select
-          id="lookup-category"
-          class="input"
-          [ngModel]="category()"
-          (ngModelChange)="selectCategory($event)"
+    <div class="tabs" role="tablist" aria-label="Master data type">
+      @for (tab of visibleTabs(); track tab.value) {
+        <button
+          type="button"
+          role="tab"
+          [class.on]="activeTab() === tab.value"
+          [attr.aria-selected]="activeTab() === tab.value"
+          (click)="selectTab(tab.value)"
         >
-          @for (option of categories; track option.value) {
-            <option [value]="option.value">{{ option.label }}</option>
-          }
-        </select>
+          {{ tab.label }}
+        </button>
+      }
+    </div>
+
+    <!-- Lookup lists: Country, Profession, Gender, Marital status, Qualification -->
+    @if (isLookupTab(activeTab())) {
+      <div class="card">
+        <div class="section-head">
+          <h2>{{ activeTabLabel() }}</h2>
+          <button class="btn small" type="button" (click)="openAddLookup($event)">Add</button>
+        </div>
 
         @if (lookupLoading()) {
           <p class="empty" role="status">Loading…</p>
@@ -81,7 +116,7 @@ const CATEGORIES: readonly { value: LookupCategory; label: string }[] = [
         } @else {
           <div class="table-wrap">
             <table>
-              <caption class="sr-only">{{ categoryLabel() }} list</caption>
+              <caption class="sr-only">{{ activeTabLabel() }} list</caption>
               <thead>
                 <tr>
                   <th>Code</th><th>Label</th><th>Sort order</th><th>Status</th><th></th>
@@ -91,32 +126,8 @@ const CATEGORIES: readonly { value: LookupCategory; label: string }[] = [
                 @for (item of lookupItems(); track item.id) {
                   <tr>
                     <td>{{ item.code }}</td>
-                    <td>
-                      @if (editingLookupId() === item.id) {
-                        <label class="sr-only" [for]="item.id + '-label'">Label</label>
-                        <input
-                          class="input inline"
-                          [id]="item.id + '-label'"
-                          [(ngModel)]="editLabel"
-                          maxlength="200"
-                        />
-                      } @else {
-                        {{ item.label }}
-                      }
-                    </td>
-                    <td>
-                      @if (editingLookupId() === item.id) {
-                        <label class="sr-only" [for]="item.id + '-sort'">Sort order</label>
-                        <input
-                          class="input inline"
-                          type="number"
-                          [id]="item.id + '-sort'"
-                          [(ngModel)]="editSortOrder"
-                        />
-                      } @else {
-                        {{ item.sortOrder }}
-                      }
-                    </td>
+                    <td>{{ item.label }}</td>
+                    <td>{{ item.sortOrder }}</td>
                     <td>
                       <span class="pill" [class.off]="!item.isActive">
                         {{ item.isActive ? 'Active' : 'Deactivated' }}
@@ -125,9 +136,7 @@ const CATEGORIES: readonly { value: LookupCategory; label: string }[] = [
                     <td>
                       @if (item.isActive) {
                         <div class="actions">
-                          <button class="btn alt small" type="button"
-                            [attr.aria-expanded]="editingLookupId() === item.id"
-                            (click)="toggleEditLookup(item)">
+                          <button class="btn alt small" type="button" (click)="openEditLookup(item, $event)">
                             Edit
                           </button>
                           <button class="btn alt small" type="button"
@@ -135,21 +144,6 @@ const CATEGORIES: readonly { value: LookupCategory; label: string }[] = [
                             (click)="askDeactivateLookup(item.id)">
                             Deactivate
                           </button>
-                        </div>
-                      }
-
-                      @if (editingLookupId() === item.id) {
-                        <div class="confirm">
-                          <div class="actions">
-                            <button class="btn small" type="button" [disabled]="busy()"
-                              (click)="saveLookup(item)">
-                              Save
-                            </button>
-                            <button class="btn alt small" type="button"
-                              (click)="cancelEditLookup()">
-                              Cancel
-                            </button>
-                          </div>
                         </div>
                       }
 
@@ -178,33 +172,12 @@ const CATEGORIES: readonly { value: LookupCategory; label: string }[] = [
             </table>
           </div>
         }
-
-        <form class="spaced" (ngSubmit)="createLookupItem()">
-          <h3>Add to {{ categoryLabel() }}</h3>
-
-          <label for="lookup-code">Code</label>
-          <input id="lookup-code" class="input" name="code" [(ngModel)]="newCode"
-            maxlength="50" placeholder="IN" />
-
-          <label for="lookup-label">Label</label>
-          <input id="lookup-label" class="input" name="label" [(ngModel)]="newLabel"
-            maxlength="200" placeholder="India" />
-
-          <label for="lookup-sort">Sort order</label>
-          <input id="lookup-sort" class="input" type="number" name="sortOrder"
-            [(ngModel)]="newSortOrder" />
-
-          <button class="btn" type="submit"
-            [disabled]="busy() || !newCode.trim() || !newLabel.trim()">
-            Add
-          </button>
-        </form>
       </div>
+    }
 
-      <!-- Cities -------------------------------------------------------- -->
-      <div class="card spaced">
-        <h2>Cities</h2>
-
+    <!-- Cities -------------------------------------------------------- -->
+    @if (activeTab() === 'Cities') {
+      <div class="card">
         <label for="city-country">Country</label>
         <select
           id="city-country"
@@ -220,10 +193,15 @@ const CATEGORIES: readonly { value: LookupCategory; label: string }[] = [
 
         @if (selectedCountryId() === '') {
           <p class="empty">Choose a country to see its cities.</p>
-        } @else if (citiesLoading()) {
-          <p class="empty" role="status">Loading…</p>
         } @else {
-          @if (cities().length === 0) {
+          <div class="section-head">
+            <h2>Cities in {{ selectedCountryLabel() }}</h2>
+            <button class="btn small" type="button" (click)="openAddCity($event)">Add city</button>
+          </div>
+
+          @if (citiesLoading()) {
+            <p class="empty" role="status">Loading…</p>
+          } @else if (cities().length === 0) {
             <p class="empty">No cities yet for this country.</p>
           } @else {
             <div class="table-wrap">
@@ -235,15 +213,7 @@ const CATEGORIES: readonly { value: LookupCategory; label: string }[] = [
                 <tbody>
                   @for (city of cities(); track city.id) {
                     <tr>
-                      <td>
-                        @if (editingCityId() === city.id) {
-                          <label class="sr-only" [for]="city.id + '-name'">Name</label>
-                          <input class="input inline" [id]="city.id + '-name'"
-                            [(ngModel)]="editCityName" maxlength="200" />
-                        } @else {
-                          {{ city.name }}
-                        }
-                      </td>
+                      <td>{{ city.name }}</td>
                       <td>
                         <span class="pill" [class.off]="!city.isActive">
                           {{ city.isActive ? 'Active' : 'Deactivated' }}
@@ -252,9 +222,7 @@ const CATEGORIES: readonly { value: LookupCategory; label: string }[] = [
                       <td>
                         @if (city.isActive) {
                           <div class="actions">
-                            <button class="btn alt small" type="button"
-                              [attr.aria-expanded]="editingCityId() === city.id"
-                              (click)="toggleEditCity(city)">
+                            <button class="btn alt small" type="button" (click)="openEditCity(city, $event)">
                               Edit
                             </button>
                             <button class="btn alt small" type="button"
@@ -262,21 +230,6 @@ const CATEGORIES: readonly { value: LookupCategory; label: string }[] = [
                               (click)="askDeactivateCity(city.id)">
                               Deactivate
                             </button>
-                          </div>
-                        }
-
-                        @if (editingCityId() === city.id) {
-                          <div class="confirm">
-                            <div class="actions">
-                              <button class="btn small" type="button" [disabled]="busy()"
-                                (click)="saveCity(city)">
-                                Save
-                              </button>
-                              <button class="btn alt small" type="button"
-                                (click)="cancelEditCity()">
-                                Cancel
-                              </button>
-                            </div>
                           </div>
                         }
 
@@ -304,25 +257,13 @@ const CATEGORIES: readonly { value: LookupCategory; label: string }[] = [
               </table>
             </div>
           }
-
-          <form class="spaced" (ngSubmit)="createCity()">
-            <h3>Add a city to {{ selectedCountryLabel() }}</h3>
-
-            <label for="city-name">Name</label>
-            <input id="city-name" class="input" name="cityName" [(ngModel)]="newCityName"
-              maxlength="200" placeholder="Udaipur" />
-
-            <button class="btn" type="submit" [disabled]="busy() || !newCityName.trim()">
-              Add city
-            </button>
-          </form>
         }
       </div>
+    }
 
-      <!-- Localities ------------------------------------------------------ -->
-      <div class="card spaced">
-        <h2>Localities</h2>
-
+    <!-- Localities ------------------------------------------------------ -->
+    @if (activeTab() === 'Localities') {
+      <div class="card">
         <label for="locality-country">Country</label>
         <select
           id="locality-country"
@@ -353,10 +294,17 @@ const CATEGORIES: readonly { value: LookupCategory; label: string }[] = [
 
         @if (selectedCityId() === '') {
           <p class="empty">Choose a city to see its localities.</p>
-        } @else if (localitiesLoading()) {
-          <p class="empty" role="status">Loading…</p>
         } @else {
-          @if (localities().length === 0) {
+          <div class="section-head">
+            <h2>Localities in {{ selectedCityLabel() }}</h2>
+            <button class="btn small" type="button" (click)="openAddLocality($event)">
+              Add locality
+            </button>
+          </div>
+
+          @if (localitiesLoading()) {
+            <p class="empty" role="status">Loading…</p>
+          } @else if (localities().length === 0) {
             <p class="empty">No localities yet for this city.</p>
           } @else {
             <div class="table-wrap">
@@ -368,15 +316,7 @@ const CATEGORIES: readonly { value: LookupCategory; label: string }[] = [
                 <tbody>
                   @for (locality of localities(); track locality.id) {
                     <tr>
-                      <td>
-                        @if (editingLocalityId() === locality.id) {
-                          <label class="sr-only" [for]="locality.id + '-name'">Name</label>
-                          <input class="input inline" [id]="locality.id + '-name'"
-                            [(ngModel)]="editLocalityName" maxlength="200" />
-                        } @else {
-                          {{ locality.name }}
-                        }
-                      </td>
+                      <td>{{ locality.name }}</td>
                       <td>
                         <span class="pill" [class.off]="!locality.isActive">
                           {{ locality.isActive ? 'Active' : 'Deactivated' }}
@@ -386,8 +326,7 @@ const CATEGORIES: readonly { value: LookupCategory; label: string }[] = [
                         @if (locality.isActive) {
                           <div class="actions">
                             <button class="btn alt small" type="button"
-                              [attr.aria-expanded]="editingLocalityId() === locality.id"
-                              (click)="toggleEditLocality(locality)">
+                              (click)="openEditLocality(locality, $event)">
                               Edit
                             </button>
                             <button class="btn alt small" type="button"
@@ -395,21 +334,6 @@ const CATEGORIES: readonly { value: LookupCategory; label: string }[] = [
                               (click)="askDeactivateLocality(locality.id)">
                               Deactivate
                             </button>
-                          </div>
-                        }
-
-                        @if (editingLocalityId() === locality.id) {
-                          <div class="confirm">
-                            <div class="actions">
-                              <button class="btn small" type="button" [disabled]="busy()"
-                                (click)="saveLocality(locality)">
-                                Save
-                              </button>
-                              <button class="btn alt small" type="button"
-                                (click)="cancelEditLocality()">
-                                Cancel
-                              </button>
-                            </div>
                           </div>
                         }
 
@@ -437,132 +361,228 @@ const CATEGORIES: readonly { value: LookupCategory; label: string }[] = [
               </table>
             </div>
           }
-
-          <form class="spaced" (ngSubmit)="createLocality()">
-            <h3>Add a locality to {{ selectedCityLabel() }}</h3>
-
-            <label for="locality-name">Name</label>
-            <input id="locality-name" class="input" name="localityName"
-              [(ngModel)]="newLocalityName" maxlength="200" placeholder="Hiran Magri" />
-
-            <button class="btn" type="submit" [disabled]="busy() || !newLocalityName.trim()">
-              Add locality
-            </button>
-          </form>
         }
       </div>
     }
 
     <!-- Gautra --------------------------------------------------------- -->
-    @if (gautraNeedsSamaaj()) {
-      <p class="notice">
-        A Gautra list belongs to a Samaaj. Choose one in the top bar to manage it.
-      </p>
-    } @else if (canManageGautra()) {
-      <div class="card spaced">
-        <h2>Gautra — {{ scope.label() }}</h2>
+    @if (activeTab() === 'Gautra') {
+      @if (gautraNeedsSamaaj()) {
+        <p class="notice">
+          A Gautra list belongs to a Samaaj. Choose one in the top bar to manage it.
+        </p>
+      } @else if (canManageGautra()) {
+        <div class="card">
+          <div class="section-head">
+            <h2>Gautra — {{ scope.label() }}</h2>
+            <button class="btn small" type="button" (click)="openAddGautra($event)">Add</button>
+          </div>
 
-        @if (gautraLoading()) {
-          <p class="empty" role="status">Loading…</p>
-        } @else if (gautras().length === 0) {
-          <p class="empty">No Gautra added yet.</p>
-        } @else {
-          <div class="table-wrap">
-            <table>
-              <caption class="sr-only">{{ scope.label() }}'s Gautra list</caption>
-              <thead>
-                <tr><th>Name</th><th>Status</th><th></th></tr>
-              </thead>
-              <tbody>
-                @for (gautra of gautras(); track gautra.id) {
-                  <tr>
-                    <td>
-                      @if (editingGautraId() === gautra.id) {
-                        <label class="sr-only" [for]="gautra.id + '-name'">Name</label>
-                        <input class="input inline" [id]="gautra.id + '-name'"
-                          [(ngModel)]="editGautraName" maxlength="200" />
-                      } @else {
-                        {{ gautra.name }}
-                      }
-                    </td>
-                    <td>
-                      <span class="pill" [class.off]="!gautra.isActive">
-                        {{ gautra.isActive ? 'Active' : 'Deactivated' }}
-                      </span>
-                    </td>
-                    <td>
-                      @if (gautra.isActive) {
-                        <div class="actions">
-                          <button class="btn alt small" type="button"
-                            [attr.aria-expanded]="editingGautraId() === gautra.id"
-                            (click)="toggleEditGautra(gautra)">
-                            Edit
-                          </button>
-                          <button class="btn alt small" type="button"
-                            [attr.aria-expanded]="confirmingGautraId() === gautra.id"
-                            (click)="askDeactivateGautra(gautra.id)">
-                            Deactivate
-                          </button>
-                        </div>
-                      }
-
-                      @if (editingGautraId() === gautra.id) {
-                        <div class="confirm">
+          @if (gautraLoading()) {
+            <p class="empty" role="status">Loading…</p>
+          } @else if (gautras().length === 0) {
+            <p class="empty">No Gautra added yet.</p>
+          } @else {
+            <div class="table-wrap">
+              <table>
+                <caption class="sr-only">{{ scope.label() }}'s Gautra list</caption>
+                <thead>
+                  <tr><th>Name</th><th>Status</th><th></th></tr>
+                </thead>
+                <tbody>
+                  @for (gautra of gautras(); track gautra.id) {
+                    <tr>
+                      <td>{{ gautra.name }}</td>
+                      <td>
+                        <span class="pill" [class.off]="!gautra.isActive">
+                          {{ gautra.isActive ? 'Active' : 'Deactivated' }}
+                        </span>
+                      </td>
+                      <td>
+                        @if (gautra.isActive) {
                           <div class="actions">
-                            <button class="btn small" type="button" [disabled]="busy()"
-                              (click)="saveGautra(gautra)">
-                              Save
+                            <button class="btn alt small" type="button"
+                              (click)="openEditGautra(gautra, $event)">
+                              Edit
                             </button>
                             <button class="btn alt small" type="button"
-                              (click)="cancelEditGautra()">
-                              Cancel
-                            </button>
-                          </div>
-                        </div>
-                      }
-
-                      @if (confirmingGautraId() === gautra.id) {
-                        <div class="confirm">
-                          <p class="small" role="status">
-                            {{ gautra.name }} stops appearing as a choice. There is no undo.
-                          </p>
-                          <div class="actions">
-                            <button class="btn small" type="button" [disabled]="busy()"
-                              (click)="confirmDeactivateGautra(gautra)">
+                              [attr.aria-expanded]="confirmingGautraId() === gautra.id"
+                              (click)="askDeactivateGautra(gautra.id)">
                               Deactivate
                             </button>
-                            <button class="btn alt small" type="button"
-                              (click)="confirmingGautraId.set(null)">
-                              Cancel
-                            </button>
                           </div>
-                        </div>
-                      }
-                    </td>
-                  </tr>
-                }
-              </tbody>
-            </table>
-          </div>
-        }
+                        }
 
-        <form class="spaced" (ngSubmit)="createGautra()">
-          <h3>Add a Gautra</h3>
+                        @if (confirmingGautraId() === gautra.id) {
+                          <div class="confirm">
+                            <p class="small" role="status">
+                              {{ gautra.name }} stops appearing as a choice. There is no undo.
+                            </p>
+                            <div class="actions">
+                              <button class="btn small" type="button" [disabled]="busy()"
+                                (click)="confirmDeactivateGautra(gautra)">
+                                Deactivate
+                              </button>
+                              <button class="btn alt small" type="button"
+                                (click)="confirmingGautraId.set(null)">
+                                Cancel
+                              </button>
+                            </div>
+                          </div>
+                        }
+                      </td>
+                    </tr>
+                  }
+                </tbody>
+              </table>
+            </div>
+          }
+        </div>
+      }
+    }
 
-          <label for="gautra-name">Name</label>
-          <input id="gautra-name" class="input" name="gautraName" [(ngModel)]="newGautraName"
-            maxlength="200" />
+    <!-- Add / Edit modal -------------------------------------------------- -->
+    @if (modalOpen()) {
+      <div class="modal-backdrop" (click)="closeModal()">
+        <div
+          class="card modal-card modal-dialog"
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="md-modal-title"
+          (click)="$event.stopPropagation()"
+          (keydown)="onModalKeydown($event)"
+        >
+          <h2 id="md-modal-title">{{ modalTitle() }}</h2>
 
-          <button class="btn" type="submit" [disabled]="busy() || !newGautraName.trim()">
-            Add
-          </button>
-        </form>
+          @if (isLookupTab(activeTab())) {
+            <form (ngSubmit)="submitLookupModal()">
+              @if (modalMode() === 'add') {
+                <label for="modal-code">Code</label>
+                <input id="modal-code" class="input" name="code" [(ngModel)]="lookupFormCode"
+                  maxlength="50" placeholder="IN" #firstField />
+              } @else {
+                <p class="small">Code: {{ lookupFormCode }} (fixed once created)</p>
+              }
+
+              <label for="modal-label">Label</label>
+              <input id="modal-label" class="input" name="label" [(ngModel)]="lookupFormLabel"
+                maxlength="200" placeholder="India" #firstFieldEdit />
+
+              <label for="modal-sort">Sort order</label>
+              <input id="modal-sort" class="input" type="number" name="sortOrder"
+                [(ngModel)]="lookupFormSortOrder" />
+
+              <div class="actions">
+                <button class="btn" type="submit"
+                  [disabled]="busy() || !lookupFormLabel.trim() || (modalMode() === 'add' && !lookupFormCode.trim())">
+                  {{ modalMode() === 'add' ? 'Add' : 'Save' }}
+                </button>
+                <button class="btn alt" type="button" (click)="closeModal()">Cancel</button>
+              </div>
+            </form>
+          } @else if (activeTab() === 'Cities') {
+            <form (ngSubmit)="submitCityModal()">
+              <label for="modal-city-name">Name</label>
+              <input id="modal-city-name" class="input" name="cityName" [(ngModel)]="cityFormName"
+                maxlength="200" placeholder="Udaipur" #firstField />
+
+              <div class="actions">
+                <button class="btn" type="submit" [disabled]="busy() || !cityFormName.trim()">
+                  {{ modalMode() === 'add' ? 'Add' : 'Save' }}
+                </button>
+                <button class="btn alt" type="button" (click)="closeModal()">Cancel</button>
+              </div>
+            </form>
+          } @else if (activeTab() === 'Localities') {
+            <form (ngSubmit)="submitLocalityModal()">
+              <label for="modal-locality-name">Name</label>
+              <input id="modal-locality-name" class="input" name="localityName"
+                [(ngModel)]="localityFormName" maxlength="200" placeholder="Hiran Magri" #firstField />
+
+              <div class="actions">
+                <button class="btn" type="submit" [disabled]="busy() || !localityFormName.trim()">
+                  {{ modalMode() === 'add' ? 'Add' : 'Save' }}
+                </button>
+                <button class="btn alt" type="button" (click)="closeModal()">Cancel</button>
+              </div>
+            </form>
+          } @else if (activeTab() === 'Gautra') {
+            <form (ngSubmit)="submitGautraModal()">
+              <label for="modal-gautra-name">Name</label>
+              <input id="modal-gautra-name" class="input" name="gautraName"
+                [(ngModel)]="gautraFormName" maxlength="200" #firstField />
+
+              <div class="actions">
+                <button class="btn" type="submit" [disabled]="busy() || !gautraFormName.trim()">
+                  {{ modalMode() === 'add' ? 'Add' : 'Save' }}
+                </button>
+                <button class="btn alt" type="button" (click)="closeModal()">Cancel</button>
+              </div>
+            </form>
+          }
+        </div>
       </div>
     }
   `,
   styles: `
-    .spaced {
-      margin-top: var(--space-4);
+    .tabs {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 4px;
+      border-bottom: 1px solid var(--line);
+      margin-bottom: var(--space-4);
+    }
+
+    .tabs button {
+      border: 0;
+      background: transparent;
+      padding: 10px 16px;
+      font-family: inherit;
+      font-size: 14px;
+      font-weight: 500;
+      color: var(--muted);
+      cursor: pointer;
+      border-bottom: 2px solid transparent;
+      margin-bottom: -1px;
+    }
+
+    .tabs button.on {
+      color: var(--ink);
+      border-bottom-color: var(--accent);
+      font-weight: 700;
+    }
+
+    .tabs button:hover:not(.on) {
+      color: var(--ink);
+    }
+
+    .section-head {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: var(--space-3);
+      margin-bottom: var(--space-3);
+    }
+
+    .section-head h2 {
+      margin: 0;
+    }
+
+    .modal-backdrop {
+      position: fixed;
+      inset: 0;
+      background: rgba(23, 32, 42, 0.5);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: var(--space-4);
+      z-index: 200;
+    }
+
+    .modal-dialog {
+      width: 100%;
+      max-height: 90vh;
+      overflow-y: auto;
     }
   `,
 })
@@ -571,8 +591,6 @@ export class MasterDataComponent implements OnInit {
   private readonly auth = inject(AuthService);
 
   readonly scope = inject(AdminScope);
-
-  readonly categories = CATEGORIES;
 
   readonly isSuperAdmin = computed(() => this.auth.roles().includes('SuperAdmin'));
 
@@ -591,28 +609,68 @@ export class MasterDataComponent implements OnInit {
     () => !this.auth.roles().includes('SamaajAdmin') && this.scope.tenantId() === null,
   );
 
+  readonly visibleTabs = computed(() => {
+    const tabs = this.isSuperAdmin() ? ALL_TABS.filter((t) => t.value !== 'Gautra') : [];
+
+    return [...tabs, { value: 'Gautra' as const, label: 'Gautra' }];
+  });
+
+  readonly activeTab = signal<TabKey>('Country');
+
+  readonly activeTabLabel = computed(
+    () => ALL_TABS.find((t) => t.value === this.activeTab())?.label ?? '',
+  );
+
   readonly error = signal<string | null>(null);
   readonly done = signal<string | null>(null);
   readonly busy = signal(false);
 
+  // ---- Modal ----------------------------------------------------------------
+
+  readonly modalOpen = signal(false);
+  private modalTrigger: HTMLElement | null = null;
+
+  @ViewChild('firstField') private firstFieldRef?: ElementRef<HTMLElement>;
+  @ViewChild('firstFieldEdit') private firstFieldEditRef?: ElementRef<HTMLElement>;
+
+  readonly modalMode = computed<'add' | 'edit'>(() => {
+    switch (this.activeTab()) {
+      case 'Cities':
+        return this.editingCityId() === null ? 'add' : 'edit';
+      case 'Localities':
+        return this.editingLocalityId() === null ? 'add' : 'edit';
+      case 'Gautra':
+        return this.editingGautraId() === null ? 'add' : 'edit';
+      default:
+        return this.editingLookupId() === null ? 'add' : 'edit';
+    }
+  });
+
+  readonly modalTitle = computed(() => {
+    const verb = this.modalMode() === 'add' ? 'Add' : 'Edit';
+
+    switch (this.activeTab()) {
+      case 'Cities':
+        return `${verb} city`;
+      case 'Localities':
+        return `${verb} locality`;
+      case 'Gautra':
+        return `${verb} Gautra`;
+      default:
+        return `${verb} ${this.activeTabLabel().toLowerCase()}`;
+    }
+  });
+
   // ---- Lookup lists -------------------------------------------------------
 
-  readonly category = signal<LookupCategory>('Country');
   readonly lookupItems = signal<readonly LookupItem[]>([]);
   readonly lookupLoading = signal(true);
 
-  readonly categoryLabel = computed(
-    () => this.categories.find((c) => c.value === this.category())?.label ?? this.category(),
-  );
-
   readonly editingLookupId = signal<string | null>(null);
   readonly confirmingLookupId = signal<string | null>(null);
-  editLabel = '';
-  editSortOrder = 0;
-
-  newCode = '';
-  newLabel = '';
-  newSortOrder = 0;
+  lookupFormCode = '';
+  lookupFormLabel = '';
+  lookupFormSortOrder = 0;
 
   // ---- Cities ---------------------------------------------------------------
 
@@ -627,8 +685,7 @@ export class MasterDataComponent implements OnInit {
 
   readonly editingCityId = signal<string | null>(null);
   readonly confirmingCityId = signal<string | null>(null);
-  editCityName = '';
-  newCityName = '';
+  cityFormName = '';
 
   // ---- Localities -----------------------------------------------------------
 
@@ -644,8 +701,7 @@ export class MasterDataComponent implements OnInit {
 
   readonly editingLocalityId = signal<string | null>(null);
   readonly confirmingLocalityId = signal<string | null>(null);
-  editLocalityName = '';
-  newLocalityName = '';
+  localityFormName = '';
 
   // ---- Gautra -----------------------------------------------------------
 
@@ -654,10 +710,11 @@ export class MasterDataComponent implements OnInit {
 
   readonly editingGautraId = signal<string | null>(null);
   readonly confirmingGautraId = signal<string | null>(null);
-  editGautraName = '';
-  newGautraName = '';
+  gautraFormName = '';
 
   ngOnInit(): void {
+    this.activeTab.set(this.isSuperAdmin() ? 'Country' : 'Gautra');
+
     if (this.isSuperAdmin()) {
       this.loadLookupItems();
       this.loadCountries();
@@ -670,19 +727,37 @@ export class MasterDataComponent implements OnInit {
     }
   }
 
-  // ---- Lookup lists -------------------------------------------------------
+  // ---- Tabs -----------------------------------------------------------------
 
-  selectCategory(category: LookupCategory): void {
-    this.category.set(category);
-    this.editingLookupId.set(null);
-    this.confirmingLookupId.set(null);
-    this.loadLookupItems();
+  isLookupTab(tab: TabKey): tab is LookupCategory {
+    return LOOKUP_TABS.some((t) => t.value === tab);
   }
+
+  selectTab(tab: TabKey): void {
+    if (this.activeTab() === tab) {
+      return;
+    }
+
+    this.activeTab.set(tab);
+    this.closeModal();
+    this.confirmingLookupId.set(null);
+    this.confirmingCityId.set(null);
+    this.confirmingLocalityId.set(null);
+    this.confirmingGautraId.set(null);
+
+    if (this.isLookupTab(tab)) {
+      this.loadLookupItems();
+    }
+  }
+
+  // ---- Lookup lists -------------------------------------------------------
 
   private loadLookupItems(): void {
     this.lookupLoading.set(true);
 
-    this.api.listLookupItems(this.category(), true).subscribe({
+    const category = this.activeTab() as LookupCategory;
+
+    this.api.listLookupItems(category, true).subscribe({
       next: (items) => {
         this.lookupItems.set(items);
         this.lookupLoading.set(false);
@@ -694,61 +769,60 @@ export class MasterDataComponent implements OnInit {
     });
   }
 
-  createLookupItem(): void {
-    const code = this.newCode.trim();
-    const label = this.newLabel.trim();
-
-    if (code.length === 0 || label.length === 0) {
-      return;
-    }
-
-    this.act(this.api.createLookupItem(this.category(), code, label, this.newSortOrder), `${label} added.`, () => {
-      this.newCode = '';
-      this.newLabel = '';
-      this.newSortOrder = 0;
-      this.loadLookupItems();
-    });
-  }
-
-  toggleEditLookup(item: LookupItem): void {
-    if (this.editingLookupId() === item.id) {
-      this.editingLookupId.set(null);
-
-      return;
-    }
-
-    this.editLabel = item.label;
-    this.editSortOrder = item.sortOrder;
-    this.confirmingLookupId.set(null);
-    this.editingLookupId.set(item.id);
-  }
-
-  cancelEditLookup(): void {
+  openAddLookup(event: MouseEvent): void {
     this.editingLookupId.set(null);
+    this.lookupFormCode = '';
+    this.lookupFormLabel = '';
+    this.lookupFormSortOrder = 0;
+    this.confirmingLookupId.set(null);
+    this.openModal(event);
   }
 
-  saveLookup(item: LookupItem): void {
-    const label = this.editLabel.trim();
+  openEditLookup(item: LookupItem, event: MouseEvent): void {
+    this.editingLookupId.set(item.id);
+    this.lookupFormCode = item.code;
+    this.lookupFormLabel = item.label;
+    this.lookupFormSortOrder = item.sortOrder;
+    this.confirmingLookupId.set(null);
+    this.openModal(event);
+  }
+
+  submitLookupModal(): void {
+    const label = this.lookupFormLabel.trim();
 
     if (label.length === 0) {
       return;
     }
 
-    this.act(this.api.updateLookupItem(item.id, label, this.editSortOrder), `${label} updated.`, () => {
-      this.editingLookupId.set(null);
+    const editingId = this.editingLookupId();
+
+    if (editingId === null) {
+      const code = this.lookupFormCode.trim();
+
+      if (code.length === 0) {
+        return;
+      }
+
+      this.act(
+        this.api.createLookupItem(this.activeTab() as LookupCategory, code, label, this.lookupFormSortOrder),
+        `${label} added.`,
+        () => {
+          this.closeModal();
+          this.loadLookupItems();
+        },
+      );
+
+      return;
+    }
+
+    this.act(this.api.updateLookupItem(editingId, label, this.lookupFormSortOrder), `${label} updated.`, () => {
+      this.closeModal();
       this.loadLookupItems();
     });
   }
 
   askDeactivateLookup(id: string): void {
-    if (this.confirmingLookupId() === id) {
-      this.confirmingLookupId.set(null);
-
-      return;
-    }
-
-    this.editingLookupId.set(null);
-    this.confirmingLookupId.set(id);
+    this.confirmingLookupId.set(this.confirmingLookupId() === id ? null : id);
   }
 
   confirmDeactivateLookup(item: LookupItem): void {
@@ -769,7 +843,6 @@ export class MasterDataComponent implements OnInit {
 
   onCountryChange(countryId: string): void {
     this.selectedCountryId.set(countryId);
-    this.editingCityId.set(null);
     this.confirmingCityId.set(null);
 
     if (countryId === '') {
@@ -796,58 +869,51 @@ export class MasterDataComponent implements OnInit {
     });
   }
 
-  createCity(): void {
-    const name = this.newCityName.trim();
+  openAddCity(event: MouseEvent): void {
+    if (this.selectedCountryId() === '') {
+      return;
+    }
+
+    this.editingCityId.set(null);
+    this.cityFormName = '';
+    this.confirmingCityId.set(null);
+    this.openModal(event);
+  }
+
+  openEditCity(city: City, event: MouseEvent): void {
+    this.editingCityId.set(city.id);
+    this.cityFormName = city.name;
+    this.confirmingCityId.set(null);
+    this.openModal(event);
+  }
+
+  submitCityModal(): void {
+    const name = this.cityFormName.trim();
     const countryId = this.selectedCountryId();
 
     if (name.length === 0 || countryId === '') {
       return;
     }
 
-    this.act(this.api.createCity(countryId, name), `${name} added.`, () => {
-      this.newCityName = '';
+    const editingId = this.editingCityId();
+
+    if (editingId === null) {
+      this.act(this.api.createCity(countryId, name), `${name} added.`, () => {
+        this.closeModal();
+        this.loadCities(countryId);
+      });
+
+      return;
+    }
+
+    this.act(this.api.updateCity(editingId, name), `${name} updated.`, () => {
+      this.closeModal();
       this.loadCities(countryId);
     });
   }
 
-  toggleEditCity(city: City): void {
-    if (this.editingCityId() === city.id) {
-      this.editingCityId.set(null);
-
-      return;
-    }
-
-    this.editCityName = city.name;
-    this.confirmingCityId.set(null);
-    this.editingCityId.set(city.id);
-  }
-
-  cancelEditCity(): void {
-    this.editingCityId.set(null);
-  }
-
-  saveCity(city: City): void {
-    const name = this.editCityName.trim();
-
-    if (name.length === 0) {
-      return;
-    }
-
-    this.act(this.api.updateCity(city.id, name), `${name} updated.`, () => {
-      this.editingCityId.set(null);
-      this.loadCities(this.selectedCountryId());
-    });
-  }
-
   askDeactivateCity(id: string): void {
-    if (this.confirmingCityId() === id) {
-      this.confirmingCityId.set(null);
-
-      return;
-    }
-
-    this.editingCityId.set(null);
-    this.confirmingCityId.set(id);
+    this.confirmingCityId.set(this.confirmingCityId() === id ? null : id);
   }
 
   confirmDeactivateCity(city: City): void {
@@ -863,7 +929,6 @@ export class MasterDataComponent implements OnInit {
     this.localityCountryId.set(countryId);
     this.selectedCityId.set('');
     this.localities.set([]);
-    this.editingLocalityId.set(null);
     this.confirmingLocalityId.set(null);
 
     if (countryId === '') {
@@ -880,7 +945,6 @@ export class MasterDataComponent implements OnInit {
 
   onCityChange(cityId: string): void {
     this.selectedCityId.set(cityId);
-    this.editingLocalityId.set(null);
     this.confirmingLocalityId.set(null);
 
     if (cityId === '') {
@@ -907,58 +971,51 @@ export class MasterDataComponent implements OnInit {
     });
   }
 
-  createLocality(): void {
-    const name = this.newLocalityName.trim();
+  openAddLocality(event: MouseEvent): void {
+    if (this.selectedCityId() === '') {
+      return;
+    }
+
+    this.editingLocalityId.set(null);
+    this.localityFormName = '';
+    this.confirmingLocalityId.set(null);
+    this.openModal(event);
+  }
+
+  openEditLocality(locality: Locality, event: MouseEvent): void {
+    this.editingLocalityId.set(locality.id);
+    this.localityFormName = locality.name;
+    this.confirmingLocalityId.set(null);
+    this.openModal(event);
+  }
+
+  submitLocalityModal(): void {
+    const name = this.localityFormName.trim();
     const cityId = this.selectedCityId();
 
     if (name.length === 0 || cityId === '') {
       return;
     }
 
-    this.act(this.api.createLocality(cityId, name), `${name} added.`, () => {
-      this.newLocalityName = '';
+    const editingId = this.editingLocalityId();
+
+    if (editingId === null) {
+      this.act(this.api.createLocality(cityId, name), `${name} added.`, () => {
+        this.closeModal();
+        this.loadLocalities(cityId);
+      });
+
+      return;
+    }
+
+    this.act(this.api.updateLocality(editingId, name), `${name} updated.`, () => {
+      this.closeModal();
       this.loadLocalities(cityId);
     });
   }
 
-  toggleEditLocality(locality: Locality): void {
-    if (this.editingLocalityId() === locality.id) {
-      this.editingLocalityId.set(null);
-
-      return;
-    }
-
-    this.editLocalityName = locality.name;
-    this.confirmingLocalityId.set(null);
-    this.editingLocalityId.set(locality.id);
-  }
-
-  cancelEditLocality(): void {
-    this.editingLocalityId.set(null);
-  }
-
-  saveLocality(locality: Locality): void {
-    const name = this.editLocalityName.trim();
-
-    if (name.length === 0) {
-      return;
-    }
-
-    this.act(this.api.updateLocality(locality.id, name), `${name} updated.`, () => {
-      this.editingLocalityId.set(null);
-      this.loadLocalities(this.selectedCityId());
-    });
-  }
-
   askDeactivateLocality(id: string): void {
-    if (this.confirmingLocalityId() === id) {
-      this.confirmingLocalityId.set(null);
-
-      return;
-    }
-
-    this.editingLocalityId.set(null);
-    this.confirmingLocalityId.set(id);
+    this.confirmingLocalityId.set(this.confirmingLocalityId() === id ? null : id);
   }
 
   confirmDeactivateLocality(locality: Locality): void {
@@ -985,57 +1042,46 @@ export class MasterDataComponent implements OnInit {
     });
   }
 
-  createGautra(): void {
-    const name = this.newGautraName.trim();
-
-    if (name.length === 0) {
-      return;
-    }
-
-    this.act(this.api.createGautra(name), `${name} added.`, () => {
-      this.newGautraName = '';
-      this.loadGautras();
-    });
-  }
-
-  toggleEditGautra(gautra: Gautra): void {
-    if (this.editingGautraId() === gautra.id) {
-      this.editingGautraId.set(null);
-
-      return;
-    }
-
-    this.editGautraName = gautra.name;
-    this.confirmingGautraId.set(null);
-    this.editingGautraId.set(gautra.id);
-  }
-
-  cancelEditGautra(): void {
+  openAddGautra(event: MouseEvent): void {
     this.editingGautraId.set(null);
+    this.gautraFormName = '';
+    this.confirmingGautraId.set(null);
+    this.openModal(event);
   }
 
-  saveGautra(gautra: Gautra): void {
-    const name = this.editGautraName.trim();
+  openEditGautra(gautra: Gautra, event: MouseEvent): void {
+    this.editingGautraId.set(gautra.id);
+    this.gautraFormName = gautra.name;
+    this.confirmingGautraId.set(null);
+    this.openModal(event);
+  }
+
+  submitGautraModal(): void {
+    const name = this.gautraFormName.trim();
 
     if (name.length === 0) {
       return;
     }
 
-    this.act(this.api.updateGautra(gautra.id, name), `${name} updated.`, () => {
-      this.editingGautraId.set(null);
+    const editingId = this.editingGautraId();
+
+    if (editingId === null) {
+      this.act(this.api.createGautra(name), `${name} added.`, () => {
+        this.closeModal();
+        this.loadGautras();
+      });
+
+      return;
+    }
+
+    this.act(this.api.updateGautra(editingId, name), `${name} updated.`, () => {
+      this.closeModal();
       this.loadGautras();
     });
   }
 
   askDeactivateGautra(id: string): void {
-    if (this.confirmingGautraId() === id) {
-      this.confirmingGautraId.set(null);
-
-      return;
-    }
-
-    this.editingGautraId.set(null);
-    this.confirmingGautraId.set(id);
+    this.confirmingGautraId.set(this.confirmingGautraId() === id ? null : id);
   }
 
   confirmDeactivateGautra(gautra: Gautra): void {
@@ -1043,6 +1089,64 @@ export class MasterDataComponent implements OnInit {
       this.confirmingGautraId.set(null);
       this.loadGautras();
     });
+  }
+
+  // ---- Modal ------------------------------------------------------------
+
+  private openModal(event: MouseEvent): void {
+    this.modalTrigger = event.currentTarget as HTMLElement;
+    this.error.set(null);
+    this.done.set(null);
+    this.modalOpen.set(true);
+    setTimeout(() => (this.firstFieldRef ?? this.firstFieldEditRef)?.nativeElement.focus());
+  }
+
+  closeModal(): void {
+    if (!this.modalOpen()) {
+      return;
+    }
+
+    this.modalOpen.set(false);
+
+    const trigger = this.modalTrigger;
+    this.modalTrigger = null;
+
+    if (trigger) {
+      setTimeout(() => trigger.focus());
+    }
+  }
+
+  onModalKeydown(event: KeyboardEvent): void {
+    if (event.key === 'Escape') {
+      event.stopPropagation();
+      this.closeModal();
+
+      return;
+    }
+
+    if (event.key !== 'Tab') {
+      return;
+    }
+
+    const dialog = event.currentTarget as HTMLElement;
+    const focusable = dialog.querySelectorAll<HTMLElement>(
+      'a[href], button:not([disabled]), input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])',
+    );
+
+    if (focusable.length === 0) {
+      return;
+    }
+
+    const first = focusable[0]!;
+    const last = focusable[focusable.length - 1]!;
+
+    if (event.shiftKey && document.activeElement === first) {
+      event.preventDefault();
+      last.focus();
+    } else if (!event.shiftKey && document.activeElement === last) {
+      event.preventDefault();
+      first.focus();
+    }
   }
 
   // ---- Shared ---------------------------------------------------------------
