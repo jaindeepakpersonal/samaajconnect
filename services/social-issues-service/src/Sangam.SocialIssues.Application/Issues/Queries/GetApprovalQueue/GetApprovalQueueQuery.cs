@@ -6,8 +6,10 @@ using Sangam.SocialIssues.Application.Security;
 namespace Sangam.SocialIssues.Application.Issues.Queries.GetApprovalQueue;
 
 /// <summary>
-/// What a reviewer has to decide about: submitted, and already under review.
-/// The admin wireframe's approval queue.
+/// What a reviewer has to decide about: submitted, under review, or
+/// approved and still waiting to be published. The admin wireframe's
+/// approval queue - one queue for every stage a reviewer's own next move
+/// applies to, not only the first decision.
 /// </summary>
 /// <remarks>
 /// Oldest first. A member waiting on an answer about their own community has

@@ -609,7 +609,7 @@ export type IssueStatus =
   | 'Published'
   | 'Rejected'
   | 'ChangesRequested'
-  | 'Resolved';
+  | 'Closed';
 
 /**
  * Mirrors `IssueResponse`.

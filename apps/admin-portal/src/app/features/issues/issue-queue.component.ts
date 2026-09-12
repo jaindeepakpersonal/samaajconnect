@@ -173,8 +173,8 @@ export class IssueQueueComponent implements OnInit {
         return 'Reject';
       case 'ChangesRequested':
         return 'Send back for changes';
-      case 'Resolved':
-        return 'Mark resolved';
+      case 'Closed':
+        return 'Close';
       default:
         return status;
     }

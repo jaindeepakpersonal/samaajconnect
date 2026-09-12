@@ -316,6 +316,33 @@ public sealed class IssueEndpointsTests(SocialIssuesApiFactory factory)
         queue.EnumerateArray().Should().BeEmpty();
     }
 
+    /// <summary>
+    /// Approving is not the same as deciding: the issue is still waiting on
+    /// its reviewer for the next move (publishing), so unlike a rejection it
+    /// must stay in the same queue rather than fall out of the only screen
+    /// that can act on it. Publishing is what actually clears it.
+    /// </summary>
+    [Fact]
+    public async Task An_approved_issue_stays_in_the_queue_until_it_is_published()
+    {
+        var id = await SubmitAsync();
+
+        await MoveAsync(Reviewer(), id, "Approved");
+
+        var afterApproval = await Reviewer().GetFromJsonAsync<JsonElement>("/v1/social-issues/approval-queue");
+
+        var row = afterApproval.EnumerateArray().Should().ContainSingle().Which;
+        row.GetProperty("status").GetString().Should().Be("Approved");
+        row.GetProperty("availableTransitions").EnumerateArray().Select(t => t.GetString())
+            .Should().Contain("Published");
+
+        await MoveAsync(Reviewer(), id, "Published");
+
+        var afterPublication = await Reviewer().GetFromJsonAsync<JsonElement>("/v1/social-issues/approval-queue");
+
+        afterPublication.EnumerateArray().Should().BeEmpty();
+    }
+
     [Fact]
     public async Task The_author_can_read_why_theirs_was_rejected()
     {

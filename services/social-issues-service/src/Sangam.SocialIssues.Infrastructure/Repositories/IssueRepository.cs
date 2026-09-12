@@ -16,8 +16,17 @@ public sealed class IssueRepository(SocialIssuesDbContext dbContext) : IIssueRep
     private static readonly IssueStatus[] PublicStatuses =
         [IssueStatus.Published, IssueStatus.Closed];
 
+    /// <summary>
+    /// `Approved` belongs here too, alongside `Submitted`/`UnderReview` - an
+    /// approved issue is still waiting on its reviewer, just for the next
+    /// move (publishing) rather than the first one. Without it, the moment
+    /// a reviewer approved an issue it fell out of the only screen that can
+    /// act on issues at all: `availableTransitions` already offered
+    /// `Published` correctly, but nothing ever queried for it, so there was
+    /// no way to reach the button that renders it.
+    /// </summary>
     private static readonly IssueStatus[] AwaitingDecision =
-        [IssueStatus.Submitted, IssueStatus.UnderReview];
+        [IssueStatus.Submitted, IssueStatus.UnderReview, IssueStatus.Approved];
 
     public Task<SocialIssue?> GetByIdAsync(Guid id, CancellationToken cancellationToken = default) =>
         dbContext.Issues

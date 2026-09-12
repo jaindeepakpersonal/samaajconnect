@@ -20,7 +20,12 @@ public interface IIssueRepository
     Task<IReadOnlyList<SocialIssue>> ListForAuthorAsync(
         Guid authorMemberId, CancellationToken cancellationToken = default);
 
-    /// <summary>Waiting for a reviewer: submitted, and under review.</summary>
+    /// <summary>
+    /// Waiting for a reviewer to act: submitted, under review, or approved
+    /// and still waiting to be published. Same queue for all three - a
+    /// reviewer's next move on an issue is still a review action, whether
+    /// that move is a first decision or publishing one already decided.
+    /// </summary>
     Task<IReadOnlyList<SocialIssue>> ListAwaitingDecisionAsync(
         CancellationToken cancellationToken = default);
 
