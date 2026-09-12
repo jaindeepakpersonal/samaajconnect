@@ -72,6 +72,7 @@ function myBiodata(overrides: Partial<MyBiodata> = {}): MyBiodata {
       preferredAgeMax: null,
       partnerPreferenceNotes: null,
     },
+    dateOfBirth: '1995-04-02',
     isActive: true,
     consentGivenAt: '2026-09-12T00:00:00Z',
     consentNoticeVersion: '2026-09-12.1',
@@ -136,6 +137,34 @@ describe('MatrimonyOptInComponent', () => {
     expect(component.form.gautraId).toBe('gautra-1');
     expect(component.form.cityId).toBe('city-1');
     expect(text()).toContain('We show your biodata');
+  });
+
+  /**
+   * A base profile with no date of birth set - the ordinary case for a
+   * fresh registration - used to leave the opt-in form's date field empty
+   * and let the member submit anyway, sending an empty string the service
+   * could only answer with an unhandled 500. The submit button must be
+   * disabled instead, the same way a native required field blocks a plain
+   * HTML form - Angular's own NgForm validity, since this app suppresses
+   * native constraint validation.
+   */
+  it('disables Opt in until a date of birth is filled in', async () => {
+    fixture.detectChanges();
+    settleMasterData();
+
+    http.expectOne('/v1/matrimony/biodata/me').flush(null, { status: 204, statusText: 'No Content' });
+    http.expectOne('/v1/matrimony/consent-notice').flush(notice());
+    http.expectOne('/v1/members/me').flush(profile({ dateOfBirth: null }));
+    http.expectOne((r) => r.url === '/v1/master-data/localities' && r.params.get('cityId') === 'city-1').flush([]);
+    fixture.detectChanges();
+    await fixture.whenStable();
+    fixture.detectChanges();
+
+    const submit = (fixture.nativeElement as HTMLElement).querySelector(
+      'button[type="submit"]',
+    ) as HTMLButtonElement;
+
+    expect(submit.disabled).toBe(true);
   });
 
   it('refuses to submit without ticking the consent box', () => {

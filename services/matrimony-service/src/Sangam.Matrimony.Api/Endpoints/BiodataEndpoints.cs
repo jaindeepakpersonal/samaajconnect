@@ -151,7 +151,10 @@ public static class BiodataEndpoints
     public sealed record OptIntoMatrimonyRequest(
         string FullName,
         string Gender,
-        DateOnly DateOfBirth,
+        // A raw string, not DateOnly - see OptIntoMatrimonyCommand's own
+        // note on why a DateOnly-typed wire field crashes ASP.NET Core's
+        // JSON model binding with an unhandled 500 on an empty string.
+        string? DateOfBirth,
         Guid? GautraId,
         Guid? ProfessionId,
         Guid? QualificationId,
@@ -176,7 +179,7 @@ public static class BiodataEndpoints
     public sealed record UpdateBiodataRequest(
         string FullName,
         string Gender,
-        DateOnly DateOfBirth,
+        string? DateOfBirth,
         Guid? GautraId,
         Guid? ProfessionId,
         Guid? QualificationId,

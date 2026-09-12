@@ -122,6 +122,34 @@ public sealed class MatrimonyEndpointsTests(MatrimonyApiFactory factory)
         response.StatusCode.Should().Be(HttpStatusCode.BadRequest);
     }
 
+    /// <summary>
+    /// A member whose base profile has never had a date of birth set (the
+    /// common case for a fresh registration) sees member-portal's opt-in form
+    /// prefill this field as an empty string - this is the request that
+    /// actually goes over the wire in that case, not a contrived one. It must
+    /// come back as a validation problem, not the unhandled 500 an empty
+    /// string against a DateOnly-typed request field used to produce before
+    /// DateOfBirth became a string here, parsed and validated like Gender and
+    /// Diet already are.
+    /// </summary>
+    [Fact]
+    public async Task An_empty_date_of_birth_is_a_validation_problem_not_a_crash()
+    {
+        var response = await Member(Ravi)
+            .PostAsJsonAsync("/v1/matrimony/biodata/me/opt-in", OptInBody(dateOfBirth: ""));
+
+        response.StatusCode.Should().Be(HttpStatusCode.BadRequest);
+    }
+
+    [Fact]
+    public async Task An_unparseable_date_of_birth_is_a_validation_problem_not_a_crash()
+    {
+        var response = await Member(Ravi)
+            .PostAsJsonAsync("/v1/matrimony/biodata/me/opt-in", OptInBody(dateOfBirth: "not-a-date"));
+
+        response.StatusCode.Should().Be(HttpStatusCode.BadRequest);
+    }
+
     [Fact]
     public async Task Nobody_has_opted_in_yet_reads_as_204_not_an_error()
     {

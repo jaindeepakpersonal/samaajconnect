@@ -23,7 +23,16 @@ namespace Sangam.Matrimony.Application.Biodata.Commands.OptIntoMatrimony;
 public sealed record OptIntoMatrimonyCommand(
     string FullName,
     string Gender,
-    DateOnly DateOfBirth,
+    // A raw string, like Gender/Diet/FamilyType below - not DateOnly. A
+    // DateOnly-typed wire field crashes ASP.NET Core's own JSON model
+    // binding with an unhandled 500 the moment the value is missing or an
+    // empty string (System.Text.Json's DateOnly converter throws on
+    // anything it cannot parse, and an empty string is not JSON `null` -
+    // nullability alone does not save it). A member whose base profile has
+    // no date of birth set is the ordinary case that sends exactly that, not
+    // an edge case. Validated and parsed below instead, the same shape every
+    // other enum-like field on this command already uses.
+    string? DateOfBirth,
     Guid? GautraId,
     Guid? ProfessionId,
     Guid? QualificationId,
@@ -55,7 +64,12 @@ public sealed class OptIntoMatrimonyCommandValidator : AbstractValidator<OptInto
             .WithMessage($"Gender must be one of: {string.Join(", ", Enum.GetNames<Gender>())}.");
 
         RuleFor(x => x.DateOfBirth)
-            .Must(value => value <= DateOnly.FromDateTime(DateTime.UtcNow))
+            .Must(value => !string.IsNullOrWhiteSpace(value) && DateOnly.TryParse(value, out _))
+            .WithMessage("Date of birth is required.");
+
+        RuleFor(x => x.DateOfBirth)
+            .Must(value => DateOnly.Parse(value!) <= DateOnly.FromDateTime(DateTime.UtcNow))
+            .When(x => DateOnly.TryParse(x.DateOfBirth, out _))
             .WithMessage("Date of birth cannot be in the future.");
 
         // Refused here, with a readable message, before the aggregate's own
@@ -63,8 +77,9 @@ public sealed class OptIntoMatrimonyCommandValidator : AbstractValidator<OptInto
         // reach it - the same relationship `CreateChildProfileCommandValidator`
         // has with `ChildProfile.Create`'s consent check.
         RuleFor(x => x.DateOfBirth)
-            .Must(value => Domain.Biodata.BiodataProfile.AgeInYearsOn(value, DateTimeOffset.UtcNow)
+            .Must(value => Domain.Biodata.BiodataProfile.AgeInYearsOn(DateOnly.Parse(value!), DateTimeOffset.UtcNow)
                 >= Domain.Biodata.BiodataProfile.MinimumAge)
+            .When(x => DateOnly.TryParse(x.DateOfBirth, out _))
             .WithMessage($"A biodata profile requires the member to be at least "
                 + $"{Domain.Biodata.BiodataProfile.MinimumAge}.");
 
@@ -136,10 +151,14 @@ public sealed class OptIntoMatrimonyCommandHandler(
         return Result.Success(existing.ToOwnerResponse(now));
     }
 
+    // DateOfBirth is guaranteed present and parseable by the validator,
+    // which ValidationBehavior runs before this handler ever sees the
+    // command - the same "validated by the time it gets here" guarantee
+    // ConsentGiven and NoticeVersion already rely on below.
     private static Domain.Biodata.BiodataFields ToFields(OptIntoMatrimonyCommand command) => new(
         command.FullName,
         Enum.Parse<Gender>(command.Gender, ignoreCase: true),
-        command.DateOfBirth,
+        DateOnly.Parse(command.DateOfBirth!),
         command.GautraId,
         command.ProfessionId,
         command.QualificationId,

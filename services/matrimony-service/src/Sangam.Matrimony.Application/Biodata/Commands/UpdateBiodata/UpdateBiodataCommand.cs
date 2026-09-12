@@ -15,7 +15,11 @@ namespace Sangam.Matrimony.Application.Biodata.Commands.UpdateBiodata;
 public sealed record UpdateBiodataCommand(
     string FullName,
     string Gender,
-    DateOnly DateOfBirth,
+    // A raw string, not DateOnly - see OptIntoMatrimonyCommand's own note on
+    // why a DateOnly-typed wire field crashes ASP.NET Core's JSON model
+    // binding with an unhandled 500 on an empty string, before this
+    // validator ever runs.
+    string? DateOfBirth,
     Guid? GautraId,
     Guid? ProfessionId,
     Guid? QualificationId,
@@ -45,12 +49,18 @@ public sealed class UpdateBiodataCommandValidator : AbstractValidator<UpdateBiod
             .WithMessage($"Gender must be one of: {string.Join(", ", Enum.GetNames<Gender>())}.");
 
         RuleFor(x => x.DateOfBirth)
-            .Must(value => value <= DateOnly.FromDateTime(DateTime.UtcNow))
+            .Must(value => !string.IsNullOrWhiteSpace(value) && DateOnly.TryParse(value, out _))
+            .WithMessage("Date of birth is required.");
+
+        RuleFor(x => x.DateOfBirth)
+            .Must(value => DateOnly.Parse(value!) <= DateOnly.FromDateTime(DateTime.UtcNow))
+            .When(x => DateOnly.TryParse(x.DateOfBirth, out _))
             .WithMessage("Date of birth cannot be in the future.");
 
         RuleFor(x => x.DateOfBirth)
-            .Must(value => Domain.Biodata.BiodataProfile.AgeInYearsOn(value, DateTimeOffset.UtcNow)
+            .Must(value => Domain.Biodata.BiodataProfile.AgeInYearsOn(DateOnly.Parse(value!), DateTimeOffset.UtcNow)
                 >= Domain.Biodata.BiodataProfile.MinimumAge)
+            .When(x => DateOnly.TryParse(x.DateOfBirth, out _))
             .WithMessage($"A biodata profile requires the member to be at least "
                 + $"{Domain.Biodata.BiodataProfile.MinimumAge}.");
 
@@ -102,10 +112,13 @@ public sealed class UpdateBiodataCommandHandler(
 
         var now = clock.UtcNow;
 
+        // DateOfBirth is guaranteed present by the validator's NotNull rule,
+        // which ValidationBehavior runs before this handler ever sees the
+        // command.
         var fields = new Domain.Biodata.BiodataFields(
             command.FullName,
             Enum.Parse<Gender>(command.Gender, ignoreCase: true),
-            command.DateOfBirth,
+            DateOnly.Parse(command.DateOfBirth!),
             command.GautraId,
             command.ProfessionId,
             command.QualificationId,

@@ -82,7 +82,7 @@ import {
           <p class="notice info" role="status">Your biodata has been saved.</p>
         }
 
-        <form class="card" (ngSubmit)="save()">
+        <form class="card" #optInForm="ngForm" (ngSubmit)="save()">
           <h2>{{ myBiodata() ? 'Edit your biodata' : 'Your biodata' }}</h2>
 
           <label for="fullName">Full name</label>
@@ -271,9 +271,14 @@ import {
           }
 
           <div class="actions">
-            <button class="btn" type="submit" [disabled]="saving()">
+            <button class="btn" type="submit" [disabled]="saving() || optInForm.invalid">
               {{ saving() ? 'Saving…' : myBiodata() ? 'Save changes' : 'Opt in' }}
             </button>
+            @if (optInForm.invalid && optInForm.touched) {
+              <p class="notice error" role="alert">
+                Fill in every required field - full name, gender and date of birth - before saving.
+              </p>
+            }
           </div>
         </form>
 
