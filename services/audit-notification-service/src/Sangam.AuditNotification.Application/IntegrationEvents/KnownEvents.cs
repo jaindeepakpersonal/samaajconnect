@@ -711,14 +711,20 @@ public static class KnownEvents
         // businesses-service, the thirteenth service. Creating and
         // deactivating a business are both self-actions, the same shape as
         // matrimony.biodata.created.v1 - the owner is both the entity and
-        // the actor, so neither carries a distinct ActorIdProperty. An
-        // order's four topics all name the buyer as the entity's
-        // BuyerMemberId; only OrderPlaced is the buyer's own act. The other
-        // three (Responded, Fulfilled, Cancelled) are usually the business
-        // owner's act, but Cancelled can be either party's, so it is left
-        // without an ActorIdProperty rather than naming the wrong one - the
-        // same restraint post.reported.v1 already takes for a field this
-        // catalogue would otherwise have to guess at.
+        // the actor, so neither carries a distinct ActorIdProperty. Placing
+        // an order is the buyer's own act (ActorIdProperty: buyerMemberId).
+        // Responding and fulfilling are always the business owner's act -
+        // found live, on 2026-09-12, when a real audit row for
+        // OrderResponded/OrderFulfilled named the order and nothing else:
+        // the domain events did not yet carry the owner's id at all, so
+        // there was no field here to point at even for a caller wanting to
+        // know who accepted or fulfilled an order. Both events now carry
+        // BusinessOwnerMemberId for exactly that. Cancel is the one topic
+        // that stays without an actor: either the buyer (while Pending) or
+        // the owner (while Accepted) can raise it, and naming one
+        // unconditionally would be wrong for the other half of the time -
+        // the same restraint post.reported.v1 already takes for a field
+        // this catalogue would otherwise have to guess at.
         ["businesses.business.created.v1"] = new(
             Action: "BusinessCreated",
             EntityName: "Business",
@@ -738,12 +744,14 @@ public static class KnownEvents
         ["businesses.order.responded.v1"] = new(
             Action: "OrderResponded",
             EntityName: "Order",
-            EntityIdProperty: "orderId"),
+            EntityIdProperty: "orderId",
+            ActorIdProperty: "businessOwnerMemberId"),
 
         ["businesses.order.fulfilled.v1"] = new(
             Action: "OrderFulfilled",
             EntityName: "Order",
-            EntityIdProperty: "orderId"),
+            EntityIdProperty: "orderId",
+            ActorIdProperty: "businessOwnerMemberId"),
 
         ["businesses.order.cancelled.v1"] = new(
             Action: "OrderCancelled",

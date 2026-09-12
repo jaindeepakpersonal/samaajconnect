@@ -132,12 +132,22 @@ routine self-service catalog edits with no other consumer and no distinct
 actor, the same reasoning `LookupItem` field edits don't each get their own
 audited fact beyond Created/Updated/Deactivated.
 
-`OrderCancelledDomainEvent` carries no `ActorIdProperty` in
-`KnownEvents.cs`, deliberately: cancelling can be either the buyer's act
-(while Pending) or the owner's (while Accepted), and naming one
-unconditionally would be wrong for the other half of the time — the same
-restraint `post.reported.v1` already takes for a field this catalogue would
-otherwise have to guess at.
+`OrderRespondedDomainEvent` and `OrderFulfilledDomainEvent` both carry
+`BusinessOwnerMemberId` and point `KnownEvents.cs`'s `ActorIdProperty` at
+it — responding to, and fulfilling, an order is always the owner's own
+act. This was missing on first ship: a live audit-log check found both
+topics recording the order and nothing else, with no way to answer "who
+accepted this?" at all, because neither event carried the owner's id in
+the first place — not merely an undescribed topic, but a genuine gap in
+what the event itself could say. Fixed by adding the field, the same
+"belongs on the event, not just the descriptor" shape every other
+actor-carrying topic on this platform already uses.
+
+`OrderCancelledDomainEvent` is the one exception, and deliberately so:
+cancelling can be either the buyer's act (while Pending) or the owner's
+(while Accepted), and naming one unconditionally would be wrong for the
+other half of the time — the same restraint `post.reported.v1` already
+takes for a field this catalogue would otherwise have to guess at.
 
 ## Events consumed
 

@@ -95,7 +95,7 @@ public sealed class Order : AggregateRoot, ITenantScopedEntity
 
         Status = OrderStatus.Accepted;
         RespondedAt = now;
-        Raise(new OrderRespondedDomainEvent(Id, TenantId, BusinessId, BuyerMemberId, true, now));
+        Raise(new OrderRespondedDomainEvent(Id, TenantId, BusinessId, BusinessOwnerMemberId, BuyerMemberId, true, now));
     }
 
     public void Decline(Guid actingMemberId, DateTimeOffset now)
@@ -106,7 +106,7 @@ public sealed class Order : AggregateRoot, ITenantScopedEntity
         Status = OrderStatus.Declined;
         RespondedAt = now;
         ClosedAt = now;
-        Raise(new OrderRespondedDomainEvent(Id, TenantId, BusinessId, BuyerMemberId, false, now));
+        Raise(new OrderRespondedDomainEvent(Id, TenantId, BusinessId, BusinessOwnerMemberId, BuyerMemberId, false, now));
     }
 
     public void Fulfill(Guid actingMemberId, DateTimeOffset now)
@@ -116,7 +116,7 @@ public sealed class Order : AggregateRoot, ITenantScopedEntity
 
         Status = OrderStatus.Fulfilled;
         ClosedAt = now;
-        Raise(new OrderFulfilledDomainEvent(Id, TenantId, BusinessId, BuyerMemberId, now));
+        Raise(new OrderFulfilledDomainEvent(Id, TenantId, BusinessId, BusinessOwnerMemberId, BuyerMemberId, now));
     }
 
     /// <summary>
