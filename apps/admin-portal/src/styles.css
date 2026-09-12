@@ -137,6 +137,37 @@ h3 {
   gap: 15px;
 }
 
+/* A long form as three columns on a wide screen, collapsing on its own as
+   the viewport narrows - auto-fit/minmax, the same mechanism `.grid2` above
+   already uses. Each direct child is one `.field` (a label stacked above its
+   control); wrap a field in `.span-all` for anything that wants the full row
+   width regardless of column count - a textarea, a checkbox, the actions
+   bar. Applying `display:grid` straight to a `<form>` would instead grid
+   *every* label and input as separate items, interleaving them across
+   columns rather than keeping each pair together - `.field` is what keeps a
+   label with its own control. */
+.form-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: var(--space-2) 15px;
+  align-items: start;
+}
+
+.form-grid .field {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  min-width: 0;
+}
+
+.form-grid .field > label {
+  margin: 0;
+}
+
+.form-grid .span-all {
+  grid-column: 1 / -1;
+}
+
 .btn {
   border: 0;
   background: var(--accent);

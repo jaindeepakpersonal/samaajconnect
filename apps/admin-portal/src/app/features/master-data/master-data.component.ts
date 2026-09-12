@@ -456,21 +456,29 @@ const ALL_TABS: readonly { value: TabKey; label: string }[] = [
 
           @if (isLookupTab(activeTab())) {
             <form (ngSubmit)="submitLookupModal()">
-              @if (modalMode() === 'add') {
-                <label for="modal-code">Code</label>
-                <input id="modal-code" class="input" name="code" [(ngModel)]="lookupFormCode"
-                  maxlength="50" placeholder="IN" #firstField />
-              } @else {
-                <p class="small">Code: {{ lookupFormCode }} (fixed once created)</p>
-              }
+              <div class="form-grid">
+                @if (modalMode() === 'add') {
+                  <div class="field">
+                    <label for="modal-code">Code</label>
+                    <input id="modal-code" class="input" name="code" [(ngModel)]="lookupFormCode"
+                      maxlength="50" placeholder="IN" #firstField />
+                  </div>
+                } @else {
+                  <p class="small span-all">Code: {{ lookupFormCode }} (fixed once created)</p>
+                }
 
-              <label for="modal-label">Label</label>
-              <input id="modal-label" class="input" name="label" [(ngModel)]="lookupFormLabel"
-                maxlength="200" placeholder="India" #firstFieldEdit />
+                <div class="field">
+                  <label for="modal-label">Label</label>
+                  <input id="modal-label" class="input" name="label" [(ngModel)]="lookupFormLabel"
+                    maxlength="200" placeholder="India" #firstFieldEdit />
+                </div>
 
-              <label for="modal-sort">Sort order</label>
-              <input id="modal-sort" class="input" type="number" name="sortOrder"
-                [(ngModel)]="lookupFormSortOrder" />
+                <div class="field">
+                  <label for="modal-sort">Sort order</label>
+                  <input id="modal-sort" class="input" type="number" name="sortOrder"
+                    [(ngModel)]="lookupFormSortOrder" />
+                </div>
+              </div>
 
               <div class="actions">
                 <button class="btn" type="submit"

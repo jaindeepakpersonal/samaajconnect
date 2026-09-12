@@ -84,7 +84,7 @@ import { AdminAddress, AdminMember, City, Gautra, LookupItem, Locality } from '.
             }
           </div>
 
-          <div class="grid2">
+          <div class="form-grid">
             <div class="field">
               <label for="dateOfBirth">Date of birth</label>
               <input
@@ -176,7 +176,7 @@ import { AdminAddress, AdminMember, City, Gautra, LookupItem, Locality } from '.
             />
           </div>
 
-          <div class="grid2">
+          <div class="form-grid">
             <div class="field">
               <label for="permanent-city">City</label>
               <select
@@ -237,7 +237,7 @@ import { AdminAddress, AdminMember, City, Gautra, LookupItem, Locality } from '.
             />
           </div>
 
-          <div class="grid2">
+          <div class="form-grid">
             <div class="field">
               <label for="temporary-city">City</label>
               <select
