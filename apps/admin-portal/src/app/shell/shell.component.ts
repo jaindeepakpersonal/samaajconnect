@@ -233,7 +233,12 @@ export class ShellComponent implements OnInit {
       return;
     }
 
-    this.api.listTenants().subscribe({
+    // Active only: an Inactive or Archived Samaaj answers every request as
+    // though it does not exist (root CLAUDE.md's own Samaaj-status
+    // reasoning), so offering one here would be offering a choice that
+    // leads nowhere - the same "don't draw a control that always fails"
+    // rule this app's own screens already follow elsewhere.
+    this.api.listTenants({ status: 'Active' }).subscribe({
       next: (tenants) => this.tenants.set(tenants),
       error: () => this.tenants.set([]),
     });
