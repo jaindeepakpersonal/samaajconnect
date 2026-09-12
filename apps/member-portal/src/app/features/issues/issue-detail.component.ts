@@ -79,48 +79,58 @@ import {
 
             @if (editing()) {
               <form (ngSubmit)="saveEdit()">
-                <label for="edit-title">Title</label>
-                <input
-                  class="input"
-                  id="edit-title"
-                  name="title"
-                  [(ngModel)]="title"
-                  maxlength="200"
-                  required
-                />
+                <div class="form-grid">
+                  <div class="field">
+                    <label for="edit-title">Title</label>
+                    <input
+                      class="input"
+                      id="edit-title"
+                      name="title"
+                      [(ngModel)]="title"
+                      maxlength="200"
+                      required
+                    />
+                  </div>
 
-                <label for="edit-category">Category</label>
-                <select class="input" id="edit-category" name="category" [(ngModel)]="category">
-                  @for (option of categories; track option) {
-                    <option [value]="option">{{ option }}</option>
-                  }
-                </select>
+                  <div class="field">
+                    <label for="edit-category">Category</label>
+                    <select class="input" id="edit-category" name="category" [(ngModel)]="category">
+                      @for (option of categories; track option) {
+                        <option [value]="option">{{ option }}</option>
+                      }
+                    </select>
+                  </div>
 
-                <label for="edit-locality">Locality (optional)</label>
-                <input
-                  class="input"
-                  id="edit-locality"
-                  name="locality"
-                  [(ngModel)]="locality"
-                  maxlength="150"
-                />
+                  <div class="field">
+                    <label for="edit-locality">Locality (optional)</label>
+                    <input
+                      class="input"
+                      id="edit-locality"
+                      name="locality"
+                      [(ngModel)]="locality"
+                      maxlength="150"
+                    />
+                  </div>
 
-                <label for="edit-description">Description</label>
-                <textarea
-                  class="input"
-                  id="edit-description"
-                  name="description"
-                  [(ngModel)]="description"
-                  rows="5"
-                  maxlength="5000"
-                  required
-                ></textarea>
+                  <div class="field span-all">
+                    <label for="edit-description">Description</label>
+                    <textarea
+                      class="input"
+                      id="edit-description"
+                      name="description"
+                      [(ngModel)]="description"
+                      rows="5"
+                      maxlength="5000"
+                      required
+                    ></textarea>
+                  </div>
 
-                <div class="actions">
-                  <button class="btn" type="submit" [disabled]="busy()">Save changes</button>
-                  <button class="btn secondary" type="button" (click)="cancelEdit()">
-                    Cancel
-                  </button>
+                  <div class="actions span-all">
+                    <button class="btn" type="submit" [disabled]="busy()">Save changes</button>
+                    <button class="btn secondary" type="button" (click)="cancelEdit()">
+                      Cancel
+                    </button>
+                  </div>
                 </div>
               </form>
             } @else {

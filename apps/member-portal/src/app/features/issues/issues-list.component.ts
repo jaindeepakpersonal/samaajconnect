@@ -48,78 +48,88 @@ import {
         <form class="card" (ngSubmit)="submit(true)">
           <h2>Raise a social issue</h2>
 
-          <label for="issue-title">Title</label>
-          <input
-            class="input"
-            id="issue-title"
-            name="title"
-            [(ngModel)]="title"
-            maxlength="200"
-            placeholder="Road safety near the community school"
-            required
-          />
+          <div class="form-grid">
+            <div class="field">
+              <label for="issue-title">Title</label>
+              <input
+                class="input"
+                id="issue-title"
+                name="title"
+                [(ngModel)]="title"
+                maxlength="200"
+                placeholder="Road safety near the community school"
+                required
+              />
+            </div>
 
-          <label for="issue-category">Category</label>
-          <select class="input" id="issue-category" name="category" [(ngModel)]="category">
-            @for (option of categories; track option) {
-              <option [value]="option">{{ option }}</option>
+            <div class="field">
+              <label for="issue-category">Category</label>
+              <select class="input" id="issue-category" name="category" [(ngModel)]="category">
+                @for (option of categories; track option) {
+                  <option [value]="option">{{ option }}</option>
+                }
+              </select>
+            </div>
+
+            <div class="field">
+              <label for="issue-locality">Locality (optional)</label>
+              <input
+                class="input"
+                id="issue-locality"
+                name="locality"
+                [(ngModel)]="locality"
+                maxlength="150"
+                placeholder="Hiran Magri"
+              />
+            </div>
+
+            <div class="field span-all">
+              <label for="issue-description">Describe the issue</label>
+              <textarea
+                class="input"
+                id="issue-description"
+                name="description"
+                [(ngModel)]="description"
+                rows="4"
+                maxlength="5000"
+                required
+              ></textarea>
+            </div>
+
+            @if (formError(); as message) {
+              <p class="notice error span-all" role="alert">{{ message }}</p>
             }
-          </select>
 
-          <label for="issue-locality">Locality (optional)</label>
-          <input
-            class="input"
-            id="issue-locality"
-            name="locality"
-            [(ngModel)]="locality"
-            maxlength="150"
-            placeholder="Hiran Magri"
-          />
+            @if (justSubmitted()) {
+              <p class="notice info span-all" role="status">
+                {{
+                  submittedAsDraft()
+                    ? 'Saved as a draft. Only you can see it until you submit it.'
+                    : 'Sent for approval. You will see it below with its progress.'
+                }}
+              </p>
+            }
 
-          <label for="issue-description">Describe the issue</label>
-          <textarea
-            class="input"
-            id="issue-description"
-            name="description"
-            [(ngModel)]="description"
-            rows="4"
-            maxlength="5000"
-            required
-          ></textarea>
+            <div class="actions span-all">
+              <button class="btn secondary" type="button" disabled>Attach Evidence</button>
+              <span class="small">
+                Attachments are not switched on yet - the platform has no file storage.
+              </span>
+            </div>
 
-          @if (formError(); as message) {
-            <p class="notice error" role="alert">{{ message }}</p>
-          }
-
-          @if (justSubmitted()) {
-            <p class="notice info" role="status">
-              {{
-                submittedAsDraft()
-                  ? 'Saved as a draft. Only you can see it until you submit it.'
-                  : 'Sent for approval. You will see it below with its progress.'
-              }}
-            </p>
-          }
-
-          <div class="actions">
-            <button class="btn secondary" type="button" disabled>Attach Evidence</button>
-            <span class="small">
-              Attachments are not switched on yet - the platform has no file storage.
-            </span>
-          </div>
-
-          <div class="actions">
-            <button
-              class="btn secondary"
-              type="button"
-              [disabled]="!canSubmit() || busy()"
-              (click)="submit(false)"
-            >
-              Save draft
-            </button>
-            <button class="btn" type="submit" [disabled]="!canSubmit() || busy()">
-              {{ busy() ? 'Sending…' : 'Submit for approval' }}
-            </button>
+            <div class="actions span-all">
+              <button
+                class="btn secondary"
+                type="button"
+                [disabled]="!canSubmit() || busy()"
+                (click)="submit(false)"
+              >
+                Save draft
+              </button>
+              <button class="btn" type="submit" [disabled]="!canSubmit() || busy()">
+                {{ busy() ? 'Sending…' : 'Submit for approval' }}
+              </button>
+            </div>
           </div>
         </form>
 

@@ -30,73 +30,91 @@ import { Biodata, Diet, DietLabels, Diets, Gender, SearchFilters } from './matri
       </header>
 
       <form class="card filters" (ngSubmit)="load()">
-        <label for="gender">Gender</label>
-        <select class="input" id="gender" name="gender" [(ngModel)]="filters.gender">
-          <option value="">Any</option>
-          @for (option of genders; track option) {
-            <option [value]="option">{{ option }}</option>
-          }
-        </select>
+        <div class="form-grid">
+          <div class="field">
+            <label for="gender">Gender</label>
+            <select class="input" id="gender" name="gender" [(ngModel)]="filters.gender">
+              <option value="">Any</option>
+              @for (option of genders; track option) {
+                <option [value]="option">{{ option }}</option>
+              }
+            </select>
+          </div>
 
-        <label for="minAge">Min age</label>
-        <input class="input" id="minAge" name="minAge" type="number" min="18" [(ngModel)]="filters.minAge" />
+          <div class="field">
+            <label for="minAge">Min age</label>
+            <input class="input" id="minAge" name="minAge" type="number" min="18" [(ngModel)]="filters.minAge" />
+          </div>
 
-        <label for="maxAge">Max age</label>
-        <input class="input" id="maxAge" name="maxAge" type="number" min="18" [(ngModel)]="filters.maxAge" />
+          <div class="field">
+            <label for="maxAge">Max age</label>
+            <input class="input" id="maxAge" name="maxAge" type="number" min="18" [(ngModel)]="filters.maxAge" />
+          </div>
 
-        <label for="maritalStatusId">Marital status</label>
-        <select class="input" id="maritalStatusId" name="maritalStatusId" [(ngModel)]="filters.maritalStatusId">
-          <option value="">Any</option>
-          @for (option of maritalStatuses(); track option.id) {
-            <option [value]="option.id">{{ option.label }}</option>
-          }
-        </select>
+          <div class="field">
+            <label for="maritalStatusId">Marital status</label>
+            <select class="input" id="maritalStatusId" name="maritalStatusId" [(ngModel)]="filters.maritalStatusId">
+              <option value="">Any</option>
+              @for (option of maritalStatuses(); track option.id) {
+                <option [value]="option.id">{{ option.label }}</option>
+              }
+            </select>
+          </div>
 
-        <label for="minHeightCm">Min height (cm)</label>
-        <input
-          class="input"
-          id="minHeightCm"
-          name="minHeightCm"
-          type="number"
-          min="0"
-          [(ngModel)]="filters.minHeightCm"
-        />
+          <div class="field">
+            <label for="minHeightCm">Min height (cm)</label>
+            <input
+              class="input"
+              id="minHeightCm"
+              name="minHeightCm"
+              type="number"
+              min="0"
+              [(ngModel)]="filters.minHeightCm"
+            />
+          </div>
 
-        <label for="maxHeightCm">Max height (cm)</label>
-        <input
-          class="input"
-          id="maxHeightCm"
-          name="maxHeightCm"
-          type="number"
-          min="0"
-          [(ngModel)]="filters.maxHeightCm"
-        />
+          <div class="field">
+            <label for="maxHeightCm">Max height (cm)</label>
+            <input
+              class="input"
+              id="maxHeightCm"
+              name="maxHeightCm"
+              type="number"
+              min="0"
+              [(ngModel)]="filters.maxHeightCm"
+            />
+          </div>
 
-        <label for="diet">Diet</label>
-        <select class="input" id="diet" name="diet" [(ngModel)]="filters.diet">
-          <option value="">Any</option>
-          @for (option of diets; track option) {
-            <option [value]="option">{{ dietLabel(option) }}</option>
-          }
-        </select>
+          <div class="field">
+            <label for="diet">Diet</label>
+            <select class="input" id="diet" name="diet" [(ngModel)]="filters.diet">
+              <option value="">Any</option>
+              @for (option of diets; track option) {
+                <option [value]="option">{{ dietLabel(option) }}</option>
+              }
+            </select>
+          </div>
 
-        <label for="localityId">Locality</label>
-        <select class="input" id="localityId" name="localityId" [(ngModel)]="filters.localityId">
-          <option value="">Any</option>
-          @for (option of localities(); track option.id) {
-            <option [value]="option.id">{{ option.name }}</option>
-          }
-        </select>
+          <div class="field">
+            <label for="localityId">Locality</label>
+            <select class="input" id="localityId" name="localityId" [(ngModel)]="filters.localityId">
+              <option value="">Any</option>
+              @for (option of localities(); track option.id) {
+                <option [value]="option.id">{{ option.name }}</option>
+              }
+            </select>
+          </div>
 
-        <label>
-          <input type="checkbox" name="excludeOwnGautra" [(ngModel)]="filters.excludeOwnGautra" />
-          Exclude my own Gautra
-        </label>
+          <label class="span-all">
+            <input type="checkbox" name="excludeOwnGautra" [(ngModel)]="filters.excludeOwnGautra" />
+            Exclude my own Gautra
+          </label>
 
-        <div class="actions">
-          <button class="btn" type="submit" [disabled]="loading()">
-            {{ loading() ? 'Searching…' : 'Search' }}
-          </button>
+          <div class="actions span-all">
+            <button class="btn" type="submit" [disabled]="loading()">
+              {{ loading() ? 'Searching…' : 'Search' }}
+            </button>
+          </div>
         </div>
       </form>
 

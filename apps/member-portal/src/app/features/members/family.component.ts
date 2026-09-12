@@ -421,61 +421,69 @@ import {
                 </div>
               } @else if (notice(); as dataNotice) {
                 <form (ngSubmit)="addChild(dataNotice)">
-                  <label for="child-name">Full name</label>
-                  <input
-                    class="input"
-                    id="child-name"
-                    name="childName"
-                    [(ngModel)]="childName"
-                    maxlength="150"
-                    required
-                  />
+                  <div class="form-grid">
+                    <div class="field">
+                      <label for="child-name">Full name</label>
+                      <input
+                        class="input"
+                        id="child-name"
+                        name="childName"
+                        [(ngModel)]="childName"
+                        maxlength="150"
+                        required
+                      />
+                    </div>
 
-                  <label for="child-dob">Date of birth</label>
-                  <input
-                    class="input"
-                    id="child-dob"
-                    name="childDob"
-                    type="date"
-                    [(ngModel)]="childDob"
-                    required
-                  />
+                    <div class="field">
+                      <label for="child-dob">Date of birth</label>
+                      <input
+                        class="input"
+                        id="child-dob"
+                        name="childDob"
+                        type="date"
+                        [(ngModel)]="childDob"
+                        required
+                      />
+                    </div>
 
-                  <label for="child-gender">Gender</label>
-                  <select class="input" id="child-gender" name="childGender"
-                    [(ngModel)]="childGender">
-                    @for (option of genders; track option) {
-                      <option [value]="option">{{ option }}</option>
+                    <div class="field">
+                      <label for="child-gender">Gender</label>
+                      <select class="input" id="child-gender" name="childGender"
+                        [(ngModel)]="childGender">
+                        @for (option of genders; track option) {
+                          <option [value]="option">{{ option }}</option>
+                        }
+                      </select>
+                    </div>
+
+                    <!-- Shown before the tick, never after, and never
+                         pre-filled: consent to something nobody has read is not
+                         consent (DPDP s.9). -->
+                    <div class="notice info span-all">
+                      <p class="small">{{ dataNotice.summary }}</p>
+                    </div>
+
+                    <label class="consent span-all">
+                      <input type="checkbox" name="consent" [(ngModel)]="consentGiven" />
+                      {{ dataNotice.attestation }}
+                    </label>
+
+                    @if (childError(); as message) {
+                      <p class="notice error span-all" role="alert">{{ message }}</p>
                     }
-                  </select>
 
-                  <!-- Shown before the tick, never after, and never
-                       pre-filled: consent to something nobody has read is not
-                       consent (DPDP s.9). -->
-                  <div class="notice info">
-                    <p class="small">{{ dataNotice.summary }}</p>
-                  </div>
-
-                  <label class="consent">
-                    <input type="checkbox" name="consent" [(ngModel)]="consentGiven" />
-                    {{ dataNotice.attestation }}
-                  </label>
-
-                  @if (childError(); as message) {
-                    <p class="notice error" role="alert">{{ message }}</p>
-                  }
-
-                  <div class="actions">
-                    <button
-                      class="btn"
-                      type="submit"
-                      [disabled]="busy() || !consentGiven || !canAddChild()"
-                    >
-                      Add child
-                    </button>
-                    <button class="btn secondary" type="button" (click)="cancelAddChild()">
-                      Cancel
-                    </button>
+                    <div class="actions span-all">
+                      <button
+                        class="btn"
+                        type="submit"
+                        [disabled]="busy() || !consentGiven || !canAddChild()"
+                      >
+                        Add child
+                      </button>
+                      <button class="btn secondary" type="button" (click)="cancelAddChild()">
+                        Cancel
+                      </button>
+                    </div>
                   </div>
                 </form>
               } @else {
