@@ -84,18 +84,19 @@ import {
 
         <form class="card" #optInForm="ngForm" (ngSubmit)="save()">
           <h2>{{ myBiodata() ? 'Edit your biodata' : 'Your biodata' }}</h2>
+          <p class="small">Fields marked <span aria-hidden="true">*</span><span class="sr-only">required</span> are required.</p>
 
-          <label for="fullName">Full name</label>
+          <label for="fullName">Full name <span aria-hidden="true">*</span><span class="sr-only">required</span></label>
           <input class="input" id="fullName" name="fullName" [(ngModel)]="form.fullName" required maxlength="200" />
 
-          <label for="gender">Gender</label>
+          <label for="gender">Gender <span aria-hidden="true">*</span><span class="sr-only">required</span></label>
           <select class="input" id="gender" name="gender" [(ngModel)]="form.gender" required>
             @for (option of genders; track option) {
               <option [value]="option">{{ option }}</option>
             }
           </select>
 
-          <label for="dateOfBirth">Date of birth</label>
+          <label for="dateOfBirth">Date of birth <span aria-hidden="true">*</span><span class="sr-only">required</span></label>
           <input
             class="input"
             id="dateOfBirth"
