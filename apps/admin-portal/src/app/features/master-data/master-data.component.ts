@@ -13,6 +13,7 @@ const LOOKUP_TABS: readonly { value: LookupCategory; label: string }[] = [
   { value: 'Gender', label: 'Gender' },
   { value: 'MaritalStatus', label: 'Marital status' },
   { value: 'Qualification', label: 'Qualification' },
+  { value: 'BusinessCategory', label: 'Business category' },
 ];
 
 const ALL_TABS: readonly { value: TabKey; label: string }[] = [
@@ -30,9 +31,13 @@ const ALL_TABS: readonly { value: TabKey; label: string }[] = [
  * of the sixteen commands behind them.
  *
  * **One type of master data at a time, chosen from a horizontal tab bar.**
- * The eight tabs - the five `LookupCategory` values, Cities, Localities and
+ * The tabs - every `LookupCategory` value, Cities, Localities and
  * Gautra - used to be four cards stacked and all visible together, with the
- * five lookup categories sharing one of those cards behind a `<select>`.
+ * lookup categories sharing one of those cards behind a `<select>`. Business
+ * category joined the rest on 2026-09-12 for the new Businesses module's
+ * directory filter and "Add a business" form - no new code beyond the tab
+ * list itself, since every lookup-category tab already shares one generic
+ * implementation.
  * Redesigned 2026-09-12 into one tab per data type: a SuperAdmin managing
  * Marital status no longer scrolls past Countries, Cities and Localities to
  * reach it, and switching data types is a tab click rather than a dropdown

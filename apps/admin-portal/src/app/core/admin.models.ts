@@ -730,13 +730,14 @@ export interface SecurityPolicy {
 
 // ---- Master data ------------------------------------------------------------
 
-/** The four flat lists behind `LookupItem`. Code and category are fixed once created. */
+/** The flat lists behind `LookupItem`. Code and category are fixed once created. */
 export type LookupCategory =
   | 'Country'
   | 'ProfessionType'
   | 'Gender'
   | 'MaritalStatus'
-  | 'Qualification';
+  | 'Qualification'
+  | 'BusinessCategory';
 
 /** Mirrors master-data-service's `LookupItemResponse`. Every write is a soft delete. */
 export interface LookupItem {
