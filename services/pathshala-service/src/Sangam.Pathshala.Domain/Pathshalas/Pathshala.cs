@@ -33,7 +33,7 @@ public sealed class Pathshala : AggregateRoot, ITenantScopedEntity
     public Guid Id { get; private set; }
     public Guid TenantId { get; private set; }
     public string Name { get; private set; } = string.Empty;
-    public string? Address { get; private set; }
+    public PathshalaAddress? Address { get; private set; }
     public string? ContactPerson { get; private set; }
     public PathshalaStatus Status { get; private set; }
     public DateTimeOffset CreatedAt { get; private set; }
@@ -47,7 +47,7 @@ public sealed class Pathshala : AggregateRoot, ITenantScopedEntity
     public static Pathshala Create(
         Guid tenantId,
         string name,
-        string? address,
+        PathshalaAddress? address,
         string? contactPerson,
         DateTimeOffset now)
     {
@@ -58,7 +58,7 @@ public sealed class Pathshala : AggregateRoot, ITenantScopedEntity
             Id = Guid.NewGuid(),
             TenantId = tenantId,
             Name = name.Trim(),
-            Address = Blank(address),
+            Address = address,
             ContactPerson = Blank(contactPerson),
             Status = PathshalaStatus.Active,
             CreatedAt = now,

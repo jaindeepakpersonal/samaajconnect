@@ -13,7 +13,7 @@ function detail(overrides: Partial<PathshalaDetail> = {}): PathshalaDetail {
   return {
     id: PATHSHALA_ID,
     name: 'Shri Mahavir Jain Pathshala',
-    address: 'Hiran Magri',
+    address: { line: 'Hiran Magri', countryId: null, stateId: null, cityId: null, localityId: null },
     contactPerson: null,
     status: 'Active',
     acceptsEnrolments: true,

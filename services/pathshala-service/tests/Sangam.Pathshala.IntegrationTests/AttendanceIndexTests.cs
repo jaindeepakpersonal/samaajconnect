@@ -153,7 +153,7 @@ public sealed class AttendanceIndexTests(PathshalaApiFactory factory)
 
         var created = await admin.PostAsJsonAsync("/v1/pathshala/pathshalas", new
         {
-            name = "Concurrency", address = (string?)null, contactPerson = (string?)null,
+            name = "Concurrency", addressLine = (string?)null, contactPerson = (string?)null,
         });
 
         var pathshalaId = (await created.Content.ReadFromJsonAsync<JsonElement>())
@@ -237,7 +237,7 @@ public sealed class AttendanceIndexTests(PathshalaApiFactory factory)
 
         var created = await admin.PostAsJsonAsync("/v1/pathshala/pathshalas", new
         {
-            name = "Conversion", address = (string?)null, contactPerson = (string?)null,
+            name = "Conversion", addressLine = (string?)null, contactPerson = (string?)null,
         });
 
         var pathshalaId = (await created.Content.ReadFromJsonAsync<JsonElement>())

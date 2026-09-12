@@ -620,6 +620,21 @@ public static class KnownEvents
             EntityName: "LookupItem",
             EntityIdProperty: "lookupItemId"),
 
+        ["master-data.state.created.v1"] = new(
+            Action: "StateCreated",
+            EntityName: "State",
+            EntityIdProperty: "stateId"),
+
+        ["master-data.state.updated.v1"] = new(
+            Action: "StateUpdated",
+            EntityName: "State",
+            EntityIdProperty: "stateId"),
+
+        ["master-data.state.deactivated.v1"] = new(
+            Action: "StateDeactivated",
+            EntityName: "State",
+            EntityIdProperty: "stateId"),
+
         ["master-data.city.created.v1"] = new(
             Action: "CityCreated",
             EntityName: "City",

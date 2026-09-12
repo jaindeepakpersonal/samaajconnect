@@ -2862,7 +2862,7 @@ refresh_tokens
 PATHSHALA=$(curl -s -X POST "$GATEWAY/v1/pathshala/pathshalas" \
   -H 'Content-Type: application/json' \
   -H "Authorization: Bearer $ADMIN_TOKEN" -H "$ADMIN_TENANT_HEADER" \
-  -d '{"name":"Shri Mahavir Jain Pathshala","address":"Hiran Magri","contactPerson":"Smt. Kavita Jain"}')
+  -d '{"name":"Shri Mahavir Jain Pathshala","addressLine":"Hiran Magri","contactPerson":"Smt. Kavita Jain"}')
 
 PATHSHALA_ID=$(printf '%s' "$PATHSHALA" | json_field id)
 
@@ -2877,12 +2877,12 @@ fi
 check "a Samaaj Admin cannot create one" 403 \
   "$(status -X POST "$GATEWAY/v1/pathshala/pathshalas" -H 'Content-Type: application/json' \
      -H "Authorization: Bearer $SAMAAJ_ADMIN_TOKEN" \
-     -d '{"name":"Ours","address":null,"contactPerson":null}')"
+     -d '{"name":"Ours","addressLine":null,"contactPerson":null}')"
 
 check "a member cannot either" 403 \
   "$(status -X POST "$GATEWAY/v1/pathshala/pathshalas" -H 'Content-Type: application/json' \
      -H "Authorization: Bearer $MEMBER_TOKEN" \
-     -d '{"name":"Mine","address":null,"contactPerson":null}')"
+     -d '{"name":"Mine","addressLine":null,"contactPerson":null}')"
 
 # A Pathshala with no current session has nowhere to put a child.
 check "it takes no enrolments before a session is open" 409 \
@@ -3919,17 +3919,37 @@ master_data_checks() {
        -H 'Content-Type: application/json' -H "Authorization: Bearer $MEMBER_TOKEN" \
        -d "{\"category\":\"Country\",\"code\":\"XX\",\"label\":\"Nowhere\",\"sortOrder\":1}")"
 
-  CITY=$(curl -s -X POST "$GATEWAY/v1/master-data/cities" \
+  STATE=$(curl -s -X POST "$GATEWAY/v1/master-data/states" \
     -H 'Content-Type: application/json' -H "Authorization: Bearer $ADMIN_TOKEN" \
-    -d "{\"countryId\":\"$COUNTRY_ID\",\"name\":\"Udaipur\"}")
+    -d "{\"countryId\":\"$COUNTRY_ID\",\"name\":\"Rajasthan\"}")
 
-  CITY_ID=$(printf '%s' "$CITY" | json_field id)
+  STATE_ID=$(printf '%s' "$STATE" | json_field id)
 
-  if [ -n "$CITY_ID" ]; then
-    echo "  ok    and a City scoped to that Country"
+  if [ -n "$STATE_ID" ]; then
+    echo "  ok    and a State scoped to that Country"
     pass=$((pass + 1))
   else
-    echo "  FAIL  creating a City"
+    echo "  FAIL  creating a State"
+    fail=$((fail + 1))
+  fi
+
+  require_id state_id "$STATE_ID"
+
+  # StateId is optional on a City - added 2026-09-12, after cities already
+  # existed without one - so this also proves a city can name the state it
+  # was just created in.
+  CITY=$(curl -s -X POST "$GATEWAY/v1/master-data/cities" \
+    -H 'Content-Type: application/json' -H "Authorization: Bearer $ADMIN_TOKEN" \
+    -d "{\"countryId\":\"$COUNTRY_ID\",\"stateId\":\"$STATE_ID\",\"name\":\"Udaipur\"}")
+
+  CITY_ID=$(printf '%s' "$CITY" | json_field id)
+  CITY_STATE_ID=$(printf '%s' "$CITY" | json_field stateId)
+
+  if [ -n "$CITY_ID" ] && [ "$CITY_STATE_ID" = "$STATE_ID" ]; then
+    echo "  ok    and a City scoped to that Country and State"
+    pass=$((pass + 1))
+  else
+    echo "  FAIL  creating a City scoped to a State"
     fail=$((fail + 1))
   fi
 

@@ -13,10 +13,33 @@ public sealed class LocationsTests
     {
         var countryId = Guid.NewGuid();
 
-        var city = City.Create(countryId, "Udaipur", Now);
+        var city = City.Create(countryId, stateId: null, "Udaipur", Now);
 
         city.CountryId.Should().Be(countryId);
+        city.StateId.Should().BeNull();
         city.IsActive.Should().BeTrue();
+    }
+
+    [Fact]
+    public void A_city_can_remember_its_state_too()
+    {
+        var countryId = Guid.NewGuid();
+        var stateId = Guid.NewGuid();
+
+        var city = City.Create(countryId, stateId, "Udaipur", Now);
+
+        city.StateId.Should().Be(stateId);
+    }
+
+    [Fact]
+    public void A_state_remembers_the_country_it_was_created_under()
+    {
+        var countryId = Guid.NewGuid();
+
+        var state = State.Create(countryId, "Rajasthan", Now);
+
+        state.CountryId.Should().Be(countryId);
+        state.IsActive.Should().BeTrue();
     }
 
     [Fact]

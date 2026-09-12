@@ -11,7 +11,7 @@ function pathshala(overrides: Partial<Pathshala> = {}): Pathshala {
   return {
     id: 'p1',
     name: 'Shri Mahavir Jain Pathshala',
-    address: 'Hiran Magri',
+    address: { line: 'Hiran Magri', countryId: null, stateId: null, cityId: null, localityId: null },
     contactPerson: null,
     status: 'Active',
     currentSessionLabel: '2026-27',
@@ -60,6 +60,9 @@ describe('PathshalaListComponent', () => {
   function load(list: Pathshala[] = []) {
     fixture.detectChanges();
     http.expectOne('/v1/pathshala/pathshalas').flush(list);
+    http
+      .expectOne('/v1/master-data/lookup-items?category=Country&includeInactive=false')
+      .flush([]);
     fixture.detectChanges();
   }
 
@@ -95,6 +98,10 @@ describe('PathshalaListComponent', () => {
     configure(['SuperAdmin'], null);
     build();
     fixture.detectChanges();
+    http
+      .expectOne('/v1/master-data/lookup-items?category=Country&includeInactive=false')
+      .flush([]);
+    fixture.detectChanges();
 
     expect(component.canCreate()).toBe(false);
     expect(text()).toContain('Choose one in the top bar');
@@ -108,7 +115,7 @@ describe('PathshalaListComponent', () => {
     load([]);
 
     component.name = '  Shri Mahavir Jain Pathshala  ';
-    component.address = '   ';
+    component.addressLine = '   ';
     component.contactPerson = 'Smt. Kavita Jain';
     component.create();
 
@@ -116,7 +123,11 @@ describe('PathshalaListComponent', () => {
 
     expect(call.request.body).toEqual({
       name: 'Shri Mahavir Jain Pathshala',
-      address: null,
+      addressLine: null,
+      countryId: null,
+      stateId: null,
+      cityId: null,
+      localityId: null,
       contactPerson: 'Smt. Kavita Jain',
     });
 
@@ -151,11 +162,82 @@ describe('PathshalaListComponent', () => {
     http.verify();
   });
 
+  it('cascades Country -> State/City -> Locality on the create form', () => {
+    configure(['SuperAdmin'], 't1');
+    build();
+    load([]);
+
+    component.onCountryChange('country-1');
+
+    http
+      .expectOne('/v1/master-data/states?includeInactive=false&countryId=country-1')
+      .flush([{ id: 'state-1', countryId: 'country-1', name: 'Rajasthan', isActive: true }]);
+    http
+      .expectOne('/v1/master-data/cities?includeInactive=false&countryId=country-1')
+      .flush([{ id: 'city-1', countryId: 'country-1', stateId: null, name: 'Udaipur', isActive: true }]);
+
+    expect(component.states().map((s) => s.name)).toEqual(['Rajasthan']);
+    expect(component.cities().map((c) => c.name)).toEqual(['Udaipur']);
+
+    component.onCityChange('city-1');
+
+    http
+      .expectOne('/v1/master-data/localities?includeInactive=false&cityId=city-1')
+      .flush([{ id: 'locality-1', cityId: 'city-1', name: 'Hiran Magri', isActive: true }]);
+
+    expect(component.localities().map((l) => l.name)).toEqual(['Hiran Magri']);
+
+    component.name = 'Shri Mahavir Jain Pathshala';
+    component.localityId = 'locality-1';
+    component.create();
+
+    const call = http.expectOne('/v1/pathshala/pathshalas');
+    expect(call.request.body).toEqual({
+      name: 'Shri Mahavir Jain Pathshala',
+      addressLine: null,
+      countryId: 'country-1',
+      stateId: null,
+      cityId: 'city-1',
+      localityId: 'locality-1',
+      contactPerson: null,
+    });
+  });
+
+  it('resets State, City and Locality when the country changes', () => {
+    configure(['SuperAdmin'], 't1');
+    build();
+    load([]);
+
+    component.onCountryChange('country-1');
+    http
+      .expectOne('/v1/master-data/states?includeInactive=false&countryId=country-1')
+      .flush([]);
+    http
+      .expectOne('/v1/master-data/cities?includeInactive=false&countryId=country-1')
+      .flush([]);
+
+    component.stateId.set('state-1');
+    component.cityId.set('city-1');
+    component.localityId = 'locality-1';
+
+    component.onCountryChange('');
+
+    expect(component.stateId()).toBe('');
+    expect(component.cityId()).toBe('');
+    expect(component.localityId).toBe('');
+    expect(component.states()).toEqual([]);
+    expect(component.cities()).toEqual([]);
+    expect(component.localities()).toEqual([]);
+  });
+
   it('reads a 404 as the module being off', () => {
     configure(['SamaajAdmin'], 't1');
     build();
     fixture.detectChanges();
     http.expectOne('/v1/pathshala/pathshalas').flush({}, { status: 404, statusText: 'Not Found' });
+    http
+      .expectOne('/v1/master-data/lookup-items?category=Country&includeInactive=false')
+      .flush([]);
     fixture.detectChanges();
 
     expect(text()).toContain('does not run the Pathshala module');

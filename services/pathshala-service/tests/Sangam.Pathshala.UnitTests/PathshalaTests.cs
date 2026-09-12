@@ -16,7 +16,11 @@ public sealed class PathshalaTests
 
     private static Domain.Pathshalas.Pathshala APathshala() =>
         Domain.Pathshalas.Pathshala.Create(
-            TenantId, "Shri Mahavir Jain Pathshala", "Hiran Magri", "Smt. Kavita Jain", Now);
+            TenantId,
+            "Shri Mahavir Jain Pathshala",
+            new PathshalaAddress("Hiran Magri", null, null, null, null),
+            "Smt. Kavita Jain",
+            Now);
 
     private static (Domain.Pathshalas.Pathshala Pathshala, PathshalaClass Class) AClass()
     {

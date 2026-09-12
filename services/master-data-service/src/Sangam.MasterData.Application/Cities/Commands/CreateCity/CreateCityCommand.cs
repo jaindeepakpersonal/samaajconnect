@@ -9,19 +9,23 @@ using Sangam.MasterData.Domain.Lookups;
 namespace Sangam.MasterData.Application.Cities.Commands.CreateCity;
 
 [RequiresPermission(PermissionKeys.MasterDataManage)]
-public sealed record CreateCityCommand(Guid CountryId, string Name) : ICommand<CityResponse>;
+public sealed record CreateCityCommand(Guid CountryId, string? StateId, string Name) : ICommand<CityResponse>;
 
 public sealed class CreateCityCommandValidator : AbstractValidator<CreateCityCommand>
 {
     public CreateCityCommandValidator()
     {
         RuleFor(x => x.CountryId).NotEmpty();
+        RuleFor(x => x.StateId).Must(BeNullOrAGuid).WithMessage("State is not valid.");
         RuleFor(x => x.Name).NotEmpty().MaximumLength(200);
     }
+
+    private static bool BeNullOrAGuid(string? value) => value is null || Guid.TryParse(value, out _);
 }
 
 public sealed class CreateCityCommandHandler(
     ICityRepository cities,
+    IStateRepository states,
     ILookupItemRepository lookupItems,
     IUnitOfWork unitOfWork,
     IDateTimeProvider clock)
@@ -37,7 +41,21 @@ public sealed class CreateCityCommandHandler(
                 Error.NotFound("City.CountryNotFound", "No such country."));
         }
 
-        var city = City.Create(command.CountryId, command.Name, clock.UtcNow);
+        // Guaranteed null-or-parseable by CreateCityCommandValidator.
+        Guid? stateId = command.StateId is null ? null : Guid.Parse(command.StateId);
+
+        if (stateId is { } id)
+        {
+            var state = await states.GetByIdAsync(id, cancellationToken);
+
+            if (state is null || state.CountryId != command.CountryId)
+            {
+                return Result.Failure<CityResponse>(
+                    Error.NotFound("City.StateNotFound", "No such state in this country."));
+            }
+        }
+
+        var city = City.Create(command.CountryId, stateId, command.Name, clock.UtcNow);
 
         cities.Add(city);
 

@@ -310,11 +310,6 @@ namespace Sangam.Pathshala.Infrastructure.Migrations
                         .HasColumnType("uuid")
                         .HasColumnName("id");
 
-                    b.Property<string>("Address")
-                        .HasMaxLength(500)
-                        .HasColumnType("character varying(500)")
-                        .HasColumnName("address");
-
                     b.Property<string>("ContactPerson")
                         .HasMaxLength(200)
                         .HasColumnType("character varying(200)")
@@ -487,6 +482,47 @@ namespace Sangam.Pathshala.Infrastructure.Migrations
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired()
                         .HasConstraintName("fk_class_schedules_classes_class_id");
+                });
+
+            modelBuilder.Entity("Sangam.Pathshala.Domain.Pathshalas.Pathshala", b =>
+                {
+                    b.OwnsOne("Sangam.Pathshala.Domain.Pathshalas.PathshalaAddress", "Address", b1 =>
+                        {
+                            b1.Property<Guid>("PathshalaId")
+                                .HasColumnType("uuid")
+                                .HasColumnName("id");
+
+                            b1.Property<Guid?>("CityId")
+                                .HasColumnType("uuid")
+                                .HasColumnName("address_city_id");
+
+                            b1.Property<Guid?>("CountryId")
+                                .HasColumnType("uuid")
+                                .HasColumnName("address_country_id");
+
+                            b1.Property<string>("Line")
+                                .HasMaxLength(500)
+                                .HasColumnType("character varying(500)")
+                                .HasColumnName("address_line");
+
+                            b1.Property<Guid?>("LocalityId")
+                                .HasColumnType("uuid")
+                                .HasColumnName("address_locality_id");
+
+                            b1.Property<Guid?>("StateId")
+                                .HasColumnType("uuid")
+                                .HasColumnName("address_state_id");
+
+                            b1.HasKey("PathshalaId");
+
+                            b1.ToTable("pathshalas");
+
+                            b1.WithOwner()
+                                .HasForeignKey("PathshalaId")
+                                .HasConstraintName("fk_pathshalas_pathshalas_id");
+                        });
+
+                    b.Navigation("Address");
                 });
 
             modelBuilder.Entity("Sangam.Pathshala.Domain.Pathshalas.PathshalaClass", b =>

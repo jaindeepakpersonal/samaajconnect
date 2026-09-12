@@ -3,9 +3,9 @@ import { FormsModule } from '@angular/forms';
 import { AuthService, describeError } from '@samaajconnect/shared';
 import { AdminApi } from '../../core/admin-api';
 import { AdminScope } from '../../core/admin-scope';
-import { City, Gautra, Locality, LookupCategory, LookupItem } from '../../core/admin.models';
+import { City, Gautra, Locality, LookupCategory, LookupItem, State } from '../../core/admin.models';
 
-type TabKey = LookupCategory | 'Cities' | 'Localities' | 'Gautra';
+type TabKey = LookupCategory | 'States' | 'Cities' | 'Localities' | 'Gautra';
 
 const LOOKUP_TABS: readonly { value: LookupCategory; label: string }[] = [
   { value: 'Country', label: 'Country' },
@@ -19,6 +19,7 @@ const LOOKUP_TABS: readonly { value: LookupCategory; label: string }[] = [
 
 const ALL_TABS: readonly { value: TabKey; label: string }[] = [
   ...LOOKUP_TABS,
+  { value: 'States', label: 'States' },
   { value: 'Cities', label: 'Cities' },
   { value: 'Localities', label: 'Localities' },
   { value: 'Gautra', label: 'Gautra' },
@@ -60,14 +61,24 @@ const ALL_TABS: readonly { value: TabKey; label: string }[] = [
  * this screen has no "module is off" state the way most others do.
  *
  * **Two permissions split the tabs in two.** `MasterData.Manage` is
- * SuperAdmin-only and covers the seven platform-wide tabs - the five lookup
- * categories, Cities and Localities. `Gautra.Manage` is a Samaaj's own list: a
+ * SuperAdmin-only and covers the platform-wide tabs - the lookup categories,
+ * States, Cities and Localities. `Gautra.Manage` is a Samaaj's own list: a
  * Samaaj Admin manages theirs, and a Super Admin manages whichever Samaaj is
  * chosen in the top bar, refused with `Gautra.NoSamaaj` otherwise - the same
  * "choose one in the top bar" shape the Pathshala create form already uses,
  * because `CreateGautraCommand` has nowhere to put a Gautra with no scope
  * selected. The Gautra tab is always shown; its content is either the
  * managed list or the "choose a Samaaj" notice.
+ *
+ * **States joined 2026-09-12, between Country and City in the hierarchy.**
+ * Unlike the lookup-category tabs, a state carries a parent (`countryId`) the
+ * flat `LookupItem` shape has no column for, so it is its own tab with its
+ * own country selector - the same shape Cities and Localities already have,
+ * copied rather than shared, because Cities' and Localities' own country
+ * selectors are independent per tab too. `City.stateId` is optional: every
+ * city that existed before this shipped is still valid with none set, and the
+ * Cities tab's own form gained a State `<select>` scoped to whichever country
+ * is currently chosen there.
  *
  * **Deactivating here has no undo.** Every write in this service is a soft
  * delete, but no service in the platform exposes a way back from it - unlike
@@ -181,6 +192,92 @@ const ALL_TABS: readonly { value: TabKey; label: string }[] = [
       </div>
     }
 
+    <!-- States -------------------------------------------------------- -->
+    @if (activeTab() === 'States') {
+      <div class="card">
+        <label for="state-country">Country</label>
+        <select
+          id="state-country"
+          class="input"
+          [ngModel]="stateCountryId()"
+          (ngModelChange)="onStateCountryChange($event)"
+        >
+          <option value="">Choose a country…</option>
+          @for (country of countries(); track country.id) {
+            <option [value]="country.id">{{ country.label }}</option>
+          }
+        </select>
+
+        @if (stateCountryId() === '') {
+          <p class="empty">Choose a country to see its states.</p>
+        } @else {
+          <div class="section-head">
+            <h2>States in {{ selectedStateCountryLabel() }}</h2>
+            <button class="btn small" type="button" (click)="openAddState($event)">Add state</button>
+          </div>
+
+          @if (statesLoading()) {
+            <p class="empty" role="status">Loading…</p>
+          } @else if (states().length === 0) {
+            <p class="empty">No states yet for this country.</p>
+          } @else {
+            <div class="table-wrap">
+              <table>
+                <caption class="sr-only">States in {{ selectedStateCountryLabel() }}</caption>
+                <thead>
+                  <tr><th>Name</th><th>Status</th><th></th></tr>
+                </thead>
+                <tbody>
+                  @for (state of states(); track state.id) {
+                    <tr>
+                      <td>{{ state.name }}</td>
+                      <td>
+                        <span class="pill" [class.off]="!state.isActive">
+                          {{ state.isActive ? 'Active' : 'Deactivated' }}
+                        </span>
+                      </td>
+                      <td>
+                        @if (state.isActive) {
+                          <div class="actions">
+                            <button class="btn alt small" type="button" (click)="openEditState(state, $event)">
+                              Edit
+                            </button>
+                            <button class="btn alt small" type="button"
+                              [attr.aria-expanded]="confirmingStateId() === state.id"
+                              (click)="askDeactivateState(state.id)">
+                              Deactivate
+                            </button>
+                          </div>
+                        }
+
+                        @if (confirmingStateId() === state.id) {
+                          <div class="confirm">
+                            <p class="small" role="status">
+                              {{ state.name }} stops appearing as a choice. There is no undo.
+                            </p>
+                            <div class="actions">
+                              <button class="btn small" type="button" [disabled]="busy()"
+                                (click)="confirmDeactivateState(state)">
+                                Deactivate
+                              </button>
+                              <button class="btn alt small" type="button"
+                                (click)="confirmingStateId.set(null)">
+                                Cancel
+                              </button>
+                            </div>
+                          </div>
+                        }
+                      </td>
+                    </tr>
+                  }
+                </tbody>
+              </table>
+            </div>
+          }
+        }
+      </div>
+    }
+
     <!-- Cities -------------------------------------------------------- -->
     @if (activeTab() === 'Cities') {
       <div class="card">
@@ -214,12 +311,13 @@ const ALL_TABS: readonly { value: TabKey; label: string }[] = [
               <table>
                 <caption class="sr-only">Cities in {{ selectedCountryLabel() }}</caption>
                 <thead>
-                  <tr><th>Name</th><th>Status</th><th></th></tr>
+                  <tr><th>Name</th><th>State</th><th>Status</th><th></th></tr>
                 </thead>
                 <tbody>
                   @for (city of cities(); track city.id) {
                     <tr>
                       <td>{{ city.name }}</td>
+                      <td>{{ stateNameFor(city.stateId) }}</td>
                       <td>
                         <span class="pill" [class.off]="!city.isActive">
                           {{ city.isActive ? 'Active' : 'Deactivated' }}
@@ -494,11 +592,32 @@ const ALL_TABS: readonly { value: TabKey; label: string }[] = [
                 <button class="btn alt" type="button" (click)="closeModal()">Cancel</button>
               </div>
             </form>
+          } @else if (activeTab() === 'States') {
+            <form (ngSubmit)="submitStateModal()">
+              <label for="modal-state-name">Name</label>
+              <input id="modal-state-name" class="input" name="stateName" [(ngModel)]="stateFormName"
+                maxlength="200" placeholder="Rajasthan" #firstField />
+
+              <div class="actions">
+                <button class="btn" type="submit" [disabled]="busy() || !stateFormName.trim()">
+                  {{ modalMode() === 'add' ? 'Add' : 'Save' }}
+                </button>
+                <button class="btn alt" type="button" (click)="closeModal()">Cancel</button>
+              </div>
+            </form>
           } @else if (activeTab() === 'Cities') {
             <form (ngSubmit)="submitCityModal()">
               <label for="modal-city-name">Name</label>
               <input id="modal-city-name" class="input" name="cityName" [(ngModel)]="cityFormName"
                 maxlength="200" placeholder="Udaipur" #firstField />
+
+              <label for="modal-city-state">State (optional)</label>
+              <select id="modal-city-state" class="input" name="cityState" [(ngModel)]="cityFormStateId">
+                <option value="">Not specified</option>
+                @for (state of statesForCity(); track state.id) {
+                  <option [value]="state.id">{{ state.name }}</option>
+                }
+              </select>
 
               <div class="actions">
                 <button class="btn" type="submit" [disabled]="busy() || !cityFormName.trim()">
@@ -649,6 +768,8 @@ export class MasterDataComponent implements OnInit {
 
   readonly modalMode = computed<'add' | 'edit'>(() => {
     switch (this.activeTab()) {
+      case 'States':
+        return this.editingStateId() === null ? 'add' : 'edit';
       case 'Cities':
         return this.editingCityId() === null ? 'add' : 'edit';
       case 'Localities':
@@ -664,6 +785,8 @@ export class MasterDataComponent implements OnInit {
     const verb = this.modalMode() === 'add' ? 'Add' : 'Edit';
 
     switch (this.activeTab()) {
+      case 'States':
+        return `${verb} state`;
       case 'Cities':
         return `${verb} city`;
       case 'Localities':
@@ -686,12 +809,29 @@ export class MasterDataComponent implements OnInit {
   lookupFormLabel = '';
   lookupFormSortOrder = 0;
 
+  // ---- States -----------------------------------------------------------
+
+  readonly stateCountryId = signal('');
+  readonly states = signal<readonly State[]>([]);
+  readonly statesLoading = signal(false);
+
+  readonly selectedStateCountryLabel = computed(
+    () => this.countries().find((c) => c.id === this.stateCountryId())?.label ?? '',
+  );
+
+  readonly editingStateId = signal<string | null>(null);
+  readonly confirmingStateId = signal<string | null>(null);
+  stateFormName = '';
+
   // ---- Cities ---------------------------------------------------------------
 
   readonly countries = signal<readonly LookupItem[]>([]);
   readonly selectedCountryId = signal('');
   readonly cities = signal<readonly City[]>([]);
   readonly citiesLoading = signal(false);
+
+  /** The Cities tab's own form: states in whichever country is chosen there. */
+  readonly statesForCity = signal<readonly State[]>([]);
 
   readonly selectedCountryLabel = computed(
     () => this.countries().find((c) => c.id === this.selectedCountryId())?.label ?? '',
@@ -700,6 +840,7 @@ export class MasterDataComponent implements OnInit {
   readonly editingCityId = signal<string | null>(null);
   readonly confirmingCityId = signal<string | null>(null);
   cityFormName = '';
+  cityFormStateId = '';
 
   // ---- Localities -----------------------------------------------------------
 
@@ -755,6 +896,7 @@ export class MasterDataComponent implements OnInit {
     this.activeTab.set(tab);
     this.closeModal();
     this.confirmingLookupId.set(null);
+    this.confirmingStateId.set(null);
     this.confirmingCityId.set(null);
     this.confirmingLocalityId.set(null);
     this.confirmingGautraId.set(null);
@@ -846,6 +988,90 @@ export class MasterDataComponent implements OnInit {
     });
   }
 
+  // ---- States -------------------------------------------------------------
+
+  onStateCountryChange(countryId: string): void {
+    this.stateCountryId.set(countryId);
+    this.confirmingStateId.set(null);
+
+    if (countryId === '') {
+      this.states.set([]);
+
+      return;
+    }
+
+    this.loadStates(countryId);
+  }
+
+  private loadStates(countryId: string): void {
+    this.statesLoading.set(true);
+
+    this.api.listStates(countryId, true).subscribe({
+      next: (found) => {
+        this.states.set(found);
+        this.statesLoading.set(false);
+      },
+      error: (failure: unknown) => {
+        this.error.set(describeError(failure));
+        this.statesLoading.set(false);
+      },
+    });
+  }
+
+  openAddState(event: MouseEvent): void {
+    if (this.stateCountryId() === '') {
+      return;
+    }
+
+    this.editingStateId.set(null);
+    this.stateFormName = '';
+    this.confirmingStateId.set(null);
+    this.openModal(event);
+  }
+
+  openEditState(state: State, event: MouseEvent): void {
+    this.editingStateId.set(state.id);
+    this.stateFormName = state.name;
+    this.confirmingStateId.set(null);
+    this.openModal(event);
+  }
+
+  submitStateModal(): void {
+    const name = this.stateFormName.trim();
+    const countryId = this.stateCountryId();
+
+    if (name.length === 0 || countryId === '') {
+      return;
+    }
+
+    const editingId = this.editingStateId();
+
+    if (editingId === null) {
+      this.act(this.api.createState(countryId, name), `${name} added.`, () => {
+        this.closeModal();
+        this.loadStates(countryId);
+      });
+
+      return;
+    }
+
+    this.act(this.api.updateState(editingId, name), `${name} updated.`, () => {
+      this.closeModal();
+      this.loadStates(countryId);
+    });
+  }
+
+  askDeactivateState(id: string): void {
+    this.confirmingStateId.set(this.confirmingStateId() === id ? null : id);
+  }
+
+  confirmDeactivateState(state: State): void {
+    this.act(this.api.deactivateState(state.id), `${state.name} deactivated.`, () => {
+      this.confirmingStateId.set(null);
+      this.loadStates(this.stateCountryId());
+    });
+  }
+
   // ---- Cities ---------------------------------------------------------------
 
   private loadCountries(): void {
@@ -855,23 +1081,37 @@ export class MasterDataComponent implements OnInit {
     });
   }
 
+  /** The State column on the Cities table, and the reader of `statesForCity`. */
+  stateNameFor(stateId: string | null): string {
+    if (stateId === null) {
+      return '—';
+    }
+
+    return this.statesForCity().find((s) => s.id === stateId)?.name ?? '—';
+  }
+
   onCountryChange(countryId: string): void {
     this.selectedCountryId.set(countryId);
     this.confirmingCityId.set(null);
 
     if (countryId === '') {
       this.cities.set([]);
+      this.statesForCity.set([]);
 
       return;
     }
 
     this.loadCities(countryId);
+    this.api.listStates(countryId, false).subscribe({
+      next: (found) => this.statesForCity.set(found),
+      error: () => this.statesForCity.set([]),
+    });
   }
 
   private loadCities(countryId: string): void {
     this.citiesLoading.set(true);
 
-    this.api.listCities(countryId, true).subscribe({
+    this.api.listCities(countryId, null, true).subscribe({
       next: (found) => {
         this.cities.set(found);
         this.citiesLoading.set(false);
@@ -890,6 +1130,7 @@ export class MasterDataComponent implements OnInit {
 
     this.editingCityId.set(null);
     this.cityFormName = '';
+    this.cityFormStateId = '';
     this.confirmingCityId.set(null);
     this.openModal(event);
   }
@@ -897,6 +1138,7 @@ export class MasterDataComponent implements OnInit {
   openEditCity(city: City, event: MouseEvent): void {
     this.editingCityId.set(city.id);
     this.cityFormName = city.name;
+    this.cityFormStateId = city.stateId ?? '';
     this.confirmingCityId.set(null);
     this.openModal(event);
   }
@@ -904,6 +1146,7 @@ export class MasterDataComponent implements OnInit {
   submitCityModal(): void {
     const name = this.cityFormName.trim();
     const countryId = this.selectedCountryId();
+    const stateId = this.cityFormStateId || null;
 
     if (name.length === 0 || countryId === '') {
       return;
@@ -912,7 +1155,7 @@ export class MasterDataComponent implements OnInit {
     const editingId = this.editingCityId();
 
     if (editingId === null) {
-      this.act(this.api.createCity(countryId, name), `${name} added.`, () => {
+      this.act(this.api.createCity(countryId, stateId, name), `${name} added.`, () => {
         this.closeModal();
         this.loadCities(countryId);
       });
@@ -920,7 +1163,7 @@ export class MasterDataComponent implements OnInit {
       return;
     }
 
-    this.act(this.api.updateCity(editingId, name), `${name} updated.`, () => {
+    this.act(this.api.updateCity(editingId, stateId, name), `${name} updated.`, () => {
       this.closeModal();
       this.loadCities(countryId);
     });
@@ -951,7 +1194,7 @@ export class MasterDataComponent implements OnInit {
       return;
     }
 
-    this.api.listCities(countryId, false).subscribe({
+    this.api.listCities(countryId, null, false).subscribe({
       next: (found) => this.citiesForLocality.set(found),
       error: () => this.citiesForLocality.set([]),
     });

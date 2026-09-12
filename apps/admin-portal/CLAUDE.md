@@ -421,6 +421,16 @@ record belongs to the platform operator and everything about *running* it
 belongs to the Samaaj. A create form on a Samaaj administrator's screen would be
 a control that always answers 403.
 
+**The create form's address became a Country -> State -> City -> Locality
+cascade on 2026-09-12, replacing one free-text field.** Each select is
+populated only once its parent is chosen, the same discipline the Master
+Data screen's own Cities/Localities tabs already apply, and every level is
+optional: a Pathshala can be created with only a free-text address line and
+nothing picked. The Pathshala list card shows only that free-text line, not
+a resolved City or Locality name — resolving one would mean a lookup per
+Pathshala on a screen that lists every one of them, the cost this app avoids
+everywhere else it has a choice between an id and a cheap name.
+
 **The placement queue makes two calls, and the second one is the point.**
 pathshala-service stores a child by id and nothing else, so the queue is a list
 of GUIDs. `GET /v1/children/names` resolves exactly the ids on screen - names

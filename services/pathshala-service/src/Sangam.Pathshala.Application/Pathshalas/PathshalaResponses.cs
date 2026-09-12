@@ -11,7 +11,7 @@ namespace Sangam.Pathshala.Application.Pathshalas;
 public sealed record PathshalaResponse(
     Guid Id,
     string Name,
-    string? Address,
+    PathshalaAddressResponse? Address,
     string? ContactPerson,
     string Status,
     string? CurrentSessionLabel,
@@ -23,12 +23,20 @@ public sealed record PathshalaResponse(
 public sealed record PathshalaDetailResponse(
     Guid Id,
     string Name,
-    string? Address,
+    PathshalaAddressResponse? Address,
     string? ContactPerson,
     string Status,
     bool AcceptsEnrolments,
     IReadOnlyList<SessionResponse> Sessions,
     IReadOnlyList<ClassResponse> Classes);
+
+/// <summary>
+/// Ids, not names - Country/State/City/Locality names live in
+/// master-data-service, and resolving them here would be a call per Pathshala
+/// for a list. The portal is already authenticated to both.
+/// </summary>
+public sealed record PathshalaAddressResponse(
+    string? Line, Guid? CountryId, Guid? StateId, Guid? CityId, Guid? LocalityId);
 
 public sealed record SessionResponse(
     Guid Id, string Label, DateOnly StartDate, DateOnly EndDate, bool IsCurrent);

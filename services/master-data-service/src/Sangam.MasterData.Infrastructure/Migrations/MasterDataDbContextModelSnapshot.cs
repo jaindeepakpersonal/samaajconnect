@@ -72,8 +72,15 @@ namespace Sangam.MasterData.Infrastructure.Migrations
                         .HasColumnType("character varying(200)")
                         .HasColumnName("name");
 
+                    b.Property<Guid?>("StateId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("state_id");
+
                     b.HasKey("Id")
                         .HasName("pk_cities");
+
+                    b.HasIndex("StateId")
+                        .HasDatabaseName("ix_cities_state_id");
 
                     b.HasIndex("CountryId", "Name")
                         .HasDatabaseName("ix_cities_country_id_name");
@@ -108,6 +115,35 @@ namespace Sangam.MasterData.Infrastructure.Migrations
                         .HasDatabaseName("ix_localities_city_id_name");
 
                     b.ToTable("localities", (string)null);
+                });
+
+            modelBuilder.Entity("Sangam.MasterData.Domain.Locations.State", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<Guid>("CountryId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("country_id");
+
+                    b.Property<bool>("IsActive")
+                        .HasColumnType("boolean")
+                        .HasColumnName("is_active");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)")
+                        .HasColumnName("name");
+
+                    b.HasKey("Id")
+                        .HasName("pk_states");
+
+                    b.HasIndex("CountryId", "Name")
+                        .HasDatabaseName("ix_states_country_id_name");
+
+                    b.ToTable("states", (string)null);
                 });
 
             modelBuilder.Entity("Sangam.MasterData.Domain.Lookups.LookupItem", b =>

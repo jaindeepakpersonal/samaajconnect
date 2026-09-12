@@ -273,7 +273,7 @@ export interface PathshalaClass {
 export interface Pathshala {
   readonly id: string;
   readonly name: string;
-  readonly address: string | null;
+  readonly address: PathshalaAddress | null;
   readonly contactPerson: string | null;
   readonly status: string;
   readonly currentSessionLabel: string | null;
@@ -283,11 +283,25 @@ export interface Pathshala {
   readonly acceptsEnrolments: boolean;
 }
 
+/**
+ * Mirrors `PathshalaAddressResponse`. Ids, not names - Country/State/City/
+ * Locality names live in master-data-service, and this screen already holds
+ * the lists it needs to resolve them (the same lists the Master Data screen's
+ * own Cities/Localities tabs use).
+ */
+export interface PathshalaAddress {
+  readonly line: string | null;
+  readonly countryId: string | null;
+  readonly stateId: string | null;
+  readonly cityId: string | null;
+  readonly localityId: string | null;
+}
+
 /** Mirrors `PathshalaDetailResponse`. */
 export interface PathshalaDetail {
   readonly id: string;
   readonly name: string;
-  readonly address: string | null;
+  readonly address: PathshalaAddress | null;
   readonly contactPerson: string | null;
   readonly status: string;
   readonly acceptsEnrolments: boolean;
@@ -755,6 +769,17 @@ export interface LookupItem {
 
 /** Mirrors `CityResponse`. Scoped to a country - `countryId` names a `LookupItem` of category `Country`. */
 export interface City {
+  readonly id: string;
+  readonly countryId: string;
+
+  /** Null means no state named - added 2026-09-12, after cities already existed. */
+  readonly stateId: string | null;
+  readonly name: string;
+  readonly isActive: boolean;
+}
+
+/** Mirrors `StateResponse`. Scoped to a country, same shape as `City`. */
+export interface State {
   readonly id: string;
   readonly countryId: string;
   readonly name: string;

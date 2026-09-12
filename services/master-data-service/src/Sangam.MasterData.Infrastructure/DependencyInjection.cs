@@ -30,6 +30,7 @@ public static class DependencyInjection
 
         services.AddScoped<IUnitOfWork, UnitOfWork>();
         services.AddScoped<ILookupItemRepository, LookupItemRepository>();
+        services.AddScoped<IStateRepository, StateRepository>();
         services.AddScoped<ICityRepository, CityRepository>();
         services.AddScoped<ILocalityRepository, LocalityRepository>();
         services.AddScoped<IGautraRepository, GautraRepository>();

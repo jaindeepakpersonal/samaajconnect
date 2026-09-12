@@ -5,7 +5,7 @@ import { provideRouter } from '@angular/router';
 import { API_CONFIG, AuthService } from '@samaajconnect/shared';
 import { MasterDataComponent } from './master-data.component';
 import { AdminScope } from '../../core/admin-scope';
-import { City, Gautra, LookupItem } from '../../core/admin.models';
+import { City, Gautra, LookupItem, State } from '../../core/admin.models';
 
 function country(overrides: Partial<LookupItem> = {}): LookupItem {
   return {
@@ -20,7 +20,24 @@ function country(overrides: Partial<LookupItem> = {}): LookupItem {
 }
 
 function city(overrides: Partial<City> = {}): City {
-  return { id: 'city-1', countryId: 'country-1', name: 'Udaipur', isActive: true, ...overrides };
+  return {
+    id: 'city-1',
+    countryId: 'country-1',
+    stateId: null,
+    name: 'Udaipur',
+    isActive: true,
+    ...overrides,
+  };
+}
+
+function state(overrides: Partial<State> = {}): State {
+  return {
+    id: 'state-1',
+    countryId: 'country-1',
+    name: 'Rajasthan',
+    isActive: true,
+    ...overrides,
+  };
 }
 
 function gautra(overrides: Partial<Gautra> = {}): Gautra {
@@ -122,7 +139,7 @@ describe('MasterDataComponent', () => {
     expect(text()).toContain('Gautra — Mahavir Samaaj');
   });
 
-  it('shows all ten tabs to a Super Admin, one type of data at a time', () => {
+  it('shows all eleven tabs to a Super Admin, one type of data at a time', () => {
     configure(['SuperAdmin'], 't1');
     build();
     loadAsSuperAdmin(true);
@@ -137,6 +154,7 @@ describe('MasterDataComponent', () => {
       'Qualification',
       'Business category',
       'Event type',
+      'States',
       'Cities',
       'Localities',
       'Gautra',
@@ -234,6 +252,9 @@ describe('MasterDataComponent', () => {
     http
       .expectOne('/v1/master-data/cities?includeInactive=true&countryId=country-1')
       .flush([city()]);
+    http
+      .expectOne('/v1/master-data/states?includeInactive=false&countryId=country-1')
+      .flush([]);
     fixture.detectChanges();
 
     expect(text()).toContain('Udaipur');
@@ -249,6 +270,9 @@ describe('MasterDataComponent', () => {
     http
       .expectOne('/v1/master-data/cities?includeInactive=true&countryId=country-1')
       .flush([city()]);
+    http
+      .expectOne('/v1/master-data/states?includeInactive=false&countryId=country-1')
+      .flush([]);
     fixture.detectChanges();
 
     component.askDeactivateCity('city-1');
@@ -269,5 +293,87 @@ describe('MasterDataComponent', () => {
 
     expect(text()).toContain('Udaipur deactivated.');
     expect(text()).not.toContain('Bring back');
+  });
+
+  it("loads a country's states once one is chosen, on the States tab", () => {
+    configure(['SuperAdmin'], 't1');
+    build();
+    loadAsSuperAdmin(true);
+
+    component.selectTab('States');
+    component.onStateCountryChange('country-1');
+
+    http
+      .expectOne('/v1/master-data/states?includeInactive=true&countryId=country-1')
+      .flush([state()]);
+    fixture.detectChanges();
+
+    expect(text()).toContain('Rajasthan');
+  });
+
+  it('adds a state to the chosen country through the modal', () => {
+    configure(['SuperAdmin'], 't1');
+    build();
+    loadAsSuperAdmin(true);
+
+    component.selectTab('States');
+    component.onStateCountryChange('country-1');
+    http
+      .expectOne('/v1/master-data/states?includeInactive=true&countryId=country-1')
+      .flush([]);
+    fixture.detectChanges();
+
+    component.openAddState({} as MouseEvent);
+    component.stateFormName = 'Rajasthan';
+    component.submitStateModal();
+
+    const call = http.expectOne('/v1/master-data/states');
+    expect(call.request.body).toEqual({ countryId: 'country-1', name: 'Rajasthan' });
+    call.flush(state());
+
+    http
+      .expectOne('/v1/master-data/states?includeInactive=true&countryId=country-1')
+      .flush([state()]);
+    fixture.detectChanges();
+
+    expect(text()).toContain('Rajasthan added.');
+  });
+
+  it("offers the chosen country's states on the city form, and sends the one picked", () => {
+    configure(['SuperAdmin'], 't1');
+    build();
+    loadAsSuperAdmin(true);
+
+    component.selectTab('Cities');
+    component.onCountryChange('country-1');
+    http
+      .expectOne('/v1/master-data/cities?includeInactive=true&countryId=country-1')
+      .flush([]);
+    http
+      .expectOne('/v1/master-data/states?includeInactive=false&countryId=country-1')
+      .flush([state()]);
+    fixture.detectChanges();
+
+    expect(component.statesForCity()).toEqual([state()]);
+
+    component.openAddCity({} as MouseEvent);
+    component.cityFormName = 'Udaipur';
+    component.cityFormStateId = 'state-1';
+    component.submitCityModal();
+
+    const call = http.expectOne('/v1/master-data/cities');
+    expect(call.request.body).toEqual({
+      countryId: 'country-1',
+      stateId: 'state-1',
+      name: 'Udaipur',
+    });
+    call.flush(city({ stateId: 'state-1' }));
+
+    http
+      .expectOne('/v1/master-data/cities?includeInactive=true&countryId=country-1')
+      .flush([city({ stateId: 'state-1' })]);
+    fixture.detectChanges();
+
+    expect(text()).toContain('Rajasthan');
   });
 });

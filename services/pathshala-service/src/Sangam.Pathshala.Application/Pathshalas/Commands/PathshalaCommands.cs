@@ -3,6 +3,7 @@ using MediatR;
 using Sangam.Pathshala.Application.Abstractions;
 using Sangam.Pathshala.Application.Common;
 using Sangam.Pathshala.Application.Security;
+using Sangam.Pathshala.Domain.Pathshalas;
 
 namespace Sangam.Pathshala.Application.Pathshalas.Commands;
 
@@ -24,16 +25,32 @@ namespace Sangam.Pathshala.Application.Pathshalas.Commands;
 [RequiresRoles(Roles.SuperAdmin)]
 [RequiresPermission(PermissionKeys.PathshalaManage)]
 public sealed record CreatePathshalaCommand(
-    string Name, string? Address, string? ContactPerson) : ICommand<PathshalaResponse>;
+    string Name,
+    string? AddressLine,
+    // Strings, not Guid? - a Guid-typed wire field crashes ASP.NET Core's own
+    // JSON model binding with an unhandled 400 the moment it cannot be parsed,
+    // the same trap OptIntoMatrimonyCommand already avoids for every
+    // master-data id it accepts. Validated and parsed below.
+    string? CountryId,
+    string? StateId,
+    string? CityId,
+    string? LocalityId,
+    string? ContactPerson) : ICommand<PathshalaResponse>;
 
 public sealed class CreatePathshalaCommandValidator : AbstractValidator<CreatePathshalaCommand>
 {
     public CreatePathshalaCommandValidator()
     {
         RuleFor(x => x.Name).NotEmpty().MaximumLength(200);
-        RuleFor(x => x.Address).MaximumLength(500);
+        RuleFor(x => x.AddressLine).MaximumLength(500);
+        RuleFor(x => x.CountryId).Must(BeNullOrAGuid).WithMessage("Country is not valid.");
+        RuleFor(x => x.StateId).Must(BeNullOrAGuid).WithMessage("State is not valid.");
+        RuleFor(x => x.CityId).Must(BeNullOrAGuid).WithMessage("City is not valid.");
+        RuleFor(x => x.LocalityId).Must(BeNullOrAGuid).WithMessage("Locality is not valid.");
         RuleFor(x => x.ContactPerson).MaximumLength(200);
     }
+
+    private static bool BeNullOrAGuid(string? value) => value is null || Guid.TryParse(value, out _);
 }
 
 public sealed class CreatePathshalaCommandHandler(
@@ -54,8 +71,10 @@ public sealed class CreatePathshalaCommandHandler(
                 "Pathshala.NoSamaaj", "Select a Samaaj before creating a Pathshala in it."));
         }
 
+        var address = ToAddress(command);
+
         var pathshala = Domain.Pathshalas.Pathshala.Create(
-            tenantId, command.Name, command.Address, command.ContactPerson, clock.UtcNow);
+            tenantId, command.Name, address, command.ContactPerson, clock.UtcNow);
 
         pathshalas.Add(pathshala);
 
@@ -63,6 +82,30 @@ public sealed class CreatePathshalaCommandHandler(
 
         return Result.Success(pathshala.ToResponse());
     }
+
+    // Guaranteed null-or-parseable by CreatePathshalaCommandValidator. Null
+    // when nothing at all was given, rather than an address with every field
+    // empty - the same "nothing filled in is nothing, not an empty struct"
+    // reasoning PathshalaAddress's own doc comment gives.
+    private static PathshalaAddress? ToAddress(CreatePathshalaCommand command)
+    {
+        var line = string.IsNullOrWhiteSpace(command.AddressLine) ? null : command.AddressLine.Trim();
+
+        if (line is null && command.CountryId is null && command.StateId is null
+            && command.CityId is null && command.LocalityId is null)
+        {
+            return null;
+        }
+
+        return new PathshalaAddress(
+            line,
+            ParseGuid(command.CountryId),
+            ParseGuid(command.StateId),
+            ParseGuid(command.CityId),
+            ParseGuid(command.LocalityId));
+    }
+
+    private static Guid? ParseGuid(string? value) => value is null ? null : Guid.Parse(value);
 }
 
 // ---- Academic sessions -------------------------------------------------------

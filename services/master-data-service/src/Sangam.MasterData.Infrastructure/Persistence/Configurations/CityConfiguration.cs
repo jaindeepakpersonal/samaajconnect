@@ -17,7 +17,11 @@ public sealed class CityConfiguration : IEntityTypeConfiguration<City>
         // No FK constraint to lookup_items: CountryId is a plain reference to
         // another aggregate in this same DbContext, kept loose on purpose so a
         // country can be deactivated without a cascading delete rule to design.
+        // StateId is the same shape, and nullable for the same reason
+        // City.cs's own doc comment gives: a city named before State existed
+        // is not wrong for having none.
         builder.HasIndex(c => new { c.CountryId, c.Name });
+        builder.HasIndex(c => c.StateId);
 
         builder.Ignore(c => c.DomainEvents);
     }

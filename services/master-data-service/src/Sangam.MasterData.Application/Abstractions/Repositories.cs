@@ -17,12 +17,22 @@ public interface ILookupItemRepository
     void Add(LookupItem item);
 }
 
+public interface IStateRepository
+{
+    Task<State?> GetByIdAsync(Guid id, CancellationToken cancellationToken = default);
+
+    Task<IReadOnlyList<State>> ListAsync(
+        Guid? countryId, bool includeInactive, CancellationToken cancellationToken = default);
+
+    void Add(State state);
+}
+
 public interface ICityRepository
 {
     Task<City?> GetByIdAsync(Guid id, CancellationToken cancellationToken = default);
 
     Task<IReadOnlyList<City>> ListAsync(
-        Guid? countryId, bool includeInactive, CancellationToken cancellationToken = default);
+        Guid? countryId, Guid? stateId, bool includeInactive, CancellationToken cancellationToken = default);
 
     void Add(City city);
 }

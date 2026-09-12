@@ -6,11 +6,17 @@ namespace Sangam.Pathshala.Application.Pathshalas;
 /// <summary>Domain to wire. No decisions here beyond shape.</summary>
 public static class PathshalaMappings
 {
+    public static PathshalaAddressResponse? ToResponse(this PathshalaAddress? address) =>
+        address is null
+            ? null
+            : new PathshalaAddressResponse(
+                address.Line, address.CountryId, address.StateId, address.CityId, address.LocalityId);
+
     public static PathshalaResponse ToResponse(
         this Domain.Pathshalas.Pathshala pathshala, int studentCount = 0) =>
         new(pathshala.Id,
             pathshala.Name,
-            pathshala.Address,
+            pathshala.Address.ToResponse(),
             pathshala.ContactPerson,
             pathshala.Status.ToString(),
             pathshala.CurrentSession?.Label,
@@ -27,7 +33,7 @@ public static class PathshalaMappings
         IReadOnlyDictionary<Guid, int> studentsByClass) =>
         new(pathshala.Id,
             pathshala.Name,
-            pathshala.Address,
+            pathshala.Address.ToResponse(),
             pathshala.ContactPerson,
             pathshala.Status.ToString(),
             pathshala.AcceptsEnrolments,

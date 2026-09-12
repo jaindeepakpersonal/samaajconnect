@@ -48,7 +48,13 @@ public static class PathshalaEndpoints
                 CreatePathshalaRequest request, ISender sender, CancellationToken cancellationToken) =>
             {
                 var command = new CreatePathshalaCommand(
-                    request.Name, request.Address, request.ContactPerson);
+                    request.Name,
+                    request.AddressLine,
+                    request.CountryId,
+                    request.StateId,
+                    request.CityId,
+                    request.LocalityId,
+                    request.ContactPerson);
 
                 var result = await sender.Send(command, cancellationToken);
 
@@ -447,7 +453,14 @@ public static class PathshalaEndpoints
 
     // ---- Wire shapes ------------------------------------------------------
 
-    public sealed record CreatePathshalaRequest(string Name, string? Address, string? ContactPerson);
+    public sealed record CreatePathshalaRequest(
+        string Name,
+        string? AddressLine,
+        string? CountryId,
+        string? StateId,
+        string? CityId,
+        string? LocalityId,
+        string? ContactPerson);
 
     public sealed record OpenSessionRequest(string Label, DateOnly StartDate, DateOnly EndDate);
 

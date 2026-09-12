@@ -52,6 +52,7 @@ import {
   SamaajEvent,
   SecurityPolicy,
   SocialIssue,
+  State,
   Tenant,
   TenantStatus,
   UserStatusResult,
@@ -353,12 +354,18 @@ export class AdminApi {
    */
   createPathshala(
     name: string,
-    address: string | null,
+    address: {
+      addressLine: string | null;
+      countryId: string | null;
+      stateId: string | null;
+      cityId: string | null;
+      localityId: string | null;
+    },
     contactPerson: string | null,
   ): Observable<Pathshala> {
     return this.http.post<Pathshala>('/v1/pathshala/pathshalas', {
       name,
-      address,
+      ...address,
       contactPerson,
     });
   }
@@ -917,22 +924,52 @@ export class AdminApi {
     return this.http.post<LookupItem>(`/v1/master-data/lookup-items/${id}/deactivate`, {});
   }
 
-  listCities(countryId?: string | null, includeInactive = false): Observable<City[]> {
+  listStates(countryId?: string | null, includeInactive = false): Observable<State[]> {
     let params = new HttpParams().set('includeInactive', includeInactive);
 
     if (countryId) {
       params = params.set('countryId', countryId);
     }
 
+    return this.http.get<State[]>('/v1/master-data/states', { params });
+  }
+
+  createState(countryId: string, name: string): Observable<State> {
+    return this.http.post<State>('/v1/master-data/states', { countryId, name });
+  }
+
+  updateState(id: string, name: string): Observable<State> {
+    return this.http.put<State>(`/v1/master-data/states/${id}`, { name });
+  }
+
+  deactivateState(id: string): Observable<State> {
+    return this.http.post<State>(`/v1/master-data/states/${id}/deactivate`, {});
+  }
+
+  listCities(
+    countryId?: string | null,
+    stateId?: string | null,
+    includeInactive = false,
+  ): Observable<City[]> {
+    let params = new HttpParams().set('includeInactive', includeInactive);
+
+    if (countryId) {
+      params = params.set('countryId', countryId);
+    }
+
+    if (stateId) {
+      params = params.set('stateId', stateId);
+    }
+
     return this.http.get<City[]>('/v1/master-data/cities', { params });
   }
 
-  createCity(countryId: string, name: string): Observable<City> {
-    return this.http.post<City>('/v1/master-data/cities', { countryId, name });
+  createCity(countryId: string, stateId: string | null, name: string): Observable<City> {
+    return this.http.post<City>('/v1/master-data/cities', { countryId, stateId, name });
   }
 
-  updateCity(id: string, name: string): Observable<City> {
-    return this.http.put<City>(`/v1/master-data/cities/${id}`, { name });
+  updateCity(id: string, stateId: string | null, name: string): Observable<City> {
+    return this.http.put<City>(`/v1/master-data/cities/${id}`, { stateId, name });
   }
 
   deactivateCity(id: string): Observable<City> {

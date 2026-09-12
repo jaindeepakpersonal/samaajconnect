@@ -64,7 +64,7 @@ public sealed class PathshalaFlowTests(PathshalaApiFactory factory)
         var created = await Platform().PostAsJsonAsync("/v1/pathshala/pathshalas", new
         {
             name = "Shri Mahavir Jain Pathshala",
-            address = "Hiran Magri",
+            addressLine = "Hiran Magri",
             contactPerson = "Smt. Kavita Jain",
         });
 
@@ -129,7 +129,7 @@ public sealed class PathshalaFlowTests(PathshalaApiFactory factory)
         // the SuperAdmin role as well as the permission.
         var response = await Admin().PostAsJsonAsync("/v1/pathshala/pathshalas", new
         {
-            name = "Ours", address = (string?)null, contactPerson = (string?)null,
+            name = "Ours", addressLine = (string?)null, contactPerson = (string?)null,
         });
 
         response.StatusCode.Should().Be(HttpStatusCode.Forbidden);
@@ -219,7 +219,7 @@ public sealed class PathshalaFlowTests(PathshalaApiFactory factory)
     {
         var created = await Platform().PostAsJsonAsync("/v1/pathshala/pathshalas", new
         {
-            name = "Not open yet", address = (string?)null, contactPerson = (string?)null,
+            name = "Not open yet", addressLine = (string?)null, contactPerson = (string?)null,
         });
 
         var pathshalaId = (await created.Content.ReadFromJsonAsync<JsonElement>())

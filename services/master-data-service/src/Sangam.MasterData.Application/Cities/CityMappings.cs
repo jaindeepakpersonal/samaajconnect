@@ -5,5 +5,5 @@ namespace Sangam.MasterData.Application.Cities;
 internal static class CityMappings
 {
     public static CityResponse ToResponse(this City city) =>
-        new(city.Id, city.CountryId, city.Name, city.IsActive);
+        new(city.Id, city.CountryId, city.StateId, city.Name, city.IsActive);
 }

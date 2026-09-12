@@ -15,10 +15,11 @@ public static class CityEndpoints
         var group = app.MapGroup("/v1/master-data/cities").WithTags("Master data - locations");
 
         group.MapGet("/", async (
-                Guid? countryId, bool includeInactive, ISender sender, CancellationToken cancellationToken) =>
+                Guid? countryId, Guid? stateId, bool includeInactive,
+                ISender sender, CancellationToken cancellationToken) =>
             {
                 var result = await sender.Send(
-                    new ListCitiesQuery(countryId, includeInactive), cancellationToken);
+                    new ListCitiesQuery(countryId, stateId, includeInactive), cancellationToken);
 
                 return result.ToApiResult();
             })
@@ -40,7 +41,7 @@ public static class CityEndpoints
         group.MapPost("/", async (CreateCityRequest request, ISender sender, CancellationToken cancellationToken) =>
             {
                 var result = await sender.Send(
-                    new CreateCityCommand(request.CountryId, request.Name), cancellationToken);
+                    new CreateCityCommand(request.CountryId, request.StateId, request.Name), cancellationToken);
 
                 return result.ToApiResult(created =>
                     Results.Created($"/v1/master-data/cities/{created.Id}", created));
@@ -56,7 +57,8 @@ public static class CityEndpoints
         group.MapPut("/{id:guid}", async (
                 Guid id, UpdateCityRequest request, ISender sender, CancellationToken cancellationToken) =>
             {
-                var result = await sender.Send(new UpdateCityCommand(id, request.Name), cancellationToken);
+                var result = await sender.Send(
+                    new UpdateCityCommand(id, request.StateId, request.Name), cancellationToken);
 
                 return result.ToApiResult();
             })
@@ -85,7 +87,7 @@ public static class CityEndpoints
         return app;
     }
 
-    public sealed record CreateCityRequest(Guid CountryId, string Name);
+    public sealed record CreateCityRequest(Guid CountryId, string? StateId, string Name);
 
-    public sealed record UpdateCityRequest(string Name);
+    public sealed record UpdateCityRequest(string? StateId, string Name);
 }

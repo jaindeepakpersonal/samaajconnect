@@ -16,12 +16,20 @@ public sealed class City : AggregateRoot
     /// <summary>The owning <c>LookupItem</c> whose <c>Category</c> is <c>Country</c>.</summary>
     public Guid CountryId { get; private set; }
 
+    /// <summary>
+    /// The owning <see cref="State"/>, or null. Added 2026-09-12, after every
+    /// city that already existed - nullable rather than a breaking migration,
+    /// since a city named before <see cref="State"/> existed is not wrong for
+    /// having no state on it.
+    /// </summary>
+    public Guid? StateId { get; private set; }
+
     public string Name { get; private set; } = null!;
     public bool IsActive { get; private set; }
 
     private City() { }   // EF Core
 
-    public static City Create(Guid countryId, string name, DateTimeOffset now)
+    public static City Create(Guid countryId, Guid? stateId, string name, DateTimeOffset now)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(name);
 
@@ -29,6 +37,7 @@ public sealed class City : AggregateRoot
         {
             Id = Guid.NewGuid(),
             CountryId = countryId,
+            StateId = stateId,
             Name = name.Trim(),
             IsActive = true,
         };
@@ -38,10 +47,11 @@ public sealed class City : AggregateRoot
         return city;
     }
 
-    public void Update(string name, DateTimeOffset now)
+    public void Update(Guid? stateId, string name, DateTimeOffset now)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(name);
 
+        StateId = stateId;
         Name = name.Trim();
 
         Raise(new CityUpdatedDomainEvent(Id, CountryId, Name, now));

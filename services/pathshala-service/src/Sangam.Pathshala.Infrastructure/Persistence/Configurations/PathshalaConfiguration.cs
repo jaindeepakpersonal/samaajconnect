@@ -20,9 +20,21 @@ public sealed class PathshalaConfiguration : IEntityTypeConfiguration<Domain.Pat
         builder.Property(p => p.Id).ValueGeneratedNever();
 
         builder.Property(p => p.Name).IsRequired().HasMaxLength(200);
-        builder.Property(p => p.Address).HasMaxLength(500);
         builder.Property(p => p.ContactPerson).HasMaxLength(200);
         builder.Property(p => p.Status).HasConversion<string>().HasMaxLength(20);
+
+        // Owned rather than a table of its own: one address that only ever
+        // travels with its Pathshala. Nullable as a whole - see
+        // PathshalaAddress's own doc comment - so no builder.Navigation(...)
+        // .IsRequired() call, unlike member-family-service's PermanentAddress.
+        builder.OwnsOne(p => p.Address, address =>
+        {
+            address.Property(x => x.Line).HasColumnName("address_line").HasMaxLength(500);
+            address.Property(x => x.CountryId).HasColumnName("address_country_id");
+            address.Property(x => x.StateId).HasColumnName("address_state_id");
+            address.Property(x => x.CityId).HasColumnName("address_city_id");
+            address.Property(x => x.LocalityId).HasColumnName("address_locality_id");
+        });
 
         builder.HasIndex(p => new { p.TenantId, p.Status });
 

@@ -19,7 +19,8 @@ for where it sits among the other ten.
 | Entity | Notes |
 |---|---|
 | `LookupItem` | One flat, admin-managed reference list, discriminated by `Category`: `Country`, `ProfessionType`, `Gender`, `MaritalStatus`, `Qualification`, `BusinessCategory`, or `EventType`. Platform-wide, not tenant-scoped |
-| `City` | Scoped to a country (`LookupItem.CountryId`, where `Category == Country`). Own aggregate because it carries a parent id the flat `LookupItem` shape has none for |
+| `State` | Scoped to a country, same shape as `City`. Added 2026-09-12, sitting between `LookupItem`'s `Country` category and `City` in the hierarchy |
+| `City` | Scoped to a country (`LookupItem.CountryId`, where `Category == Country`) and, optionally, a `State`. Own aggregate because it carries a parent id the flat `LookupItem` shape has none for |
 | `Locality` | Scoped to a city. The "locations master" — this is the member-portal wireframe's existing locality dropdown (Hiran Magri, Surajpole, Shobhagpura) |
 | `Gautra` | The one **tenant-scoped** entity here (`ITenantScopedEntity`). A Samaaj's own Gautra list, per root CLAUDE.md §6's "Samaaj-wise" requirement |
 
@@ -56,7 +57,10 @@ references dangling with nothing to say so.
 | `CreateLookupItemCommand` | `MasterData.Manage` | Refuses a duplicate `(Category, Code)` pair |
 | `UpdateLookupItemCommand` | `MasterData.Manage` | Renames/reorders. Code and category are fixed once created |
 | `DeactivateLookupItemCommand` | `MasterData.Manage` | Soft delete |
-| `CreateCityCommand` | `MasterData.Manage` | Refuses an unknown or non-`Country` `CountryId` |
+| `CreateStateCommand` | `MasterData.Manage` | Refuses an unknown or non-`Country` `CountryId` |
+| `UpdateStateCommand` | `MasterData.Manage` | |
+| `DeactivateStateCommand` | `MasterData.Manage` | Soft delete |
+| `CreateCityCommand` | `MasterData.Manage` | Refuses an unknown or non-`Country` `CountryId`, or a `StateId` naming a state outside that country |
 | `UpdateCityCommand` | `MasterData.Manage` | |
 | `DeactivateCityCommand` | `MasterData.Manage` | Soft delete |
 | `CreateLocalityCommand` | `MasterData.Manage` | Refuses an unknown `CityId` |
@@ -72,7 +76,9 @@ references dangling with nothing to say so.
 |---|---|---|
 | `ListLookupItemsQuery` | anonymous | One category, active-first by sort order — this is exactly the shape a registration-form dropdown or a startup cache warmup wants |
 | `GetLookupItemByIdQuery` | anonymous | |
-| `ListCitiesQuery` | anonymous | Optionally narrowed to one country |
+| `ListStatesQuery` | anonymous | Optionally narrowed to one country |
+| `GetStateByIdQuery` | anonymous | |
+| `ListCitiesQuery` | anonymous | Optionally narrowed to one country and/or one state |
 | `GetCityByIdQuery` | anonymous | |
 | `ListLocalitiesQuery` | anonymous | Optionally narrowed to one city |
 | `GetLocalityByIdQuery` | anonymous | |
@@ -91,17 +97,17 @@ platform.
 
 ## Events published
 
-Twelve topics, three per aggregate (`Created`/`Updated`/`Deactivated`):
-`master-data.lookup-item.*.v1`, `master-data.city.*.v1`,
-`master-data.locality.*.v1`, `master-data.gautra.*.v1`.
+Fifteen topics, three per aggregate (`Created`/`Updated`/`Deactivated`):
+`master-data.lookup-item.*.v1`, `master-data.state.*.v1`,
+`master-data.city.*.v1`, `master-data.locality.*.v1`, `master-data.gautra.*.v1`.
 
-**`IDomainEvent.TenantId` is `Guid.Empty` on every `LookupItem`, `City` and
-`Locality` event.** That is the same sentinel `PlatformClaimTypes.TenantId`
-already uses for a platform account's token — these three aggregates belong
+**`IDomainEvent.TenantId` is `Guid.Empty` on every `LookupItem`, `State`, `City`
+and `Locality` event.** That is the same sentinel `PlatformClaimTypes.TenantId`
+already uses for a platform account's token — these four aggregates belong
 to the platform, not to any one Samaaj, so there is no real tenant id to put
 on their events. Only `Gautra`'s three events carry a real `TenantId`.
 
-All twelve have `audit-notification-service` `KnownEvents.cs` descriptors.
+All fifteen have `audit-notification-service` `KnownEvents.cs` descriptors.
 None carries an actor distinct from the row itself: every change here is
 maintained by whichever administrator happened to be signed in, not a
 decision made *about* somebody else the way `IssueStatusChangedDomainEvent`

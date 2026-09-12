@@ -48,6 +48,7 @@ app.MapGet("/health", () => Results.Ok(new { status = "healthy" }))
     .ExcludeFromDescription();
 
 app.MapLookupItemEndpoints();
+app.MapStateEndpoints();
 app.MapCityEndpoints();
 app.MapLocalityEndpoints();
 app.MapGautraEndpoints();

@@ -5,9 +5,12 @@ using Sangam.MasterData.Application.Security;
 
 namespace Sangam.MasterData.Application.Cities.Queries;
 
-/// <summary>Cities, optionally narrowed to one country — this is a registration-form dropdown query.</summary>
+/// <summary>
+/// Cities, optionally narrowed to one country and/or one state — this is a
+/// registration-form dropdown query.
+/// </summary>
 [AllowAnonymousRequest]
-public sealed record ListCitiesQuery(Guid? CountryId, bool IncludeInactive)
+public sealed record ListCitiesQuery(Guid? CountryId, Guid? StateId, bool IncludeInactive)
     : IQuery<IReadOnlyList<CityResponse>>;
 
 public sealed class ListCitiesQueryHandler(ICityRepository cities)
@@ -16,7 +19,8 @@ public sealed class ListCitiesQueryHandler(ICityRepository cities)
     public async Task<Result<IReadOnlyList<CityResponse>>> Handle(
         ListCitiesQuery query, CancellationToken cancellationToken)
     {
-        var found = await cities.ListAsync(query.CountryId, query.IncludeInactive, cancellationToken);
+        var found = await cities.ListAsync(
+            query.CountryId, query.StateId, query.IncludeInactive, cancellationToken);
 
         return Result.Success<IReadOnlyList<CityResponse>>(
             [.. found.OrderBy(c => c.Name).Select(c => c.ToResponse())]);

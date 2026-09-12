@@ -18,6 +18,8 @@ public sealed class MasterDataDbContext(
 
     public DbSet<LookupItem> LookupItems => Set<LookupItem>();
 
+    public DbSet<State> States => Set<State>();
+
     public DbSet<City> Cities => Set<City>();
 
     public DbSet<Locality> Localities => Set<Locality>();

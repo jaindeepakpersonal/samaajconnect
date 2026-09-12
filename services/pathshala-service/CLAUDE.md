@@ -182,6 +182,29 @@ register take their locks in the same order and cannot form a cycle at all.
 
 ## Decisions worth knowing before you change this service
 
+**A Pathshala's address became a structured pick on 2026-09-12, not a
+free-text field.** `Pathshala.Address` was one nullable string; it is a
+`PathshalaAddress` now (a free-text line plus `CountryId`/`StateId`/`CityId`/
+`LocalityId`, all master-data-service ids), the same free-text-to-master-
+data-pick move member-family-service already made for `MemberProfile`'s own
+address. Nullable as a whole, unlike member-family-service's
+`PermanentAddress`: a Pathshala can simply have no address recorded, where a
+member profile always carries *an* address object even with every field
+inside it empty. The cascade goes Country -> State -> City -> Locality
+because master-data-service's own `Locality` is scoped to a `City`, which is
+scoped to a `Country` and, optionally, a `State` — there is no way to filter
+a Locality list without a City chosen first. `CreatePathshalaCommand` is the
+only place the address is ever set: there is no update command for a
+Pathshala at all, so correcting one after creation is not yet possible
+through any route this service offers.
+
+The migration renamed the old `address` column to `address_line` rather than
+discarding it — a Pathshala's one address always meant its physical line —
+and added the four new nullable id columns starting null, the same shape
+member-family-service's own address migration used: there is no confident
+lookup from typed free text to a specific master-data-service row, so
+nothing already in that free text is back-filled into a City or Locality id.
+
 **Enrolment is two steps, and the second one is not bureaucracy.** The endpoint
 is `POST /pathshalas/{id}/enrollments`, not `/classes/{id}/...`, so somebody at
 the Pathshala still has to pick the class — the parent does not know the
