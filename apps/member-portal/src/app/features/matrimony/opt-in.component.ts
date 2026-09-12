@@ -86,200 +86,242 @@ import {
           <h2>{{ myBiodata() ? 'Edit your biodata' : 'Your biodata' }}</h2>
           <p class="small">Fields marked <span aria-hidden="true">*</span><span class="sr-only">required</span> are required.</p>
 
-          <label for="fullName">Full name <span aria-hidden="true">*</span><span class="sr-only">required</span></label>
-          <input class="input" id="fullName" name="fullName" [(ngModel)]="form.fullName" required maxlength="200" />
+          <div class="form-grid">
+            <div class="field">
+              <label for="fullName">Full name <span aria-hidden="true">*</span><span class="sr-only">required</span></label>
+              <input class="input" id="fullName" name="fullName" [(ngModel)]="form.fullName" required maxlength="200" />
+            </div>
 
-          <label for="gender">Gender <span aria-hidden="true">*</span><span class="sr-only">required</span></label>
-          <select class="input" id="gender" name="gender" [(ngModel)]="form.gender" required>
-            @for (option of genders; track option) {
-              <option [value]="option">{{ option }}</option>
+            <div class="field">
+              <label for="gender">Gender <span aria-hidden="true">*</span><span class="sr-only">required</span></label>
+              <select class="input" id="gender" name="gender" [(ngModel)]="form.gender" required>
+                @for (option of genders; track option) {
+                  <option [value]="option">{{ option }}</option>
+                }
+              </select>
+            </div>
+
+            <div class="field">
+              <label for="dateOfBirth">Date of birth <span aria-hidden="true">*</span><span class="sr-only">required</span></label>
+              <input
+                class="input"
+                id="dateOfBirth"
+                name="dateOfBirth"
+                type="date"
+                [(ngModel)]="form.dateOfBirth"
+                required
+              />
+            </div>
+
+            <div class="field">
+              <label for="gautraId">Gautra</label>
+              <select class="input" id="gautraId" name="gautraId" [(ngModel)]="form.gautraId">
+                <option [ngValue]="null">Not specified</option>
+                @for (option of gautras(); track option.id) {
+                  <option [ngValue]="option.id">{{ option.name }}</option>
+                }
+              </select>
+            </div>
+
+            <div class="field">
+              <label for="professionId">Profession</label>
+              <select class="input" id="professionId" name="professionId" [(ngModel)]="form.professionId">
+                <option [ngValue]="null">Not specified</option>
+                @for (option of professions(); track option.id) {
+                  <option [ngValue]="option.id">{{ option.label }}</option>
+                }
+              </select>
+            </div>
+
+            <div class="field">
+              <label for="qualificationId">Qualification</label>
+              <select class="input" id="qualificationId" name="qualificationId" [(ngModel)]="form.qualificationId">
+                <option [ngValue]="null">Not specified</option>
+                @for (option of qualifications(); track option.id) {
+                  <option [ngValue]="option.id">{{ option.label }}</option>
+                }
+              </select>
+            </div>
+
+            <div class="field">
+              <label for="cityId">City</label>
+              <select
+                class="input"
+                id="cityId"
+                name="cityId"
+                [(ngModel)]="form.cityId"
+                (ngModelChange)="onCityChange($event)"
+              >
+                <option [ngValue]="null">Not specified</option>
+                @for (option of cities(); track option.id) {
+                  <option [ngValue]="option.id">{{ option.name }}</option>
+                }
+              </select>
+            </div>
+
+            <div class="field">
+              <label for="localityId">Locality</label>
+              <select class="input" id="localityId" name="localityId" [(ngModel)]="form.localityId">
+                <option [ngValue]="null">Not specified</option>
+                @for (option of localities(); track option.id) {
+                  <option [ngValue]="option.id">{{ option.name }}</option>
+                }
+              </select>
+            </div>
+
+            <div class="field">
+              <label for="heightCm">Height (cm)</label>
+              <input class="input" id="heightCm" name="heightCm" type="number" min="0" [(ngModel)]="form.heightCm" />
+            </div>
+
+            <div class="field">
+              <label for="maritalStatusId">Marital status</label>
+              <select class="input" id="maritalStatusId" name="maritalStatusId" [(ngModel)]="form.maritalStatusId">
+                <option [ngValue]="null">Not specified</option>
+                @for (option of maritalStatuses(); track option.id) {
+                  <option [ngValue]="option.id">{{ option.label }}</option>
+                }
+              </select>
+            </div>
+
+            <div class="field">
+              <label for="diet">Diet</label>
+              <select class="input" id="diet" name="diet" [(ngModel)]="form.diet">
+                <option [ngValue]="null">Not specified</option>
+                @for (option of diets; track option) {
+                  <option [ngValue]="option">{{ dietLabel(option) }}</option>
+                }
+              </select>
+            </div>
+
+            <div class="field">
+              <label for="familyType">Family type</label>
+              <select class="input" id="familyType" name="familyType" [(ngModel)]="form.familyType">
+                <option [ngValue]="null">Not specified</option>
+                @for (option of familyTypes; track option) {
+                  <option [ngValue]="option">{{ option }}</option>
+                }
+              </select>
+            </div>
+
+            <div class="field">
+              <label for="fatherOccupation">Father's occupation</label>
+              <input
+                class="input"
+                id="fatherOccupation"
+                name="fatherOccupation"
+                [(ngModel)]="form.fatherOccupation"
+                maxlength="120"
+              />
+            </div>
+
+            <div class="field">
+              <label for="motherOccupation">Mother's occupation</label>
+              <input
+                class="input"
+                id="motherOccupation"
+                name="motherOccupation"
+                [(ngModel)]="form.motherOccupation"
+                maxlength="120"
+              />
+            </div>
+
+            <div class="field">
+              <label for="siblingsCount">Number of siblings</label>
+              <input
+                class="input"
+                id="siblingsCount"
+                name="siblingsCount"
+                type="number"
+                min="0"
+                [(ngModel)]="form.siblingsCount"
+              />
+            </div>
+
+            <div class="field">
+              <label for="preferredAgeMin">Preferred age - from</label>
+              <input
+                class="input"
+                id="preferredAgeMin"
+                name="preferredAgeMin"
+                type="number"
+                min="18"
+                [(ngModel)]="form.preferredAgeMin"
+              />
+            </div>
+
+            <div class="field">
+              <label for="preferredAgeMax">Preferred age - to</label>
+              <input
+                class="input"
+                id="preferredAgeMax"
+                name="preferredAgeMax"
+                type="number"
+                min="18"
+                [(ngModel)]="form.preferredAgeMax"
+              />
+            </div>
+
+            <label class="span-all">
+              <input type="checkbox" name="manglik" [(ngModel)]="form.manglik" />
+              Manglik
+            </label>
+
+            <div class="field span-all">
+              <label for="horoscopeNotes">Horoscope notes</label>
+              <textarea
+                class="input"
+                id="horoscopeNotes"
+                name="horoscopeNotes"
+                rows="3"
+                maxlength="500"
+                [(ngModel)]="form.horoscopeNotes"
+              ></textarea>
+            </div>
+
+            <div class="field span-all">
+              <label for="aboutMe">About me</label>
+              <textarea
+                class="input"
+                id="aboutMe"
+                name="aboutMe"
+                rows="4"
+                maxlength="1000"
+                [(ngModel)]="form.aboutMe"
+              ></textarea>
+            </div>
+
+            <div class="field span-all">
+              <label for="partnerPreferenceNotes">Partner preference notes</label>
+              <textarea
+                class="input"
+                id="partnerPreferenceNotes"
+                name="partnerPreferenceNotes"
+                rows="3"
+                maxlength="500"
+                [(ngModel)]="form.partnerPreferenceNotes"
+              ></textarea>
+            </div>
+
+            @if (!myBiodata()) {
+              @if (notice(); as consentNotice) {
+                <label class="consent-line span-all">
+                  <input type="checkbox" name="consentGiven" [(ngModel)]="consentGiven" required />
+                  {{ consentNotice.attestation }}
+                </label>
+              }
             }
-          </select>
 
-          <label for="dateOfBirth">Date of birth <span aria-hidden="true">*</span><span class="sr-only">required</span></label>
-          <input
-            class="input"
-            id="dateOfBirth"
-            name="dateOfBirth"
-            type="date"
-            [(ngModel)]="form.dateOfBirth"
-            required
-          />
-
-          <label for="gautraId">Gautra</label>
-          <select class="input" id="gautraId" name="gautraId" [(ngModel)]="form.gautraId">
-            <option [ngValue]="null">Not specified</option>
-            @for (option of gautras(); track option.id) {
-              <option [ngValue]="option.id">{{ option.name }}</option>
-            }
-          </select>
-
-          <label for="professionId">Profession</label>
-          <select class="input" id="professionId" name="professionId" [(ngModel)]="form.professionId">
-            <option [ngValue]="null">Not specified</option>
-            @for (option of professions(); track option.id) {
-              <option [ngValue]="option.id">{{ option.label }}</option>
-            }
-          </select>
-
-          <label for="qualificationId">Qualification</label>
-          <select class="input" id="qualificationId" name="qualificationId" [(ngModel)]="form.qualificationId">
-            <option [ngValue]="null">Not specified</option>
-            @for (option of qualifications(); track option.id) {
-              <option [ngValue]="option.id">{{ option.label }}</option>
-            }
-          </select>
-
-          <label for="cityId">City</label>
-          <select
-            class="input"
-            id="cityId"
-            name="cityId"
-            [(ngModel)]="form.cityId"
-            (ngModelChange)="onCityChange($event)"
-          >
-            <option [ngValue]="null">Not specified</option>
-            @for (option of cities(); track option.id) {
-              <option [ngValue]="option.id">{{ option.name }}</option>
-            }
-          </select>
-
-          <label for="localityId">Locality</label>
-          <select class="input" id="localityId" name="localityId" [(ngModel)]="form.localityId">
-            <option [ngValue]="null">Not specified</option>
-            @for (option of localities(); track option.id) {
-              <option [ngValue]="option.id">{{ option.name }}</option>
-            }
-          </select>
-
-          <label for="heightCm">Height (cm)</label>
-          <input class="input" id="heightCm" name="heightCm" type="number" min="0" [(ngModel)]="form.heightCm" />
-
-          <label for="maritalStatusId">Marital status</label>
-          <select class="input" id="maritalStatusId" name="maritalStatusId" [(ngModel)]="form.maritalStatusId">
-            <option [ngValue]="null">Not specified</option>
-            @for (option of maritalStatuses(); track option.id) {
-              <option [ngValue]="option.id">{{ option.label }}</option>
-            }
-          </select>
-
-          <label for="diet">Diet</label>
-          <select class="input" id="diet" name="diet" [(ngModel)]="form.diet">
-            <option [ngValue]="null">Not specified</option>
-            @for (option of diets; track option) {
-              <option [ngValue]="option">{{ dietLabel(option) }}</option>
-            }
-          </select>
-
-          <label for="familyType">Family type</label>
-          <select class="input" id="familyType" name="familyType" [(ngModel)]="form.familyType">
-            <option [ngValue]="null">Not specified</option>
-            @for (option of familyTypes; track option) {
-              <option [ngValue]="option">{{ option }}</option>
-            }
-          </select>
-
-          <label for="fatherOccupation">Father's occupation</label>
-          <input
-            class="input"
-            id="fatherOccupation"
-            name="fatherOccupation"
-            [(ngModel)]="form.fatherOccupation"
-            maxlength="120"
-          />
-
-          <label for="motherOccupation">Mother's occupation</label>
-          <input
-            class="input"
-            id="motherOccupation"
-            name="motherOccupation"
-            [(ngModel)]="form.motherOccupation"
-            maxlength="120"
-          />
-
-          <label for="siblingsCount">Number of siblings</label>
-          <input
-            class="input"
-            id="siblingsCount"
-            name="siblingsCount"
-            type="number"
-            min="0"
-            [(ngModel)]="form.siblingsCount"
-          />
-
-          <label>
-            <input type="checkbox" name="manglik" [(ngModel)]="form.manglik" />
-            Manglik
-          </label>
-
-          <label for="horoscopeNotes">Horoscope notes</label>
-          <textarea
-            class="input"
-            id="horoscopeNotes"
-            name="horoscopeNotes"
-            rows="3"
-            maxlength="500"
-            [(ngModel)]="form.horoscopeNotes"
-          ></textarea>
-
-          <label for="aboutMe">About me</label>
-          <textarea
-            class="input"
-            id="aboutMe"
-            name="aboutMe"
-            rows="4"
-            maxlength="1000"
-            [(ngModel)]="form.aboutMe"
-          ></textarea>
-
-          <label for="preferredAgeMin">Preferred age - from</label>
-          <input
-            class="input"
-            id="preferredAgeMin"
-            name="preferredAgeMin"
-            type="number"
-            min="18"
-            [(ngModel)]="form.preferredAgeMin"
-          />
-
-          <label for="preferredAgeMax">Preferred age - to</label>
-          <input
-            class="input"
-            id="preferredAgeMax"
-            name="preferredAgeMax"
-            type="number"
-            min="18"
-            [(ngModel)]="form.preferredAgeMax"
-          />
-
-          <label for="partnerPreferenceNotes">Partner preference notes</label>
-          <textarea
-            class="input"
-            id="partnerPreferenceNotes"
-            name="partnerPreferenceNotes"
-            rows="3"
-            maxlength="500"
-            [(ngModel)]="form.partnerPreferenceNotes"
-          ></textarea>
-
-          @if (!myBiodata()) {
-            @if (notice(); as consentNotice) {
-              <label class="consent-line">
-                <input type="checkbox" name="consentGiven" [(ngModel)]="consentGiven" required />
-                {{ consentNotice.attestation }}
-              </label>
-            }
-          }
-
-          <div class="actions">
-            <button class="btn" type="submit" [disabled]="saving() || optInForm.invalid">
-              {{ saving() ? 'Saving…' : myBiodata() ? 'Save changes' : 'Opt in' }}
-            </button>
-            @if (optInForm.invalid && optInForm.touched) {
-              <p class="notice error" role="alert">
-                Fill in every required field - full name, gender and date of birth - before saving.
-              </p>
-            }
+            <div class="actions span-all">
+              <button class="btn" type="submit" [disabled]="saving() || optInForm.invalid">
+                {{ saving() ? 'Saving…' : myBiodata() ? 'Save changes' : 'Opt in' }}
+              </button>
+              @if (optInForm.invalid && optInForm.touched) {
+                <p class="notice error" role="alert">
+                  Fill in every required field - full name, gender and date of birth - before saving.
+                </p>
+              }
+            </div>
           </div>
         </form>
 

@@ -136,64 +136,78 @@ type ProfileTab = 'basic' | 'professional' | 'educational' | 'address' | 'photo'
           <div class="card">
             <h2>Basic information</h2>
 
-            <label for="full-name">Full name</label>
-            <input
-              class="input"
-              id="full-name"
-              name="fullName"
-              [(ngModel)]="form.fullName"
-              maxlength="200"
-              required
-              [attr.aria-invalid]="attempted() && !form.fullName.trim() ? 'true' : null"
-            />
-            @if (attempted() && !form.fullName.trim()) {
-              <p class="field-error">Your Samaaj needs a name to list you by.</p>
-            }
+            <div class="form-grid">
+              <div class="field span-all">
+                <label for="full-name">Full name</label>
+                <input
+                  class="input"
+                  id="full-name"
+                  name="fullName"
+                  [(ngModel)]="form.fullName"
+                  maxlength="200"
+                  required
+                  [attr.aria-invalid]="attempted() && !form.fullName.trim() ? 'true' : null"
+                />
+                @if (attempted() && !form.fullName.trim()) {
+                  <p class="field-error">Your Samaaj needs a name to list you by.</p>
+                }
+              </div>
 
-            <label for="mobile">Mobile</label>
-            <input
-              class="input"
-              id="mobile"
-              name="mobile"
-              [(ngModel)]="form.mobile"
-              maxlength="20"
-              placeholder="+91 98765 43210"
-            />
+              <div class="field">
+                <label for="mobile">Mobile</label>
+                <input
+                  class="input"
+                  id="mobile"
+                  name="mobile"
+                  [(ngModel)]="form.mobile"
+                  maxlength="20"
+                  placeholder="+91 98765 43210"
+                />
+              </div>
 
-            <label for="email">Email</label>
-            <input
-              class="input"
-              id="email"
-              name="email"
-              type="email"
-              [(ngModel)]="form.email"
-              maxlength="320"
-            />
+              <div class="field">
+                <label for="email">Email</label>
+                <input
+                  class="input"
+                  id="email"
+                  name="email"
+                  type="email"
+                  [(ngModel)]="form.email"
+                  maxlength="320"
+                />
+              </div>
 
-            <label for="dob">Date of birth</label>
-            <input
-              class="input"
-              id="dob"
-              name="dateOfBirth"
-              type="date"
-              [(ngModel)]="form.dateOfBirth"
-              [max]="today"
-            />
+              <div class="field">
+                <label for="dob">Date of birth</label>
+                <input
+                  class="input"
+                  id="dob"
+                  name="dateOfBirth"
+                  type="date"
+                  [(ngModel)]="form.dateOfBirth"
+                  [max]="today"
+                />
+              </div>
 
-            <label for="gender">Gender</label>
-            <select class="input" id="gender" name="gender" [(ngModel)]="form.gender">
-              @for (option of genders; track option.value) {
-                <option [value]="option.value">{{ option.label }}</option>
-              }
-            </select>
+              <div class="field">
+                <label for="gender">Gender</label>
+                <select class="input" id="gender" name="gender" [(ngModel)]="form.gender">
+                  @for (option of genders; track option.value) {
+                    <option [value]="option.value">{{ option.label }}</option>
+                  }
+                </select>
+              </div>
 
-            <label for="gautra">Gautra</label>
-            <select class="input" id="gautra" name="gautra" [(ngModel)]="form.gautraId">
-              <option value="">Not set</option>
-              @for (option of gautras(); track option.id) {
-                <option [value]="option.id">{{ option.name }}</option>
-              }
-            </select>
+              <div class="field">
+                <label for="gautra">Gautra</label>
+                <select class="input" id="gautra" name="gautra" [(ngModel)]="form.gautraId">
+                  <option value="">Not set</option>
+                  @for (option of gautras(); track option.id) {
+                    <option [value]="option.id">{{ option.name }}</option>
+                  }
+                </select>
+              </div>
+            </div>
           </div>
           }
 
@@ -239,43 +253,52 @@ type ProfileTab = 'basic' | 'professional' | 'educational' | 'address' | 'photo'
 
             <h3>Permanent</h3>
 
-            <label for="permanent-line">Address</label>
-            <textarea
-              class="input"
-              id="permanent-line"
-              name="permanentLine"
-              rows="3"
-              [(ngModel)]="form.permanentAddress.line"
-              maxlength="500"
-            ></textarea>
+            <div class="form-grid">
+              <div class="field span-all">
+                <label for="permanent-line">Address</label>
+                <textarea
+                  class="input"
+                  id="permanent-line"
+                  name="permanentLine"
+                  rows="3"
+                  [(ngModel)]="form.permanentAddress.line"
+                  maxlength="500"
+                ></textarea>
+              </div>
 
-            <label for="permanent-city">City</label>
-            <select
-              class="input"
-              id="permanent-city"
-              name="permanentCity"
-              [ngModel]="form.permanentAddress.cityId"
-              (ngModelChange)="onCityChange('permanent', $event)"
-            >
-              <option value="">Choose a city</option>
-              @for (option of cities(); track option.id) {
-                <option [value]="option.id">{{ option.name }}</option>
-              }
-            </select>
+              <div class="field">
+                <label for="permanent-city">City</label>
+                <select
+                  class="input"
+                  id="permanent-city"
+                  name="permanentCity"
+                  [ngModel]="form.permanentAddress.cityId"
+                  (ngModelChange)="onCityChange('permanent', $event)"
+                >
+                  <option value="">Choose a city</option>
+                  @for (option of cities(); track option.id) {
+                    <option [value]="option.id">{{ option.name }}</option>
+                  }
+                </select>
+              </div>
 
-            <label for="permanent-locality">Locality</label>
-            <select
-              class="input"
-              id="permanent-locality"
-              name="permanentLocality"
-              [(ngModel)]="form.permanentAddress.localityId"
-              [disabled]="!form.permanentAddress.cityId"
-            >
-              <option value="">Choose a locality</option>
-              @for (option of permanentLocalities(); track option.id) {
-                <option [value]="option.id">{{ option.name }}</option>
-              }
-            </select>
+              <div class="field">
+                <label for="permanent-locality">Locality</label>
+                <select
+                  class="input"
+                  id="permanent-locality"
+                  name="permanentLocality"
+                  [(ngModel)]="form.permanentAddress.localityId"
+                  [disabled]="!form.permanentAddress.cityId"
+                >
+                  <option value="">Choose a locality</option>
+                  @for (option of permanentLocalities(); track option.id) {
+                    <option [value]="option.id">{{ option.name }}</option>
+                  }
+                </select>
+              </div>
+            </div>
+
             <p class="small">
               Members can filter the directory by locality, so this one is always visible.
             </p>
@@ -293,45 +316,53 @@ type ProfileTab = 'basic' | 'professional' | 'educational' | 'address' | 'photo'
               />
             </div>
 
-            <label for="temporary-line">Address</label>
-            <textarea
-              class="input"
-              id="temporary-line"
-              name="temporaryLine"
-              rows="3"
-              [(ngModel)]="form.temporaryAddress.line"
-              [disabled]="sameAsPermanent()"
-              maxlength="500"
-            ></textarea>
+            <div class="form-grid">
+              <div class="field span-all">
+                <label for="temporary-line">Address</label>
+                <textarea
+                  class="input"
+                  id="temporary-line"
+                  name="temporaryLine"
+                  rows="3"
+                  [(ngModel)]="form.temporaryAddress.line"
+                  [disabled]="sameAsPermanent()"
+                  maxlength="500"
+                ></textarea>
+              </div>
 
-            <label for="temporary-city">City</label>
-            <select
-              class="input"
-              id="temporary-city"
-              name="temporaryCity"
-              [ngModel]="form.temporaryAddress.cityId"
-              (ngModelChange)="onCityChange('temporary', $event)"
-              [disabled]="sameAsPermanent()"
-            >
-              <option value="">Choose a city</option>
-              @for (option of cities(); track option.id) {
-                <option [value]="option.id">{{ option.name }}</option>
-              }
-            </select>
+              <div class="field">
+                <label for="temporary-city">City</label>
+                <select
+                  class="input"
+                  id="temporary-city"
+                  name="temporaryCity"
+                  [ngModel]="form.temporaryAddress.cityId"
+                  (ngModelChange)="onCityChange('temporary', $event)"
+                  [disabled]="sameAsPermanent()"
+                >
+                  <option value="">Choose a city</option>
+                  @for (option of cities(); track option.id) {
+                    <option [value]="option.id">{{ option.name }}</option>
+                  }
+                </select>
+              </div>
 
-            <label for="temporary-locality">Locality</label>
-            <select
-              class="input"
-              id="temporary-locality"
-              name="temporaryLocality"
-              [(ngModel)]="form.temporaryAddress.localityId"
-              [disabled]="sameAsPermanent() || !form.temporaryAddress.cityId"
-            >
-              <option value="">Choose a locality</option>
-              @for (option of temporaryLocalities(); track option.id) {
-                <option [value]="option.id">{{ option.name }}</option>
-              }
-            </select>
+              <div class="field">
+                <label for="temporary-locality">Locality</label>
+                <select
+                  class="input"
+                  id="temporary-locality"
+                  name="temporaryLocality"
+                  [(ngModel)]="form.temporaryAddress.localityId"
+                  [disabled]="sameAsPermanent() || !form.temporaryAddress.cityId"
+                >
+                  <option value="">Choose a locality</option>
+                  @for (option of temporaryLocalities(); track option.id) {
+                    <option [value]="option.id">{{ option.name }}</option>
+                  }
+                </select>
+              </div>
+            </div>
           </div>
           }
 
