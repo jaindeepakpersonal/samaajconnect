@@ -292,11 +292,6 @@ namespace Sangam.MemberFamily.Infrastructure.Persistence.Migrations
                         .HasColumnType("uuid")
                         .HasColumnName("id");
 
-                    b.Property<string>("Address")
-                        .HasMaxLength(500)
-                        .HasColumnType("character varying(500)")
-                        .HasColumnName("address");
-
                     b.Property<DateTimeOffset>("CreatedAt")
                         .HasColumnType("timestamp with time zone")
                         .HasColumnName("created_at");
@@ -316,6 +311,10 @@ namespace Sangam.MemberFamily.Infrastructure.Persistence.Migrations
                         .HasColumnType("character varying(200)")
                         .HasColumnName("full_name");
 
+                    b.Property<Guid?>("GautraId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("gautra_id");
+
                     b.Property<string>("Gender")
                         .IsRequired()
                         .HasMaxLength(20)
@@ -327,11 +326,6 @@ namespace Sangam.MemberFamily.Infrastructure.Persistence.Migrations
                         .HasDefaultValue(true)
                         .HasColumnName("is_listed_in_directory");
 
-                    b.Property<string>("Locality")
-                        .HasMaxLength(120)
-                        .HasColumnType("character varying(120)")
-                        .HasColumnName("locality");
-
                     b.Property<string>("Mobile")
                         .HasMaxLength(20)
                         .HasColumnType("character varying(20)")
@@ -341,10 +335,13 @@ namespace Sangam.MemberFamily.Infrastructure.Persistence.Migrations
                         .HasColumnType("uuid")
                         .HasColumnName("photo_image_id");
 
-                    b.Property<string>("Profession")
-                        .HasMaxLength(120)
-                        .HasColumnType("character varying(120)")
-                        .HasColumnName("profession");
+                    b.Property<Guid?>("ProfessionId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("profession_id");
+
+                    b.Property<Guid?>("QualificationId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("qualification_id");
 
                     b.Property<Guid>("TenantId")
                         .HasColumnType("uuid")
@@ -359,9 +356,6 @@ namespace Sangam.MemberFamily.Infrastructure.Persistence.Migrations
 
                     b.HasIndex("TenantId", "FullName")
                         .HasDatabaseName("ix_member_profiles_tenant_id_full_name");
-
-                    b.HasIndex("TenantId", "Locality")
-                        .HasDatabaseName("ix_member_profiles_tenant_id_locality");
 
                     b.ToTable("member_profiles", (string)null);
                 });
@@ -527,6 +521,12 @@ namespace Sangam.MemberFamily.Infrastructure.Persistence.Migrations
                                 .HasColumnType("character varying(20)")
                                 .HasColumnName("privacy_profession");
 
+                            b1.Property<string>("Qualification")
+                                .IsRequired()
+                                .HasMaxLength(20)
+                                .HasColumnType("character varying(20)")
+                                .HasColumnName("privacy_qualification");
+
                             b1.HasKey("MemberProfileId");
 
                             b1.ToTable("member_profiles");
@@ -536,8 +536,69 @@ namespace Sangam.MemberFamily.Infrastructure.Persistence.Migrations
                                 .HasConstraintName("fk_member_profiles_member_profiles_id");
                         });
 
+                    b.OwnsOne("Sangam.MemberFamily.Domain.Members.ProfileAddress", "PermanentAddress", b1 =>
+                        {
+                            b1.Property<Guid>("MemberProfileId")
+                                .HasColumnType("uuid")
+                                .HasColumnName("id");
+
+                            b1.Property<Guid?>("CityId")
+                                .HasColumnType("uuid")
+                                .HasColumnName("permanent_address_city_id");
+
+                            b1.Property<string>("Line")
+                                .HasMaxLength(500)
+                                .HasColumnType("character varying(500)")
+                                .HasColumnName("permanent_address_line");
+
+                            b1.Property<Guid?>("LocalityId")
+                                .HasColumnType("uuid")
+                                .HasColumnName("permanent_address_locality_id");
+
+                            b1.HasKey("MemberProfileId");
+
+                            b1.ToTable("member_profiles");
+
+                            b1.WithOwner()
+                                .HasForeignKey("MemberProfileId")
+                                .HasConstraintName("fk_member_profiles_member_profiles_id");
+                        });
+
+                    b.OwnsOne("Sangam.MemberFamily.Domain.Members.ProfileAddress", "TemporaryAddress", b1 =>
+                        {
+                            b1.Property<Guid>("MemberProfileId")
+                                .HasColumnType("uuid")
+                                .HasColumnName("id");
+
+                            b1.Property<Guid?>("CityId")
+                                .HasColumnType("uuid")
+                                .HasColumnName("temporary_address_city_id");
+
+                            b1.Property<string>("Line")
+                                .HasMaxLength(500)
+                                .HasColumnType("character varying(500)")
+                                .HasColumnName("temporary_address_line");
+
+                            b1.Property<Guid?>("LocalityId")
+                                .HasColumnType("uuid")
+                                .HasColumnName("temporary_address_locality_id");
+
+                            b1.HasKey("MemberProfileId");
+
+                            b1.ToTable("member_profiles");
+
+                            b1.WithOwner()
+                                .HasForeignKey("MemberProfileId")
+                                .HasConstraintName("fk_member_profiles_member_profiles_id");
+                        });
+
+                    b.Navigation("PermanentAddress")
+                        .IsRequired();
+
                     b.Navigation("Privacy")
                         .IsRequired();
+
+                    b.Navigation("TemporaryAddress");
                 });
 
             modelBuilder.Entity("Sangam.MemberFamily.Domain.Families.Family", b =>

@@ -34,18 +34,21 @@ public sealed class AdminCorrectionTests
             gender: Gender.Male,
             mobile: "+919812345678",
             email: "ravi@example.com",
-            address: "12 Old Road",
-            locality: "Udaipur",
-            profession: "Teacher",
-            new FieldPrivacy(
+            gautraId: Guid.NewGuid(),
+            professionId: Guid.NewGuid(),
+            qualificationId: Guid.NewGuid(),
+            permanentAddress: new ProfileAddress("12 Old Road", Guid.NewGuid(), Guid.NewGuid()),
+            temporaryAddress: null,
+            privacy: new FieldPrivacy(
                 Mobile: PrivacyLevel.Public,
                 Email: PrivacyLevel.Public,
                 Address: PrivacyLevel.Private,
                 Profession: PrivacyLevel.Public,
-                DateOfBirth: PrivacyLevel.Private),
+                DateOfBirth: PrivacyLevel.Private,
+                Qualification: PrivacyLevel.Public),
             isListedInDirectory: true,
-            Now,
-            profile.Id);
+            updatedAt: Now,
+            updatedBy: profile.Id);
 
         return profile;
     }
@@ -61,9 +64,11 @@ public sealed class AdminCorrectionTests
             profile.Gender,
             profile.Mobile,
             profile.Email,
-            profile.Address,
-            profile.Locality,
-            profile.Profession,
+            profile.GautraId,
+            profile.ProfessionId,
+            profile.QualificationId,
+            profile.PermanentAddress,
+            profile.TemporaryAddress,
             Now,
             Guid.NewGuid());
 
@@ -82,9 +87,11 @@ public sealed class AdminCorrectionTests
             profile.Gender,
             "+919800000000",
             profile.Email,
-            profile.Address,
-            profile.Locality,
-            profile.Profession,
+            profile.GautraId,
+            profile.ProfessionId,
+            profile.QualificationId,
+            profile.PermanentAddress,
+            profile.TemporaryAddress,
             Now,
             Guid.NewGuid());
 
@@ -108,13 +115,15 @@ public sealed class AdminCorrectionTests
             profile.Gender,
             profile.Mobile,
             profile.Email,
-            profile.Address,
-            profile.Locality,
-            profile.Profession,
-            profile.Privacy,
+            profile.GautraId,
+            profile.ProfessionId,
+            profile.QualificationId,
+            profile.PermanentAddress,
+            profile.TemporaryAddress,
+            privacy: profile.Privacy,
             isListedInDirectory: false,
-            Now,
-            profile.Id);
+            updatedAt: Now,
+            updatedBy: profile.Id);
 
         profile.CorrectDetails(
             "Ravi Shah",
@@ -122,9 +131,11 @@ public sealed class AdminCorrectionTests
             profile.Gender,
             profile.Mobile,
             profile.Email,
-            profile.Address,
-            profile.Locality,
-            profile.Profession,
+            profile.GautraId,
+            profile.ProfessionId,
+            profile.QualificationId,
+            profile.PermanentAddress,
+            profile.TemporaryAddress,
             Now,
             Guid.NewGuid());
 
@@ -146,9 +157,11 @@ public sealed class AdminCorrectionTests
             profile.Gender,
             "+919800000000",
             profile.Email,
-            profile.Address,
-            profile.Locality,
-            profile.Profession,
+            profile.GautraId,
+            profile.ProfessionId,
+            profile.QualificationId,
+            profile.PermanentAddress,
+            profile.TemporaryAddress,
             Now,
             admin);
 
@@ -174,9 +187,11 @@ public sealed class AdminCorrectionTests
             profile.Gender,
             profile.Mobile,
             profile.Email,
-            profile.Address,
-            profile.Locality,
-            profile.Profession,
+            profile.GautraId,
+            profile.ProfessionId,
+            profile.QualificationId,
+            profile.PermanentAddress,
+            profile.TemporaryAddress,
             Now,
             Guid.NewGuid());
 

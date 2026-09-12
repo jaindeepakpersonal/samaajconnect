@@ -24,15 +24,18 @@ function profile(overrides: Partial<MyProfile> = {}): MyProfile {
     gender: 'Male',
     mobile: '+919812345678',
     email: 'member@example.com',
-    address: null,
-    locality: 'Udaipur',
-    profession: null,
+    gautraId: null,
+    professionId: null,
+    qualificationId: null,
+    permanentAddress: { line: null, cityId: null, localityId: 'loc-udaipur' },
+    temporaryAddress: null,
     privacy: {
       mobile: 'SamaajOnly',
       email: 'Private',
       address: 'Private',
       profession: 'SamaajOnly',
       dateOfBirth: 'SamaajOnly',
+      qualification: 'SamaajOnly',
     },
     isListedInDirectory: true,
     createdAt: '2026-01-01T10:00:00Z',
@@ -401,7 +404,17 @@ describe('PrivacyComponent', () => {
   });
 
   it('fills the directory privacy form from what the server holds', () => {
-    load(identityExport(), profile({ privacy: { mobile: 'Public', email: 'SamaajOnly', address: 'Private', profession: 'Public', dateOfBirth: 'Private' }, isListedInDirectory: false }));
+    load(identityExport(), profile({
+      privacy: {
+        mobile: 'Public',
+        email: 'SamaajOnly',
+        address: 'Private',
+        profession: 'Public',
+        dateOfBirth: 'Private',
+        qualification: 'Public',
+      },
+      isListedInDirectory: false,
+    }));
 
     expect(component.privacyForm.privacy.mobile).toBe('Public');
     expect(component.privacyForm.privacy.email).toBe('SamaajOnly');
@@ -412,7 +425,7 @@ describe('PrivacyComponent', () => {
     // updateMe replaces the profile whole, and this screen never touched the
     // member's name, mobile or any other basic-information field - they have
     // to travel with the request exactly as the server sent them.
-    load(identityExport(), profile({ fullName: 'Deepak Jain', locality: 'Udaipur' }));
+    load(identityExport(), profile({ fullName: 'Deepak Jain' }));
 
     component.privacyForm.privacy = { ...component.privacyForm.privacy, mobile: 'Public' };
     component.privacyForm.isListedInDirectory = false;
@@ -422,7 +435,7 @@ describe('PrivacyComponent', () => {
 
     expect(request.request.method).toBe('PATCH');
     expect(request.request.body.fullName).toBe('Deepak Jain');
-    expect(request.request.body.locality).toBe('Udaipur');
+    expect(request.request.body.permanentAddress.localityId).toBe('loc-udaipur');
     expect(request.request.body.privacy.mobile).toBe('Public');
     expect(request.request.body.isListedInDirectory).toBe(false);
 

@@ -4,7 +4,7 @@ import { RouterLink } from '@angular/router';
 import { AuthService, describeError } from '@samaajconnect/shared';
 import { AdminApi } from '../../core/admin-api';
 import { AdminScope } from '../../core/admin-scope';
-import { AdminMember } from '../../core/admin.models';
+import { AdminMember, Locality } from '../../core/admin.models';
 
 /**
  * Members, from the admin wireframe's `#members` screen.
@@ -32,6 +32,13 @@ import { AdminMember } from '../../core/admin.models';
  * **Status** is not member-family-service's to answer either: whether an account
  * is activated lives in identity-tenant-service, and the pending ones already
  * have a screen under Admin Users.
+ *
+ * **The Locality filter is a dropdown now, not a text box.** Locality moved
+ * from free text to a master-data-service pick on 2026-09-11, so the search
+ * takes an exact `localityId` rather than a substring - a member picks one
+ * Locality, an administrator filters by picking the same one. The full
+ * Locality list is fetched once, from master-data-service, to resolve both
+ * the dropdown's options and the Locality column's ids to names.
  */
 @Component({
   selector: 'app-member-list',
@@ -70,13 +77,12 @@ import { AdminMember } from '../../core/admin.models';
 
             <div class="field">
               <label for="locality">Locality</label>
-              <input
-                class="input"
-                id="locality"
-                name="locality"
-                [(ngModel)]="locality"
-                placeholder="Udaipur"
-              />
+              <select class="input" id="locality" name="locality" [(ngModel)]="localityId">
+                <option value="">All localities</option>
+                @for (option of localities(); track option.id) {
+                  <option [value]="option.id">{{ option.name }}</option>
+                }
+              </select>
             </div>
 
             <div class="actions">
@@ -123,7 +129,7 @@ import { AdminMember } from '../../core/admin.models';
                   <td>
                     <b>{{ member.fullName }}</b>
                   </td>
-                  <td>{{ member.locality ?? '—' }}</td>
+                  <td>{{ localityName(member.permanentAddress.localityId) }}</td>
                   <td>{{ member.mobile ?? '—' }}</td>
                   <td>{{ member.email ?? '—' }}</td>
                   <td>
@@ -174,10 +180,14 @@ export class MemberListComponent implements OnInit {
     () => this.auth.roles().includes('SuperAdmin') && this.scope.tenantId() === null,
   );
 
+  readonly localities = signal<readonly Locality[]>([]);
+
   term = '';
-  locality = '';
+  localityId = '';
 
   ngOnInit(): void {
+    this.api.listLocalities().subscribe({ next: (found) => this.localities.set(found), error: () => {} });
+
     if (this.needsSamaaj()) {
       this.loading.set(false);
       return;
@@ -190,7 +200,7 @@ export class MemberListComponent implements OnInit {
     this.loading.set(true);
     this.error.set(null);
 
-    this.api.searchMembers(this.term, this.locality).subscribe({
+    this.api.searchMembers(this.term, this.localityId || null).subscribe({
       next: (found) => {
         this.members.set(found);
         this.loading.set(false);
@@ -204,7 +214,15 @@ export class MemberListComponent implements OnInit {
 
   clear(): void {
     this.term = '';
-    this.locality = '';
+    this.localityId = '';
     this.search();
+  }
+
+  localityName(localityId: string | null): string {
+    if (localityId === null) {
+      return '—';
+    }
+
+    return this.localities().find((locality) => locality.id === localityId)?.name ?? '—';
   }
 }

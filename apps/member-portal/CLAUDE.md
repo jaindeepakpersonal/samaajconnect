@@ -32,7 +32,7 @@ before translating another screen.
 | Pathshala events | — | `#pathevents` | not built — no endpoint exists |
 | Set your password | `/activate` | — | built; no wireframe covers redeeming an activation code, and three admin screens told people to do it here |
 | Forgot password | `/forgot`, `/reset` | `#forgot`, `#otp` | built — redeems into a new password, not a session |
-| My Profile | `/profile` | `#profile` | built |
+| My Profile | `/profile` | `#profile` | built — five tabs (Basic, Professional, Educational, Address, Photo) since 2026-09-12, see below |
 | Change your password | `/change-password` | — | built; no wireframe covers it. Its own screen now, reachable from the top bar's user menu, not a card on My Profile |
 
 ## Where things live
@@ -342,6 +342,47 @@ they say they are - they simply mistyped. Every other signed-in device is
 still signed out the moment it succeeds, which the screen still says plainly
 rather than leaving a member to wonder why a different tab suddenly asks them
 to sign in again.
+
+**My Profile split into five cards on 2026-09-11, then into five tabs on
+2026-09-12** — Basic, Professional, Educational, Address, Photo — and fields
+moved off free text onto master-data-service, which this app had never called
+before. `master-data.api.ts` (new, local to this feature) fetches Gautra,
+Profession and Qualification lists once on init and City/Locality lists per
+address's chosen City. Basic gained a Gautra `<select>`; Educational is one
+Qualification `<select>`, sourced the same way Gautra is. **Professional was
+relocated verbatim on 2026-09-11 and became a `<select>` of its own on
+2026-09-12** — the field split deliberately left it as free text at the time,
+and it moved onto master-data-service's `ProfessionType` category (one of the
+platform's original four flat lookup lists, present since before Qualification
+was ever added) once a dropdown was asked for; `form.profession: string`
+became `form.professionId: string`, matching Qualification's shape exactly.
+
+**One tab renders at a time, all five behind one `<form>` and one Save
+button.** The cards used to be five stacked sections a member scrolled past
+to reach the one they wanted; a horizontal tab bar (`role="tablist"`, the
+same pattern admin-portal's Master Data screen adopted the same day) now
+shows one at a time, switched by `activeTab`. Switching tabs never touches
+`form`, so a half-edited Address survives a detour to Educational and back -
+the fields are simply not rendered while their tab is inactive, and Angular's
+two-way `ngModel` binding does not need them mounted to hold their values.
+The one client-side validation (a required full name, on Basic) jumps the
+screen back to Basic on a failed save, because an error on a tab nobody is
+looking at is not a validation message.
+
+**Address is Permanent and Temporary, each a line plus a City→Locality
+cascade.** Choosing a City clears that address's own Locality field and
+fetches that City's own Locality list — the same "an uninitialised `<select>`
+renders nothing" trap this file already names for the Pathshala child picker,
+avoided the same way, seeded to `''`. Permanent and Temporary track separate
+City/Locality state because they can legitimately name different cities.
+
+**"Same as permanent" is a one-time copy, not a live link.** Checking it
+copies the current Permanent line/city/locality into Temporary and disables
+those inputs; unchecking hands them back for independent editing from
+wherever the copy left off. The server always stores two independent
+structs — this was the user's own choice, a "copy shortcut" over "kept in
+sync," so nothing on the wire or in the domain treats Temporary as derived
+from Permanent.
 
 **A photo is fetched, never linked.** `photoUrl` is a path on this platform and
 authorized per request, so an `<img src>` would fail — the browser sends no

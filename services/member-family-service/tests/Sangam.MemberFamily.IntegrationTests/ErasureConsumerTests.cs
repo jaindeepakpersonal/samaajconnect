@@ -44,9 +44,17 @@ public sealed class ErasureConsumerTests(MemberFamilyApiFactory factory)
 
         profile.Update(
             "Ravi Shah", new DateOnly(1985, 4, 2), Gender.Male,
-            "9876543210", "ravi@example.com", "12 Temple Road", "Ghatkopar",
-            "Chartered Accountant", FieldPrivacy.Default,
-            isListedInDirectory: true, DateTimeOffset.UtcNow, Guid.NewGuid());
+            mobile: "9876543210",
+            email: "ravi@example.com",
+            gautraId: Guid.NewGuid(),
+            professionId: Guid.NewGuid(),
+            qualificationId: Guid.NewGuid(),
+            permanentAddress: new ProfileAddress("12 Temple Road", Guid.NewGuid(), Guid.NewGuid()),
+            temporaryAddress: null,
+            privacy: FieldPrivacy.Default,
+            isListedInDirectory: true,
+            updatedAt: DateTimeOffset.UtcNow,
+            updatedBy: Guid.NewGuid());
 
         db.MemberProfiles.Add(profile);
 
@@ -112,8 +120,10 @@ public sealed class ErasureConsumerTests(MemberFamilyApiFactory factory)
 
         profile.Mobile.Should().BeNull();
         profile.Email.Should().BeNull();
-        profile.Address.Should().BeNull();
-        profile.Profession.Should().BeNull();
+        profile.GautraId.Should().BeNull();
+        profile.QualificationId.Should().BeNull();
+        profile.PermanentAddress.Should().Be(ProfileAddress.Empty);
+        profile.ProfessionId.Should().BeNull();
         profile.DateOfBirth.Should().BeNull();
         profile.FullName.Should().NotContain("Ravi");
     }

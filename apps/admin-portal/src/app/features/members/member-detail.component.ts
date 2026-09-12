@@ -3,7 +3,7 @@ import { FormsModule } from '@angular/forms';
 import { ActivatedRoute, RouterLink } from '@angular/router';
 import { describeError } from '@samaajconnect/shared';
 import { AdminApi } from '../../core/admin-api';
-import { AdminMember } from '../../core/admin.models';
+import { AdminAddress, AdminMember, City, Gautra, LookupItem, Locality } from '../../core/admin.models';
 
 /**
  * One member, and the correction form.
@@ -29,6 +29,14 @@ import { AdminMember } from '../../core/admin.models';
  * set" and never "not shared". The form must send the values back unchanged, so
  * showing them is not a courtesy, it is what stops a correction from wiping a
  * field the administrator was never shown.
+ *
+ * **Gautra, Qualification, and Permanent/Temporary address all became
+ * master-data-service picks on 2026-09-11, matching the member portal's own
+ * My Profile screen field for field.** Locality's City→Locality cascade is
+ * the same shape there: choosing a City clears whatever Locality was
+ * previously selected and loads that City's own list, since a Locality from
+ * the old City is nonsense once the City changes. "Same as permanent" is a
+ * one-time copy into Temporary, not a link the two stay bound by afterwards.
  */
 @Component({
   selector: 'app-member-detail',
@@ -120,37 +128,148 @@ import { AdminMember } from '../../core/admin.models';
             </div>
 
             <div class="field">
-              <label for="locality">Locality</label>
-              <input
-                class="input"
-                id="locality"
-                name="locality"
-                maxlength="120"
-                [(ngModel)]="form.locality"
-              />
+              <label for="gautra">Gautra</label>
+              <select class="input" id="gautra" name="gautra" [(ngModel)]="form.gautraId">
+                <option value="">Not set</option>
+                @for (option of gautras(); track option.id) {
+                  <option [value]="option.id">{{ option.name }}</option>
+                }
+              </select>
             </div>
 
             <div class="field">
               <label for="profession">Profession</label>
-              <input
+              <select class="input" id="profession" name="profession" [(ngModel)]="form.professionId">
+                <option value="">Not set</option>
+                @for (option of professions(); track option.id) {
+                  <option [value]="option.id">{{ option.label }}</option>
+                }
+              </select>
+            </div>
+
+            <div class="field">
+              <label for="qualification">Qualification</label>
+              <select
                 class="input"
-                id="profession"
-                name="profession"
-                maxlength="120"
-                [(ngModel)]="form.profession"
-              />
+                id="qualification"
+                name="qualification"
+                [(ngModel)]="form.qualificationId"
+              >
+                <option value="">Not set</option>
+                @for (option of qualifications(); track option.id) {
+                  <option [value]="option.id">{{ option.label }}</option>
+                }
+              </select>
             </div>
           </div>
 
+          <h3>Permanent address</h3>
+
           <div class="field">
-            <label for="address">Address</label>
+            <label for="permanent-line">Address</label>
             <input
               class="input"
-              id="address"
-              name="address"
+              id="permanent-line"
+              name="permanentLine"
               maxlength="500"
-              [(ngModel)]="form.address"
+              [(ngModel)]="form.permanentAddress.line"
             />
+          </div>
+
+          <div class="grid2">
+            <div class="field">
+              <label for="permanent-city">City</label>
+              <select
+                class="input"
+                id="permanent-city"
+                name="permanentCity"
+                [ngModel]="form.permanentAddress.cityId"
+                (ngModelChange)="onCityChange('permanent', $event)"
+              >
+                <option value="">Choose a city</option>
+                @for (option of cities(); track option.id) {
+                  <option [value]="option.id">{{ option.name }}</option>
+                }
+              </select>
+            </div>
+
+            <div class="field">
+              <label for="permanent-locality">Locality</label>
+              <select
+                class="input"
+                id="permanent-locality"
+                name="permanentLocality"
+                [(ngModel)]="form.permanentAddress.localityId"
+                [disabled]="!form.permanentAddress.cityId"
+              >
+                <option value="">Choose a locality</option>
+                @for (option of permanentLocalities(); track option.id) {
+                  <option [value]="option.id">{{ option.name }}</option>
+                }
+              </select>
+            </div>
+          </div>
+
+          <h3>Temporary address</h3>
+
+          <div class="field">
+            <label for="same-as-permanent">
+              <input
+                id="same-as-permanent"
+                type="checkbox"
+                name="sameAsPermanent"
+                [ngModel]="sameAsPermanent()"
+                (ngModelChange)="toggleSameAsPermanent($event)"
+              />
+              Same as permanent
+            </label>
+          </div>
+
+          <div class="field">
+            <label for="temporary-line">Address</label>
+            <input
+              class="input"
+              id="temporary-line"
+              name="temporaryLine"
+              maxlength="500"
+              [(ngModel)]="form.temporaryAddress.line"
+              [disabled]="sameAsPermanent()"
+            />
+          </div>
+
+          <div class="grid2">
+            <div class="field">
+              <label for="temporary-city">City</label>
+              <select
+                class="input"
+                id="temporary-city"
+                name="temporaryCity"
+                [ngModel]="form.temporaryAddress.cityId"
+                (ngModelChange)="onCityChange('temporary', $event)"
+                [disabled]="sameAsPermanent()"
+              >
+                <option value="">Choose a city</option>
+                @for (option of cities(); track option.id) {
+                  <option [value]="option.id">{{ option.name }}</option>
+                }
+              </select>
+            </div>
+
+            <div class="field">
+              <label for="temporary-locality">Locality</label>
+              <select
+                class="input"
+                id="temporary-locality"
+                name="temporaryLocality"
+                [(ngModel)]="form.temporaryAddress.localityId"
+                [disabled]="sameAsPermanent() || !form.temporaryAddress.cityId"
+              >
+                <option value="">Choose a locality</option>
+                @for (option of temporaryLocalities(); track option.id) {
+                  <option [value]="option.id">{{ option.name }}</option>
+                }
+              </select>
+            </div>
           </div>
 
           <p class="small">
@@ -192,6 +311,16 @@ export class MemberDetailComponent implements OnInit {
   readonly saved = signal(false);
   readonly error = signal<string | null>(null);
 
+  readonly gautras = signal<readonly Gautra[]>([]);
+  readonly professions = signal<readonly LookupItem[]>([]);
+  readonly qualifications = signal<readonly LookupItem[]>([]);
+  readonly cities = signal<readonly City[]>([]);
+  readonly permanentLocalities = signal<readonly Locality[]>([]);
+  readonly temporaryLocalities = signal<readonly Locality[]>([]);
+
+  /** True while the Temporary fields are a disabled copy of Permanent. */
+  readonly sameAsPermanent = signal(false);
+
   /** The service's closed list. A value outside it is a validation problem. */
   readonly genders = ['Unspecified', 'Male', 'Female', 'Other'];
 
@@ -201,9 +330,11 @@ export class MemberDetailComponent implements OnInit {
     gender: 'Unspecified',
     mobile: '',
     email: '',
-    address: '',
-    locality: '',
-    profession: '',
+    gautraId: '',
+    professionId: '',
+    qualificationId: '',
+    permanentAddress: { line: '', cityId: '', localityId: '' },
+    temporaryAddress: { line: '', cityId: '', localityId: '' },
   };
 
   nameMissing(): boolean {
@@ -211,6 +342,17 @@ export class MemberDetailComponent implements OnInit {
   }
 
   ngOnInit(): void {
+    this.api.listGautras().subscribe({ next: (found) => this.gautras.set(found), error: () => {} });
+    this.api.listLookupItems('ProfessionType').subscribe({
+      next: (found) => this.professions.set(found),
+      error: () => {},
+    });
+    this.api.listLookupItems('Qualification').subscribe({
+      next: (found) => this.qualifications.set(found),
+      error: () => {},
+    });
+    this.api.listCities().subscribe({ next: (found) => this.cities.set(found), error: () => {} });
+
     const id = this.route.snapshot.paramMap.get('id');
 
     if (id === null) {
@@ -242,10 +384,67 @@ export class MemberDetailComponent implements OnInit {
       gender: person.gender,
       mobile: person.mobile ?? '',
       email: person.email ?? '',
-      address: person.address ?? '',
-      locality: person.locality ?? '',
-      profession: person.profession ?? '',
+      gautraId: person.gautraId ?? '',
+      professionId: person.professionId ?? '',
+      qualificationId: person.qualificationId ?? '',
+      permanentAddress: toFormAddress(person.permanentAddress),
+      temporaryAddress: toFormAddress(person.temporaryAddress),
     };
+
+    this.sameAsPermanent.set(false);
+
+    if (this.form.permanentAddress.cityId) {
+      this.loadLocalities('permanent', this.form.permanentAddress.cityId);
+    }
+
+    if (this.form.temporaryAddress.cityId) {
+      this.loadLocalities('temporary', this.form.temporaryAddress.cityId);
+    }
+  }
+
+  onCityChange(which: 'permanent' | 'temporary', cityId: string): void {
+    const address = which === 'permanent' ? this.form.permanentAddress : this.form.temporaryAddress;
+
+    address.cityId = cityId;
+    // A Locality from the old City is nonsense once the City changes.
+    address.localityId = '';
+
+    if (which === 'permanent') {
+      this.permanentLocalities.set([]);
+    } else {
+      this.temporaryLocalities.set([]);
+    }
+
+    if (cityId) {
+      this.loadLocalities(which, cityId);
+    }
+  }
+
+  private loadLocalities(which: 'permanent' | 'temporary', cityId: string): void {
+    this.api.listLocalities(cityId).subscribe({
+      next: (found) => {
+        if (which === 'permanent') {
+          this.permanentLocalities.set(found);
+        } else {
+          this.temporaryLocalities.set(found);
+        }
+      },
+      error: () => {},
+    });
+  }
+
+  /**
+   * A one-time copy, not a link the two addresses stay bound by. Checking
+   * fills Temporary from Permanent and disables it; unchecking hands the
+   * fields back for independent editing from wherever the copy left them.
+   */
+  toggleSameAsPermanent(checked: boolean): void {
+    this.sameAsPermanent.set(checked);
+
+    if (checked) {
+      this.form.temporaryAddress = { ...this.form.permanentAddress };
+      this.temporaryLocalities.set(this.permanentLocalities());
+    }
   }
 
   save(): void {
@@ -259,6 +458,11 @@ export class MemberDetailComponent implements OnInit {
     this.saved.set(false);
     this.error.set(null);
 
+    const permanentAddress = toWireAddress(this.form.permanentAddress);
+    const temporaryAddress = isBlankAddress(this.form.temporaryAddress)
+      ? null
+      : toWireAddress(this.form.temporaryAddress);
+
     this.api
       .correctMember(person.id, {
         fullName: this.form.fullName.trim(),
@@ -270,9 +474,11 @@ export class MemberDetailComponent implements OnInit {
         gender: this.form.gender,
         mobile: this.blank(this.form.mobile),
         email: this.blank(this.form.email),
-        address: this.blank(this.form.address),
-        locality: this.blank(this.form.locality),
-        profession: this.blank(this.form.profession),
+        gautraId: this.blank(this.form.gautraId),
+        professionId: this.blank(this.form.professionId),
+        qualificationId: this.blank(this.form.qualificationId),
+        permanentAddress,
+        temporaryAddress,
       })
       .subscribe({
         next: (updated) => {
@@ -291,4 +497,30 @@ export class MemberDetailComponent implements OnInit {
   private blank(value: string): string | null {
     return value.trim() === '' ? null : value.trim();
   }
+}
+
+interface FormAddress {
+  line: string;
+  cityId: string;
+  localityId: string;
+}
+
+function toFormAddress(address: AdminAddress | null): FormAddress {
+  return {
+    line: address?.line ?? '',
+    cityId: address?.cityId ?? '',
+    localityId: address?.localityId ?? '',
+  };
+}
+
+function toWireAddress(address: FormAddress): AdminAddress {
+  return {
+    line: address.line.trim() === '' ? null : address.line.trim(),
+    cityId: address.cityId === '' ? null : address.cityId,
+    localityId: address.localityId === '' ? null : address.localityId,
+  };
+}
+
+function isBlankAddress(address: FormAddress): boolean {
+  return address.line.trim().length === 0 && !address.cityId && !address.localityId;
 }

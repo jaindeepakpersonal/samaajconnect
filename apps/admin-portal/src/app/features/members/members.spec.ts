@@ -12,12 +12,14 @@ function member(overrides: Partial<AdminMember> = {}): AdminMember {
     id: 'm1',
     fullName: 'Meera Shah',
     photoUrl: null,
-    locality: 'Udaipur',
+    gautraId: null,
     dateOfBirth: '1990-04-02',
     mobile: '+919812345678',
     email: 'meera@example.com',
-    address: '12 Old Road',
-    profession: 'Architect',
+    permanentAddress: { line: '12 Old Road', cityId: null, localityId: 'loc-udaipur' },
+    temporaryAddress: null,
+    professionId: null,
+    qualificationId: null,
     gender: 'Female',
     ...overrides,
   };
@@ -50,6 +52,8 @@ describe('MemberListComponent', () => {
 
   function load(members: AdminMember[] = [member()]) {
     fixture.detectChanges();
+    http.expectOne((r) => r.url === '/v1/master-data/localities')
+      .flush([{ id: 'loc-udaipur', cityId: 'city-1', name: 'Udaipur', isActive: true }]);
     http.expectOne((r) => r.url === '/v1/members').flush(members);
     fixture.detectChanges();
   }
@@ -65,13 +69,13 @@ describe('MemberListComponent', () => {
     load();
 
     component.term = 'Meera';
-    component.locality = 'Udaipur';
+    component.localityId = 'loc-udaipur';
     component.search();
 
     const request = http.expectOne((r) => r.url === '/v1/members');
 
     expect(request.request.params.get('term')).toBe('Meera');
-    expect(request.request.params.get('locality')).toBe('Udaipur');
+    expect(request.request.params.get('localityId')).toBe('loc-udaipur');
     expect(request.request.params.get('limit')).toBe('100');
 
     request.flush([]);
@@ -151,8 +155,21 @@ describe('MemberDetailComponent', () => {
 
   const text = () => fixture.nativeElement.textContent as string;
 
+  /** Flushes the four master-data lists the screen fetches once on init. */
+  function settleMasterData(): void {
+    http.expectOne((r) => r.url === '/v1/master-data/gautras').flush([]);
+    http
+      .expectOne((r) => r.url === '/v1/master-data/lookup-items' && r.params.get('category') === 'ProfessionType')
+      .flush([]);
+    http
+      .expectOne((r) => r.url === '/v1/master-data/lookup-items' && r.params.get('category') === 'Qualification')
+      .flush([]);
+    http.expectOne((r) => r.url === '/v1/master-data/cities').flush([]);
+  }
+
   function load(person: AdminMember = member()) {
     fixture.detectChanges();
+    settleMasterData();
     http.expectOne('/v1/members/m1').flush(person);
     fixture.detectChanges();
   }
@@ -168,10 +185,14 @@ describe('MemberDetailComponent', () => {
   it('turns nulls into empty strings, never the word undefined', () => {
     // An undefined bound to a `<select>` matches no option at all and renders
     // blank rather than showing its first choice.
-    load(member({ mobile: null, address: null, dateOfBirth: null }));
+    load(member({
+      mobile: null,
+      permanentAddress: { line: null, cityId: null, localityId: null },
+      dateOfBirth: null,
+    }));
 
     expect(component.form.mobile).toBe('');
-    expect(component.form.address).toBe('');
+    expect(component.form.permanentAddress.line).toBe('');
     expect(component.form.dateOfBirth).toBe('');
   });
 

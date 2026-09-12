@@ -29,20 +29,37 @@ public static class MemberMappings
     /// becomes a directory response, so there is one place to check that the
     /// rules are actually applied.
     /// </summary>
-    public static MemberResponse ToDirectoryResponse(this MemberProfile profile, ProfileViewer viewer) =>
-        new(
+    public static MemberResponse ToDirectoryResponse(this MemberProfile profile, ProfileViewer viewer)
+    {
+        var addressVisible = profile.IsVisibleTo(profile.Privacy.Address, viewer);
+
+        return new(
             profile.Id,
-            // Name, photo and locality are what a directory is for; they carry
-            // no per-field level and are visible to the Samaaj.
+            // Name, photo, Gautra and a permanent address's City/Locality are
+            // what a directory is for; they carry no per-field level and are
+            // visible to the Samaaj - a Samaaj sub-lineage reads as an identity
+            // marker here, the same family as a name, not as a phone number.
             profile.FullName,
             PhotoPath(profile.Id, profile.PhotoImageId),
-            profile.Locality,
+            profile.GautraId,
             profile.IsVisibleTo(profile.Privacy.DateOfBirth, viewer) ? profile.DateOfBirth : null,
             profile.IsVisibleTo(profile.Privacy.Mobile, viewer) ? profile.Mobile : null,
             profile.IsVisibleTo(profile.Privacy.Email, viewer) ? profile.Email : null,
-            profile.IsVisibleTo(profile.Privacy.Address, viewer) ? profile.Address : null,
-            profile.IsVisibleTo(profile.Privacy.Profession, viewer) ? profile.Profession : null,
+            new AddressResponse(
+                addressVisible ? profile.PermanentAddress.Line : null,
+                profile.PermanentAddress.CityId,
+                profile.PermanentAddress.LocalityId),
+            // The temporary address is the supplementary one, so it is gated
+            // as a whole rather than City/Locality staying visible the way
+            // the permanent address's do - there is no directory-listing
+            // reason for it to be visible at all once Line is hidden.
+            addressVisible && profile.TemporaryAddress is { } temporary
+                ? new AddressResponse(temporary.Line, temporary.CityId, temporary.LocalityId)
+                : null,
+            profile.IsVisibleTo(profile.Privacy.Profession, viewer) ? profile.ProfessionId : null,
+            profile.IsVisibleTo(profile.Privacy.Qualification, viewer) ? profile.QualificationId : null,
             profile.Gender.ToString());
+    }
 
     public static MyProfileResponse ToOwnerResponse(this MemberProfile profile) => new(
         profile.Id,
@@ -53,15 +70,21 @@ public static class MemberMappings
         profile.Gender.ToString(),
         profile.Mobile,
         profile.Email,
-        profile.Address,
-        profile.Locality,
-        profile.Profession,
+        profile.GautraId,
+        profile.ProfessionId,
+        profile.QualificationId,
+        new AddressResponse(
+            profile.PermanentAddress.Line, profile.PermanentAddress.CityId, profile.PermanentAddress.LocalityId),
+        profile.TemporaryAddress is { } temporary
+            ? new AddressResponse(temporary.Line, temporary.CityId, temporary.LocalityId)
+            : null,
         new FieldPrivacyResponse(
             profile.Privacy.Mobile.ToString(),
             profile.Privacy.Email.ToString(),
             profile.Privacy.Address.ToString(),
             profile.Privacy.Profession.ToString(),
-            profile.Privacy.DateOfBirth.ToString()),
+            profile.Privacy.DateOfBirth.ToString(),
+            profile.Privacy.Qualification.ToString()),
         profile.IsListedInDirectory,
         profile.CreatedAt,
         profile.UpdatedAt);

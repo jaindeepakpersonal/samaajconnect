@@ -20,9 +20,15 @@ public interface IMemberProfileRepository
 
     /// <summary>
     /// The Samaaj directory. Tenant-filtered, so it cannot cross Samaaj.
-    /// Matching is on name and locality only - searching by someone's private
-    /// mobile number would leak it one guess at a time.
+    /// Matching is on name (substring) and locality (exact) only - searching
+    /// by someone's private mobile number would leak it one guess at a time.
     /// </summary>
+    /// <param name="localityId">
+    /// An exact match against the permanent address's Locality, not a
+    /// substring - Locality moved from a free-text field to a
+    /// master-data-service pick, so there is no longer a string to search
+    /// toward, only a value to filter on.
+    /// </param>
     /// <param name="includeUnlisted">
     /// True only for a Samaaj administrator. A member who has taken themselves
     /// out of the directory is still someone an administrator has to be able to
@@ -31,7 +37,7 @@ public interface IMemberProfileRepository
     /// </param>
     Task<IReadOnlyList<MemberProfile>> SearchAsync(
         string? term,
-        string? locality,
+        Guid? localityId,
         int limit,
         bool includeUnlisted,
         CancellationToken cancellationToken = default);

@@ -1,9 +1,10 @@
-import { Component, OnInit, inject, signal } from '@angular/core';
+import { Component, OnInit, computed, inject, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { RouterLink } from '@angular/router';
 import { describeError } from '@samaajconnect/shared';
+import { MasterDataApi } from './master-data.api';
 import { MembersApi } from './members.api';
-import { Member } from './members.models';
+import { Locality, LookupItem, Member } from './members.models';
 
 /**
  * Members, from the member-portal wireframe's `#members` screen.
@@ -20,8 +21,15 @@ import { Member } from './members.models';
  * because a member who chose to share it should be findable by eye; the filter
  * goes.
  *
- * The locality dropdown is built from what the directory actually returns
- * rather than the wireframe's three hardcoded names, which were prototype data.
+ * **The locality filter is an exact `localityId` match now, not a substring on
+ * free text.** Locality moved to a master-data-service pick on 2026-09-11, so
+ * there is no longer a string to search toward - only a value to filter on. The
+ * dropdown still keeps its own rule from before: it offers only localities
+ * somebody in the results actually has, never the platform's full list, which
+ * would be a filter that returns nothing for no visible reason. What changed is
+ * how the option label reads - the full locality list is fetched once, from
+ * master-data-service, purely to resolve an id on screen to the name a member
+ * recognises.
  */
 @Component({
   selector: 'app-members-list',
@@ -51,10 +59,10 @@ import { Member } from './members.models';
 
           <div>
             <label for="member-locality">Locality</label>
-            <select class="input" id="member-locality" name="locality" [(ngModel)]="locality">
+            <select class="input" id="member-locality" name="locality" [(ngModel)]="localityId">
               <option value="">All localities</option>
-              @for (option of localities(); track option) {
-                <option [value]="option">{{ option }}</option>
+              @for (option of localityOptions(); track option.id) {
+                <option [value]="option.id">{{ option.name }}</option>
               }
             </select>
           </div>
@@ -73,7 +81,7 @@ import { Member } from './members.models';
           <p role="status">Loading the directory…</p>
         } @else if (members().length === 0) {
           <p class="notice info" role="status">
-            @if (term.length > 0 || locality.length > 0) {
+            @if (term.length > 0 || localityId.length > 0) {
               Nobody matches that. Try a different name or locality.
             } @else {
               This Samaaj's directory is empty.
@@ -92,13 +100,13 @@ import { Member } from './members.models';
               @for (member of members(); track member.id) {
                 <tr>
                   <td>{{ member.fullName }}</td>
-                  <td>{{ member.locality ?? '—' }}</td>
+                  <td>{{ localityName(member.permanentAddress.localityId) }}</td>
                   <td>
                     <!-- Null means "not shared", which is not the same as
                          "none" - the service returns null rather than masking,
                          so this must not claim the member has no profession. -->
-                    @if (member.profession; as profession) {
-                      {{ profession }}
+                    @if (member.professionId; as id) {
+                      {{ professionName(id) }}
                     } @else {
                       <span class="small">Not shared</span>
                     }
@@ -123,24 +131,50 @@ import { Member } from './members.models';
 })
 export class MembersListComponent implements OnInit {
   private readonly api = inject(MembersApi);
+  private readonly master = inject(MasterDataApi);
 
   readonly members = signal<readonly Member[]>([]);
   readonly loading = signal(true);
   readonly error = signal<string | null>(null);
 
   term = '';
-  locality = '';
+  localityId = '';
+
+  /** Every Locality on the platform, fetched once purely to resolve an id to a name. */
+  private readonly allLocalities = signal<readonly Locality[]>([]);
+
+  /** The ProfessionType lookup list, fetched once purely to resolve an id to a label. */
+  private readonly professions = signal<readonly LookupItem[]>([]);
 
   /**
-   * Localities to offer, taken from the directory itself.
+   * Locality ids to offer, taken from the directory itself.
    *
-   * The wireframe hardcoded three. Real ones come from the data, and a filter
-   * offering a locality nobody lives in is a filter that returns nothing for no
-   * visible reason.
+   * The wireframe hardcoded three names. Real ones come from the data, and a
+   * filter offering a locality nobody lives in is a filter that returns
+   * nothing for no visible reason.
    */
-  readonly localities = signal<readonly string[]>([]);
+  private readonly knownLocalityIds = signal<readonly string[]>([]);
+
+  readonly localityOptions = computed(() => {
+    const byId = new Map(this.allLocalities().map((locality) => [locality.id, locality]));
+
+    return this.knownLocalityIds()
+      .map((id) => byId.get(id))
+      .filter((locality): locality is Locality => locality !== undefined)
+      .sort((a, b) => a.name.localeCompare(b.name));
+  });
 
   ngOnInit(): void {
+    this.master.listLocalities().subscribe({
+      next: (found) => this.allLocalities.set(found),
+      error: () => {},
+    });
+
+    this.master.listProfessions().subscribe({
+      next: (found) => this.professions.set(found),
+      error: () => {},
+    });
+
     this.load();
   }
 
@@ -148,7 +182,7 @@ export class MembersListComponent implements OnInit {
     this.loading.set(true);
     this.error.set(null);
 
-    this.api.search(this.term, this.locality).subscribe({
+    this.api.search(this.term, this.localityId || null).subscribe({
       next: (found) => {
         this.members.set(found);
         this.rememberLocalities(found);
@@ -161,20 +195,32 @@ export class MembersListComponent implements OnInit {
     });
   }
 
+  localityName(localityId: string | null): string {
+    if (localityId === null) {
+      return '—';
+    }
+
+    return this.allLocalities().find((locality) => locality.id === localityId)?.name ?? '—';
+  }
+
+  professionName(professionId: string): string {
+    return this.professions().find((profession) => profession.id === professionId)?.label ?? '—';
+  }
+
   /**
-   * Adds any new localities to the dropdown without dropping ones a narrower
-   * search filtered out - otherwise choosing a locality would empty the list
-   * that offered it.
+   * Adds any new locality ids to the dropdown without dropping ones a
+   * narrower search filtered out - otherwise choosing a locality would empty
+   * the list that offered it.
    */
   private rememberLocalities(found: readonly Member[]): void {
-    const known = new Set(this.localities());
+    const known = new Set(this.knownLocalityIds());
 
     for (const member of found) {
-      if (member.locality !== null && member.locality.length > 0) {
-        known.add(member.locality);
+      if (member.permanentAddress.localityId !== null) {
+        known.add(member.permanentAddress.localityId);
       }
     }
 
-    this.localities.set([...known].sort((a, b) => a.localeCompare(b)));
+    this.knownLocalityIds.set([...known]);
   }
 }

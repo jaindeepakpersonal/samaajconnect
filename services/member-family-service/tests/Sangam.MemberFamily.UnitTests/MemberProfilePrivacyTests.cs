@@ -15,6 +15,13 @@ public sealed class MemberProfilePrivacyTests
     private static readonly DateTimeOffset Now = new(2026, 1, 1, 12, 0, 0, TimeSpan.Zero);
     private static readonly Guid TenantId = Guid.NewGuid();
     private static readonly Guid MemberId = Guid.NewGuid();
+    private static readonly Guid GautraId = Guid.NewGuid();
+    private static readonly Guid ProfessionId = Guid.NewGuid();
+    private static readonly Guid QualificationId = Guid.NewGuid();
+    private static readonly Guid CityId = Guid.NewGuid();
+    private static readonly Guid LocalityId = Guid.NewGuid();
+
+    private static readonly ProfileAddress Permanent = new("Udaipur, Rajasthan", CityId, LocalityId);
 
     private static MemberProfile ProfileWith(FieldPrivacy privacy)
     {
@@ -27,23 +34,26 @@ public sealed class MemberProfilePrivacyTests
             gender: Gender.Male,
             mobile: "+919812345678",
             email: "ravi@example.com",
-            address: "Udaipur, Rajasthan",
-            locality: "Udaipur",
-            profession: "Architect",
-            privacy,
+            gautraId: GautraId,
+            professionId: ProfessionId,
+            qualificationId: QualificationId,
+            permanentAddress: Permanent,
+            temporaryAddress: null,
+            privacy: privacy,
             isListedInDirectory: true,
-            Now, Guid.NewGuid());
+            updatedAt: Now,
+            updatedBy: Guid.NewGuid());
 
         return profile;
     }
 
     private static FieldPrivacy AllPrivate => new(
         PrivacyLevel.Private, PrivacyLevel.Private, PrivacyLevel.Private,
-        PrivacyLevel.Private, PrivacyLevel.Private);
+        PrivacyLevel.Private, PrivacyLevel.Private, PrivacyLevel.Private);
 
     private static FieldPrivacy AllSamaajOnly => new(
         PrivacyLevel.SamaajOnly, PrivacyLevel.SamaajOnly, PrivacyLevel.SamaajOnly,
-        PrivacyLevel.SamaajOnly, PrivacyLevel.SamaajOnly);
+        PrivacyLevel.SamaajOnly, PrivacyLevel.SamaajOnly, PrivacyLevel.SamaajOnly);
 
     private static ProfileViewer AnotherMember => new(Guid.NewGuid(), IsSamaajAdmin: false);
 
@@ -52,12 +62,14 @@ public sealed class MemberProfilePrivacyTests
     private static ProfileViewer Self => new(MemberId, IsSamaajAdmin: false);
 
     [Fact]
-    public void Another_member_sees_the_name_photo_and_locality_that_a_directory_is_for()
+    public void Another_member_sees_the_name_photo_Gautra_and_permanent_locality_that_a_directory_is_for()
     {
         var response = ProfileWith(AllPrivate).ToDirectoryResponse(AnotherMember);
 
         response.FullName.Should().Be("Ravi Shah");
-        response.Locality.Should().Be("Udaipur");
+        response.GautraId.Should().Be(GautraId);
+        response.PermanentAddress.CityId.Should().Be(CityId);
+        response.PermanentAddress.LocalityId.Should().Be(LocalityId);
     }
 
     [Fact]
@@ -67,8 +79,9 @@ public sealed class MemberProfilePrivacyTests
 
         response.Mobile.Should().BeNull();
         response.Email.Should().BeNull();
-        response.Address.Should().BeNull();
-        response.Profession.Should().BeNull();
+        response.PermanentAddress.Line.Should().BeNull();
+        response.ProfessionId.Should().BeNull();
+        response.QualificationId.Should().BeNull();
         response.DateOfBirth.Should().BeNull();
     }
 
@@ -78,7 +91,8 @@ public sealed class MemberProfilePrivacyTests
         var response = ProfileWith(AllSamaajOnly).ToDirectoryResponse(AnotherMember);
 
         response.Mobile.Should().Be("+919812345678");
-        response.Address.Should().Be("Udaipur, Rajasthan");
+        response.PermanentAddress.Line.Should().Be("Udaipur, Rajasthan");
+        response.QualificationId.Should().Be(QualificationId);
     }
 
     [Fact]
@@ -89,14 +103,16 @@ public sealed class MemberProfilePrivacyTests
             Email: PrivacyLevel.Private,
             Address: PrivacyLevel.Private,
             Profession: PrivacyLevel.Public,
-            DateOfBirth: PrivacyLevel.Private);
+            DateOfBirth: PrivacyLevel.Private,
+            Qualification: PrivacyLevel.Public);
 
         var response = ProfileWith(mixed).ToDirectoryResponse(AnotherMember);
 
         response.Mobile.Should().NotBeNull();
-        response.Profession.Should().NotBeNull();
+        response.ProfessionId.Should().NotBeNull();
+        response.QualificationId.Should().NotBeNull();
         response.Email.Should().BeNull();
-        response.Address.Should().BeNull();
+        response.PermanentAddress.Line.Should().BeNull();
         response.DateOfBirth.Should().BeNull();
     }
 
@@ -106,7 +122,7 @@ public sealed class MemberProfilePrivacyTests
         var response = ProfileWith(AllPrivate).ToDirectoryResponse(Self);
 
         response.Mobile.Should().NotBeNull();
-        response.Address.Should().NotBeNull();
+        response.PermanentAddress.Line.Should().NotBeNull();
     }
 
     [Fact]
@@ -115,7 +131,7 @@ public sealed class MemberProfilePrivacyTests
         var response = ProfileWith(AllPrivate).ToDirectoryResponse(Admin);
 
         response.Email.Should().Be("ravi@example.com");
-        response.Address.Should().NotBeNull();
+        response.PermanentAddress.Line.Should().NotBeNull();
     }
 
     [Fact]

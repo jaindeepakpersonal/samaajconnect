@@ -2,8 +2,9 @@ import { Component, OnInit, computed, inject, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { RouterLink } from '@angular/router';
 import { AuthedImageDirective, describeError } from '@samaajconnect/shared';
+import { MasterDataApi } from './master-data.api';
 import { MembersApi } from './members.api';
-import { Gender, MyProfile, PrivacyLevel } from './members.models';
+import { Address, City, Gautra, Gender, LookupItem, Locality, MyProfile, PrivacyLevel } from './members.models';
 
 /**
  * My Profile, from the member-portal wireframe's `#profile` screen.
@@ -13,19 +14,55 @@ import { Gender, MyProfile, PrivacyLevel } from './members.models';
  * notification, and there was nowhere to do it. `PATCH /v1/members/{id}` and
  * even `MembersApi.updateMe` existed; no screen called either.
  *
+ * **Five cards now, not one, as of 2026-09-11: Basic, Professional,
+ * Educational, Address and Photo.** The screen used to mix a member's basic
+ * identity fields, their profession and their address into one long card.
+ * Splitting it did not need a bigger form - it needed the fields grouped by
+ * what they are, which is also what let Gautra (Basic) and Qualification
+ * (Educational) each land somewhere that reads as their own kind of fact
+ * rather than one more row bolted onto whichever card was open.
+ *
+ * **Gautra, Qualification and, since 2026-09-12, Profession are all
+ * master-data-service picks, not free text.** `MasterDataApi` (new when
+ * Gautra/Qualification landed - member-portal had never called this service
+ * before) loads this Samaaj's own Gautra list and the platform's Qualification
+ * and ProfessionType lookup lists once on init, the same "small closed list,
+ * fetched once" shape `AuthedImageDirective`'s own photo handling and the
+ * Pathshala child picker already use elsewhere in this app. Profession was the
+ * one field the original five-card split deliberately left as free text -
+ * "just relocate it" was the explicit choice at the time - and became a
+ * dropdown once master-data-service's existing `ProfessionType` category (one
+ * of the platform's original four flat lookup lists, present since before
+ * Qualification was ever added) was the obvious place to source it from.
+ * `MemberProfile.Profession: string?` became `ProfessionId: Guid?` on the
+ * backend; the migration drops the free-text column rather than attempting to
+ * resolve old values into lookup ids, the same "cannot be recovered from old
+ * free text" call already made for `PermanentAddress.LocalityId`.
+ *
+ * **Address became Permanent and Temporary, each a line plus a City and a
+ * Locality picked from master-data-service - not two lines of free text.**
+ * Locality used to be a plain text field; it is a structured pick now, scoped
+ * to whichever City is chosen, so the two selects cascade: choosing a City
+ * loads that City's Localities and clears whatever Locality was previously
+ * selected, because a Locality from the old City would be nonsense once the
+ * City changes. "Same as permanent" is a one-time copy, not a link the two
+ * addresses stay bound by afterwards - checking it fills the Temporary
+ * fields from the Permanent ones and disables them; unchecking hands them
+ * back for independent editing from wherever the copy left them.
+ *
  * **Per-field privacy and "listed in directory" moved to Privacy settings
- * (`/privacy`) on 2026-09-11.** This screen used to carry them itself, on the
- * reasoning that every field a member fills in here is visible to their
- * Samaaj unless they say otherwise, so the levels belonged beside the fields
- * rather than behind a separate settings page. That stopped being where a
- * member would look for them once the top bar's user menu started calling
- * the destination "Privacy settings" - a member following that link and
- * finding nothing about who sees what would have been the mismatch, not the
- * page it used to be on. `form.privacy` and `form.isListedInDirectory` are
- * still here and still sent on every save, unedited - `save()`'s request
- * still replaces the whole profile, so both have to travel with it - but
- * nothing on this screen offers to change them any more, and the note above
- * the Save button says where to.
+ * (`/privacy`).** This screen used to carry them itself, on the reasoning
+ * that every field a member fills in here is visible to their Samaaj unless
+ * they say otherwise, so the levels belonged beside the fields rather than
+ * behind a separate settings page. That stopped being where a member would
+ * look for them once the top bar's user menu started calling the
+ * destination "Privacy settings" - a member following that link and finding
+ * nothing about who sees what would have been the mismatch, not the page it
+ * used to be on. `form.privacy` and `form.isListedInDirectory` are still
+ * here and still sent on every save, unedited - `save()`'s request still
+ * replaces the whole profile, so both have to travel with it - but nothing
+ * on this screen offers to change them any more, and the note above the
+ * Save button says where to.
  *
  * **The photo is a real upload now, and it is saved on its own.** It used to be
  * a link field, because the platform hosted no images and the honest control was
@@ -39,7 +76,20 @@ import { Gender, MyProfile, PrivacyLevel } from './members.models';
  * photo was text somebody typed. It also means choosing a picture takes effect
  * immediately, which is what people expect of a profile photo, and a failed
  * upload cannot lose an address somebody was halfway through editing.
+ *
+ * **The five cards became five tabs on 2026-09-12.** Stacked, a member
+ * scrolled past four cards' worth of fields to reach Photo whether or not
+ * they had come here to change it. One tab is shown at a time now, the same
+ * "one type at a time" shape admin-portal's Master Data screen was redesigned
+ * around the same day. All five still submit through the one `<form>` and one
+ * Save button below the tabs - switching tabs never touches `form`, so a
+ * half-edited Address survives a detour to Educational and back. A failed
+ * validation jumps back to Basic, because that is the only tab the one
+ * client-side check (a required full name) can ever fail on, and an error a
+ * member cannot see is not a validation message.
  */
+type ProfileTab = 'basic' | 'professional' | 'educational' | 'address' | 'photo';
+
 @Component({
   selector: 'app-profile',
   imports: [AuthedImageDirective, FormsModule, RouterLink],
@@ -66,8 +116,23 @@ import { Gender, MyProfile, PrivacyLevel } from './members.models';
       @if (loading()) {
         <p class="notice info" role="status">Loading your profile…</p>
       } @else if (profile(); as me) {
+        <div class="tabs" role="tablist" aria-label="Profile section">
+          @for (tab of tabs; track tab.key) {
+            <button
+              type="button"
+              role="tab"
+              [class.on]="activeTab() === tab.key"
+              [attr.aria-selected]="activeTab() === tab.key"
+              (click)="activeTab.set(tab.key)"
+            >
+              {{ tab.label }}
+            </button>
+          }
+        </div>
+
         <form (ngSubmit)="save()">
           <!-- Basic information ------------------------------------------- -->
+          @if (activeTab() === 'basic') {
           <div class="card">
             <h2>Basic information</h2>
 
@@ -122,43 +187,158 @@ import { Gender, MyProfile, PrivacyLevel } from './members.models';
               }
             </select>
 
-            <label for="locality">Locality</label>
-            <input
+            <label for="gautra">Gautra</label>
+            <select class="input" id="gautra" name="gautra" [(ngModel)]="form.gautraId">
+              <option value="">Not set</option>
+              @for (option of gautras(); track option.id) {
+                <option [value]="option.id">{{ option.name }}</option>
+              }
+            </select>
+          </div>
+          }
+
+          <!-- Professional ---------------------------------------------------- -->
+          @if (activeTab() === 'professional') {
+          <div class="card">
+            <h2>Professional</h2>
+
+            <label for="profession">Profession</label>
+            <select class="input" id="profession" name="profession" [(ngModel)]="form.professionId">
+              <option value="">Not set</option>
+              @for (option of professions(); track option.id) {
+                <option [value]="option.id">{{ option.label }}</option>
+              }
+            </select>
+          </div>
+          }
+
+          <!-- Educational ------------------------------------------------------ -->
+          @if (activeTab() === 'educational') {
+          <div class="card">
+            <h2>Educational</h2>
+
+            <label for="qualification">Qualification</label>
+            <select
               class="input"
-              id="locality"
-              name="locality"
-              [(ngModel)]="form.locality"
-              maxlength="120"
-              placeholder="Hiran Magri"
-            />
+              id="qualification"
+              name="qualification"
+              [(ngModel)]="form.qualificationId"
+            >
+              <option value="">Not set</option>
+              @for (option of qualifications(); track option.id) {
+                <option [value]="option.id">{{ option.label }}</option>
+              }
+            </select>
+          </div>
+          }
+
+          <!-- Address ------------------------------------------------------ -->
+          @if (activeTab() === 'address') {
+          <div class="card">
+            <h2>Address</h2>
+
+            <h3>Permanent</h3>
+
+            <label for="permanent-line">Address</label>
+            <textarea
+              class="input"
+              id="permanent-line"
+              name="permanentLine"
+              rows="3"
+              [(ngModel)]="form.permanentAddress.line"
+              maxlength="500"
+            ></textarea>
+
+            <label for="permanent-city">City</label>
+            <select
+              class="input"
+              id="permanent-city"
+              name="permanentCity"
+              [ngModel]="form.permanentAddress.cityId"
+              (ngModelChange)="onCityChange('permanent', $event)"
+            >
+              <option value="">Choose a city</option>
+              @for (option of cities(); track option.id) {
+                <option [value]="option.id">{{ option.name }}</option>
+              }
+            </select>
+
+            <label for="permanent-locality">Locality</label>
+            <select
+              class="input"
+              id="permanent-locality"
+              name="permanentLocality"
+              [(ngModel)]="form.permanentAddress.localityId"
+              [disabled]="!form.permanentAddress.cityId"
+            >
+              <option value="">Choose a locality</option>
+              @for (option of permanentLocalities(); track option.id) {
+                <option [value]="option.id">{{ option.name }}</option>
+              }
+            </select>
             <p class="small">
               Members can filter the directory by locality, so this one is always visible.
             </p>
 
-            <label for="profession">Profession</label>
-            <input
-              class="input"
-              id="profession"
-              name="profession"
-              [(ngModel)]="form.profession"
-              maxlength="120"
-            />
+            <h3>Temporary</h3>
 
-            <label for="address">Address</label>
+            <div class="privacy-row listing-row">
+              <label for="same-as-permanent">Same as permanent</label>
+              <input
+                id="same-as-permanent"
+                type="checkbox"
+                name="sameAsPermanent"
+                [ngModel]="sameAsPermanent()"
+                (ngModelChange)="toggleSameAsPermanent($event)"
+              />
+            </div>
+
+            <label for="temporary-line">Address</label>
             <textarea
               class="input"
-              id="address"
-              name="address"
+              id="temporary-line"
+              name="temporaryLine"
               rows="3"
-              [(ngModel)]="form.address"
+              [(ngModel)]="form.temporaryAddress.line"
+              [disabled]="sameAsPermanent()"
               maxlength="500"
             ></textarea>
 
-            <!-- The photo is uploaded on its own, not saved with the rest of
-                 the form: it is a file rather than a field, and the two were
-                 only ever one control because the photo used to be a link
-                 somebody typed. -->
-            <h3>Photo</h3>
+            <label for="temporary-city">City</label>
+            <select
+              class="input"
+              id="temporary-city"
+              name="temporaryCity"
+              [ngModel]="form.temporaryAddress.cityId"
+              (ngModelChange)="onCityChange('temporary', $event)"
+              [disabled]="sameAsPermanent()"
+            >
+              <option value="">Choose a city</option>
+              @for (option of cities(); track option.id) {
+                <option [value]="option.id">{{ option.name }}</option>
+              }
+            </select>
+
+            <label for="temporary-locality">Locality</label>
+            <select
+              class="input"
+              id="temporary-locality"
+              name="temporaryLocality"
+              [(ngModel)]="form.temporaryAddress.localityId"
+              [disabled]="sameAsPermanent() || !form.temporaryAddress.cityId"
+            >
+              <option value="">Choose a locality</option>
+              @for (option of temporaryLocalities(); track option.id) {
+                <option [value]="option.id">{{ option.name }}</option>
+              }
+            </select>
+          </div>
+          }
+
+          <!-- Photo ---------------------------------------------------------- -->
+          @if (activeTab() === 'photo') {
+          <div class="card">
+            <h2>Photo</h2>
 
             @if (photoPath(); as path) {
               <img class="profile-photo" [scAuthedSrc]="path" alt="Your profile photo" />
@@ -202,18 +382,19 @@ import { Gender, MyProfile, PrivacyLevel } from './members.models';
                 </button>
               </div>
             }
+          </div>
+          }
 
-            <p class="small">
-              Changes to your profile are recorded in your account activity, including which
-              fields changed. Who can see each field is set on
-              <a routerLink="/privacy">Privacy settings</a>.
-            </p>
+          <p class="small">
+            Changes to your profile are recorded in your account activity, including which
+            fields changed. Who can see each field is set on
+            <a routerLink="/privacy">Privacy settings</a>.
+          </p>
 
-            <div class="actions">
-              <button class="btn" type="submit" [disabled]="saving()">
-                {{ saving() ? 'Saving…' : 'Save changes' }}
-              </button>
-            </div>
+          <div class="actions">
+            <button class="btn" type="submit" [disabled]="saving()">
+              {{ saving() ? 'Saving…' : 'Save changes' }}
+            </button>
           </div>
         </form>
       }
@@ -222,6 +403,17 @@ import { Gender, MyProfile, PrivacyLevel } from './members.models';
 })
 export class ProfileComponent implements OnInit {
   private readonly api = inject(MembersApi);
+  private readonly master = inject(MasterDataApi);
+
+  readonly tabs: { key: ProfileTab; label: string }[] = [
+    { key: 'basic', label: 'Basic' },
+    { key: 'professional', label: 'Professional' },
+    { key: 'educational', label: 'Educational' },
+    { key: 'address', label: 'Address' },
+    { key: 'photo', label: 'Photo' },
+  ];
+
+  readonly activeTab = signal<ProfileTab>('basic');
 
   readonly profile = signal<MyProfile | null>(null);
   readonly loading = signal(false);
@@ -233,6 +425,16 @@ export class ProfileComponent implements OnInit {
   readonly uploading = signal(false);
   readonly photoError = signal<string | null>(null);
   readonly photoNotice = signal<string | null>(null);
+
+  readonly gautras = signal<readonly Gautra[]>([]);
+  readonly professions = signal<readonly LookupItem[]>([]);
+  readonly qualifications = signal<readonly LookupItem[]>([]);
+  readonly cities = signal<readonly City[]>([]);
+  readonly permanentLocalities = signal<readonly Locality[]>([]);
+  readonly temporaryLocalities = signal<readonly Locality[]>([]);
+
+  /** True while the Temporary fields are a disabled copy of Permanent. */
+  readonly sameAsPermanent = signal(false);
 
   /**
    * Where the member's own photo is, or null.
@@ -263,11 +465,13 @@ export class ProfileComponent implements OnInit {
     fullName: '',
     mobile: '',
     email: '',
-    address: '',
-    locality: '',
-    profession: '',
     dateOfBirth: '',
     gender: 'Unspecified' as Gender,
+    gautraId: '',
+    professionId: '',
+    qualificationId: '',
+    permanentAddress: { line: '', cityId: '', localityId: '' },
+    temporaryAddress: { line: '', cityId: '', localityId: '' },
     isListedInDirectory: true,
     // Overwritten by `fill()` before the form is ever rendered — the template
     // only draws once `profile()` is set. These match `FieldPrivacy.Default`
@@ -279,11 +483,23 @@ export class ProfileComponent implements OnInit {
       address: 'Private' as PrivacyLevel,
       profession: 'SamaajOnly' as PrivacyLevel,
       dateOfBirth: 'SamaajOnly' as PrivacyLevel,
+      qualification: 'SamaajOnly' as PrivacyLevel,
     },
   };
 
   ngOnInit(): void {
     this.load();
+
+    this.master.listGautras().subscribe({ next: (found) => this.gautras.set(found), error: () => {} });
+    this.master.listProfessions().subscribe({
+      next: (found) => this.professions.set(found),
+      error: () => {},
+    });
+    this.master.listQualifications().subscribe({
+      next: (found) => this.qualifications.set(found),
+      error: () => {},
+    });
+    this.master.listCities().subscribe({ next: (found) => this.cities.set(found), error: () => {} });
   }
 
   private load(): void {
@@ -308,17 +524,79 @@ export class ProfileComponent implements OnInit {
       fullName: me.fullName,
       mobile: me.mobile ?? '',
       email: me.email ?? '',
-      address: me.address ?? '',
-      locality: me.locality ?? '',
-      profession: me.profession ?? '',
       // The service sends a date, the control wants yyyy-MM-dd, and they
       // already agree — but a value with a time on it would silently render as
       // an empty date input rather than as an error.
       dateOfBirth: me.dateOfBirth ? me.dateOfBirth.slice(0, 10) : '',
       gender: me.gender,
+      gautraId: me.gautraId ?? '',
+      professionId: me.professionId ?? '',
+      qualificationId: me.qualificationId ?? '',
+      permanentAddress: toFormAddress(me.permanentAddress),
+      temporaryAddress: toFormAddress(me.temporaryAddress),
       isListedInDirectory: me.isListedInDirectory,
       privacy: { ...me.privacy },
     };
+
+    this.sameAsPermanent.set(false);
+
+    // A City already chosen needs its Localities loaded, or the select would
+    // show the id with no matching option - the same trap an uninitialised
+    // <select> falls into, one step later.
+    if (this.form.permanentAddress.cityId) {
+      this.loadLocalities('permanent', this.form.permanentAddress.cityId);
+    }
+
+    if (this.form.temporaryAddress.cityId) {
+      this.loadLocalities('temporary', this.form.temporaryAddress.cityId);
+    }
+  }
+
+  // ---- Address ------------------------------------------------------------
+
+  onCityChange(which: 'permanent' | 'temporary', cityId: string): void {
+    const address = which === 'permanent' ? this.form.permanentAddress : this.form.temporaryAddress;
+
+    address.cityId = cityId;
+    // A Locality from the old City is nonsense once the City changes.
+    address.localityId = '';
+
+    if (which === 'permanent') {
+      this.permanentLocalities.set([]);
+    } else {
+      this.temporaryLocalities.set([]);
+    }
+
+    if (cityId) {
+      this.loadLocalities(which, cityId);
+    }
+  }
+
+  private loadLocalities(which: 'permanent' | 'temporary', cityId: string): void {
+    this.master.listLocalities(cityId).subscribe({
+      next: (found) => {
+        if (which === 'permanent') {
+          this.permanentLocalities.set(found);
+        } else {
+          this.temporaryLocalities.set(found);
+        }
+      },
+      error: () => {},
+    });
+  }
+
+  /**
+   * A one-time copy, not a link the two addresses stay bound by. Checking
+   * fills Temporary from Permanent and disables it; unchecking hands the
+   * fields back for independent editing from wherever the copy left them.
+   */
+  toggleSameAsPermanent(checked: boolean): void {
+    this.sameAsPermanent.set(checked);
+
+    if (checked) {
+      this.form.temporaryAddress = { ...this.form.permanentAddress };
+      this.temporaryLocalities.set(this.permanentLocalities());
+    }
   }
 
   save(): void {
@@ -329,10 +607,23 @@ export class ProfileComponent implements OnInit {
     const current = this.profile();
 
     if (current === null || !this.form.fullName.trim()) {
+      // The only client-side validation is a required full name, which only
+      // ever renders on the Basic tab - jumping there is what makes the error
+      // this sets visible rather than silent on whichever tab was open.
+      this.activeTab.set('basic');
+
       return;
     }
 
     this.saving.set(true);
+
+    const permanentAddress = toWireAddress(this.form.permanentAddress);
+    // "No temporary address" is a real, distinct state from one with nothing
+    // filled in - sent as null, not as an object every field of which is
+    // null, so the two never come apart on the wire.
+    const temporaryAddress = isBlankAddress(this.form.temporaryAddress)
+      ? null
+      : toWireAddress(this.form.temporaryAddress);
 
     this.api
       .updateMe({
@@ -343,11 +634,13 @@ export class ProfileComponent implements OnInit {
         // different states in one column.
         mobile: blankToNull(this.form.mobile),
         email: blankToNull(this.form.email),
-        address: blankToNull(this.form.address),
-        locality: blankToNull(this.form.locality),
-        profession: blankToNull(this.form.profession),
         dateOfBirth: blankToNull(this.form.dateOfBirth),
         gender: this.form.gender,
+        gautraId: blankToNull(this.form.gautraId),
+        professionId: blankToNull(this.form.professionId),
+        qualificationId: blankToNull(this.form.qualificationId),
+        permanentAddress,
+        temporaryAddress,
         isListedInDirectory: this.form.isListedInDirectory,
         privacy: { ...this.form.privacy },
       })
@@ -465,4 +758,30 @@ function blankToNull(value: string): string | null {
   const trimmed = value.trim();
 
   return trimmed.length === 0 ? null : trimmed;
+}
+
+interface FormAddress {
+  line: string;
+  cityId: string;
+  localityId: string;
+}
+
+function toFormAddress(address: Address | null): FormAddress {
+  return {
+    line: address?.line ?? '',
+    cityId: address?.cityId ?? '',
+    localityId: address?.localityId ?? '',
+  };
+}
+
+function toWireAddress(address: FormAddress): Address {
+  return {
+    line: blankToNull(address.line),
+    cityId: blankToNull(address.cityId),
+    localityId: blankToNull(address.localityId),
+  };
+}
+
+function isBlankAddress(address: FormAddress): boolean {
+  return address.line.trim().length === 0 && !address.cityId && !address.localityId;
 }

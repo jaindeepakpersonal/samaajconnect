@@ -17,12 +17,12 @@ public sealed class MemberProfileConfiguration : IEntityTypeConfiguration<Member
 
         builder.Property(p => p.TenantId).IsRequired();
         builder.Property(p => p.FullName).HasMaxLength(200).IsRequired();
-        // No max length: PhotoImageId is a Guid pointing at stored_images.
+        // No max length: PhotoImageId, GautraId, ProfessionId and
+        // QualificationId are Guids - the latter three pointing at
+        // master-data-service, held as plain foreign keys with no referential
+        // integrity across the service boundary.
         builder.Property(p => p.Mobile).HasMaxLength(20);
         builder.Property(p => p.Email).HasMaxLength(320);
-        builder.Property(p => p.Address).HasMaxLength(500);
-        builder.Property(p => p.Locality).HasMaxLength(120);
-        builder.Property(p => p.Profession).HasMaxLength(120);
         builder.Property(p => p.CreatedAt).IsRequired();
 
         // Defaulted in the database as well as in the aggregate, so the rows that
@@ -48,7 +48,7 @@ public sealed class MemberProfileConfiguration : IEntityTypeConfiguration<Member
 
         builder.Property(p => p.Gender).HasConversion<string>().HasMaxLength(20).IsRequired();
 
-        // Owned rather than a table of its own: five levels that only ever
+        // Owned rather than a table of its own: six levels that only ever
         // travel with their profile.
         builder.OwnsOne(p => p.Privacy, privacy =>
         {
@@ -62,13 +62,44 @@ public sealed class MemberProfileConfiguration : IEntityTypeConfiguration<Member
                 .HasConversion<string>().HasMaxLength(20).IsRequired();
             privacy.Property(x => x.DateOfBirth).HasColumnName("privacy_date_of_birth")
                 .HasConversion<string>().HasMaxLength(20).IsRequired();
+            privacy.Property(x => x.Qualification).HasColumnName("privacy_qualification")
+                .HasConversion<string>().HasMaxLength(20).IsRequired();
         });
 
         builder.Navigation(p => p.Privacy).IsRequired();
 
-        // The directory is searched a Samaaj at a time, by name and locality.
+        // One shape (ProfileAddress), owned twice - the same CLR type can be
+        // owned more than once as long as each OwnsOne call names its own
+        // columns, which these do.
+        builder.OwnsOne(p => p.PermanentAddress, address =>
+        {
+            address.Property(x => x.Line).HasColumnName("permanent_address_line").HasMaxLength(500);
+            address.Property(x => x.CityId).HasColumnName("permanent_address_city_id");
+            address.Property(x => x.LocalityId).HasColumnName("permanent_address_locality_id");
+        });
+
+        builder.Navigation(p => p.PermanentAddress).IsRequired();
+
+        builder.OwnsOne(p => p.TemporaryAddress, address =>
+        {
+            address.Property(x => x.Line).HasColumnName("temporary_address_line").HasMaxLength(500);
+            address.Property(x => x.CityId).HasColumnName("temporary_address_city_id");
+            address.Property(x => x.LocalityId).HasColumnName("temporary_address_locality_id");
+        });
+
+        // TemporaryAddress itself stays optional - unlike Permanent, above,
+        // "no temporary address" is a real state, not an unset one.
+
+        // The directory is searched a Samaaj at a time, by name. It used to
+        // also carry a (TenantId, Locality) index for the free-text locality
+        // filter; a composite index spanning the parent's TenantId and an
+        // owned type's own column needs more than HasIndex's usual lambda
+        // shape, and at this platform's scale (a few thousand members per
+        // Samaaj, the same reasoning member-family-service's own CLAUDE.md
+        // already gives for keeping photos in this database rather than an
+        // object store) a plain filter on PermanentAddress_LocalityId costs
+        // nothing worth indexing away yet.
         builder.HasIndex(p => new { p.TenantId, p.FullName });
-        builder.HasIndex(p => new { p.TenantId, p.Locality });
 
         builder.Ignore(p => p.DomainEvents);
     }

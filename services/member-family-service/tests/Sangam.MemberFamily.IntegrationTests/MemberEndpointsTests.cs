@@ -16,6 +16,11 @@ public sealed class MemberEndpointsTests(MemberFamilyApiFactory factory)
     private static readonly Guid TenantA = Guid.NewGuid();
     private static readonly Guid TenantB = Guid.NewGuid();
 
+    // Locality is a master-data-service pick now, not free text - these stand
+    // in for "Udaipur" and "Pune" for the exact-match search tests.
+    private static readonly Guid UdaipurLocalityId = Guid.NewGuid();
+    private static readonly Guid PuneLocalityId = Guid.NewGuid();
+
     private readonly Guid _ravi = Guid.NewGuid();
     private readonly Guid _meera = Guid.NewGuid();
     private readonly Guid _outsider = Guid.NewGuid();
@@ -29,14 +34,14 @@ public sealed class MemberEndpointsTests(MemberFamilyApiFactory factory)
 
     public async Task InitializeAsync()
     {
-        await SeedAsync(_ravi, TenantA, Named("Ravi Shah"), "Udaipur");
-        await SeedAsync(_meera, TenantA, Named("Meera Shah"), "Udaipur");
-        await SeedAsync(_outsider, TenantB, Named("Someone Else"), "Pune");
+        await SeedAsync(_ravi, TenantA, Named("Ravi Shah"), UdaipurLocalityId);
+        await SeedAsync(_meera, TenantA, Named("Meera Shah"), UdaipurLocalityId);
+        await SeedAsync(_outsider, TenantB, Named("Someone Else"), PuneLocalityId);
     }
 
     public Task DisposeAsync() => Task.CompletedTask;
 
-    private async Task SeedAsync(Guid id, Guid tenantId, string name, string locality)
+    private async Task SeedAsync(Guid id, Guid tenantId, string name, Guid? localityId)
     {
         await using var scope = factory.Services.CreateAsyncScope();
         var db = scope.ServiceProvider.GetRequiredService<MemberFamilyDbContext>();
@@ -57,17 +62,21 @@ public sealed class MemberEndpointsTests(MemberFamilyApiFactory factory)
             gender: Gender.Unspecified,
             mobile: "+919812345678",
             email: contact,
-            address: "An address",
-            locality: locality,
-            profession: "Architect",
-            new FieldPrivacy(
+            gautraId: null,
+            professionId: null,
+            qualificationId: null,
+            permanentAddress: new ProfileAddress("An address", CityId: null, localityId),
+            temporaryAddress: null,
+            privacy: new FieldPrivacy(
                 PrivacyLevel.SamaajOnly,
                 PrivacyLevel.Private,
                 PrivacyLevel.Private,
                 PrivacyLevel.SamaajOnly,
-                PrivacyLevel.Private),
+                PrivacyLevel.Private,
+                PrivacyLevel.SamaajOnly),
             isListedInDirectory: true,
-            DateTimeOffset.UtcNow, Guid.NewGuid());
+            updatedAt: DateTimeOffset.UtcNow,
+            updatedBy: Guid.NewGuid());
 
         db.MemberProfiles.Add(profile);
         await db.SaveChangesAsync();
@@ -89,7 +98,15 @@ public sealed class MemberEndpointsTests(MemberFamilyApiFactory factory)
         address = level,
         profession = level,
         dateOfBirth = level,
+        qualification = level,
     };
+
+    /// <summary>
+    /// A permanent address with nothing set - `UpdateProfileCommand` requires
+    /// the object itself (there is no state for "no address at all", unlike
+    /// the temporary one), so every PATCH body in this file needs one.
+    /// </summary>
+    private static object BlankAddress() => new { line = (string?)null, cityId = (Guid?)null, localityId = (Guid?)null };
 
     [Fact]
     public async Task The_directory_needs_a_token()
@@ -128,7 +145,7 @@ public sealed class MemberEndpointsTests(MemberFamilyApiFactory factory)
 
         meera.GetProperty("mobile").GetString().Should().NotBeNullOrEmpty();
         meera.GetProperty("email").ValueKind.Should().Be(JsonValueKind.Null);
-        meera.GetProperty("address").ValueKind.Should().Be(JsonValueKind.Null);
+        meera.GetProperty("permanentAddress").GetProperty("line").ValueKind.Should().Be(JsonValueKind.Null);
     }
 
     [Fact]
@@ -163,6 +180,32 @@ public sealed class MemberEndpointsTests(MemberFamilyApiFactory factory)
     }
 
     [Fact]
+    public async Task Searching_by_locality_is_an_exact_match_not_a_substring()
+    {
+        // Locality moved from free text to a master-data-service pick, so
+        // there is no longer a string to search toward - only a value to
+        // filter on.
+        var directory = await MemberClient(_ravi, TenantA)
+            .GetFromJsonAsync<JsonElement>("/v1/members?localityId=" + UdaipurLocalityId);
+
+        var names = directory.EnumerateArray()
+            .Select(m => m.GetProperty("fullName").GetString())
+            .ToList();
+
+        names.Should().Contain(Named("Ravi Shah"));
+        names.Should().Contain(Named("Meera Shah"));
+    }
+
+    [Fact]
+    public async Task A_different_localitys_members_are_not_returned()
+    {
+        var directory = await MemberClient(_ravi, TenantA)
+            .GetFromJsonAsync<JsonElement>("/v1/members?localityId=" + Guid.NewGuid());
+
+        directory.EnumerateArray().Should().BeEmpty();
+    }
+
+    [Fact]
     public async Task One_member_can_be_read_by_id()
     {
         // API-CONTRACTS.md promised this route from the start and nothing
@@ -189,12 +232,16 @@ public sealed class MemberEndpointsTests(MemberFamilyApiFactory factory)
         var direct = await MemberClient(_ravi, TenantA)
             .GetFromJsonAsync<JsonElement>($"/v1/members/{_meera}");
 
-        foreach (var field in new[] { "mobile", "email", "address", "profession" })
+        foreach (var field in new[] { "mobile", "email", "professionId" })
         {
             direct.GetProperty(field).ToString().Should().Be(
                 fromList.GetProperty(field).ToString(),
                 $"the detail view must not reveal more {field} than the directory");
         }
+
+        direct.GetProperty("permanentAddress").GetProperty("line").ToString().Should().Be(
+            fromList.GetProperty("permanentAddress").GetProperty("line").ToString(),
+            "the detail view must not reveal more of the address than the directory");
     }
 
     [Fact]
@@ -220,7 +267,13 @@ public sealed class MemberEndpointsTests(MemberFamilyApiFactory factory)
     {
         var response = await MemberClient(_ravi, TenantA).PatchAsJsonAsync(
             "/v1/members/" + _ravi,
-            new { fullName = Named("Ravi K Shah"), locality = "Jaipur", privacy = PrivacyAll("Private"), isListedInDirectory = true });
+            new
+            {
+                fullName = Named("Ravi K Shah"),
+                permanentAddress = BlankAddress(),
+                privacy = PrivacyAll("Private"),
+                isListedInDirectory = true,
+            });
 
         response.StatusCode.Should().Be(HttpStatusCode.OK);
 
@@ -235,7 +288,13 @@ public sealed class MemberEndpointsTests(MemberFamilyApiFactory factory)
     {
         var response = await MemberClient(_ravi, TenantA).PatchAsJsonAsync(
             "/v1/members/" + _meera,
-            new { fullName = "Hijacked", privacy = PrivacyAll("Public"), isListedInDirectory = true });
+            new
+            {
+                fullName = "Hijacked",
+                permanentAddress = BlankAddress(),
+                privacy = PrivacyAll("Public"),
+                isListedInDirectory = true,
+            });
 
         response.StatusCode.Should().Be(HttpStatusCode.Forbidden);
     }
@@ -247,7 +306,13 @@ public sealed class MemberEndpointsTests(MemberFamilyApiFactory factory)
         // than trusting the query filter alone.
         var response = await AdminClient(TenantA).PatchAsJsonAsync(
             "/v1/members/" + _outsider,
-            new { fullName = "Hijacked", privacy = PrivacyAll("Public"), isListedInDirectory = true });
+            new
+            {
+                fullName = "Hijacked",
+                permanentAddress = BlankAddress(),
+                privacy = PrivacyAll("Public"),
+                isListedInDirectory = true,
+            });
 
         response.StatusCode.Should().Be(HttpStatusCode.NotFound);
     }
@@ -260,6 +325,7 @@ public sealed class MemberEndpointsTests(MemberFamilyApiFactory factory)
             new
             {
                 fullName = "Ravi Shah",
+                permanentAddress = BlankAddress(),
                 privacy = new
                 {
                     mobile = "Whenever",
@@ -267,6 +333,7 @@ public sealed class MemberEndpointsTests(MemberFamilyApiFactory factory)
                     address = "Private",
                     profession = "Private",
                     dateOfBirth = "Private",
+                    qualification = "Private",
                 },
             });
 
@@ -287,7 +354,7 @@ public sealed class MemberEndpointsTests(MemberFamilyApiFactory factory)
         // something else entirely.
         var response = await MemberClient(_ravi, TenantA).PatchAsJsonAsync(
             "/v1/members/" + _ravi,
-            new { fullName = Named("Ravi No Privacy"), locality = "Jaipur" });
+            new { fullName = Named("Ravi No Privacy"), permanentAddress = BlankAddress() });
 
         response.StatusCode.Should().Be(HttpStatusCode.BadRequest);
 
@@ -304,7 +371,7 @@ public sealed class MemberEndpointsTests(MemberFamilyApiFactory factory)
         // telling an attacker it had reached code it did not expect to.
         var response = await MemberClient(_ravi, TenantA).PatchAsJsonAsync(
             "/v1/members/" + _meera,
-            new { fullName = Named("Not Mine"), locality = "Jaipur" });
+            new { fullName = Named("Not Mine"), permanentAddress = BlankAddress() });
 
         response.StatusCode.Should().NotBe(HttpStatusCode.InternalServerError);
     }
@@ -331,9 +398,11 @@ public sealed class MemberEndpointsTests(MemberFamilyApiFactory factory)
         gender = "Unspecified",
         mobile,
         email = "kept@example.com",
-        address = "An address",
-        locality = "Udaipur",
-        profession = "Architect",
+        gautraId = (Guid?)null,
+        professionId = (Guid?)null,
+        qualificationId = (Guid?)null,
+        permanentAddress = new { line = "An address", cityId = (Guid?)null, localityId = UdaipurLocalityId },
+        temporaryAddress = (object?)null,
     };
 
     [Fact]
@@ -398,7 +467,7 @@ public sealed class MemberEndpointsTests(MemberFamilyApiFactory factory)
         // one caller entitled to it would be worse than saying so.
         var admin = Guid.NewGuid();
 
-        await SeedAsync(admin, TenantA, Named("An Admin"), "Udaipur");
+        await SeedAsync(admin, TenantA, Named("An Admin"), UdaipurLocalityId);
 
         var client = factory.CreateClientAs(
             admin, TenantA, ["SamaajAdmin"], ["Members.Read", "Members.Write"]);
@@ -424,6 +493,7 @@ public sealed class MemberEndpointsTests(MemberFamilyApiFactory factory)
             new
             {
                 fullName = Named("Meera Shah"),
+                permanentAddress = BlankAddress(),
                 privacy = PrivacyAll("Public"),
                 isListedInDirectory = true,
             });

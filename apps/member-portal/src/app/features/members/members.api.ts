@@ -29,20 +29,22 @@ export class MembersApi {
    * The Samaaj directory, each row already filtered to what this viewer may
    * see.
    *
-   * The service takes a name/locality term and a locality; it does **not**
-   * filter on profession, because profession carries a privacy level and a
-   * server-side filter on it would let a caller confirm a private value one
-   * query at a time. See the list screen for what that costs the wireframe.
+   * The service takes a name term and a Locality id - exact, not a
+   * substring, since Locality is a master-data-service pick now rather than
+   * text somebody typed. It does **not** filter on profession, because
+   * profession carries a privacy level and a server-side filter on it would
+   * let a caller confirm a private value one query at a time. See the list
+   * screen for what that costs the wireframe.
    */
-  search(term?: string | null, locality?: string | null): Observable<Member[]> {
+  search(term?: string | null, localityId?: string | null): Observable<Member[]> {
     let params = new HttpParams();
 
     if (term && term.length > 0) {
       params = params.set('term', term);
     }
 
-    if (locality && locality.length > 0) {
-      params = params.set('locality', locality);
+    if (localityId) {
+      params = params.set('localityId', localityId);
     }
 
     return this.http.get<Member[]>('/v1/members', { params });
@@ -65,9 +67,13 @@ export class MembersApi {
       gender: profile.gender,
       mobile: profile.mobile,
       email: profile.email,
-      address: profile.address,
-      locality: profile.locality,
-      profession: profile.profession,
+      gautraId: profile.gautraId,
+      professionId: profile.professionId,
+      qualificationId: profile.qualificationId,
+      // Always sent, never omitted - the service has no state for "no
+      // permanent address at all", only fields that are individually unset.
+      permanentAddress: profile.permanentAddress,
+      temporaryAddress: profile.temporaryAddress,
       privacy: profile.privacy,
       // Always sent. The service refuses a body without it rather than
       // defaulting, because defaulting would put a member who had taken

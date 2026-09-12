@@ -14,7 +14,8 @@ public sealed record FieldPrivacy(
     PrivacyLevel Email,
     PrivacyLevel Address,
     PrivacyLevel Profession,
-    PrivacyLevel DateOfBirth)
+    PrivacyLevel DateOfBirth,
+    PrivacyLevel Qualification)
 {
     /// <summary>
     /// What a new member gets. Contact details start closed and the member
@@ -25,5 +26,9 @@ public sealed record FieldPrivacy(
         Email: PrivacyLevel.Private,
         Address: PrivacyLevel.Private,
         Profession: PrivacyLevel.SamaajOnly,
-        DateOfBirth: PrivacyLevel.SamaajOnly);
+        DateOfBirth: PrivacyLevel.SamaajOnly,
+        // Qualification is the closest sibling Profession has - a personal/
+        // professional fact rather than an identity marker like a name or a
+        // locality - so it starts at the same level.
+        Qualification: PrivacyLevel.SamaajOnly);
 }

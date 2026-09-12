@@ -82,10 +82,10 @@ enforced by `TenantAuthorizationBehavior`, not just UI hiding.
 
 | Method | Path | Roles | Purpose |
 |---|---|---|---|
-| GET | `/members` | Member, SamaajAdmin | Search/filter tenant directory |
+| GET | `/members` | Member, SamaajAdmin | Search/filter tenant directory. `term` matches full name; `localityId` is an exact match against the searched member's permanent Locality (a master-data-service id, not a substring — see below) |
 | GET | `/members/registration-summary` | `SamaajAdmin`/`SuperAdmin` + `Members.Read` | Registrations in the current 30-day window against the 30 days before it, for the admin Reports & Analytics screen |
 | GET | `/members/{id}` | `Members.Read` | One member, through the same per-field privacy mapper the directory uses |
-| PATCH | `/members/{id}` | Member, **self only** | Update your own profile. Replaces it whole: `privacy` and `isListedInDirectory` are both **required**, because defaulting either would silently reopen something a member had closed. Takes **no** photo field — see below |
+| PATCH | `/members/{id}` | Member, **self only** | Update your own profile. Replaces it whole: `privacy` and `isListedInDirectory` are both **required**, because defaulting either would silently reopen something a member had closed. Also carries `gautraId`, `professionId`, `qualificationId` (all master-data-service ids), `permanentAddress` (`{line, cityId, localityId}`, required) and `temporaryAddress` (same shape, nullable). Takes **no** photo field — see below |
 | PATCH | `/members/{id}/details` | `SamaajAdmin` + `Members.Write`, never self | Correct somebody else's factual details. The same fields **minus** `privacy` and `isListedInDirectory`, which are the member's own. **409** on your own id: use the profile screen, which can set them |
 | POST | `/members/{id}/photo` | Member (self), `Members.Write` | `multipart/form-data`, one file part. JPEG, PNG or WebP, 2 MB |
 | GET | `/members/{id}/photo` | `Members.Read` | The bytes. `ETag` + `Cache-Control: private` |
@@ -336,7 +336,7 @@ before the person filling them in has an account. See root `CLAUDE.md` §6 and
 
 | Method | Path | Permission | Purpose |
 |---|---|---|---|
-| GET | `/lookup-items?category=` | anonymous | One category's list (`Country`, `ProfessionType`, `Gender`, `MaritalStatus`), active first by sort order |
+| GET | `/lookup-items?category=` | anonymous | One category's list (`Country`, `ProfessionType`, `Gender`, `MaritalStatus`, `Qualification`), active first by sort order |
 | GET | `/lookup-items/{id}` | anonymous | One lookup item |
 | POST | `/lookup-items` | `MasterData.Manage` | Add a row to one of the four flat lists. Refuses a duplicate `(category, code)` |
 | PUT | `/lookup-items/{id}` | `MasterData.Manage` | Rename/reorder. Code and category are fixed once created |

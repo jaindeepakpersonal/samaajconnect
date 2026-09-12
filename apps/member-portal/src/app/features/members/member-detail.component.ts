@@ -1,8 +1,9 @@
 import { Component, OnInit, inject, signal } from '@angular/core';
 import { ActivatedRoute, RouterLink } from '@angular/router';
 import { describeError } from '@samaajconnect/shared';
+import { MasterDataApi } from './master-data.api';
 import { MembersApi } from './members.api';
-import { Member } from './members.models';
+import { Gautra, LookupItem, Locality, Member } from './members.models';
 
 /**
  * One member, from the member-portal wireframe's `#memberdetail` screen.
@@ -18,6 +19,15 @@ import { Member } from './members.models';
  * here the two cases are indistinguishable, and the honest label is the one
  * that does not claim the member has no mobile number. The wireframe says
  * exactly this with "Mobile: Not shared".
+ *
+ * **Gautra, Locality, Qualification and, since 2026-09-12, Profession are ids
+ * on the wire, resolved to names here.** Each is a small, closed, platform- or
+ * Samaaj-wide list - the same shape the admin panel's Pathshala placement
+ * queue and this app's own Pathshala child picker already resolve ids
+ * against, rather than a call per row for an arbitrary set of people. `GET
+ * .../localities` with no `cityId` returns every Locality on the platform in
+ * one call, which is all this screen needs - it shows the id it already has,
+ * not a City to pick one by.
  *
  * The wireframe's second card - Family and Volunteer Group - is **not** built.
  * Both live in other services: a household is member-family-service's but is
@@ -51,11 +61,17 @@ import { Member } from './members.models';
             <h2>Profile</h2>
 
             <dl class="profile">
+              <dt>Gautra</dt>
+              <dd>{{ gautraName(found.gautraId) }}</dd>
+
               <dt>Locality</dt>
-              <dd>{{ found.locality ?? notShared }}</dd>
+              <dd>{{ localityName(found.permanentAddress.localityId) }}</dd>
 
               <dt>Profession</dt>
-              <dd>{{ found.profession ?? notShared }}</dd>
+              <dd>{{ professionName(found.professionId) }}</dd>
+
+              <dt>Qualification</dt>
+              <dd>{{ qualificationName(found.qualificationId) }}</dd>
 
               <dt>Mobile</dt>
               <dd>{{ found.mobile ?? notShared }}</dd>
@@ -64,7 +80,7 @@ import { Member } from './members.models';
               <dd>{{ found.email ?? notShared }}</dd>
 
               <dt>Address</dt>
-              <dd>{{ found.address ?? notShared }}</dd>
+              <dd>{{ found.permanentAddress.line ?? notShared }}</dd>
 
               <dt>Date of birth</dt>
               <dd>{{ found.dateOfBirth ? date(found.dateOfBirth) : notShared }}</dd>
@@ -91,6 +107,7 @@ import { Member } from './members.models';
 })
 export class MemberDetailComponent implements OnInit {
   private readonly api = inject(MembersApi);
+  private readonly master = inject(MasterDataApi);
   private readonly route = inject(ActivatedRoute);
 
   /**
@@ -104,8 +121,27 @@ export class MemberDetailComponent implements OnInit {
   readonly loading = signal(true);
   readonly error = signal<string | null>(null);
 
+  private readonly gautras = signal<readonly Gautra[]>([]);
+  private readonly professions = signal<readonly LookupItem[]>([]);
+  private readonly qualifications = signal<readonly LookupItem[]>([]);
+  private readonly localities = signal<readonly Locality[]>([]);
+
   ngOnInit(): void {
     this.load();
+
+    this.master.listGautras().subscribe({ next: (found) => this.gautras.set(found), error: () => {} });
+    this.master.listProfessions().subscribe({
+      next: (found) => this.professions.set(found),
+      error: () => {},
+    });
+    this.master.listQualifications().subscribe({
+      next: (found) => this.qualifications.set(found),
+      error: () => {},
+    });
+    this.master.listLocalities().subscribe({
+      next: (found) => this.localities.set(found),
+      error: () => {},
+    });
   }
 
   load(): void {
@@ -135,6 +171,41 @@ export class MemberDetailComponent implements OnInit {
   /** For the subtitle. Falls back to the whole name rather than to nothing. */
   firstName(member: Member): string {
     return member.fullName.split(' ')[0] || member.fullName;
+  }
+
+  gautraName(gautraId: string | null): string {
+    if (gautraId === null) {
+      return this.notShared;
+    }
+
+    return this.gautras().find((gautra) => gautra.id === gautraId)?.name ?? this.notShared;
+  }
+
+  professionName(professionId: string | null): string {
+    if (professionId === null) {
+      return this.notShared;
+    }
+
+    return this.professions().find((profession) => profession.id === professionId)?.label ?? this.notShared;
+  }
+
+  qualificationName(qualificationId: string | null): string {
+    if (qualificationId === null) {
+      return this.notShared;
+    }
+
+    return (
+      this.qualifications().find((qualification) => qualification.id === qualificationId)?.label
+        ?? this.notShared
+    );
+  }
+
+  localityName(localityId: string | null): string {
+    if (localityId === null) {
+      return this.notShared;
+    }
+
+    return this.localities().find((locality) => locality.id === localityId)?.name ?? this.notShared;
   }
 
   date(iso: string): string {

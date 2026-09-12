@@ -648,16 +648,29 @@ export interface SocialIssue {
  * are listed. This screen cannot change either, so being shown them would be
  * being shown a control that does nothing.
  */
+/**
+ * One address - the free-text line plus the City and Locality ids picked
+ * from master-data-service. Mirrors `AddressResponse`, reused for both
+ * Permanent and Temporary.
+ */
+export interface AdminAddress {
+  readonly line: string | null;
+  readonly cityId: string | null;
+  readonly localityId: string | null;
+}
+
 export interface AdminMember {
   readonly id: string;
   readonly fullName: string;
   readonly photoUrl: string | null;
-  readonly locality: string | null;
+  readonly gautraId: string | null;
   readonly dateOfBirth: string | null;
   readonly mobile: string | null;
   readonly email: string | null;
-  readonly address: string | null;
-  readonly profession: string | null;
+  readonly permanentAddress: AdminAddress;
+  readonly temporaryAddress: AdminAddress | null;
+  readonly professionId: string | null;
+  readonly qualificationId: string | null;
   readonly gender: string;
 }
 
@@ -668,9 +681,11 @@ export interface MemberCorrection {
   readonly gender: string;
   readonly mobile: string | null;
   readonly email: string | null;
-  readonly address: string | null;
-  readonly locality: string | null;
-  readonly profession: string | null;
+  readonly gautraId: string | null;
+  readonly professionId: string | null;
+  readonly qualificationId: string | null;
+  readonly permanentAddress: AdminAddress;
+  readonly temporaryAddress: AdminAddress | null;
 }
 
 // ---- Reports & Analytics ---------------------------------------------------

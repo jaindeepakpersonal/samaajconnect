@@ -5,15 +5,15 @@ namespace Sangam.MasterData.Domain.Lookups;
 
 /// <summary>
 /// One row in one of the platform's flat, admin-managed reference lists:
-/// Country, ProfessionType, Gender, or MaritalStatus.
+/// Country, ProfessionType, Gender, MaritalStatus, or Qualification.
 /// </summary>
 /// <remarks>
-/// These four categories share an identical shape - a code, a label, a sort
+/// These categories share an identical shape - a code, a label, a sort
 /// position and an active flag - and nothing else on the platform reasons
 /// about them differently from one category to the next. A separate CRUD
-/// aggregate for each of the four would be four copies of the same file with
+/// aggregate for each would be that many copies of the same file with
 /// the words changed, which is not the "three similar lines" root CLAUDE.md
-/// asks to leave alone; it is the same table, four times.
+/// asks to leave alone; it is the same table, five times over.
 ///
 /// <c>City</c>, <c>Locality</c> and <c>Gautra</c> are deliberately <b>not</b>
 /// part of this table. City and Locality carry a parent id (a hierarchy this
@@ -86,11 +86,19 @@ public sealed class LookupItem : AggregateRoot
     }
 }
 
-/// <summary>The four flat, platform-wide reference lists this aggregate holds.</summary>
+/// <summary>The flat, platform-wide reference lists this aggregate holds.</summary>
 public enum LookupCategory
 {
     Country = 1,
     ProfessionType = 2,
     Gender = 3,
     MaritalStatus = 4,
+
+    /// <summary>
+    /// A member's highest educational qualification. Added 2026-09-11 for
+    /// My Profile's Educational card - the same flat, admin-managed shape as
+    /// the other four, so it needed no new aggregate and no migration:
+    /// <see cref="LookupItem.Category"/> is stored as a string.
+    /// </summary>
+    Qualification = 5,
 }

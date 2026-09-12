@@ -8,7 +8,42 @@ version of the plan; the reasoning behind the ordering lives in
 ## Current Status
 
 - **Stage:** every module has a service and member screens; Phase 5 hardening under way
-- **Last updated:** 2026-09-12 - **admin-portal's Master Data screen redesigned
+- **Last updated:** 2026-09-12 - **member-portal's My Profile became five tabs
+  instead of five stacked cards, and Profession became a master-data-service
+  dropdown instead of free text - across member-family-service, member-portal
+  and admin-portal.**
+
+  My Profile's five cards (Basic, Professional, Educational, Address, Photo)
+  are now a horizontal tab bar showing one at a time, the same shape
+  admin-portal's Master Data screen adopted the day before. All five still
+  submit through one `<form>` and one Save button below the tabs; switching
+  tabs never touches the component's `form` object, so a half-edited field on
+  a tab scrolled out of view survives a detour to another tab and back. The
+  one client-side validation (a required full name, on Basic) jumps the
+  screen back to Basic on a failed save, so the error is never raised on a
+  tab nobody is looking at.
+
+  Profession followed Qualification's own free-text-to-master-data-pick
+  conversion from the previous cycle: `MemberProfile.Profession: string?`
+  became `ProfessionId: Guid?` on the backend, against master-data-service's
+  `ProfessionType` category - one of the platform's original four flat
+  lookup lists, present since before `Qualification` was ever added, so this
+  needed no master-data-service change at all. The migration drops the
+  `profession` column rather than resolving old free text into lookup ids,
+  the same "cannot be recovered from old free text" call already made for
+  `PermanentAddress.LocalityId`. `Privacy.Profession`'s existing
+  `PrivacyLevel` carries over unchanged - gating a field's presence means the
+  same thing whether the value is typed text or a picked id. Both apps'
+  Profession inputs became `<select>`s sourced the same way Qualification's
+  already were; admin-portal needed only a new `listLookupItems('ProfessionType')`
+  call, since `listLookupItems` was already generic per category.
+
+  Verified with member-family-service's full unit+integration suite (119 +
+  121, both green), 361 member-portal tests, 232 admin-portal tests, both
+  apps' production builds, `tsc --noEmit`, `scripts/css-class-coverage.sh`,
+  `scripts/unreachable-endpoints.sh`, `scripts/uncalled-api-methods.sh`, and
+  `scripts/service-docs.sh` across all services.
+- **Previously:** 2026-09-12 - **admin-portal's Master Data screen redesigned
   as a horizontal tab bar, one type of data at a time, with Add and Edit moved
   into a modal.**
 

@@ -22,6 +22,17 @@ export type FamilyMemberStatus = 'PendingJoinRequest' | 'Active' | 'Rejected';
 export type ChildStatus = 'Minor' | 'Converted';
 
 /**
+ * One address - the free-text line plus the City and Locality ids picked
+ * from master-data-service. Mirrors `AddressResponse` in
+ * member-family-service, reused for both Permanent and Temporary.
+ */
+export interface Address {
+  readonly line: string | null;
+  readonly cityId: string | null;
+  readonly localityId: string | null;
+}
+
+/**
  * A profile as this viewer is allowed to see it.
  *
  * **A null field means "not shared", not "not set", and the two are
@@ -34,12 +45,18 @@ export interface Member {
   readonly id: string;
   readonly fullName: string;
   readonly photoUrl: string | null;
-  readonly locality: string | null;
+  readonly gautraId: string | null;
   readonly dateOfBirth: string | null;
   readonly mobile: string | null;
   readonly email: string | null;
-  readonly address: string | null;
-  readonly profession: string | null;
+  // Never null - City/Locality carry no privacy level and are always
+  // present; only `line` is gated, per viewer.
+  readonly permanentAddress: Address;
+  // Null when there is none, or the viewer may not see it - gated as a whole
+  // rather than field by field, since it is the supplementary address.
+  readonly temporaryAddress: Address | null;
+  readonly professionId: string | null;
+  readonly qualificationId: string | null;
   readonly gender: Gender;
 }
 
@@ -49,6 +66,7 @@ export interface FieldPrivacy {
   readonly address: PrivacyLevel;
   readonly profession: PrivacyLevel;
   readonly dateOfBirth: PrivacyLevel;
+  readonly qualification: PrivacyLevel;
 }
 
 /** The member's own profile: always complete, plus their privacy settings. */
@@ -61,9 +79,11 @@ export interface MyProfile {
   readonly gender: Gender;
   readonly mobile: string | null;
   readonly email: string | null;
-  readonly address: string | null;
-  readonly locality: string | null;
-  readonly profession: string | null;
+  readonly gautraId: string | null;
+  readonly professionId: string | null;
+  readonly qualificationId: string | null;
+  readonly permanentAddress: Address;
+  readonly temporaryAddress: Address | null;
   readonly privacy: FieldPrivacy;
 
   /**
@@ -141,6 +161,43 @@ export interface ChildDataNotice {
   readonly version: string;
   readonly summary: string;
   readonly attestation: string;
+}
+
+/**
+ * Wire shapes for master-data-service, mirroring `GautraResponse`,
+ * `LookupItemResponse`, `CityResponse` and `LocalityResponse`. Kept local to
+ * this feature rather than shared with admin-portal's own copies - a type
+ * moves to `libs/shared` when a second *app* needs it, and admin-portal
+ * already has its own for managing these lists, not for picking from them.
+ */
+export interface Gautra {
+  readonly id: string;
+  readonly name: string;
+  readonly isActive: boolean;
+}
+
+/** A `LookupItem` row - used here for the `Qualification` and `ProfessionType` categories. */
+export interface LookupItem {
+  readonly id: string;
+  readonly category: string;
+  readonly code: string;
+  readonly label: string;
+  readonly sortOrder: number;
+  readonly isActive: boolean;
+}
+
+export interface City {
+  readonly id: string;
+  readonly countryId: string;
+  readonly name: string;
+  readonly isActive: boolean;
+}
+
+export interface Locality {
+  readonly id: string;
+  readonly cityId: string;
+  readonly name: string;
+  readonly isActive: boolean;
 }
 
 export const Relationships: readonly Relationship[] = [

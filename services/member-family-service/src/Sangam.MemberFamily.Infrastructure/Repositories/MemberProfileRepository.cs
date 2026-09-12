@@ -19,7 +19,7 @@ public sealed class MemberProfileRepository(MemberFamilyDbContext dbContext) : I
 
     public async Task<IReadOnlyList<MemberProfile>> SearchAsync(
         string? term,
-        string? locality,
+        Guid? localityId,
         int limit,
         bool includeUnlisted,
         CancellationToken cancellationToken = default)
@@ -48,11 +48,11 @@ public sealed class MemberProfileRepository(MemberFamilyDbContext dbContext) : I
             query = query.Where(p => EF.Functions.ILike(p.FullName, pattern));
         }
 
-        if (!string.IsNullOrWhiteSpace(locality))
+        if (localityId is { } id)
         {
-            var pattern = $"%{locality.Trim()}%";
-
-            query = query.Where(p => p.Locality != null && EF.Functions.ILike(p.Locality, pattern));
+            // Exact, not a substring: Locality is a master-data-service pick
+            // now, not text somebody typed toward.
+            query = query.Where(p => p.PermanentAddress.LocalityId == id);
         }
 
         return await query

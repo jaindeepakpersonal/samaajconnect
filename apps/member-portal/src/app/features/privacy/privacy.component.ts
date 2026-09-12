@@ -383,10 +383,10 @@ export class PrivacyComponent implements OnInit {
   readonly privacyError = signal<string | null>(null);
 
   /**
-   * The five fields that carry a level, in the order the wireframe's
-   * `#profile` screen lists them with date of birth added - it has a level in
-   * the domain and leaving it off the screen would mean a setting a member
-   * cannot see or change.
+   * The six fields that carry a level, in the order the wireframe's
+   * `#profile` screen lists them with date of birth and Qualification added -
+   * both have a level in the domain and leaving either off the screen would
+   * mean a setting a member cannot see or change.
    */
   readonly privacyFields = [
     { key: 'mobile', label: 'Mobile number' },
@@ -394,6 +394,7 @@ export class PrivacyComponent implements OnInit {
     { key: 'address', label: 'Address' },
     { key: 'profession', label: 'Profession' },
     { key: 'dateOfBirth', label: 'Date of birth' },
+    { key: 'qualification', label: 'Qualification' },
   ] as const;
 
   readonly levels: { value: PrivacyLevel; label: string }[] = [
@@ -416,6 +417,7 @@ export class PrivacyComponent implements OnInit {
       address: 'Private' as PrivacyLevel,
       profession: 'SamaajOnly' as PrivacyLevel,
       dateOfBirth: 'SamaajOnly' as PrivacyLevel,
+      qualification: 'SamaajOnly' as PrivacyLevel,
     },
     isListedInDirectory: true,
   };

@@ -52,13 +52,15 @@ public sealed class DirectoryListingTests(MemberFamilyApiFactory factory)
             gender: Gender.Unspecified,
             mobile: "+919812345678",
             email: id.ToString("N") + "@example.com",
-            address: null,
-            locality: "Udaipur",
-            profession: null,
-            FieldPrivacy.Default,
+            gautraId: null,
+            professionId: null,
+            qualificationId: null,
+            permanentAddress: new ProfileAddress(null, null, Guid.NewGuid()),
+            temporaryAddress: null,
+            privacy: FieldPrivacy.Default,
             isListedInDirectory: listed,
-            DateTimeOffset.UtcNow,
-            Guid.NewGuid());
+            updatedAt: DateTimeOffset.UtcNow,
+            updatedBy: Guid.NewGuid());
 
         db.MemberProfiles.Add(profile);
         await db.SaveChangesAsync();
@@ -141,6 +143,7 @@ public sealed class DirectoryListingTests(MemberFamilyApiFactory factory)
                 fullName = Named("Ravi Shah"),
                 gender = "Male",
                 mobile = "+919812345678",
+                permanentAddress = new { line = (string?)null, cityId = (Guid?)null, localityId = (Guid?)null },
                 privacy = new
                 {
                     mobile = "SamaajOnly",
@@ -148,6 +151,7 @@ public sealed class DirectoryListingTests(MemberFamilyApiFactory factory)
                     address = "Private",
                     profession = "SamaajOnly",
                     dateOfBirth = "Private",
+                    qualification = "SamaajOnly",
                 },
                 isListedInDirectory = false,
             });

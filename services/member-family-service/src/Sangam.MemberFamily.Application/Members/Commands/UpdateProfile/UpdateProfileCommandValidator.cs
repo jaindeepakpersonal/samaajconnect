@@ -14,9 +14,27 @@ public sealed class UpdateProfileCommandValidator : AbstractValidator<UpdateProf
         RuleFor(x => x.FullName).NotEmpty().MaximumLength(200);
         RuleFor(x => x.Mobile).MaximumLength(20);
         RuleFor(x => x.Email).MaximumLength(320);
-        RuleFor(x => x.Address).MaximumLength(500);
-        RuleFor(x => x.Locality).MaximumLength(120);
-        RuleFor(x => x.Profession).MaximumLength(120);
+
+        // Required, same as Privacy below: this command replaces the whole
+        // profile, and "no address at all" is expressed by every field on it
+        // being null, not by omitting the object.
+        RuleFor(x => x.PermanentAddress)
+            .NotNull()
+            .WithMessage(
+                "A permanent address is required. Send one with every field null if the "
+                + "member has not set one yet.");
+
+        When(x => x.PermanentAddress is not null, () =>
+        {
+            RuleFor(x => x.PermanentAddress.Line).MaximumLength(500);
+        });
+
+        // Temporary is nullable as a whole - unlike permanent, "no temporary
+        // address" is a real state a member can be in, not an unset field.
+        When(x => x.TemporaryAddress is not null, () =>
+        {
+            RuleFor(x => x.TemporaryAddress!.Line).MaximumLength(500);
+        });
 
         RuleFor(x => x.Gender)
             .Must(value => Enum.TryParse<Gender>(value, ignoreCase: true, out _))
@@ -58,6 +76,7 @@ public sealed class UpdateProfileCommandValidator : AbstractValidator<UpdateProf
             RuleFor(x => x.Privacy.Address).Must(BeALevel).WithMessage(LevelMessage);
             RuleFor(x => x.Privacy.Profession).Must(BeALevel).WithMessage(LevelMessage);
             RuleFor(x => x.Privacy.DateOfBirth).Must(BeALevel).WithMessage(LevelMessage);
+            RuleFor(x => x.Privacy.Qualification).Must(BeALevel).WithMessage(LevelMessage);
         });
     }
 

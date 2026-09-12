@@ -25,13 +25,15 @@ public sealed class DirectoryListingTests
             gender: Gender.Male,
             mobile: "+919812345678",
             email: "ravi@example.com",
-            address: null,
-            locality: "Udaipur",
-            profession: null,
-            FieldPrivacy.Default,
+            gautraId: null,
+            professionId: null,
+            qualificationId: null,
+            permanentAddress: new ProfileAddress(null, null, Guid.NewGuid()),
+            temporaryAddress: null,
+            privacy: FieldPrivacy.Default,
             isListedInDirectory: listed,
-            Now,
-            Guid.NewGuid());
+            updatedAt: Now,
+            updatedBy: Guid.NewGuid());
 
     [Fact]
     public void A_new_member_is_in_the_directory()
@@ -115,10 +117,12 @@ public sealed class UpdateProfileCommandValidatorDirectoryTests
         Gender: "Male",
         Mobile: null,
         Email: null,
-        Address: null,
-        Locality: null,
-        Profession: null,
-        new PrivacySettings("SamaajOnly", "Private", "Private", "SamaajOnly", "Private"),
+        GautraId: null,
+        ProfessionId: null,
+        QualificationId: null,
+        PermanentAddress: new ProfileAddressInput(null, null, null),
+        TemporaryAddress: null,
+        new PrivacySettings("SamaajOnly", "Private", "Private", "SamaajOnly", "Private", "SamaajOnly"),
         listed);
 
     [Fact]

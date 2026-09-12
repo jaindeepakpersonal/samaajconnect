@@ -13,7 +13,7 @@ worked example of a cross-service flow with no synchronous call.
 
 | Entity | Status | Notes |
 |---|---|---|
-| `MemberProfile` | built | Tenant-scoped. Its `Id` **is** the user id from identity-tenant-service. |
+| `MemberProfile` | built | Tenant-scoped. Its `Id` **is** the user id from identity-tenant-service. Carries `GautraId`/`ProfessionId`/`QualificationId` (master-data-service ids) and a `PermanentAddress`/`TemporaryAddress` pair (`ProfileAddress`: line, city id, locality id) — see the address/Gautra/Qualification decision note and the Profession note below. |
 | `Family` | built | Household, joined by quoting a family code. |
 | `FamilyMember` | built | Membership or a pending request; carries the relationship. |
 | `ChildProfile` | built | No login of its own; the family manages the record. |
@@ -350,14 +350,79 @@ is the single place a profile becomes a directory row — so there is one place 
 check the rules are applied. A hidden field comes back **null, not masked**: a
 mask still leaks length and shape.
 
-**New profiles start closed.** Email and address default to Private, mobile and
-profession to SamaajOnly. Closed by default and opened deliberately, rather than
-open by default and hoping the member notices.
+**New profiles start closed.** Email and address default to Private, mobile,
+profession and qualification to SamaajOnly. Closed by default and opened
+deliberately, rather than open by default and hoping the member notices.
 
-**Search matches names and localities only.** Never contact details, whatever
-their privacy level says. Matching on a private mobile number would let anyone
-confirm one digit-guess at a time — the filtering afterwards would be beside the
-point.
+**Search matches names by substring and Locality by exact id.** Never contact
+details, whatever their privacy level says — matching on a private mobile
+number would let anyone confirm one digit-guess at a time, and the filtering
+afterwards would be beside the point. Locality stopped being a free-text
+substring match on 2026-09-11, when it became a master-data-service pick
+(`PermanentAddress.LocalityId`) rather than typed text: there is no longer a
+string to substring-match, a member chooses one Locality from a dropdown, and
+the search now filters on the same id rather than on what they typed toward
+it.
+
+**Address, Gautra and Qualification, added 2026-09-11.** My Profile split into
+five cards, and three fields moved off free text onto master-data-service:
+
+- `Address`/`Locality` (two free-text columns) became `PermanentAddress` and
+  `TemporaryAddress`, both a `ProfileAddress` (`Line`, `CityId`, `LocalityId`)
+  — `PermanentAddress` is never null (an empty one when nothing is set, the
+  same "always present, fields nullable" shape `Privacy` already uses);
+  `TemporaryAddress` is nullable as a whole, because "no temporary address" is
+  a real, distinct state from "one with nothing filled in," not something a
+  set-of-empty-fields should have to stand in for.
+- `GautraId` and `QualificationId` are new, both referencing rows in
+  master-data-service's `Gautra` and `LookupItem` (`Category == Qualification`)
+  tables as plain foreign keys with no referential integrity across the
+  service boundary — the same stance master-data-service's own `CLAUDE.md`
+  already takes for every id another service holds of its rows.
+
+**Privacy widened by one level, not by one field's worth of surface.** The
+existing `Address` `PrivacyLevel` now gates only the free-text `Line` of
+*both* addresses — the user asked for a source change (typed text to a
+master-data pick), not a bigger privacy surface, so there is still one level
+covering "address," not two. City and Locality on both addresses stay
+ungated, extending the precedent Locality already set ("name, photo and
+locality are what a directory is for"); `GautraId` stays ungated for the same
+reason — a Samaaj sub-lineage reads closer to a name than to a phone number.
+`TemporaryAddress` is gated as a whole (null unless the viewer may see
+`Address`), not field by field — a temporary address that showed its City
+while hiding its Line would leak most of what `Address` privacy exists to
+hide. `Qualification` gets its own new `PrivacyLevel`, defaulting
+`SamaajOnly` — closer in kind to `Profession`, its nearest sibling, than to an
+identity marker like Gautra.
+
+**The migration copies old free text into the field it always meant, and
+cannot recover a Locality nobody had picked.** `address` renames to
+`permanent_address_line` — a member's one address always meant their
+permanent one, never the supplementary one nobody had a field for — and
+`temporary_address_line` arrives as a fresh nullable column. `LocalityId`
+cannot be reconstructed from old free text (there is no lookup from "Hiran
+Magri" typed by hand to a master-data-service row with confidence), so every
+migrated row's `PermanentAddress.LocalityId` starts null, same as any other
+field nobody has picked from a new dropdown yet.
+
+**Profession followed the same free-text-to-master-data-pick move on
+2026-09-12, one cycle after Gautra/Qualification/Address.** `Profession` was
+the one field that split deliberately kept as free text - "just relocate it"
+was the explicit answer at the time - and became `ProfessionId: Guid?`
+against master-data-service's `ProfessionType` category once a dropdown was
+the ask. `ProfessionType` needed no work of its own: it has been one of
+`LookupItem.Category`'s four original values since before `Qualification` was
+ever added, so this is a pure "point an existing screen at an existing list"
+change, the smallest-possible version of what Gautra and Qualification
+needed. The existing `Privacy.Profession` `PrivacyLevel` carries over
+unchanged - gating a field's *presence* means the same thing whether the
+value behind it is typed text or a picked id, so there was no reason to widen
+or rename it, unlike `Qualification`, which needed a level of its own because
+none existed yet. The migration is the same shape as the others: `profession`
+(free text) is dropped rather than resolved into a `ProfessionType` id, for
+the same reason `PermanentAddress.LocalityId` could not be back-filled -
+there is no confident lookup from typed text to a specific `LookupItem` row -
+so every migrated row's `ProfessionId` starts null.
 
 **A Samaaj admin sees every field; deciding join requests is still the head's
 call.** Correcting a member's details is administrative work (SERVICES.md), so

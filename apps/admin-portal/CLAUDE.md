@@ -568,11 +568,34 @@ is other members' data — so putting it on a directory row is a privacy decisio
 have a screen under Admin Users. Locality takes their place because it is what
 the search actually filters on.
 
+**The correction form's fields followed member-family-service's structured
+address, Gautra and Qualification change on 2026-09-11.** `Address`/`Locality`
+free text became a Permanent and Temporary address pair, each a line plus the
+same City→Locality cascade member-portal's own My Profile now uses, plus new
+Gautra and Qualification `<select>`s — all sourced from `AdminApi`'s existing
+`listGautras()`, `listCities()`, `listLocalities()` and
+`listLookupItems('Qualification', false)`, already on this client from the
+master-data screen. The form still carries no privacy controls: that rule did
+not change, only which factual fields it corrects. The Locality search filter
+on the list screen made the same free-text-to-dropdown swap, resolved against
+the same full Locality list fetched once.
+
 **Profession is shown and cannot be searched, and the screen says why.** The
 field carries a per-field privacy level, so a server-side filter on it would let
 anybody confirm a private value one query at a time — member-family-service
 refuses to offer one for that reason. A box quietly missing from a search form
 reads as an oversight; a sentence saying it is a privacy decision does not.
+
+**The correction form's free-text Profession input became a `<select>` on
+2026-09-12, one cycle after the structured-address/Gautra/Qualification
+change.** `Profession` was the one field that change deliberately left as
+free text; it moved onto master-data-service's `ProfessionType` category —
+already one of the platform's original four flat lookup lists, so nothing
+needed to be added to master-data-service itself — the same "point an
+existing screen at an existing list" shape `Qualification`'s own `<select>`
+already used. `AdminApi.listLookupItems('ProfessionType')` is the only new
+call; `listLookupItems` was already generic per category. `form.profession`
+became `form.professionId`, and the request body's field follows suit.
 
 **Class names are checked against a stylesheet before they are used, the same
 rule member-portal's own `CLAUDE.md` states and this app had never written

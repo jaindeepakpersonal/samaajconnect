@@ -65,9 +65,11 @@ public sealed class UpdateProfileCommandHandler(
             ParseGender(command.Gender),
             command.Mobile,
             command.Email,
-            command.Address,
-            command.Locality,
-            command.Profession,
+            command.GautraId,
+            command.ProfessionId,
+            command.QualificationId,
+            ToProfileAddress(command.PermanentAddress),
+            command.TemporaryAddress is { } temporary ? ToProfileAddress(temporary) : null,
             ToFieldPrivacy(command.Privacy),
             // Falls back to what the profile already says, never to true. The
             // validator makes a null here impossible; if one ever arrives by
@@ -92,7 +94,11 @@ public sealed class UpdateProfileCommandHandler(
         Level(settings.Email),
         Level(settings.Address),
         Level(settings.Profession),
-        Level(settings.DateOfBirth));
+        Level(settings.DateOfBirth),
+        Level(settings.Qualification));
+
+    private static ProfileAddress ToProfileAddress(ProfileAddressInput input) =>
+        new(input.Line, input.CityId, input.LocalityId);
 
     /// <summary>
     /// Falls back to Private, never Public. An unreadable privacy value is a

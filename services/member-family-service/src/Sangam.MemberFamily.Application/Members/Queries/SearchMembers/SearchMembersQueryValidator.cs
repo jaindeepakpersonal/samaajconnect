@@ -8,6 +8,5 @@ public sealed class SearchMembersQueryValidator : AbstractValidator<SearchMember
     {
         RuleFor(x => x.Limit).InclusiveBetween(1, 100);
         RuleFor(x => x.Term).MaximumLength(120);
-        RuleFor(x => x.Locality).MaximumLength(120);
     }
 }

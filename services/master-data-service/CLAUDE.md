@@ -18,17 +18,21 @@ for where it sits among the other ten.
 
 | Entity | Notes |
 |---|---|
-| `LookupItem` | One flat, admin-managed reference list, discriminated by `Category`: `Country`, `ProfessionType`, `Gender`, or `MaritalStatus`. Platform-wide, not tenant-scoped |
+| `LookupItem` | One flat, admin-managed reference list, discriminated by `Category`: `Country`, `ProfessionType`, `Gender`, `MaritalStatus`, or `Qualification`. Platform-wide, not tenant-scoped |
 | `City` | Scoped to a country (`LookupItem.CountryId`, where `Category == Country`). Own aggregate because it carries a parent id the flat `LookupItem` shape has none for |
 | `Locality` | Scoped to a city. The "locations master" — this is the member-portal wireframe's existing locality dropdown (Hiran Magri, Surajpole, Shobhagpura) |
 | `Gautra` | The one **tenant-scoped** entity here (`ITenantScopedEntity`). A Samaaj's own Gautra list, per root CLAUDE.md §6's "Samaaj-wise" requirement |
 
-**Why one `LookupItem` table for four categories, not four aggregates.**
-Country, ProfessionType, Gender and MaritalStatus are structurally identical —
-a code, a label, a sort position, an active flag — and nothing on the platform
-reasons about them differently from one to the next. Four separate CRUD
-stacks would be four copies of the same file with the words changed — not a
-handful of similar lines worth leaving alone, but the same table, four times. `City`, `Locality` and `Gautra` are deliberately kept
+**Why one `LookupItem` table for five categories, not five aggregates.**
+Country, ProfessionType, Gender, MaritalStatus and Qualification are
+structurally identical — a code, a label, a sort position, an active flag —
+and nothing on the platform reasons about them differently from one to the
+next. Qualification joined the other four on 2026-09-11, member-family-
+service's My Profile screen's educational card, and needed no migration at
+all: `Category` is already `HasConversion<string>()`, and every command and
+query already operates generically per category. Five separate CRUD stacks
+would be five copies of the same file with the words changed — not a
+handful of similar lines worth leaving alone, but the same table, five times. `City`, `Locality` and `Gautra` are deliberately kept
 out of it: the first two carry a parent id this flat shape has no column for,
 and folding a tenant id into it to accommodate `Gautra` would put every read
 of every global lookup through the tenant query filter for data that belongs

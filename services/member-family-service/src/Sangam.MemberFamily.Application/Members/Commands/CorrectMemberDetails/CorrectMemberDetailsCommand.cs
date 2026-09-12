@@ -2,6 +2,7 @@ using FluentValidation;
 using MediatR;
 using Sangam.MemberFamily.Application.Abstractions;
 using Sangam.MemberFamily.Application.Common;
+using Sangam.MemberFamily.Application.Members.Commands.UpdateProfile;
 using Sangam.MemberFamily.Application.Security;
 using Sangam.MemberFamily.Domain.Members;
 
@@ -56,9 +57,11 @@ public sealed record CorrectMemberDetailsCommand(
     string? Gender,
     string? Mobile,
     string? Email,
-    string? Address,
-    string? Locality,
-    string? Profession) : ICommand<MemberResponse>;
+    Guid? GautraId,
+    Guid? ProfessionId,
+    Guid? QualificationId,
+    ProfileAddressInput PermanentAddress,
+    ProfileAddressInput? TemporaryAddress) : ICommand<MemberResponse>;
 
 public sealed class CorrectMemberDetailsCommandValidator
     : AbstractValidator<CorrectMemberDetailsCommand>
@@ -72,9 +75,22 @@ public sealed class CorrectMemberDetailsCommandValidator
         RuleFor(x => x.FullName).NotEmpty().MaximumLength(200);
         RuleFor(x => x.Mobile).MaximumLength(20);
         RuleFor(x => x.Email).MaximumLength(320);
-        RuleFor(x => x.Address).MaximumLength(500);
-        RuleFor(x => x.Locality).MaximumLength(120);
-        RuleFor(x => x.Profession).MaximumLength(120);
+
+        RuleFor(x => x.PermanentAddress)
+            .NotNull()
+            .WithMessage(
+                "A permanent address is required. Send one with every field null if the "
+                + "member has not set one yet.");
+
+        When(x => x.PermanentAddress is not null, () =>
+        {
+            RuleFor(x => x.PermanentAddress.Line).MaximumLength(500);
+        });
+
+        When(x => x.TemporaryAddress is not null, () =>
+        {
+            RuleFor(x => x.TemporaryAddress!.Line).MaximumLength(500);
+        });
 
         RuleFor(x => x.Gender)
             .Must(value => Enum.TryParse<Gender>(value, ignoreCase: true, out _))
@@ -136,9 +152,11 @@ public sealed class CorrectMemberDetailsCommandHandler(
             ParseGender(command.Gender),
             command.Mobile,
             command.Email,
-            command.Address,
-            command.Locality,
-            command.Profession,
+            command.GautraId,
+            command.ProfessionId,
+            command.QualificationId,
+            ToProfileAddress(command.PermanentAddress),
+            command.TemporaryAddress is { } temporary ? ToProfileAddress(temporary) : null,
             clock.UtcNow,
             actorId);
 
@@ -157,4 +175,7 @@ public sealed class CorrectMemberDetailsCommandHandler(
 
     private static Gender ParseGender(string? value) =>
         Enum.TryParse<Gender>(value, ignoreCase: true, out var parsed) ? parsed : Gender.Unspecified;
+
+    private static ProfileAddress ToProfileAddress(ProfileAddressInput input) =>
+        new(input.Line, input.CityId, input.LocalityId);
 }

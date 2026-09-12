@@ -304,15 +304,15 @@ export class AdminApi {
    * on it. Both follow from the same decision, that correcting somebody's
    * details is administrative work.
    */
-  searchMembers(term: string | null, locality: string | null): Observable<AdminMember[]> {
+  searchMembers(term: string | null, localityId: string | null): Observable<AdminMember[]> {
     let params = new HttpParams().set('limit', 100);
 
     if (term && term.trim() !== '') {
       params = params.set('term', term.trim());
     }
 
-    if (locality && locality.trim() !== '') {
-      params = params.set('locality', locality.trim());
+    if (localityId) {
+      params = params.set('localityId', localityId);
     }
 
     return this.http.get<AdminMember[]>('/v1/members', { params });

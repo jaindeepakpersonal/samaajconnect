@@ -22,12 +22,19 @@ public sealed class ProfileErasureTests
 
         profile.Update(
             "Ravi Shah", new DateOnly(1985, 4, 2), Gender.Male,
-            "9876543210", "ravi@example.com", "12 Temple Road", "Ghatkopar", "Chartered Accountant",
-            new FieldPrivacy(
+            mobile: "9876543210",
+            email: "ravi@example.com",
+            gautraId: Guid.NewGuid(),
+            professionId: Guid.NewGuid(),
+            qualificationId: Guid.NewGuid(),
+            permanentAddress: new ProfileAddress("12 Temple Road", Guid.NewGuid(), Guid.NewGuid()),
+            temporaryAddress: new ProfileAddress("A temporary flat", Guid.NewGuid(), Guid.NewGuid()),
+            privacy: new FieldPrivacy(
                 PrivacyLevel.Public, PrivacyLevel.Public, PrivacyLevel.Public,
-                PrivacyLevel.Public, PrivacyLevel.Public),
+                PrivacyLevel.Public, PrivacyLevel.Public, PrivacyLevel.Public),
             isListedInDirectory: true,
-            Now, Guid.NewGuid());
+            updatedAt: Now,
+            updatedBy: Guid.NewGuid());
 
         return profile;
     }
@@ -41,9 +48,11 @@ public sealed class ProfileErasureTests
 
         profile.Mobile.Should().BeNull();
         profile.Email.Should().BeNull();
-        profile.Address.Should().BeNull();
-        profile.Locality.Should().BeNull();
-        profile.Profession.Should().BeNull();
+        profile.GautraId.Should().BeNull();
+        profile.QualificationId.Should().BeNull();
+        profile.PermanentAddress.Should().Be(ProfileAddress.Empty);
+        profile.TemporaryAddress.Should().BeNull();
+        profile.ProfessionId.Should().BeNull();
         profile.PhotoImageId.Should().BeNull();
         profile.DateOfBirth.Should().BeNull();
         profile.FullName.Should().NotContain("Ravi");

@@ -19,13 +19,13 @@ public static class MemberEndpoints
 
         group.MapGet("/", async (
                 string? term,
-                string? locality,
+                Guid? localityId,
                 int? limit,
                 ISender sender,
                 CancellationToken cancellationToken) =>
             {
                 var result = await sender.Send(
-                    new SearchMembersQuery(term, locality, limit ?? 50), cancellationToken);
+                    new SearchMembersQuery(term, localityId, limit ?? 50), cancellationToken);
 
                 return result.ToApiResult();
             })
@@ -99,9 +99,11 @@ public static class MemberEndpoints
                     request.Gender,
                     request.Mobile,
                     request.Email,
-                    request.Address,
-                    request.Locality,
-                    request.Profession,
+                    request.GautraId,
+                    request.ProfessionId,
+                    request.QualificationId,
+                    request.PermanentAddress,
+                    request.TemporaryAddress,
                     request.Privacy,
                     request.IsListedInDirectory);
 
@@ -136,9 +138,11 @@ public static class MemberEndpoints
                     request.Gender,
                     request.Mobile,
                     request.Email,
-                    request.Address,
-                    request.Locality,
-                    request.Profession);
+                    request.GautraId,
+                    request.ProfessionId,
+                    request.QualificationId,
+                    request.PermanentAddress,
+                    request.TemporaryAddress);
 
                 var result = await sender.Send(command, cancellationToken);
 
@@ -161,9 +165,11 @@ public static class MemberEndpoints
         string? Gender,
         string? Mobile,
         string? Email,
-        string? Address,
-        string? Locality,
-        string? Profession,
+        Guid? GautraId,
+        Guid? ProfessionId,
+        Guid? QualificationId,
+        ProfileAddressInput PermanentAddress,
+        ProfileAddressInput? TemporaryAddress,
         PrivacySettings Privacy,
         bool? IsListedInDirectory);
 
@@ -176,7 +182,9 @@ public static class MemberEndpoints
         string? Gender,
         string? Mobile,
         string? Email,
-        string? Address,
-        string? Locality,
-        string? Profession);
+        Guid? GautraId,
+        Guid? ProfessionId,
+        Guid? QualificationId,
+        ProfileAddressInput PermanentAddress,
+        ProfileAddressInput? TemporaryAddress);
 }

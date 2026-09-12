@@ -15,5 +15,5 @@ namespace Sangam.MemberFamily.Application.Members.Queries.SearchMembers;
     Roles.SamaajAdmin,
     Roles.SuperAdmin)]
 [RequiresPermission(PermissionKeys.MembersRead)]
-public sealed record SearchMembersQuery(string? Term, string? Locality, int Limit = 50)
+public sealed record SearchMembersQuery(string? Term, Guid? LocalityId, int Limit = 50)
     : IQuery<IReadOnlyList<MemberResponse>>;

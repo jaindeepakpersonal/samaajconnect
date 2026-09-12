@@ -29,9 +29,11 @@ public sealed record UpdateProfileCommand(
     string? Gender,
     string? Mobile,
     string? Email,
-    string? Address,
-    string? Locality,
-    string? Profession,
+    Guid? GautraId,
+    Guid? ProfessionId,
+    Guid? QualificationId,
+    ProfileAddressInput PermanentAddress,
+    ProfileAddressInput? TemporaryAddress,
     PrivacySettings Privacy,
     // Nullable and required, for the same reason Privacy is: this command
     // replaces the whole profile, so a body that omits this is malformed rather
@@ -45,4 +47,14 @@ public sealed record PrivacySettings(
     string Email,
     string Address,
     string Profession,
-    string DateOfBirth);
+    string DateOfBirth,
+    string Qualification);
+
+/// <summary>
+/// The wire shape of one address - a free-text line plus the City and
+/// Locality ids picked from master-data-service. Shared by
+/// <see cref="UpdateProfileCommand"/> and <c>CorrectMemberDetailsCommand</c>,
+/// and by both apps' request bodies, so there is one shape to keep in step
+/// rather than two.
+/// </summary>
+public sealed record ProfileAddressInput(string? Line, Guid? CityId, Guid? LocalityId);

@@ -38,9 +38,27 @@ public sealed class MemberProfile : AggregateRoot, ITenantScopedEntity
     public Gender Gender { get; private set; }
     public string? Mobile { get; private set; }
     public string? Email { get; private set; }
-    public string? Address { get; private set; }
-    public string? Locality { get; private set; }
-    public string? Profession { get; private set; }
+
+    /// <summary>A master-data-service <c>LookupItem</c> id (category <c>ProfessionType</c>). Optional.</summary>
+    public Guid? ProfessionId { get; private set; }
+
+    /// <summary>This Samaaj's own Gautra list, held as a master-data-service id. Optional.</summary>
+    public Guid? GautraId { get; private set; }
+
+    /// <summary>Highest educational qualification, a master-data-service <c>LookupItem</c> id. Optional.</summary>
+    public Guid? QualificationId { get; private set; }
+
+    /// <summary>
+    /// Always present - <see cref="ProfileAddress.Empty"/> until the member
+    /// sets one, never null. See <see cref="ProfileAddress"/>.
+    /// </summary>
+    public ProfileAddress PermanentAddress { get; private set; } = ProfileAddress.Empty;
+
+    /// <summary>
+    /// Null means no temporary address at all, a real and distinct state from
+    /// one with nothing filled in - most members only ever have one address.
+    /// </summary>
+    public ProfileAddress? TemporaryAddress { get; private set; }
 
     public FieldPrivacy Privacy { get; private set; } = FieldPrivacy.Default;
 
@@ -146,10 +164,13 @@ public sealed class MemberProfile : AggregateRoot, ITenantScopedEntity
         Gender = Gender.Unspecified;
         Mobile = null;
         Email = null;
-        Address = null;
-        Locality = null;
-        Profession = null;
+        ProfessionId = null;
+        GautraId = null;
+        QualificationId = null;
+        PermanentAddress = ProfileAddress.Empty;
+        TemporaryAddress = null;
         Privacy = new FieldPrivacy(
+            PrivacyLevel.Private,
             PrivacyLevel.Private,
             PrivacyLevel.Private,
             PrivacyLevel.Private,
@@ -217,9 +238,11 @@ public sealed class MemberProfile : AggregateRoot, ITenantScopedEntity
         Gender gender,
         string? mobile,
         string? email,
-        string? address,
-        string? locality,
-        string? profession,
+        Guid? gautraId,
+        Guid? professionId,
+        Guid? qualificationId,
+        ProfileAddress permanentAddress,
+        ProfileAddress? temporaryAddress,
         FieldPrivacy privacy,
         bool isListedInDirectory,
         DateTimeOffset updatedAt,
@@ -227,6 +250,7 @@ public sealed class MemberProfile : AggregateRoot, ITenantScopedEntity
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(fullName);
         ArgumentNullException.ThrowIfNull(privacy);
+        ArgumentNullException.ThrowIfNull(permanentAddress);
 
         // Which fields changed, recorded before anything is overwritten.
         // SECURITY-CHECKLIST.md asks for a before-state on corrections, and a
@@ -239,15 +263,19 @@ public sealed class MemberProfile : AggregateRoot, ITenantScopedEntity
         // Knowing which field an administrator touched is what the audit
         // question actually needs.
         var changed = new List<string>();
+        var normalizedPermanent = NormalizeAddress(permanentAddress);
+        var normalizedTemporary = temporaryAddress is null ? null : NormalizeAddress(temporaryAddress);
 
         Note(changed, nameof(FullName), FullName, fullName.Trim());
         Note(changed, nameof(DateOfBirth), DateOfBirth?.ToString("O"), dateOfBirth?.ToString("O"));
         Note(changed, nameof(Gender), Gender.ToString(), gender.ToString());
         Note(changed, nameof(Mobile), Mobile, Normalize(mobile));
         Note(changed, nameof(Email), Email, Normalize(email)?.ToLowerInvariant());
-        Note(changed, nameof(Address), Address, Normalize(address));
-        Note(changed, nameof(Locality), Locality, Normalize(locality));
-        Note(changed, nameof(Profession), Profession, Normalize(profession));
+        NoteEquatable(changed, nameof(ProfessionId), ProfessionId, professionId);
+        NoteEquatable(changed, nameof(GautraId), GautraId, gautraId);
+        NoteEquatable(changed, nameof(QualificationId), QualificationId, qualificationId);
+        NoteEquatable(changed, nameof(PermanentAddress), PermanentAddress, normalizedPermanent);
+        NoteEquatable(changed, nameof(TemporaryAddress), TemporaryAddress, normalizedTemporary);
 
         if (!Privacy.Equals(privacy))
         {
@@ -264,9 +292,11 @@ public sealed class MemberProfile : AggregateRoot, ITenantScopedEntity
         Gender = gender;
         Mobile = Normalize(mobile);
         Email = Normalize(email)?.ToLowerInvariant();
-        Address = Normalize(address);
-        Locality = Normalize(locality);
-        Profession = Normalize(profession);
+        ProfessionId = professionId;
+        GautraId = gautraId;
+        QualificationId = qualificationId;
+        PermanentAddress = normalizedPermanent;
+        TemporaryAddress = normalizedTemporary;
         Privacy = privacy;
         IsListedInDirectory = isListedInDirectory;
         UpdatedAt = updatedAt;
@@ -304,9 +334,11 @@ public sealed class MemberProfile : AggregateRoot, ITenantScopedEntity
         Gender gender,
         string? mobile,
         string? email,
-        string? address,
-        string? locality,
-        string? profession,
+        Guid? gautraId,
+        Guid? professionId,
+        Guid? qualificationId,
+        ProfileAddress permanentAddress,
+        ProfileAddress? temporaryAddress,
         DateTimeOffset updatedAt,
         Guid correctedBy) =>
         Update(
@@ -315,9 +347,11 @@ public sealed class MemberProfile : AggregateRoot, ITenantScopedEntity
             gender,
             mobile,
             email,
-            address,
-            locality,
-            profession,
+            gautraId,
+            professionId,
+            qualificationId,
+            permanentAddress,
+            temporaryAddress,
             Privacy,
             IsListedInDirectory,
             updatedAt,
@@ -330,6 +364,18 @@ public sealed class MemberProfile : AggregateRoot, ITenantScopedEntity
             changed.Add(field);
         }
     }
+
+    private static void NoteEquatable<T>(List<string> changed, string field, T before, T after)
+    {
+        if (!EqualityComparer<T>.Default.Equals(before, after))
+        {
+            changed.Add(field);
+        }
+    }
+
+    /// <summary>Trims the free-text line the same way every other string field is normalized.</summary>
+    private static ProfileAddress NormalizeAddress(ProfileAddress address) =>
+        address with { Line = Normalize(address.Line) };
 
     /// <summary>
     /// Whether <paramref name="viewer"/> may see a field at this privacy level.

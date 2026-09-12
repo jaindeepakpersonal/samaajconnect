@@ -19,7 +19,7 @@ public sealed class SearchMembersQueryHandler(
 
         var found = await profiles.SearchAsync(
             query.Term,
-            query.Locality,
+            query.LocalityId,
             Math.Clamp(query.Limit, 1, 100),
             // Administrators see members who have taken themselves out of the
             // directory; nobody else does. The same role decides whether the

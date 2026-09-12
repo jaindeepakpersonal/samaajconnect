@@ -29,12 +29,14 @@ function member(overrides: Partial<Member> = {}): Member {
     id: 'm1',
     fullName: 'Rajesh Jain',
     photoUrl: null,
-    locality: 'Hiran Magri',
+    gautraId: null,
     dateOfBirth: null,
     mobile: null,
     email: null,
-    address: null,
-    profession: 'Business',
+    permanentAddress: { line: null, cityId: null, localityId: 'loc-hiran-magri' },
+    temporaryAddress: null,
+    professionId: 'prof-business',
+    qualificationId: null,
     gender: 'Male',
     ...overrides,
   };
@@ -107,8 +109,23 @@ describe('MembersListComponent', () => {
 
   afterEach(() => http.verify());
 
+  const surajpole = { id: 'loc-surajpole', cityId: 'city-1', name: 'Surajpole', isActive: true };
+  const hiranMagri = { id: 'loc-hiran-magri', cityId: 'city-1', name: 'Hiran Magri', isActive: true };
+
+  function memberIn(locality: typeof surajpole | null, overrides: Partial<Member> = {}): Member {
+    return member({
+      permanentAddress: { line: null, cityId: null, localityId: locality?.id ?? null },
+      ...overrides,
+    });
+  }
+
+  /** Answers the platform's full Locality and Profession lists, then the directory search. */
   function load(members: Member[]): void {
     fixture.detectChanges();
+    http.expectOne((r) => r.url === '/v1/master-data/localities').flush([surajpole, hiranMagri]);
+    http
+      .expectOne((r) => r.url === '/v1/master-data/lookup-items' && r.params.get('category') === 'ProfessionType')
+      .flush([{ id: 'prof-business', category: 'ProfessionType', code: 'BIZ', label: 'Business', sortOrder: 1, isActive: true }]);
     http.expectOne((r) => r.url === '/v1/members').flush(members);
     fixture.detectChanges();
   }
@@ -118,7 +135,7 @@ describe('MembersListComponent', () => {
   }
 
   it('lists the directory', () => {
-    load([member(), member({ id: 'm2', fullName: 'Neha Jain', locality: 'Surajpole' })]);
+    load([member(), memberIn(surajpole, { id: 'm2', fullName: 'Neha Jain' })]);
 
     expect(text()).toContain('Rajesh Jain');
     expect(text()).toContain('Neha Jain');
@@ -127,7 +144,7 @@ describe('MembersListComponent', () => {
   it('says a withheld field is not shared rather than claiming there is none', () => {
     // The service returns null rather than masking, so from here "not set" and
     // "not shared" are indistinguishable - and only one of them is safe to say.
-    load([member({ profession: null })]);
+    load([member({ professionId: null })]);
 
     expect(text()).toContain('Not shared');
   });
@@ -149,37 +166,37 @@ describe('MembersListComponent', () => {
 
   it('builds the locality list from the data, not the wireframe three', () => {
     load([
-      member({ locality: 'Surajpole' }),
-      member({ id: 'm2', locality: 'Hiran Magri' }),
-      member({ id: 'm3', locality: null }),
+      memberIn(surajpole),
+      memberIn(hiranMagri, { id: 'm2' }),
+      memberIn(null, { id: 'm3' }),
     ]);
 
-    expect(component.localities()).toEqual(['Hiran Magri', 'Surajpole']);
+    expect(component.localityOptions()).toEqual([hiranMagri, surajpole]);
   });
 
   it('keeps localities a narrower search filtered out', () => {
     // Otherwise choosing a locality would empty the very list that offered it.
-    load([member({ locality: 'Surajpole' }), member({ id: 'm2', locality: 'Hiran Magri' })]);
+    load([memberIn(surajpole), memberIn(hiranMagri, { id: 'm2' })]);
 
-    component.locality = 'Surajpole';
+    component.localityId = surajpole.id;
     component.load();
-    http.expectOne((r) => r.url === '/v1/members').flush([member({ locality: 'Surajpole' })]);
+    http.expectOne((r) => r.url === '/v1/members').flush([memberIn(surajpole)]);
     fixture.detectChanges();
 
-    expect(component.localities()).toEqual(['Hiran Magri', 'Surajpole']);
+    expect(component.localityOptions()).toEqual([hiranMagri, surajpole]);
   });
 
-  it('sends the search term and locality to the service', () => {
+  it('sends the search term and locality id to the service', () => {
     load([]);
 
     component.term = 'Neha';
-    component.locality = 'Surajpole';
+    component.localityId = surajpole.id;
     component.load();
 
     const request = http.expectOne((r) => r.url === '/v1/members');
 
     expect(request.request.params.get('term')).toBe('Neha');
-    expect(request.request.params.get('locality')).toBe('Surajpole');
+    expect(request.request.params.get('localityId')).toBe(surajpole.id);
 
     request.flush([]);
   });
@@ -217,8 +234,21 @@ describe('MemberDetailComponent', () => {
 
   afterEach(() => http.verify());
 
+  /** Flushes the four master-data lists the screen fetches once on init. */
+  function settleMasterData(): void {
+    http.expectOne((r) => r.url === '/v1/master-data/gautras').flush([]);
+    http
+      .expectOne((r) => r.url === '/v1/master-data/lookup-items' && r.params.get('category') === 'ProfessionType')
+      .flush([{ id: 'prof-business', category: 'ProfessionType', code: 'BIZ', label: 'Business', sortOrder: 1, isActive: true }]);
+    http
+      .expectOne((r) => r.url === '/v1/master-data/lookup-items' && r.params.get('category') === 'Qualification')
+      .flush([]);
+    http.expectOne((r) => r.url === '/v1/master-data/localities').flush([]);
+  }
+
   function load(found: Member): void {
     fixture.detectChanges();
+    settleMasterData();
     http.expectOne('/v1/members/m1').flush(found);
     fixture.detectChanges();
   }
@@ -228,14 +258,19 @@ describe('MemberDetailComponent', () => {
   }
 
   it('shows what the viewer may see', () => {
-    load(member({ mobile: '+91 98765 43210', profession: 'Business' }));
+    load(member({ mobile: '+91 98765 43210', professionId: 'prof-business' }));
 
     expect(text()).toContain('+91 98765 43210');
     expect(text()).toContain('Business');
   });
 
   it('says "Not shared" for every field the service withheld', () => {
-    load(member({ mobile: null, email: null, address: null, dateOfBirth: null }));
+    load(member({
+      mobile: null,
+      email: null,
+      permanentAddress: { line: null, cityId: null, localityId: null },
+      dateOfBirth: null,
+    }));
 
     const notShared = (text().match(/Not shared/g) ?? []).length;
 
@@ -254,6 +289,7 @@ describe('MemberDetailComponent', () => {
 
   it('offers a retry when the profile cannot be loaded', () => {
     fixture.detectChanges();
+    settleMasterData();
     http.expectOne('/v1/members/m1').flush({}, { status: 404, statusText: 'Not Found' });
     fixture.detectChanges();
 
