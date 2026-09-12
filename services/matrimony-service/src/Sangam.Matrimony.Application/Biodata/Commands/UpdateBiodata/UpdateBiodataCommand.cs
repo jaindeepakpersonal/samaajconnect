@@ -20,13 +20,16 @@ public sealed record UpdateBiodataCommand(
     // binding with an unhandled 500 on an empty string, before this
     // validator ever runs.
     string? DateOfBirth,
-    Guid? GautraId,
-    Guid? ProfessionId,
-    Guid? QualificationId,
-    Guid? CityId,
-    Guid? LocalityId,
+    // Raw strings, not Guid? - see OptIntoMatrimonyCommand's own note on why
+    // a Guid?-typed wire field crashes ASP.NET Core's JSON model binding on
+    // the literal text "null" a mis-bound `<select>` can send.
+    string? GautraId,
+    string? ProfessionId,
+    string? QualificationId,
+    string? CityId,
+    string? LocalityId,
     int? HeightCm,
-    Guid? MaritalStatusId,
+    string? MaritalStatusId,
     string? Diet,
     string? FamilyType,
     string? FatherOccupation,
@@ -64,6 +67,13 @@ public sealed class UpdateBiodataCommandValidator : AbstractValidator<UpdateBiod
             .WithMessage($"A biodata profile requires the member to be at least "
                 + $"{Domain.Biodata.BiodataProfile.MinimumAge}.");
 
+        RuleFor(x => x.GautraId).Must(BeNullOrAGuid).WithMessage("Gautra is not valid.");
+        RuleFor(x => x.ProfessionId).Must(BeNullOrAGuid).WithMessage("Profession is not valid.");
+        RuleFor(x => x.QualificationId).Must(BeNullOrAGuid).WithMessage("Qualification is not valid.");
+        RuleFor(x => x.CityId).Must(BeNullOrAGuid).WithMessage("City is not valid.");
+        RuleFor(x => x.LocalityId).Must(BeNullOrAGuid).WithMessage("Locality is not valid.");
+        RuleFor(x => x.MaritalStatusId).Must(BeNullOrAGuid).WithMessage("Marital status is not valid.");
+
         RuleFor(x => x.Diet)
             .Must(value => value is null || Enum.TryParse<Domain.Biodata.Diet>(value, ignoreCase: true, out _))
             .WithMessage($"Diet must be one of: {string.Join(", ", Enum.GetNames<Domain.Biodata.Diet>())}.");
@@ -78,6 +88,8 @@ public sealed class UpdateBiodataCommandValidator : AbstractValidator<UpdateBiod
         RuleFor(x => x.AboutMe).MaximumLength(1000);
         RuleFor(x => x.PartnerPreferenceNotes).MaximumLength(500);
     }
+
+    private static bool BeNullOrAGuid(string? value) => value is null || Guid.TryParse(value, out _);
 }
 
 public sealed class UpdateBiodataCommandHandler(
@@ -119,13 +131,13 @@ public sealed class UpdateBiodataCommandHandler(
             command.FullName,
             Enum.Parse<Gender>(command.Gender, ignoreCase: true),
             DateOnly.Parse(command.DateOfBirth!),
-            command.GautraId,
-            command.ProfessionId,
-            command.QualificationId,
-            command.CityId,
-            command.LocalityId,
+            ParseGuid(command.GautraId),
+            ParseGuid(command.ProfessionId),
+            ParseGuid(command.QualificationId),
+            ParseGuid(command.CityId),
+            ParseGuid(command.LocalityId),
             command.HeightCm,
-            command.MaritalStatusId,
+            ParseGuid(command.MaritalStatusId),
             command.Diet is null ? null : Enum.Parse<Domain.Biodata.Diet>(command.Diet, ignoreCase: true),
             command.FamilyType is null ? null : Enum.Parse<Domain.Biodata.FamilyType>(command.FamilyType, ignoreCase: true),
             command.FatherOccupation,
@@ -144,4 +156,7 @@ public sealed class UpdateBiodataCommandHandler(
 
         return Result.Success(profile.ToOwnerResponse(now));
     }
+
+    // Guaranteed null-or-parseable by the validator's own BeNullOrAGuid rule.
+    private static Guid? ParseGuid(string? value) => value is null ? null : Guid.Parse(value);
 }

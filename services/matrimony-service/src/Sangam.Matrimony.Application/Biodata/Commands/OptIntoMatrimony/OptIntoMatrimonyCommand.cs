@@ -33,13 +33,19 @@ public sealed record OptIntoMatrimonyCommand(
     // an edge case. Validated and parsed below instead, the same shape every
     // other enum-like field on this command already uses.
     string? DateOfBirth,
-    Guid? GautraId,
-    Guid? ProfessionId,
-    Guid? QualificationId,
-    Guid? CityId,
-    Guid? LocalityId,
+    // Raw strings, not Guid? - a master-data-service id the member cleared
+    // back to "Not specified" is exactly the case a select bound the wrong
+    // way (`[value]` instead of `[ngValue]`) sent as the literal text
+    // "null" rather than JSON null, which crashed the same way DateOfBirth
+    // above did. Parsed and validated below instead of trusted to the wire
+    // type.
+    string? GautraId,
+    string? ProfessionId,
+    string? QualificationId,
+    string? CityId,
+    string? LocalityId,
     int? HeightCm,
-    Guid? MaritalStatusId,
+    string? MaritalStatusId,
     string? Diet,
     string? FamilyType,
     string? FatherOccupation,
@@ -83,6 +89,13 @@ public sealed class OptIntoMatrimonyCommandValidator : AbstractValidator<OptInto
             .WithMessage($"A biodata profile requires the member to be at least "
                 + $"{Domain.Biodata.BiodataProfile.MinimumAge}.");
 
+        RuleFor(x => x.GautraId).Must(BeNullOrAGuid).WithMessage("Gautra is not valid.");
+        RuleFor(x => x.ProfessionId).Must(BeNullOrAGuid).WithMessage("Profession is not valid.");
+        RuleFor(x => x.QualificationId).Must(BeNullOrAGuid).WithMessage("Qualification is not valid.");
+        RuleFor(x => x.CityId).Must(BeNullOrAGuid).WithMessage("City is not valid.");
+        RuleFor(x => x.LocalityId).Must(BeNullOrAGuid).WithMessage("Locality is not valid.");
+        RuleFor(x => x.MaritalStatusId).Must(BeNullOrAGuid).WithMessage("Marital status is not valid.");
+
         RuleFor(x => x.Diet)
             .Must(value => value is null || Enum.TryParse<Domain.Biodata.Diet>(value, ignoreCase: true, out _))
             .WithMessage($"Diet must be one of: {string.Join(", ", Enum.GetNames<Domain.Biodata.Diet>())}.");
@@ -107,6 +120,8 @@ public sealed class OptIntoMatrimonyCommandValidator : AbstractValidator<OptInto
 
         RuleFor(x => x.NoticeVersion).NotEmpty().WithMessage("Matrimony consent notice version is required.");
     }
+
+    private static bool BeNullOrAGuid(string? value) => value is null || Guid.TryParse(value, out _);
 }
 
 public sealed class OptIntoMatrimonyCommandHandler(
@@ -159,13 +174,13 @@ public sealed class OptIntoMatrimonyCommandHandler(
         command.FullName,
         Enum.Parse<Gender>(command.Gender, ignoreCase: true),
         DateOnly.Parse(command.DateOfBirth!),
-        command.GautraId,
-        command.ProfessionId,
-        command.QualificationId,
-        command.CityId,
-        command.LocalityId,
+        ParseGuid(command.GautraId),
+        ParseGuid(command.ProfessionId),
+        ParseGuid(command.QualificationId),
+        ParseGuid(command.CityId),
+        ParseGuid(command.LocalityId),
         command.HeightCm,
-        command.MaritalStatusId,
+        ParseGuid(command.MaritalStatusId),
         command.Diet is null ? null : Enum.Parse<Domain.Biodata.Diet>(command.Diet, ignoreCase: true),
         command.FamilyType is null ? null : Enum.Parse<Domain.Biodata.FamilyType>(command.FamilyType, ignoreCase: true),
         command.FatherOccupation,
@@ -177,4 +192,7 @@ public sealed class OptIntoMatrimonyCommandHandler(
         command.PreferredAgeMin,
         command.PreferredAgeMax,
         command.PartnerPreferenceNotes);
+
+    // Guaranteed null-or-parseable by the validator's own BeNullOrAGuid rule.
+    private static Guid? ParseGuid(string? value) => value is null ? null : Guid.Parse(value);
 }

@@ -107,25 +107,25 @@ import {
 
           <label for="gautraId">Gautra</label>
           <select class="input" id="gautraId" name="gautraId" [(ngModel)]="form.gautraId">
-            <option [value]="null">Not specified</option>
+            <option [ngValue]="null">Not specified</option>
             @for (option of gautras(); track option.id) {
-              <option [value]="option.id">{{ option.name }}</option>
+              <option [ngValue]="option.id">{{ option.name }}</option>
             }
           </select>
 
           <label for="professionId">Profession</label>
           <select class="input" id="professionId" name="professionId" [(ngModel)]="form.professionId">
-            <option [value]="null">Not specified</option>
+            <option [ngValue]="null">Not specified</option>
             @for (option of professions(); track option.id) {
-              <option [value]="option.id">{{ option.label }}</option>
+              <option [ngValue]="option.id">{{ option.label }}</option>
             }
           </select>
 
           <label for="qualificationId">Qualification</label>
           <select class="input" id="qualificationId" name="qualificationId" [(ngModel)]="form.qualificationId">
-            <option [value]="null">Not specified</option>
+            <option [ngValue]="null">Not specified</option>
             @for (option of qualifications(); track option.id) {
-              <option [value]="option.id">{{ option.label }}</option>
+              <option [ngValue]="option.id">{{ option.label }}</option>
             }
           </select>
 
@@ -137,17 +137,17 @@ import {
             [(ngModel)]="form.cityId"
             (ngModelChange)="onCityChange($event)"
           >
-            <option [value]="null">Not specified</option>
+            <option [ngValue]="null">Not specified</option>
             @for (option of cities(); track option.id) {
-              <option [value]="option.id">{{ option.name }}</option>
+              <option [ngValue]="option.id">{{ option.name }}</option>
             }
           </select>
 
           <label for="localityId">Locality</label>
           <select class="input" id="localityId" name="localityId" [(ngModel)]="form.localityId">
-            <option [value]="null">Not specified</option>
+            <option [ngValue]="null">Not specified</option>
             @for (option of localities(); track option.id) {
-              <option [value]="option.id">{{ option.name }}</option>
+              <option [ngValue]="option.id">{{ option.name }}</option>
             }
           </select>
 
@@ -156,25 +156,25 @@ import {
 
           <label for="maritalStatusId">Marital status</label>
           <select class="input" id="maritalStatusId" name="maritalStatusId" [(ngModel)]="form.maritalStatusId">
-            <option [value]="null">Not specified</option>
+            <option [ngValue]="null">Not specified</option>
             @for (option of maritalStatuses(); track option.id) {
-              <option [value]="option.id">{{ option.label }}</option>
+              <option [ngValue]="option.id">{{ option.label }}</option>
             }
           </select>
 
           <label for="diet">Diet</label>
           <select class="input" id="diet" name="diet" [(ngModel)]="form.diet">
-            <option [value]="null">Not specified</option>
+            <option [ngValue]="null">Not specified</option>
             @for (option of diets; track option) {
-              <option [value]="option">{{ dietLabel(option) }}</option>
+              <option [ngValue]="option">{{ dietLabel(option) }}</option>
             }
           </select>
 
           <label for="familyType">Family type</label>
           <select class="input" id="familyType" name="familyType" [(ngModel)]="form.familyType">
-            <option [value]="null">Not specified</option>
+            <option [ngValue]="null">Not specified</option>
             @for (option of familyTypes; track option) {
-              <option [value]="option">{{ option }}</option>
+              <option [ngValue]="option">{{ option }}</option>
             }
           </select>
 

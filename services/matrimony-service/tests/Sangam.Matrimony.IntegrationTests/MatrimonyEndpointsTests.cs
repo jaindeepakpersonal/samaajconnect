@@ -37,12 +37,13 @@ public sealed class MatrimonyEndpointsTests(MatrimonyApiFactory factory)
         string gender = "Male",
         string dateOfBirth = "1995-04-02",
         bool consentGiven = true,
-        string noticeVersion = "2026-09-12.1") => new
+        string noticeVersion = "2026-09-12.1",
+        string? gautraId = null) => new
     {
         fullName,
         gender,
         dateOfBirth,
-        gautraId = (Guid?)null,
+        gautraId,
         professionId = (Guid?)null,
         qualificationId = (Guid?)null,
         cityId = (Guid?)null,
@@ -148,6 +149,37 @@ public sealed class MatrimonyEndpointsTests(MatrimonyApiFactory factory)
             .PostAsJsonAsync("/v1/matrimony/biodata/me/opt-in", OptInBody(dateOfBirth: "not-a-date"));
 
         response.StatusCode.Should().Be(HttpStatusCode.BadRequest);
+    }
+
+    /// <summary>
+    /// The literal text "null" - what a `&lt;select&gt;` bound with `[value]`
+    /// instead of `[ngValue]` sends for its "Not specified" option, since
+    /// `[value]` always stringifies onto the DOM. A Guid?-typed request field
+    /// crashed on this exactly the way DateOnly crashed on an empty string,
+    /// before GautraId became a string here, parsed and validated the same
+    /// way.
+    /// </summary>
+    [Fact]
+    public async Task The_literal_text_null_for_a_lookup_id_is_a_validation_problem_not_a_crash()
+    {
+        var response = await Member(Ravi)
+            .PostAsJsonAsync("/v1/matrimony/biodata/me/opt-in", OptInBody(gautraId: "null"));
+
+        response.StatusCode.Should().Be(HttpStatusCode.BadRequest);
+    }
+
+    [Fact]
+    public async Task A_real_lookup_id_can_be_cleared_back_to_not_specified()
+    {
+        await OptInAsync(Ravi);
+
+        var response = await Member(Ravi)
+            .PostAsJsonAsync("/v1/matrimony/biodata/me/opt-in", OptInBody(gautraId: null));
+
+        response.StatusCode.Should().Be(HttpStatusCode.OK);
+
+        var mine = await Member(Ravi).GetFromJsonAsync<JsonElement>("/v1/matrimony/biodata/me");
+        mine.GetProperty("biodata").GetProperty("gautraId").ValueKind.Should().Be(JsonValueKind.Null);
     }
 
     [Fact]
