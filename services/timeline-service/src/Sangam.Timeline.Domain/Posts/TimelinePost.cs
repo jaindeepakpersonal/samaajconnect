@@ -351,4 +351,10 @@ public enum ReactionType
     Appreciate = 1,
     Support = 2,
     Celebrate = 3,
+
+    /// <summary>Added 2026-09-12, alongside the other three rather than in
+    /// place of any of them - a member wanting to disagree with something on
+    /// the timeline had no reaction that said so and no way to say so at all
+    /// beside a comment.</summary>
+    Dislike = 4,
 }

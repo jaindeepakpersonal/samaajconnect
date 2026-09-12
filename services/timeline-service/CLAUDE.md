@@ -15,7 +15,7 @@ off gets 404 on every path here — see "The module gate" below.
 |---|---|---|
 | `TimelinePost` | built | Tenant-scoped. The moderation lifecycle is the substance of it. |
 | `PostComment` | built | Owned by the post; only an approved post accepts one. |
-| `PostReaction` | built | At most one per member per post. |
+| `PostReaction` | built | At most one per member per post. `ReactionType` gained `Dislike` on 2026-09-12, alongside `Appreciate`/`Support`/`Celebrate` rather than in place of any of them. |
 | `ModerationAction` | built | Append-only within the aggregate. Every decision, with who made it. |
 | `PostMedia` | not built | Waits on virus scanning, not on storage any more — see below. |
 

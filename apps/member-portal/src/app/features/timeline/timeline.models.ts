@@ -72,10 +72,14 @@ export interface PostDetail {
  *
  * `ReactionType` in timeline-service is a closed enum and the validator refuses
  * anything else, so this is not the portal's list to choose - it is the
- * platform's, and these three names are exactly it. An earlier version offered
+ * platform's, and these four names are exactly it. An earlier version offered
  * Like, Pray and Celebrate on the theory that the service stored whatever
  * string it was given; two of the three were rejected with a 400 that only
  * showed up when the screen was opened against a running service.
+ *
+ * `Dislike` was added to the enum on 2026-09-12, alongside the original three
+ * rather than replacing any of them - a member disagreeing with something on
+ * the timeline had no reaction that said so.
  *
  * The labels are separate from the types so the wording can change without
  * changing what goes on the wire.
@@ -84,6 +88,7 @@ export const Reactions = [
   { type: 'Appreciate', label: 'Appreciate' },
   { type: 'Support', label: 'Support' },
   { type: 'Celebrate', label: 'Celebrate' },
+  { type: 'Dislike', label: 'Dislike' },
 ] as const;
 
 export type ReactionType = (typeof Reactions)[number]['type'];

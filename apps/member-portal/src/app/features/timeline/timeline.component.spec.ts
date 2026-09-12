@@ -118,6 +118,15 @@ describe('TimelineComponent', () => {
     expect(buttonSaying('Report')).toBeUndefined();
   });
 
+  it('offers Dislike alongside the other three reactions', () => {
+    // Added 2026-09-12 to the platform's own closed enum - the button exists
+    // here only because Reactions in timeline.models.ts lists it, not because
+    // this screen invented a fourth one.
+    load([post({ status: 'Approved' })]);
+
+    expect(buttonSaying('Dislike')).toBeDefined();
+  });
+
   // ---- Composing ---------------------------------------------------------
 
   it('says a member post goes for review rather than implying it is live', () => {

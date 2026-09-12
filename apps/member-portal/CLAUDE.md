@@ -235,6 +235,14 @@ matching where a "way back to the start" row reads as belonging. There is
 still exactly one row for it, so the redundancy this whole change exists to
 avoid has not returned - only its name and position did.
 
+**Timeline gained a fourth reaction, `Dislike`, on 2026-09-12 - added to
+`Reactions` in `timeline.models.ts` alongside `Appreciate`/`Support`/
+`Celebrate` rather than in place of any of them.** The button needed no
+template change: the reaction row already renders `Reactions` generically,
+so the fourth entry in that list is the whole change on this side. The
+service's own `ReactionType` enum and its validator's error message moved
+with it - see timeline-service's own `CLAUDE.md`.
+
 **A module key is `ModuleKeys.X`, never a string literal.** Home filtered its
 Events and Volunteer tiles on `Events` and `VolunteerGroups`, neither of which
 is a key the platform has ever had - both features are behind `community`. The

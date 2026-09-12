@@ -23,7 +23,7 @@ public sealed class ReactToPostCommandValidator : AbstractValidator<ReactToPostC
         RuleFor(x => x.Reaction)
             .NotEmpty()
             .Must(r => Enum.TryParse<ReactionType>(r, ignoreCase: true, out _))
-            .WithMessage("Reaction must be one of Appreciate, Support or Celebrate.");
+            .WithMessage("Reaction must be one of Appreciate, Support, Celebrate or Dislike.");
     }
 }
 
