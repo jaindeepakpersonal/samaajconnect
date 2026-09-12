@@ -126,22 +126,28 @@ import { isNotFound } from '../../core/http-status';
         <h2>Set up a campaign</h2>
 
         <form (ngSubmit)="create()">
-          <label for="campaign-title">Title</label>
-          <input id="campaign-title" class="input" name="title" [(ngModel)]="title"
-            maxlength="200" placeholder="2026 Samaaj Celebrity" />
+          <div class="form-grid">
+            <div class="field">
+              <label for="campaign-title">Title</label>
+              <input id="campaign-title" class="input" name="title" [(ngModel)]="title"
+                maxlength="200" placeholder="2026 Samaaj Celebrity" />
+            </div>
 
-          <label for="campaign-description">Description</label>
-          <input id="campaign-description" class="input" name="description"
-            [(ngModel)]="description" maxlength="2000" />
+            <div class="field">
+              <label for="campaign-description">Description</label>
+              <input id="campaign-description" class="input" name="description"
+                [(ngModel)]="description" maxlength="2000" />
+            </div>
+          </div>
 
           <h3 class="section-heading">Nominations</h3>
-          <div class="filter-row">
-            <div>
+          <div class="form-grid">
+            <div class="field">
               <label for="nom-start">Open</label>
               <input id="nom-start" class="input" type="datetime-local" name="nominationStartAt"
                 [(ngModel)]="nominationStartAt" />
             </div>
-            <div>
+            <div class="field">
               <label for="nom-end">Close</label>
               <input id="nom-end" class="input" type="datetime-local" name="nominationEndAt"
                 [(ngModel)]="nominationEndAt" />
@@ -149,34 +155,32 @@ import { isNotFound } from '../../core/http-status';
           </div>
 
           <h3 class="section-heading">Voting</h3>
-          <div class="filter-row">
-            <div>
+          <div class="form-grid">
+            <div class="field">
               <label for="vote-start">Open</label>
               <input id="vote-start" class="input" type="datetime-local" name="votingStartAt"
                 [(ngModel)]="votingStartAt"
                 [attr.aria-invalid]="windowsOverlap() ? 'true' : null" />
             </div>
-            <div>
+            <div class="field">
               <label for="vote-end">Close</label>
               <input id="vote-end" class="input" type="datetime-local" name="votingEndAt"
                 [(ngModel)]="votingEndAt" />
             </div>
-          </div>
 
-          @if (windowsOverlap()) {
-            <p class="notice" role="alert">
-              Voting cannot start before nominations close. Members who vote early have to see
-              the same ballot as members who vote late.
-            </p>
-          }
+            @if (windowsOverlap()) {
+              <p class="notice span-all" role="alert">
+                Voting cannot start before nominations close. Members who vote early have to see
+                the same ballot as members who vote late.
+              </p>
+            }
 
-          <div class="filter-row">
-            <div>
+            <div class="field">
               <label for="campaign-topn">Top</label>
               <input id="campaign-topn" class="input" type="number" min="1" name="topN"
                 [(ngModel)]="topN" />
             </div>
-            <div>
+            <div class="field">
               <label for="campaign-visibility">While voting is open, members see</label>
               <select id="campaign-visibility" class="input" name="visibility"
                 [(ngModel)]="resultsVisibility">
@@ -184,13 +188,13 @@ import { isNotFound } from '../../core/http-status';
                 <option value="Live">The running count</option>
               </select>
             </div>
-          </div>
 
-          <p class="small">
-            Decide the count now: members who can see who is winning vote differently from
-            members who cannot. An administrator sees it either way, because somebody has to be
-            able to tell whether the thing is working.
-          </p>
+            <p class="small span-all">
+              Decide the count now: members who can see who is winning vote differently from
+              members who cannot. An administrator sees it either way, because somebody has to be
+              able to tell whether the thing is working.
+            </p>
+          </div>
 
           <button class="btn" type="submit" [disabled]="busy() || !canCreate()">
             Create as a draft
@@ -208,15 +212,6 @@ import { isNotFound } from '../../core/http-status';
       margin-top: var(--space-5);
     }
 
-    .filter-row {
-      display: flex;
-      gap: var(--space-3);
-      flex-wrap: wrap;
-    }
-
-    .filter-row > div {
-      flex: 1 1 200px;
-    }
   `,
 })
 export class CampaignListComponent implements OnInit {

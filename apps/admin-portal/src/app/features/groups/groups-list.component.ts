@@ -171,35 +171,47 @@ import { isNotFound } from '../../core/http-status';
         <h2>Set up a group</h2>
 
         <form (ngSubmit)="create()">
-          <label for="group-name">Name</label>
-          <input id="group-name" class="input" name="name" [(ngModel)]="name"
-            maxlength="200" placeholder="Seva Group" />
+          <div class="form-grid">
+            <div class="field">
+              <label for="group-name">Name</label>
+              <input id="group-name" class="input" name="name" [(ngModel)]="name"
+                maxlength="200" placeholder="Seva Group" />
+            </div>
 
-          <label for="group-description">Description</label>
-          <input id="group-description" class="input" name="description"
-            [(ngModel)]="description" maxlength="1000" />
+            <div class="field">
+              <label for="group-description">Description</label>
+              <input id="group-description" class="input" name="description"
+                [(ngModel)]="description" maxlength="1000" />
+            </div>
 
-          <label for="group-focus">Focus area</label>
-          <input id="group-focus" class="input" name="focusArea" [(ngModel)]="focusArea"
-            maxlength="120" placeholder="Social Service" />
+            <div class="field">
+              <label for="group-focus">Focus area</label>
+              <input id="group-focus" class="input" name="focusArea" [(ngModel)]="focusArea"
+                maxlength="120" placeholder="Social Service" />
+            </div>
 
-          <label for="group-president">President</label>
-          <select id="group-president" class="input" name="president"
-            [(ngModel)]="presidentMemberId">
-            <option value="">Choose a member…</option>
-            @for (member of members(); track member.id) {
-              <option [value]="member.id">{{ member.fullName }}</option>
-            }
-          </select>
+            <div class="field">
+              <label for="group-president">President</label>
+              <select id="group-president" class="input" name="president"
+                [(ngModel)]="presidentMemberId">
+                <option value="">Choose a member…</option>
+                @for (member of members(); track member.id) {
+                  <option [value]="member.id">{{ member.fullName }}</option>
+                }
+              </select>
+            </div>
 
-          <p class="small">
-            A group needs one from the start: the president is who decides its applications, and
-            a group without one is a group whose join requests go nowhere.
-          </p>
+            <p class="small span-all">
+              A group needs one from the start: the president is who decides its applications, and
+              a group without one is a group whose join requests go nowhere.
+            </p>
 
-          <button class="btn" type="submit" [disabled]="busy() || !canCreate()">
-            Create group
-          </button>
+            <div class="span-all">
+              <button class="btn" type="submit" [disabled]="busy() || !canCreate()">
+                Create group
+              </button>
+            </div>
+          </div>
         </form>
       </div>
     }

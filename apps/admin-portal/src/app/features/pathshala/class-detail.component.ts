@@ -129,8 +129,8 @@ type Mark = AttendanceStatus | '';
         <form (ngSubmit)="addSlot()">
           <h3 class="section-heading">Add a slot</h3>
 
-          <div class="filter-row">
-            <div>
+          <div class="form-grid">
+            <div class="field">
               <label for="day">Day</label>
               <select id="day" class="input" name="day" [(ngModel)]="day">
                 @for (name of days; track name) {
@@ -138,11 +138,11 @@ type Mark = AttendanceStatus | '';
                 }
               </select>
             </div>
-            <div>
+            <div class="field">
               <label for="from">From</label>
               <input id="from" class="input" type="time" name="from" [(ngModel)]="startTime" />
             </div>
-            <div>
+            <div class="field">
               <label for="to">To</label>
               <input id="to" class="input" type="time" name="to" [(ngModel)]="endTime" />
             </div>
@@ -350,17 +350,20 @@ type Mark = AttendanceStatus | '';
         <form (ngSubmit)="scheduleExam()">
           <h3 class="section-heading">Set an exam</h3>
 
-          <label for="exam-title">Title</label>
-          <input id="exam-title" class="input" name="examTitle" [(ngModel)]="examTitle"
-            maxlength="200" placeholder="Half-yearly" />
+          <div class="form-grid">
+            <div class="field">
+              <label for="exam-title">Title</label>
+              <input id="exam-title" class="input" name="examTitle" [(ngModel)]="examTitle"
+                maxlength="200" placeholder="Half-yearly" />
+            </div>
 
-          <div class="filter-row">
-            <div>
+            <div class="field">
               <label for="exam-date">Date</label>
               <input id="exam-date" class="input" type="date" name="examDate"
                 [(ngModel)]="examDate" />
             </div>
-            <div>
+
+            <div class="field">
               <label for="exam-max">Out of</label>
               <input id="exam-max" class="input" type="number" min="1" name="examMax"
                 [(ngModel)]="examMax" />
@@ -381,16 +384,6 @@ type Mark = AttendanceStatus | '';
 
     .section-heading {
       margin-top: var(--space-5);
-    }
-
-    .filter-row {
-      display: flex;
-      gap: var(--space-3);
-      flex-wrap: wrap;
-    }
-
-    .filter-row > div {
-      flex: 1 1 160px;
     }
 
     .row-actions {

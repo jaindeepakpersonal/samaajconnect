@@ -104,23 +104,26 @@ import { isNotFound } from '../../core/http-status';
             records are kept.
           </p>
 
-          <label for="session-label">Label</label>
-          <input
-            id="session-label"
-            class="input"
-            name="label"
-            [(ngModel)]="sessionLabel"
-            maxlength="40"
-            placeholder="2026-27"
-          />
+          <div class="form-grid">
+            <div class="field">
+              <label for="session-label">Label</label>
+              <input
+                id="session-label"
+                class="input"
+                name="label"
+                [(ngModel)]="sessionLabel"
+                maxlength="40"
+                placeholder="2026-27"
+              />
+            </div>
 
-          <div class="filter-row">
-            <div>
+            <div class="field">
               <label for="session-start">Starts</label>
               <input id="session-start" class="input" type="date" name="start"
                 [(ngModel)]="sessionStart" />
             </div>
-            <div>
+
+            <div class="field">
               <label for="session-end">Ends</label>
               <input id="session-end" class="input" type="date" name="end"
                 [(ngModel)]="sessionEnd" />
@@ -169,13 +172,19 @@ import { isNotFound } from '../../core/http-status';
           <form (ngSubmit)="createClass(current.id)">
             <h3 class="section-heading">Add a class to {{ current.label }}</h3>
 
-            <label for="class-name">Name</label>
-            <input id="class-name" class="input" name="className" [(ngModel)]="className"
-              maxlength="120" placeholder="Class 8 — Jain Studies" />
+            <div class="form-grid">
+              <div class="field">
+                <label for="class-name">Name</label>
+                <input id="class-name" class="input" name="className" [(ngModel)]="className"
+                  maxlength="120" placeholder="Class 8 — Jain Studies" />
+              </div>
 
-            <label for="class-room">Room</label>
-            <input id="class-room" class="input" name="roomLabel" [(ngModel)]="roomLabel"
-              maxlength="60" placeholder="Room 2" />
+              <div class="field">
+                <label for="class-room">Room</label>
+                <input id="class-room" class="input" name="roomLabel" [(ngModel)]="roomLabel"
+                  maxlength="60" placeholder="Room 2" />
+              </div>
+            </div>
 
             <button class="btn" type="submit" [disabled]="busy() || !className.trim()">
               Add class
@@ -313,16 +322,6 @@ import { isNotFound } from '../../core/http-status';
 
     .section-heading {
       margin-top: var(--space-5);
-    }
-
-    .filter-row {
-      display: flex;
-      gap: var(--space-3);
-      flex-wrap: wrap;
-    }
-
-    .filter-row > div {
-      flex: 1 1 180px;
     }
 
     .row-actions {

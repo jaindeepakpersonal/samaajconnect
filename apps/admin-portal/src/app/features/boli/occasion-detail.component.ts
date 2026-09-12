@@ -216,67 +216,75 @@ import { isNotFound } from '../../core/http-status';
           <form (ngSubmit)="open()">
             <h3 class="section-heading">Open a Boli</h3>
 
-            <label for="boli-type">Type</label>
-            <select id="boli-type" class="input" name="boliType" [(ngModel)]="boliTypeId">
-              <option value="">Choose a type…</option>
-              @for (type of event.types; track type.id) {
-                <option [value]="type.id">{{ type.name }}</option>
-              }
-            </select>
+            <div class="form-grid">
+              <div class="field">
+                <label for="boli-type">Type</label>
+                <select id="boli-type" class="input" name="boliType" [(ngModel)]="boliTypeId">
+                  <option value="">Choose a type…</option>
+                  @for (type of event.types; track type.id) {
+                    <option [value]="type.id">{{ type.name }}</option>
+                  }
+                </select>
+              </div>
 
-            <label for="boli-title">Title</label>
-            <input id="boli-title" class="input" name="boliTitle" [(ngModel)]="boliTitle"
-              maxlength="200" placeholder="Mangal Deep — first day" />
+              <div class="field">
+                <label for="boli-title">Title</label>
+                <input id="boli-title" class="input" name="boliTitle" [(ngModel)]="boliTitle"
+                  maxlength="200" placeholder="Mangal Deep — first day" />
+              </div>
 
-            <div class="filter-row">
-              <div>
+              <div class="field">
                 <label for="boli-start">Opens</label>
                 <input id="boli-start" class="input" type="datetime-local" name="startAt"
                   [(ngModel)]="startAt" />
               </div>
-              <div>
+
+              <div class="field">
                 <label for="boli-end">Closes</label>
                 <input id="boli-end" class="input" type="datetime-local" name="endAt"
                   [(ngModel)]="endAt" />
               </div>
-            </div>
 
-            <div class="filter-row">
-              <div>
+              <div class="field">
                 <label for="boli-floor">Starting amount (₹)</label>
                 <input id="boli-floor" class="input" name="startingAmount"
                   [(ngModel)]="startingAmount" inputmode="decimal" placeholder="1000"
                   [attr.aria-invalid]="startingAmount && floorPaise() === null ? 'true' : null" />
               </div>
-              <div>
+
+              <div class="field">
                 <label for="boli-increment">Minimum increment (₹)</label>
                 <input id="boli-increment" class="input" name="minIncrement"
                   [(ngModel)]="minIncrement" inputmode="decimal" placeholder="500"
                   [attr.aria-invalid]="minIncrement && incrementPaise() === null ? 'true' : null" />
               </div>
+
+              <div class="field span-all">
+                <label for="boli-extend">If somebody bids in the last… (seconds)</label>
+                <input id="boli-extend" class="input inline" type="number" min="0" max="3600"
+                  name="autoExtendSeconds" [(ngModel)]="autoExtendSeconds" />
+                <p class="small">
+                  …then the close moves that far past the bid, and keeps moving while people keep
+                  bidding. Leave it at 0 and the Boli shuts on the clock — which means it can be won
+                  by whoever bids last rather than by whoever will pay most. Two minutes is a common
+                  choice; the auctioneer's "going, going" is the same idea.
+                </p>
+              </div>
+
+              <div class="field span-all">
+                <label for="boli-eligibility">Eligibility rule</label>
+                <input id="boli-eligibility" class="input" name="eligibilityRule"
+                  [(ngModel)]="eligibilityRule" maxlength="500" placeholder="One per family." />
+                <p class="small">
+                  The eligibility rule is shown to bidders and enforced by the Samaaj, not by the
+                  platform. Real rules are facts this service does not hold.
+                </p>
+              </div>
+
+              <div class="span-all">
+                <button class="btn" type="submit" [disabled]="busy() || !canOpen()">Open Boli</button>
+              </div>
             </div>
-
-            <label for="boli-extend">If somebody bids in the last… (seconds)</label>
-            <input id="boli-extend" class="input inline" type="number" min="0" max="3600"
-              name="autoExtendSeconds" [(ngModel)]="autoExtendSeconds" />
-
-            <p class="small">
-              …then the close moves that far past the bid, and keeps moving while people keep
-              bidding. Leave it at 0 and the Boli shuts on the clock — which means it can be won
-              by whoever bids last rather than by whoever will pay most. Two minutes is a common
-              choice; the auctioneer's "going, going" is the same idea.
-            </p>
-
-            <label for="boli-eligibility">Eligibility rule</label>
-            <input id="boli-eligibility" class="input" name="eligibilityRule"
-              [(ngModel)]="eligibilityRule" maxlength="500" placeholder="One per family." />
-
-            <p class="small">
-              The eligibility rule is shown to bidders and enforced by the Samaaj, not by the
-              platform. Real rules are facts this service does not hold.
-            </p>
-
-            <button class="btn" type="submit" [disabled]="busy() || !canOpen()">Open Boli</button>
           </form>
         }
       </div>
@@ -289,16 +297,6 @@ import { isNotFound } from '../../core/http-status';
 
     .section-heading {
       margin-top: var(--space-5);
-    }
-
-    .filter-row {
-      display: flex;
-      gap: var(--space-3);
-      flex-wrap: wrap;
-    }
-
-    .filter-row > div {
-      flex: 1 1 180px;
     }
 
     .row-actions {

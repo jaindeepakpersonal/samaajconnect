@@ -34,51 +34,61 @@ import { ModuleDescriptor } from '../../core/admin.models';
 
     <div class="card modal-card">
       <form [formGroup]="form" (ngSubmit)="submit()" novalidate>
-        <label for="name">Samaaj name</label>
-        <input
-          id="name"
-          class="input"
-          formControlName="name"
-          placeholder="e.g. Parshwanath Samaaj"
-          [attr.aria-invalid]="showError('name')"
-        />
-        @if (showError('name')) {
-          <p class="field-error">Enter the Samaaj's name.</p>
-        }
+        <div class="form-grid">
+          <div class="field">
+            <label for="name">Samaaj name</label>
+            <input
+              id="name"
+              class="input"
+              formControlName="name"
+              placeholder="e.g. Parshwanath Samaaj"
+              [attr.aria-invalid]="showError('name')"
+            />
+            @if (showError('name')) {
+              <p class="field-error">Enter the Samaaj's name.</p>
+            }
+          </div>
 
-        <label for="slug">Slug</label>
-        <input
-          id="slug"
-          class="input"
-          formControlName="slug"
-          placeholder="e.g. parshwanath-samaj"
-          [attr.aria-invalid]="showError('slug')"
-        />
-        @if (showError('slug')) {
-          <p class="field-error">
-            Lowercase letters, numbers and hyphens only, between 3 and 63 characters.
-          </p>
-        } @else {
-          <p class="field-hint">
-            How members find this Samaaj when they register. Permanent once anyone has joined.
-          </p>
-        }
+          <div class="field">
+            <label for="slug">Slug</label>
+            <input
+              id="slug"
+              class="input"
+              formControlName="slug"
+              placeholder="e.g. parshwanath-samaj"
+              [attr.aria-invalid]="showError('slug')"
+            />
+            @if (showError('slug')) {
+              <p class="field-error">
+                Lowercase letters, numbers and hyphens only, between 3 and 63 characters.
+              </p>
+            } @else {
+              <p class="field-hint">
+                How members find this Samaaj when they register. Permanent once anyone has joined.
+              </p>
+            }
+          </div>
 
-        <label for="contactPerson">Contact person</label>
-        <input id="contactPerson" class="input" formControlName="contactPerson" placeholder="Name" />
+          <div class="field">
+            <label for="contactPerson">Contact person</label>
+            <input id="contactPerson" class="input" formControlName="contactPerson" placeholder="Name" />
+          </div>
 
-        <label for="contactEmail">Contact email</label>
-        <input
-          id="contactEmail"
-          class="input"
-          type="email"
-          formControlName="contactEmail"
-          placeholder="admin@example.com"
-          [attr.aria-invalid]="showError('contactEmail')"
-        />
-        @if (showError('contactEmail')) {
-          <p class="field-error">Enter a valid email address, or leave it blank.</p>
-        }
+          <div class="field">
+            <label for="contactEmail">Contact email</label>
+            <input
+              id="contactEmail"
+              class="input"
+              type="email"
+              formControlName="contactEmail"
+              placeholder="admin@example.com"
+              [attr.aria-invalid]="showError('contactEmail')"
+            />
+            @if (showError('contactEmail')) {
+              <p class="field-error">Enter a valid email address, or leave it blank.</p>
+            }
+          </div>
+        </div>
 
         <fieldset class="modules">
           <legend>Enabled modules</legend>

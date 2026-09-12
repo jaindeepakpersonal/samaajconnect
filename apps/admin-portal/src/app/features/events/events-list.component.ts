@@ -168,58 +168,71 @@ import { isNotFound } from '../../core/http-status';
         <h2>Create an event</h2>
 
         <form (ngSubmit)="create()">
-          <label for="event-title">Title</label>
-          <input id="event-title" class="input" name="title" [(ngModel)]="title"
-            maxlength="200" placeholder="Paryushan Lecture" />
+          <div class="form-grid">
+            <div class="field">
+              <label for="event-title">Title</label>
+              <input id="event-title" class="input" name="title" [(ngModel)]="title"
+                maxlength="200" placeholder="Paryushan Lecture" />
+            </div>
 
-          <label for="event-description">Description</label>
-          <input id="event-description" class="input" name="description"
-            [(ngModel)]="description" maxlength="2000" />
+            <div class="field">
+              <label for="event-description">Description</label>
+              <input id="event-description" class="input" name="description"
+                [(ngModel)]="description" maxlength="2000" />
+            </div>
 
-          <label for="event-venue">Venue</label>
-          <input id="event-venue" class="input" name="venue" [(ngModel)]="venue"
-            maxlength="200" placeholder="Jain Bhavan, Hiran Magri" />
+            <div class="field">
+              <label for="event-venue">Venue</label>
+              <input id="event-venue" class="input" name="venue" [(ngModel)]="venue"
+                maxlength="200" placeholder="Jain Bhavan, Hiran Magri" />
+            </div>
 
-          <div class="filter-row">
-            <div>
+            <div class="field">
               <label for="event-start">Starts</label>
               <input id="event-start" class="input" type="datetime-local" name="startAt"
                 [(ngModel)]="startAt" />
             </div>
-            <div>
+
+            <div class="field">
               <label for="event-end">Ends</label>
               <input id="event-end" class="input" type="datetime-local" name="endAt"
                 [(ngModel)]="endAt" />
             </div>
-          </div>
 
-          <label for="event-organiser">Organiser</label>
-          <select id="event-organiser" class="input" name="organiser" [(ngModel)]="organizerId">
-            <option value="">{{ scope.label() }} itself</option>
-            @for (group of groups(); track group.id) {
-              <option [value]="group.id">{{ group.name }}</option>
+            <div class="field">
+              <label for="event-organiser">Organiser</label>
+              <select id="event-organiser" class="input" name="organiser" [(ngModel)]="organizerId">
+                <option value="">{{ scope.label() }} itself</option>
+                @for (group of groups(); track group.id) {
+                  <option [value]="group.id">{{ group.name }}</option>
+                }
+              </select>
+            </div>
+
+            <label class="inline-check span-all">
+              <input type="checkbox" name="registrationEnabled" [(ngModel)]="registrationEnabled" />
+              Members may register
+            </label>
+
+            @if (registrationEnabled) {
+              <div class="field span-all">
+                <label for="event-capacity">Capacity</label>
+                <input id="event-capacity" class="input inline" type="number" min="1"
+                  name="capacity" [(ngModel)]="capacity" placeholder="Leave blank for no limit" />
+
+                <p class="small">
+                  Blank means no limit. It is not the same as zero, which the service refuses — an
+                  event nobody can attend is a mistake rather than an intention.
+                </p>
+              </div>
             }
-          </select>
 
-          <label class="inline-check">
-            <input type="checkbox" name="registrationEnabled" [(ngModel)]="registrationEnabled" />
-            Members may register
-          </label>
-
-          @if (registrationEnabled) {
-            <label for="event-capacity">Capacity</label>
-            <input id="event-capacity" class="input inline" type="number" min="1"
-              name="capacity" [(ngModel)]="capacity" placeholder="Leave blank for no limit" />
-
-            <p class="small">
-              Blank means no limit. It is not the same as zero, which the service refuses — an
-              event nobody can attend is a mistake rather than an intention.
-            </p>
-          }
-
-          <button class="btn" type="submit" [disabled]="busy() || !canCreate()">
-            Create as a draft
-          </button>
+            <div class="span-all">
+              <button class="btn" type="submit" [disabled]="busy() || !canCreate()">
+                Create as a draft
+              </button>
+            </div>
+          </div>
         </form>
       </div>
     }
@@ -227,16 +240,6 @@ import { isNotFound } from '../../core/http-status';
   styles: `
     .spaced {
       margin-top: var(--space-4);
-    }
-
-    .filter-row {
-      display: flex;
-      gap: var(--space-3);
-      flex-wrap: wrap;
-    }
-
-    .filter-row > div {
-      flex: 1 1 200px;
     }
 
     .row-actions {
