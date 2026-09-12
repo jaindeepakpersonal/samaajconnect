@@ -49,6 +49,9 @@ public static class ModuleCatalog
     /// <summary>Matrimony biodata and proposals. Off by default - see Boli's own note.</summary>
     public const string Matrimony = "matrimony";
 
+    /// <summary>Members' own businesses, products and orders between members. Off by default - see Boli's own note.</summary>
+    public const string Businesses = "businesses";
+
     public static IReadOnlyList<ModuleDescriptor> All { get; } =
     [
         new(Community, "Timeline & Volunteer Groups", DefaultOn: true),
@@ -63,6 +66,10 @@ public static class ModuleCatalog
         // Same reasoning as Boli: not every Samaaj wants a matrimony module
         // running, and opting in should be a visible admin decision.
         new(Matrimony, "Matrimony", DefaultOn: false),
+
+        // Same reasoning again: a member marketplace is optional, not every
+        // Samaaj wants to run one.
+        new(Businesses, "Businesses", DefaultOn: false),
     ];
 
     public static IReadOnlyList<string> DefaultKeys { get; } =

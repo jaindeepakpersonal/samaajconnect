@@ -408,3 +408,34 @@ its own.
 No photo or contact endpoints — biodata reuses the member's existing photo
 route and never carries Mobile or Email. Search is within the caller's own
 Samaaj only; there is no cross-tenant variant.
+
+## businesses-service — `/v1/businesses`
+
+Module-gated on `businesses`, off by default. Roles below are the same
+self-scoped list member-family-service's own profile-update command
+uses, for every write, and `Members.Read` for every read — no permission
+key of its own.
+
+| Method | Path | Roles | Purpose |
+|---|---|---|---|
+| GET | `/mine` | `Members.Read` | The caller's own businesses, active or not |
+| POST | `/mine` | role list above | Register a business. Visible in the directory immediately — no moderation |
+| PATCH | `/mine/{businessId}` | role list above, owner only | Edit a business the caller owns. 404 for anyone else |
+| POST | `/mine/{businessId}/status` | role list above, owner only | Deactivate or reactivate. Reversible |
+| POST | `/mine/{businessId}/products` | role list above, owner only | Add a product |
+| PATCH | `/mine/{businessId}/products/{productId}` | role list above, owner only | Edit a product's name, description or price |
+| POST | `/mine/{businessId}/products/{productId}/availability` | role list above, owner only | Take a product off sale, or put it back. Never deletes |
+| GET | `/` | `Members.Read` | The directory: active businesses in the caller's own Samaaj, filtered by category/location/term, capped at 50 |
+| GET | `/{businessId}` | `Members.Read` | One business's public detail. Every product to its owner, only available ones to anyone else. 404 if inactive-and-not-owner or in a different Samaaj |
+| POST | `/orders` | role list above | Place an order. 409 for an unavailable product, 400 for ordering your own business |
+| GET | `/orders/mine` | `Members.Read` | Orders the caller has placed |
+| GET | `/orders/received` | `Members.Read` | Orders against any business the caller owns |
+| POST | `/orders/{id}/respond` | role list above, business owner only | Accept or decline a pending order. 404 for anyone else |
+| POST | `/orders/{id}/fulfill` | role list above, business owner only | Mark an accepted order fulfilled |
+| POST | `/orders/{id}/cancel` | role list above, buyer or owner | The buyer cancels while Pending; the owner cancels while Accepted |
+
+No photo endpoint — there is no file storage this service could use.
+Directory search and every order are within the caller's own Samaaj only;
+there is no cross-tenant variant. An order's total is computed
+server-side from each product's price at placement time and never
+trusted from the client.

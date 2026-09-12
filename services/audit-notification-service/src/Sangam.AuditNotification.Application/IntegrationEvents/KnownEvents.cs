@@ -707,6 +707,48 @@ public static class KnownEvents
             EntityName: "Proposal",
             EntityIdProperty: "proposalId",
             ActorIdProperty: "fromMemberId"),
+
+        // businesses-service, the thirteenth service. Creating and
+        // deactivating a business are both self-actions, the same shape as
+        // matrimony.biodata.created.v1 - the owner is both the entity and
+        // the actor, so neither carries a distinct ActorIdProperty. An
+        // order's four topics all name the buyer as the entity's
+        // BuyerMemberId; only OrderPlaced is the buyer's own act. The other
+        // three (Responded, Fulfilled, Cancelled) are usually the business
+        // owner's act, but Cancelled can be either party's, so it is left
+        // without an ActorIdProperty rather than naming the wrong one - the
+        // same restraint post.reported.v1 already takes for a field this
+        // catalogue would otherwise have to guess at.
+        ["businesses.business.created.v1"] = new(
+            Action: "BusinessCreated",
+            EntityName: "Business",
+            EntityIdProperty: "businessId"),
+
+        ["businesses.business.status-changed.v1"] = new(
+            Action: "BusinessStatusChanged",
+            EntityName: "Business",
+            EntityIdProperty: "businessId"),
+
+        ["businesses.order.placed.v1"] = new(
+            Action: "OrderPlaced",
+            EntityName: "Order",
+            EntityIdProperty: "orderId",
+            ActorIdProperty: "buyerMemberId"),
+
+        ["businesses.order.responded.v1"] = new(
+            Action: "OrderResponded",
+            EntityName: "Order",
+            EntityIdProperty: "orderId"),
+
+        ["businesses.order.fulfilled.v1"] = new(
+            Action: "OrderFulfilled",
+            EntityName: "Order",
+            EntityIdProperty: "orderId"),
+
+        ["businesses.order.cancelled.v1"] = new(
+            Action: "OrderCancelled",
+            EntityName: "Order",
+            EntityIdProperty: "orderId"),
     };
 
     public static EventDescriptor Describe(string topic) =>

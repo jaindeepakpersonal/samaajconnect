@@ -3725,6 +3725,163 @@ matrimony_checks() {
 matrimony_checks || echo "  ..    the rest of the Matrimony checks were skipped"
 
 echo
+echo "Businesses: a listing, a product, and an order through its lifecycle"
+
+# Wrapped in a function for the same reason boli_checks and matrimony_checks
+# are: a missing id can return rather than exit, so one broken extraction
+# here does not blame the sections that run after it.
+businesses_checks() {
+
+  check "switching the businesses module on" 200 \
+    "$(status -X PUT "$GATEWAY/v1/identity/tenants/$TENANT_ID/modules" \
+       -H 'Content-Type: application/json' -H "Authorization: Bearer $ADMIN_TOKEN" -H "$ADMIN_TENANT_HEADER" \
+       -d '{"enabledModules":["community","businesses"]}')"
+
+  sleep 62
+
+  refresh_tokens
+
+  # businesses-service holds CategoryId as a plain foreign key into
+  # master-data-service with no referential integrity across the boundary -
+  # the same stance every other service holding one of these ids already
+  # takes (see master-data-service/CLAUDE.md) - so a syntactically valid but
+  # otherwise arbitrary id is exactly what a real request looks like too.
+  BUSINESS_CATEGORY_ID=$(od -An -N16 -tx1 /dev/urandom | tr -d ' \n' \
+    | sed -E 's/(.{8})(.{4})(.{4})(.{4})(.{12})/\1-\2-\3-\4-\5/')
+
+  BUSINESS=$(curl -s -X POST "$GATEWAY/v1/businesses/mine" \
+    -H 'Content-Type: application/json' -H "Authorization: Bearer $MEMBER_TOKEN" \
+    -d "{\"name\":\"Smoke Sweets\",\"categoryId\":\"$BUSINESS_CATEGORY_ID\",
+         \"description\":\"Traditional sweets.\",
+         \"contactPhone\":\"9876543210\",\"contactEmail\":\"smoke@example.com\"}")
+
+  BUSINESS_ID=$(printf '%s' "$BUSINESS" | json_field id)
+
+  if [ -n "$BUSINESS_ID" ]; then
+    echo "  ok    a member registers a business - visible immediately, no moderation"
+    pass=$((pass + 1))
+  else
+    echo "  FAIL  registering a business (got '$BUSINESS')"
+    fail=$((fail + 1))
+    return 1
+  fi
+
+  PRODUCT=$(curl -s -X POST "$GATEWAY/v1/businesses/mine/$BUSINESS_ID/products" \
+    -H 'Content-Type: application/json' -H "Authorization: Bearer $MEMBER_TOKEN" \
+    -d '{"name":"Kaju Katli","description":"500g box","priceInPaise":45000}')
+
+  # The response is the whole Business, so its own top-level "id" comes
+  # first - the product's is the second (and, at this point, only other)
+  # match, not the first `json_field` would return.
+  PRODUCT_ID=$(printf '%s' "$PRODUCT" | grep -o '"id":"[^"]*"' | tail -n 1 | cut -d'"' -f4)
+
+  if [ -n "$PRODUCT_ID" ]; then
+    echo "  ok    the owner adds a product"
+    pass=$((pass + 1))
+  else
+    echo "  FAIL  adding a product (got '$PRODUCT')"
+    fail=$((fail + 1))
+    return 1
+  fi
+
+  DIRECTORY=$(curl -s -H "Authorization: Bearer $CHILD_TOKEN" "$GATEWAY/v1/businesses")
+
+  if printf '%s' "$DIRECTORY" | grep -q "$BUSINESS_ID"; then
+    echo "  ok    another member finds it in the directory"
+    pass=$((pass + 1))
+  else
+    echo "  FAIL  the directory is missing the business (got '$DIRECTORY')"
+    fail=$((fail + 1))
+  fi
+
+  check "a member cannot order from their own business" 400 \
+    "$(status -X POST "$GATEWAY/v1/businesses/orders" \
+       -H 'Content-Type: application/json' -H "Authorization: Bearer $MEMBER_TOKEN" \
+       -d "{\"businessId\":\"$BUSINESS_ID\",\"items\":[{\"productId\":\"$PRODUCT_ID\",\"quantity\":1}]}")"
+
+  ORDER=$(curl -s -X POST "$GATEWAY/v1/businesses/orders" \
+    -H 'Content-Type: application/json' -H "Authorization: Bearer $CHILD_TOKEN" \
+    -d "{\"businessId\":\"$BUSINESS_ID\",\"items\":[{\"productId\":\"$PRODUCT_ID\",\"quantity\":2}],
+         \"note\":\"Please pack well.\"}")
+
+  ORDER_ID=$(printf '%s' "$ORDER" | json_field id)
+
+  if printf '%s' "$ORDER" | grep -q '"totalAmountInPaise":90000'; then
+    echo "  ok    a second member places an order, total computed server-side"
+    pass=$((pass + 1))
+  else
+    echo "  FAIL  placing the order (got '$ORDER')"
+    fail=$((fail + 1))
+    return 1
+  fi
+
+  check "only the owner may accept it" 404 \
+    "$(status -X POST "$GATEWAY/v1/businesses/orders/$ORDER_ID/respond" \
+       -H 'Content-Type: application/json' -H "Authorization: Bearer $CHILD_TOKEN" \
+       -d '{"accept":true}')"
+
+  check "the owner accepts" 200 \
+    "$(status -X POST "$GATEWAY/v1/businesses/orders/$ORDER_ID/respond" \
+       -H 'Content-Type: application/json' -H "Authorization: Bearer $MEMBER_TOKEN" \
+       -d '{"accept":true}')"
+
+  check "the buyer can no longer cancel once accepted" 409 \
+    "$(status -X POST "$GATEWAY/v1/businesses/orders/$ORDER_ID/cancel" \
+       -H "Authorization: Bearer $CHILD_TOKEN")"
+
+  check "the owner marks it fulfilled" 200 \
+    "$(status -X POST "$GATEWAY/v1/businesses/orders/$ORDER_ID/fulfill" \
+       -H "Authorization: Bearer $MEMBER_TOKEN")"
+
+  RECEIVED=$(curl -s -H "Authorization: Bearer $MEMBER_TOKEN" "$GATEWAY/v1/businesses/orders/received")
+
+  if printf '%s' "$RECEIVED" | grep -q '"status":"Fulfilled"'; then
+    echo "  ok    the owner's Received list shows the outcome"
+    pass=$((pass + 1))
+  else
+    echo "  FAIL  the received list does not show the fulfilled outcome (got '$RECEIVED')"
+    fail=$((fail + 1))
+  fi
+
+  check "deactivating the business" 200 \
+    "$(status -X POST "$GATEWAY/v1/businesses/mine/$BUSINESS_ID/status" \
+       -H 'Content-Type: application/json' -H "Authorization: Bearer $MEMBER_TOKEN" \
+       -d '{"active":false}')"
+
+  AFTER_DEACTIVATE=$(curl -s -H "Authorization: Bearer $CHILD_TOKEN" "$GATEWAY/v1/businesses")
+
+  if ! printf '%s' "$AFTER_DEACTIVATE" | grep -q "$BUSINESS_ID"; then
+    echo "  ok    it drops out of the directory"
+    pass=$((pass + 1))
+  else
+    echo "  FAIL  the deactivated business is still listed (got '$AFTER_DEACTIVATE')"
+    fail=$((fail + 1))
+  fi
+
+  STILL_RECEIVED=$(curl -s -H "Authorization: Bearer $MEMBER_TOKEN" "$GATEWAY/v1/businesses/orders/received")
+
+  if printf '%s' "$STILL_RECEIVED" | grep -q "$ORDER_ID"; then
+    echo "  ok    but the order history survives"
+    pass=$((pass + 1))
+  else
+    echo "  FAIL  order history did not survive deactivation (got '$STILL_RECEIVED')"
+    fail=$((fail + 1))
+  fi
+
+  check "switching the businesses module off" 200 \
+    "$(status -X PUT "$GATEWAY/v1/identity/tenants/$TENANT_ID/modules" \
+       -H 'Content-Type: application/json' -H "Authorization: Bearer $ADMIN_TOKEN" -H "$ADMIN_TENANT_HEADER" \
+       -d '{"enabledModules":["community"]}')"
+
+  sleep 62
+
+  check "the businesses route then answers 404" 404 \
+    "$(status -H "Authorization: Bearer $MEMBER_TOKEN" "$GATEWAY/v1/businesses")"
+}
+
+businesses_checks || echo "  ..    the rest of the Businesses checks were skipped"
+
+echo
 echo "Master data"
 
 master_data_checks() {

@@ -75,6 +75,11 @@ erDiagram
     MEMBER_PROFILE ||--o| BIODATA_PROFILE : "opts into"
     BIODATA_PROFILE ||--o{ PROPOSAL : "sends"
     BIODATA_PROFILE ||--o{ PROPOSAL : "receives"
+
+    MEMBER_PROFILE ||--o{ BUSINESS : "owns"
+    BUSINESS ||--o{ PRODUCT : "lists"
+    BUSINESS ||--o{ ORDER : "receives"
+    MEMBER_PROFILE ||--o{ ORDER : "places"
 ```
 
 ## 2. Platform-level entities (Identity & Tenant)
@@ -310,3 +315,38 @@ caller's own Samaaj, with no exception. Full account erasure
 de-identifies (strips the message from, and closes out if still `Pending`)
 every `Proposal` the erased member was part of, keeping the row so the other
 party's own history is not silently broken.
+
+## 14. Businesses
+
+**Business** — `Id, TenantId, OwnerMemberId, Name, CategoryId, CityId
+(nullable), LocalityId (nullable), Description (nullable), ContactPhone
+(nullable), ContactEmail (nullable), IsActive, CreatedAt, UpdatedAt` —
+`Id` is a fresh id, not the owner's own: unlike Matrimony's `BiodataProfile`,
+a member may own more than one business. `CategoryId` is a
+master-data-service `LookupItem` id, `Category = BusinessCategory`.
+`ContactPhone`/`ContactEmail` are plain fields the owner types in for this
+listing, not a read of the member's own privacy-gated Mobile/Email.
+
+**Product** — `Id, Name, Description (nullable), PriceInPaise, IsAvailable,
+CreatedAt, UpdatedAt` — an owned entity of `Business`, not its own
+aggregate. Never deleted, only toggled unavailable, so a past order still
+names a real product.
+
+**Order** — `Id, TenantId, BusinessId, BusinessOwnerMemberId,
+BuyerMemberId, Status (Pending/Accepted/Declined/Fulfilled/Cancelled),
+Items (owned collection: ProductId, ProductName, UnitPriceInPaise,
+Quantity — snapshotted at placement, never read live off `Product`
+afterwards), TotalAmountInPaise (computed server-side from the snapshot),
+Note (nullable), PlacedAt, RespondedAt (nullable), ClosedAt (nullable)` —
+a peer-to-peer fact between a buyer and a `Business`, not owned by either.
+`BusinessOwnerMemberId` is itself a snapshot, taken at placement, which is
+what lets the aggregate enforce its own owner-only guards without a live
+join back to `Business`.
+
+Not tenant-crossing: every directory search and every order is scoped to
+the caller's own Samaaj, with no exception. Full account erasure
+(`identity.user.erased.v1`) removes every `Business` the erased member
+owned outright (no other party has a stake in the row itself, only in the
+`Order`s referencing it by plain id) and de-identifies (strips `Note`)
+every `Order` they placed as a buyer, keeping the row so the business
+owner's own order history is not silently broken.

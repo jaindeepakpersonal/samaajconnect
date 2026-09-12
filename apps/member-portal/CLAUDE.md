@@ -29,6 +29,11 @@ before translating another screen.
 | Boli detail | `/boli/:id` | `#bolidetail` | built |
 | Boli occasion | `/boli/occasions/:id` | — | built; the wireframe's "View Occasion" had no screen behind it |
 | Notifications | `/notifications` | `#notifications` | built |
+| Businesses directory | `/businesses` | — | built; no wireframe covers a member marketplace |
+| Business detail | `/businesses/:id` | — | built. Products, contact info, and "Place an order" - hidden for the business's own owner |
+| My businesses | `/businesses/mine` | — | built. The caller's own businesses, plus a create form |
+| Manage business | `/businesses/mine/:id` | — | built. Edit fields, activate/deactivate, and product management |
+| Orders | `/businesses/orders` | — | built. Placed/Received tabs |
 | Pathshala events | — | `#pathevents` | not built — no endpoint exists |
 | Set your password | `/activate` | — | built; no wireframe covers redeeming an activation code, and three admin screens told people to do it here |
 | Forgot password | `/forgot`, `/reset` | `#forgot`, `#otp` | built — redeems into a new password, not a session |
@@ -678,6 +683,23 @@ closing the tab is longer than a community app needs. That goes double for the r
 which can mint access tokens for a fortnight. Not a cookie either: a cookie
 is sent automatically on every request, which is what makes cookies useful
 and what makes them need CSRF protection - and this platform has none.
+
+**An order's running total is a display convenience, not a submission.**
+Business detail shows a total computed from the quantities a buyer has
+typed, purely so they can see what they are about to send - the number
+businesses-service actually records is computed server-side from each
+product's price at the moment the order is placed, and the client's own
+figure is never sent. Placing an order also omits any product left at
+quantity zero, rather than sending a zero-quantity line for every product on
+the business.
+
+**The order form is simply absent from a business's own public page, for
+its own owner.** businesses-service refuses ordering from your own
+business; the screen does not wait to find that out from a 400 - `isOwner()`
+compares the signed-in member's id (`AuthService.user()?.userId`) against
+`Business.ownerMemberId` and swaps the form for a plain sentence instead,
+the same "don't offer a control that always fails" reasoning the admin
+panel's own Pathshala-create note already states.
 
 ## Accessibility
 

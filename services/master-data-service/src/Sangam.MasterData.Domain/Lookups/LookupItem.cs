@@ -101,4 +101,12 @@ public enum LookupCategory
     /// <see cref="LookupItem.Category"/> is stored as a string.
     /// </summary>
     Qualification = 5,
+
+    /// <summary>
+    /// A business's category (Grocery, Textiles, Catering, ...), for the new
+    /// Businesses module's directory filter. Added 2026-09-12, the same
+    /// zero-migration story as <see cref="Qualification"/> - a Samaaj Admin
+    /// seeds actual values through the existing Master Data screen.
+    /// </summary>
+    BusinessCategory = 6,
 }

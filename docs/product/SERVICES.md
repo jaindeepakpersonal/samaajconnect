@@ -275,6 +275,36 @@ and expose its endpoints behind the gateway at the route prefix shown.
   synchronous call from this service to member-family-service. Visibility
   is within the caller's own Samaaj only; there is no cross-tenant search.
 
+## 13. businesses-service
+
+- **First / primary aggregate:** `Business` (a fresh id — a member may
+  own more than one), with `Order` as a second, peer-to-peer aggregate
+- **Owns:** Business (with `Product` as an owned entity), Order
+- **Key commands:** `CreateBusinessCommand`, `UpdateBusinessCommand`,
+  `SetBusinessStatusCommand`, `AddProductCommand`, `UpdateProductCommand`,
+  `SetProductAvailabilityCommand`, `PlaceOrderCommand`,
+  `RespondToOrderCommand`, `FulfillOrderCommand`, `CancelOrderCommand`
+- **Key queries:** `ListMyBusinessesQuery`, `SearchBusinessesQuery`,
+  `GetBusinessQuery`, `ListMyOrdersQuery`, `ListReceivedOrdersQuery`
+- **Events published:** `businesses.business.created.v1`,
+  `businesses.business.status-changed.v1`, `businesses.order.placed.v1`,
+  `businesses.order.responded.v1`, `businesses.order.fulfilled.v1`,
+  `businesses.order.cancelled.v1`
+- **Events consumed:** `identity.user.erased.v1` — removes every business
+  the member owned outright and de-identifies (not deletes) every order
+  they placed as a buyer, so the business owner's own order history
+  survives
+- **Gateway route prefix:** `/v1/businesses/**`, module-gated on
+  `businesses` (off by default, the same stance as `boli`/`matrimony`)
+- **Tenant role(s):** the same self-scoped role list
+  member-family-service's own profile-update command uses, for every
+  write; `Members.Read` for every read
+- **Notes:** `Business.CategoryId` is a master-data-service `LookupItem`
+  id, `Category = BusinessCategory`. An order's line items and total are
+  snapshotted at placement time, never read live off `Product` afterwards.
+  Visibility is within the caller's own Samaaj only; there is no
+  cross-tenant directory or order.
+
 ---
 
 ## Inter-service data access rule

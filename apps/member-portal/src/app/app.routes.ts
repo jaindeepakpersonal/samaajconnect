@@ -224,6 +224,49 @@ export const routes: Routes = [
             (m) => m.CandidateDetailComponent,
           ),
       },
+      {
+        path: 'businesses',
+        title: 'Businesses - samaajconnect',
+        loadComponent: () =>
+          import('./features/businesses/directory.component').then(
+            (m) => m.BusinessesDirectoryComponent,
+          ),
+      },
+      {
+        path: 'businesses/mine',
+        title: 'My businesses - samaajconnect',
+        loadComponent: () =>
+          import('./features/businesses/my-businesses.component').then(
+            (m) => m.MyBusinessesComponent,
+          ),
+      },
+      {
+        path: 'businesses/orders',
+        title: 'Orders - samaajconnect',
+        loadComponent: () =>
+          import('./features/businesses/orders.component').then(
+            (m) => m.BusinessesOrdersComponent,
+          ),
+      },
+      {
+        // Declared after the literal 'businesses/mine'/'businesses/orders'
+        // segments, the same reasoning 'matrimony/candidates/:id' above
+        // follows.
+        path: 'businesses/mine/:id',
+        title: 'Manage business - samaajconnect',
+        loadComponent: () =>
+          import('./features/businesses/manage-business.component').then(
+            (m) => m.ManageBusinessComponent,
+          ),
+      },
+      {
+        path: 'businesses/:id',
+        title: 'Business - samaajconnect',
+        loadComponent: () =>
+          import('./features/businesses/business-detail.component').then(
+            (m) => m.BusinessDetailComponent,
+          ),
+      },
       { path: '', pathMatch: 'full', redirectTo: 'timeline' },
     ],
   },

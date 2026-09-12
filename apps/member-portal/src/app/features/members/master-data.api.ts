@@ -51,6 +51,18 @@ export class MasterDataApi {
     });
   }
 
+  /**
+   * The BusinessCategory category - added 2026-09-12 for the Businesses
+   * module's directory filter and "Add a business" form, the same
+   * zero-migration flat lookup shape Qualification and MaritalStatus above
+   * already use.
+   */
+  listBusinessCategories(): Observable<LookupItem[]> {
+    return this.http.get<LookupItem[]>('/v1/master-data/lookup-items', {
+      params: new HttpParams().set('category', 'BusinessCategory').set('includeInactive', false),
+    });
+  }
+
   listCities(countryId?: string | null): Observable<City[]> {
     let params = new HttpParams().set('includeInactive', false);
 

@@ -53,6 +53,8 @@ jobs:
             solution: services/master-data-service/Sangam.MasterData.sln
           - name: matrimony-service
             solution: services/matrimony-service/Sangam.Matrimony.sln
+          - name: businesses-service
+            solution: services/businesses-service/Sangam.Businesses.sln
           - name: gateway
             solution: gateway/Sangam.Gateway.sln
 
@@ -330,6 +332,12 @@ jobs:
           dotnet dotnet-ef migrations has-pending-model-changes \
             --project services/matrimony-service/src/Sangam.Matrimony.Infrastructure \
             --startup-project services/matrimony-service/src/Sangam.Matrimony.Api
+
+      - name: Check businesses-service
+        run: |
+          dotnet dotnet-ef migrations has-pending-model-changes \
+            --project services/businesses-service/src/Sangam.Businesses.Infrastructure \
+            --startup-project services/businesses-service/src/Sangam.Businesses.Api
 
   smoke:
     name: Through the gateway

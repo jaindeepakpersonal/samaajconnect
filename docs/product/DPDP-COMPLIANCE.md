@@ -112,6 +112,24 @@ withdrawal is the same "as easy as giving" right §6(4) already applies to
 every other consent on this platform, exercised through one call
 (`DELETE /v1/matrimony/biodata/me/consent`) with no admin in the way.
 
+### Businesses — not a personal-sensitive category, no separate consent
+
+A business listing is commercial information a member chooses to publish —
+its name, category, location, description and a contact the owner types in
+for the purpose — not a personal-sensitive DPDP category the way a
+biodata profile or a child's record is, so it needs no notice-and-consent
+flow of its own the way Matrimony's opt-in does. `Business.ContactPhone`/
+`ContactEmail` are the owner's own choice of what to publish for this
+listing and are never a read of their base profile's privacy-gated
+Mobile/Email.
+
+Erasure still applies in full: on the member's own account erasure below,
+businesses-service removes every business the member owned outright (no
+notice period, no soft-deactivate first — a business row carries no
+personal data of any *other* party, unlike a Proposal) and de-identifies
+(strips the note from) every order they placed as a buyer, keeping the
+row so the business owner's own order history is not silently broken.
+
 ### Data export
 
 Each service answers for what it holds:
@@ -248,6 +266,7 @@ because audit-notification-service records every payload verbatim.
 | member-family-service | Clears the profile and closes its privacy settings; erases the children held on this member's own parental consent, wherever they now sit; removes their household membership |
 | audit-notification-service | Deletes their notifications; de-identifies the audit rows where they were the actor; records the erasure itself |
 | matrimony-service | Erases their biodata profile outright (not merely deactivates); de-identifies every proposal they sent or received, keeping the row so the other party's own history survives |
+| businesses-service | Removes every business they owned outright; de-identifies every order they placed as a buyer, keeping the row so the business owner's own order history survives |
 
 Three decisions inside that are worth knowing:
 

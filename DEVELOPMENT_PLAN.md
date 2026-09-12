@@ -8,7 +8,51 @@ version of the plan; the reasoning behind the ordering lives in
 ## Current Status
 
 - **Stage:** every module has a service and member screens; Phase 5 hardening under way
-- **Last updated:** 2026-09-12 - **a new module, matrimony-service: biodata,
+- **Last updated:** 2026-09-12 - **a new module, businesses-service:
+  members' own businesses, products and orders within a Samaaj, module-gated
+  off by default.**
+
+  End to end: a member registers one or more businesses they own (no
+  moderation - live in the directory immediately), lists products under
+  each, and every member browses a directory filtered by category and
+  location and sends an order to a business owner, who accepts or declines
+  it and later marks an accepted order fulfilled or cancels it. An order's
+  line items and total are snapshotted at placement time from each
+  product's price then, never read live off `Product` afterwards and never
+  trusted from the client - the same "record what was actually agreed"
+  reasoning a real order needs that neither Matrimony's Proposal nor a
+  Boli's bid quite required. `Order.BusinessOwnerMemberId` is itself
+  snapshotted at placement, which is what lets the aggregate enforce its
+  own owner-only guards internally and lets the Received-orders query
+  avoid a join back to `Business` entirely.
+
+  New service `businesses-service` (`Business` with `Product` as an owned
+  entity, `Order` as a second peer-to-peer aggregate, the usual
+  CQRS/outbox/tenant-filter shape copied from matrimony-service), wired
+  into the module catalogue, the gateway, docker-compose (port 5113), CI's
+  build/test matrix and migrations job, `scripts/smoke-through-gateway.sh`,
+  and `audit-notification-service`'s `KnownEvents.cs` (6 new descriptors).
+  master-data-service gained a sixth `LookupItem` category,
+  `BusinessCategory`, with no migration needed - the same zero-migration
+  story `Qualification` had a cycle earlier. New member-portal feature
+  folder: Directory (`/businesses`), Business detail (`/businesses/:id`,
+  "Place an order", hidden for the business's own owner), My businesses
+  (`/businesses/mine`), Manage business (`/businesses/mine/:id`, fields,
+  activate/deactivate, product management), Orders (`/businesses/orders`,
+  Placed/Received tabs), gated in the shell nav on the new `businesses`
+  module key.
+
+  Verified with businesses-service's full unit+integration suite (20 + 18,
+  both green), 28 new member-portal component specs (409 total, all
+  green), both apps' production builds, `tsc --noEmit`,
+  `scripts/css-class-coverage.sh` (caught two real mistakes: this module's
+  own `.details`/`.group-body` classes not yet defined in its stylesheet,
+  and a Cancel button copying admin-portal's `.btn.alt` convention instead
+  of member-portal's own `.btn.secondary`), `scripts/uncalled-api-methods.sh`,
+  `scripts/unreachable-endpoints.sh`, `scripts/module-keys.sh`,
+  `scripts/service-coverage.sh`, `scripts/audit-descriptor-coverage.sh`,
+  `scripts/pipeline-order.sh`, `scripts/service-docs.sh`.
+- **Previously:** 2026-09-12 - **a new module, matrimony-service: biodata,
   search and proposals within a Samaaj, module-gated off by default.**
 
   End to end: a member opts into matrimony with their own explicit DPDP
