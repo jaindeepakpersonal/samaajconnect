@@ -2,6 +2,9 @@ import { Component, OnInit, computed, inject, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { ActivatedRoute, RouterLink } from '@angular/router';
 import { AuthService, describeError } from '@samaajconnect/shared';
+import { Subject, of, switchMap } from 'rxjs';
+import { Member } from '../members/members.models';
+import { MembersApi } from '../members/members.api';
 import { VotingApi } from './voting.api';
 import { Campaign, CampaignDetail, CampaignResult, Candidate, stageLabel } from './voting.models';
 
@@ -31,6 +34,18 @@ import { Campaign, CampaignDetail, CampaignResult, Candidate, stageLabel } from 
  * Names are member ids: names live in member-family-service and a ballot would
  * be a call per candidate. The screen marks the reader and otherwise shows the
  * category, which is what the wireframe's cards actually lead with.
+ *
+ * **Nominating no longer asks for a raw member id, and the category is no
+ * longer optional.** Both changed the same cycle, from the same report: typing
+ * a GUID copied off the directory was the whole reason a nomination read as
+ * "not working" - a single mistyped character failed silently once, and before
+ * that fix failed loudly with a raw 400 the service's own model binder threw
+ * before validation ever ran (see celebrity-voting-service's own `CLAUDE.md`).
+ * The nominee is now found by typing their name into `MembersApi.search()`,
+ * the same directory search the Members screen already calls, and `memberId`
+ * is set only once a result is picked - never typed by hand. A reason or
+ * speciality is required for the same reason a Boli needs an opening bid: a
+ * nomination with nothing said about it gave a reviewer nothing to judge.
  */
 @Component({
   selector: 'app-campaign-detail',
@@ -95,21 +110,47 @@ import { Campaign, CampaignDetail, CampaignResult, Candidate, stageLabel } from 
           <h2 class="section-heading">Put somebody forward</h2>
 
           <form class="card" (ngSubmit)="nominate(found.campaign)">
-            <label for="nominee">Their member id</label>
+            <label for="nominee">Their name</label>
             <input
               class="input"
               id="nominee"
-              name="memberId"
-              [(ngModel)]="memberId"
-              placeholder="Copy it from the member directory"
+              name="nomineeQuery"
+              [ngModel]="nomineeQuery()"
+              (ngModelChange)="onNomineeQueryChange($event)"
+              placeholder="Start typing a member's name"
+              autocomplete="off"
               required
             />
+
+            @if (nomineeSearching()) {
+              <p class="small" role="status">Searching…</p>
+            } @else if (nomineeResults().length > 0) {
+              <ul class="suggestions" role="listbox" aria-label="Matching members">
+                @for (match of nomineeResults(); track match.id) {
+                  <li role="option">
+                    <button type="button" class="btn link" (click)="selectNominee(match)">
+                      {{ match.fullName }}
+                    </button>
+                  </li>
+                }
+              </ul>
+            } @else if (nomineeQuery().trim().length >= 2 && memberId.length === 0) {
+              <p class="small">No member found by that name.</p>
+            }
+
+            @if (memberId.length > 0) {
+              <p class="small">
+                Nominating <strong>{{ selectedNomineeName() }}</strong>.
+                <button type="button" class="btn link" (click)="clearNominee()">Change</button>
+              </p>
+            }
+
             <p class="small">
               The directory is at <a routerLink="/members">Members</a>. A nomination goes to a
               reviewer before it reaches the ballot.
             </p>
 
-            <label for="category">Category (optional)</label>
+            <label for="category">Reason or speciality</label>
             <input
               class="input"
               id="category"
@@ -117,6 +158,7 @@ import { Campaign, CampaignDetail, CampaignResult, Candidate, stageLabel } from 
               [(ngModel)]="category"
               maxlength="100"
               placeholder="Community service"
+              required
             />
 
             @if (nominateError(); as message) {
@@ -128,7 +170,7 @@ import { Campaign, CampaignDetail, CampaignResult, Candidate, stageLabel } from 
             }
 
             <div class="actions">
-              <button class="btn" type="submit" [disabled]="busy() || !memberId.trim()">
+              <button class="btn" type="submit" [disabled]="busy() || !canNominate()">
                 {{ busy() ? 'Sending…' : 'Nominate' }}
               </button>
             </div>
@@ -208,6 +250,7 @@ export class CampaignDetailComponent implements OnInit {
   private readonly api = inject(VotingApi);
   private readonly auth = inject(AuthService);
   private readonly route = inject(ActivatedRoute);
+  private readonly members = inject(MembersApi);
 
   readonly detail = signal<CampaignDetail | null>(null);
   readonly result = signal<CampaignResult | null>(null);
@@ -222,6 +265,14 @@ export class CampaignDetailComponent implements OnInit {
   readonly nominateError = signal<string | null>(null);
   readonly nominateMessage = signal<string | null>(null);
 
+  /** What the nominee search box holds - not necessarily a chosen member. */
+  readonly nomineeQuery = signal('');
+  readonly nomineeResults = signal<readonly Member[]>([]);
+  readonly nomineeSearching = signal(false);
+  readonly selectedNomineeName = signal<string | null>(null);
+  private readonly nomineeQuery$ = new Subject<string>();
+
+  /** Set only by picking a search result, never typed directly. */
   memberId = '';
   category = '';
 
@@ -234,6 +285,17 @@ export class CampaignDetailComponent implements OnInit {
       next: () => this.load(),
       error: () => this.load(),
     });
+
+    // switchMap rather than a debounce: this codebase has no debounced-input
+    // infrastructure anywhere else, and cancelling the previous request on
+    // every keystroke already stops a slow reply for "Rav" from clobbering a
+    // faster one for "Ravi" - the actual race a debounce would guard against.
+    this.nomineeQuery$
+      .pipe(switchMap((term) => (term.trim().length < 2 ? of([]) : this.members.search(term))))
+      .subscribe((found) => {
+        this.nomineeSearching.set(false);
+        this.nomineeResults.set(found);
+      });
   }
 
   load(): void {
@@ -278,12 +340,48 @@ export class CampaignDetailComponent implements OnInit {
     });
   }
 
+  // ---- Nominating ---------------------------------------------------------
+
+  /** Debounced: fires the search only after typing settles, not per keystroke. */
+  onNomineeQueryChange(value: string): void {
+    this.nomineeQuery.set(value);
+    this.memberId = '';
+    this.selectedNomineeName.set(null);
+    this.nominateError.set(null);
+
+    if (value.trim().length < 2) {
+      this.nomineeResults.set([]);
+      this.nomineeSearching.set(false);
+      return;
+    }
+
+    this.nomineeSearching.set(true);
+    this.nomineeQuery$.next(value);
+  }
+
+  selectNominee(member: Member): void {
+    this.memberId = member.id;
+    this.selectedNomineeName.set(member.fullName);
+    this.nomineeQuery.set(member.fullName);
+    this.nomineeResults.set([]);
+  }
+
+  /** Back to typing a different name - `memberId` is not carried over. */
+  clearNominee(): void {
+    this.memberId = '';
+    this.selectedNomineeName.set(null);
+    this.nomineeQuery.set('');
+    this.nomineeResults.set([]);
+  }
+
+  canNominate(): boolean {
+    return this.memberId.length > 0 && this.category.trim().length > 0;
+  }
+
   // ---- Acting ------------------------------------------------------------
 
   nominate(campaign: Campaign): void {
-    const nominee = this.memberId.trim();
-
-    if (nominee.length === 0) {
+    if (!this.canNominate()) {
       return;
     }
 
@@ -291,11 +389,9 @@ export class CampaignDetailComponent implements OnInit {
     this.nominateError.set(null);
     this.nominateMessage.set(null);
 
-    const category = this.category.trim();
-
-    this.api.nominate(campaign.id, nominee, category.length > 0 ? category : null).subscribe({
+    this.api.nominate(campaign.id, this.memberId, this.category.trim()).subscribe({
       next: (result) => {
-        this.memberId = '';
+        this.clearNominee();
         this.category = '';
         this.busy.set(false);
 

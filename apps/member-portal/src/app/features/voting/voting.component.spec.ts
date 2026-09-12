@@ -340,6 +340,7 @@ describe('CampaignDetailComponent', () => {
     load(detail({ status: 'NominationsOpen', acceptsNominations: true, acceptsVotes: false }));
 
     component.memberId = 'm5';
+    component.category = 'Community service';
     component.nominate(component.detail()!.campaign);
 
     http.expectOne('/v1/celebrity-voting/campaigns/c1/candidates').flush({
@@ -357,16 +358,63 @@ describe('CampaignDetailComponent', () => {
     expect(text()).toContain('had already been put forward');
   });
 
-  it('sends no category rather than an empty one', () => {
+  it('sends the trimmed category over the wire', () => {
     load(detail({ status: 'NominationsOpen', acceptsNominations: true, acceptsVotes: false }));
 
-    component.memberId = '  m5  ';
-    component.category = '   ';
+    component.memberId = 'm5';
+    component.category = '  Community service  ';
     component.nominate(component.detail()!.campaign);
 
     expect(
       http.expectOne('/v1/celebrity-voting/campaigns/c1/candidates').request.body,
-    ).toEqual({ memberId: 'm5', category: null });
+    ).toEqual({ memberId: 'm5', category: 'Community service' });
+  });
+
+  it('refuses to submit a nomination with no member picked', () => {
+    load(detail({ status: 'NominationsOpen', acceptsNominations: true, acceptsVotes: false }));
+
+    component.category = 'Community service';
+    expect(component.canNominate()).toBe(false);
+
+    component.nominate(component.detail()!.campaign);
+
+    // The assertion is that nothing was sent - http.verify() in afterEach.
+  });
+
+  it('refuses to submit a nomination with no reason given', () => {
+    load(detail({ status: 'NominationsOpen', acceptsNominations: true, acceptsVotes: false }));
+
+    component.memberId = 'm5';
+    component.category = '   ';
+    expect(component.canNominate()).toBe(false);
+
+    component.nominate(component.detail()!.campaign);
+  });
+
+  it('finds a nominee by name through the member directory search', () => {
+    load(detail({ status: 'NominationsOpen', acceptsNominations: true, acceptsVotes: false }));
+
+    component.onNomineeQueryChange('Ravi');
+
+    const request = http.expectOne(
+      (r) => r.method === 'GET' && r.url === '/v1/members' && r.params.get('term') === 'Ravi',
+    );
+    request.flush([
+      { id: 'm5', fullName: 'Ravi Shah' } as never,
+      { id: 'm6', fullName: 'Ravi Mehta' } as never,
+    ]);
+
+    expect(component.nomineeResults().map((m) => m.fullName)).toEqual([
+      'Ravi Shah',
+      'Ravi Mehta',
+    ]);
+    expect(component.memberId).toBe('');
+
+    component.selectNominee({ id: 'm5', fullName: 'Ravi Shah' } as never);
+
+    expect(component.memberId).toBe('m5');
+    expect(component.selectedNomineeName()).toBe('Ravi Shah');
+    expect(component.nomineeResults()).toEqual([]);
   });
 
   // ---- The published result -----------------------------------------------

@@ -36,9 +36,11 @@ export class VotingApi {
    *
    * A second nomination of the same person is reported as success with
    * `nominated: false` - the second nominator has done nothing wrong, and one
-   * candidacy per member is what keeps a vote from splitting.
+   * candidacy per member is what keeps a vote from splitting. `category` is a
+   * required reason or speciality as of 2026-09-12 - a nomination with nothing
+   * said about it gave a reviewer nothing to judge.
    */
-  nominate(id: string, memberId: string, category: string | null): Observable<NominateResult> {
+  nominate(id: string, memberId: string, category: string): Observable<NominateResult> {
     return this.http.post<NominateResult>(
       `/v1/celebrity-voting/campaigns/${id}/candidates`,
       { memberId, category },

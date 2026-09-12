@@ -701,6 +701,26 @@ compares the signed-in member's id (`AuthService.user()?.userId`) against
 the same "don't offer a control that always fails" reasoning the admin
 panel's own Pathshala-create note already states.
 
+**Nominating for Celebrities of Samaaj asked for a raw member id typed by
+hand, and that was the whole reason it read as broken.** The service typed
+`MemberId` as a `Guid` on the wire; a value that failed to parse crashed
+ASP.NET Core's own JSON model binding with an unhandled 400 before
+FluentValidation ever ran, and even a value that *did* parse was a GUID
+copied off the member directory by hand into a bare text box next to a
+placeholder saying to do exactly that. The nominee is found by typing their
+name instead - `CampaignDetailComponent` fires `MembersApi.search()` through
+a `switchMap` (cancelling a slower reply for "Rav" the moment "Ravi" is
+typed, rather than adding a debounce this codebase has no other example of)
+and `memberId` is set only by picking a result, never typed. The category
+field, previously optional, is required as of the same cycle: a nomination
+with no stated reason or speciality gave a reviewer nothing to judge it by.
+
+**Same-Samaaj member search, without a directory screen's own paging or
+filters.** The nominee picker calls the same `MembersApi.search(term)` the
+Members directory uses, capped at the service's own default of 50 - a
+nomination is one member found by name, not a browse, so nothing here needs
+Locality filtering or pagination on top of it.
+
 ## Accessibility
 
 The requirements call for WCAG 2.1 AA. **The audit was done on 2026-09-01**;
