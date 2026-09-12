@@ -1,5 +1,8 @@
 .timeline-page {
-  max-width: 760px;
+  /* Matches every other page-wrapper's cap in this app - Timeline was the
+     one page still narrower than the rest, at 760px, wasting the free
+     space either side on any screen wider than a phone. */
+  max-width: 1100px;
   margin: 0 auto;
   padding: var(--space-6) var(--space-4);
 }
