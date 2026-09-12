@@ -216,7 +216,15 @@ public static class CampaignEndpoints
     /// <summary>NominationsOpen, VotingOpen or Closed. Publishing is its own call.</summary>
     public sealed record MoveRequest(string Status);
 
-    public sealed record NominateRequest(Guid MemberId, string? Category);
+    // MemberId is a string, not Guid: a Guid-typed wire field crashes ASP.NET
+    // Core's own JSON model binding with an unhandled 400 the moment the
+    // value cannot be parsed - the member-portal autosuggest picker always
+    // sends one it looked up itself, but the field has to survive whatever a
+    // client actually sends rather than trust the wire type. Validated and
+    // parsed in NominateCandidateCommandValidator/Handler instead, the same
+    // shape matrimony-service's own OptIntoMatrimonyCommand already uses for
+    // every master-data id on its wire.
+    public sealed record NominateRequest(string MemberId, string Category);
 
     /// <summary>
     /// <paramref name="Approve"/> is required and has no default: a decision

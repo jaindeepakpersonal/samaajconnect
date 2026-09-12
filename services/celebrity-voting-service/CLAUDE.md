@@ -133,6 +133,20 @@ them — two entries for one person split their vote and make the result
 meaningless. The aggregate refuses the second; a unique index on
 `(CampaignId, MemberId)` is what holds if two nominators arrive at once.
 
+**A nomination's category became mandatory on 2026-09-12, and the wire type
+of `MemberId` changed with it.** `Candidate.Category` was optional from the
+start, and a member-portal form that let somebody submit a blank one gave a
+reviewer a bare name with no stated reason to judge it by. The field itself
+is unchanged — a pre-existing nomination can still carry a null category —
+only the validator now refuses a new one that omits it.
+
+`NominateRequest.MemberId` was a raw `Guid` on the wire until the same
+change, which meant a value that failed to parse crashed ASP.NET Core's own
+JSON model binding with an unhandled 400 before FluentValidation ever ran —
+the same trap `OptIntoMatrimonyCommand` was written to avoid for every
+master-data id it accepts. It is a `string` now, validated by
+`NominateCandidateCommandValidator.BeAGuid` and parsed only in the handler.
+
 **The published result is stored, not recomputed.** A result recomputed
 on every read could change after it was announced — by a late vote, a
 corrected one, a candidate removed — and an announced result that moves

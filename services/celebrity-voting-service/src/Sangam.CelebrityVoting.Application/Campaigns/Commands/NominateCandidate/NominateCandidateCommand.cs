@@ -7,8 +7,22 @@ using Sangam.CelebrityVoting.Application.Security;
 namespace Sangam.CelebrityVoting.Application.Campaigns.Commands.NominateCandidate;
 
 /// <summary>Puts a member forward. A reviewer decides whether they reach the ballot.</summary>
+/// <remarks>
+/// <paramref name="MemberId"/> is a string, not a <see cref="Guid"/> - a
+/// Guid-typed wire field crashes ASP.NET Core's own JSON model binding with an
+/// unhandled 400 the moment the value cannot be parsed, before FluentValidation
+/// ever runs. Validated by <see cref="NominateCandidateCommandValidator"/> and
+/// parsed only in the handler, the same defense-in-depth every master-data id
+/// on matrimony-service's <c>OptIntoMatrimonyCommand</c> already uses.
+///
+/// <paramref name="Category"/> is required as of 2026-09-12: a nomination with
+/// no stated reason or speciality left a reviewer nothing to judge it by, and
+/// the ballot itself shows "No category given" for every one of the pre-existing
+/// nominations that predate this - the field itself did not change, only
+/// whether a new nomination may omit it.
+/// </remarks>
 [RequiresPermission(PermissionKeys.MembersRead)]
-public sealed record NominateCandidateCommand(Guid CampaignId, Guid MemberId, string? Category)
+public sealed record NominateCandidateCommand(Guid CampaignId, string MemberId, string Category)
     : ICommand<NominateResponse>;
 
 /// <summary>
@@ -32,9 +46,14 @@ public sealed class NominateCandidateCommandValidator
     public NominateCandidateCommandValidator()
     {
         RuleFor(x => x.CampaignId).NotEmpty();
-        RuleFor(x => x.MemberId).NotEmpty();
-        RuleFor(x => x.Category).MaximumLength(100);
+        RuleFor(x => x.MemberId).Must(BeAGuid).WithMessage("Choose a member to nominate.");
+        RuleFor(x => x.Category)
+            .NotEmpty()
+            .WithMessage("A reason or speciality is required for every nomination.")
+            .MaximumLength(100);
     }
+
+    private static bool BeAGuid(string value) => Guid.TryParse(value, out _);
 }
 
 public sealed class NominateCandidateCommandHandler(
@@ -72,22 +91,23 @@ public sealed class NominateCandidateCommandHandler(
                 "Campaign.NominationsClosed", "Nominations for this campaign are not open."));
         }
 
-        var candidate = campaign.Nominate(
-            command.MemberId, command.Category, nominatorId, now);
+        // Guaranteed parseable by NominateCandidateCommandValidator.BeAGuid.
+        var memberId = Guid.Parse(command.MemberId);
+
+        var candidate = campaign.Nominate(memberId, command.Category, nominatorId, now);
 
         if (candidate is null)
         {
             // Already put forward. The candidacy that stands is the one to
             // report back, not an empty id.
-            var existing = campaign.FindCandidateForMember(command.MemberId);
+            var existing = campaign.FindCandidateForMember(memberId);
 
             return Result.Success(new NominateResponse(
-                campaign.Id, existing?.Id ?? Guid.Empty, command.MemberId, false));
+                campaign.Id, existing?.Id ?? Guid.Empty, memberId, false));
         }
 
         await unitOfWork.SaveChangesAsync(cancellationToken);
 
-        return Result.Success(new NominateResponse(
-            campaign.Id, candidate.Id, command.MemberId, true));
+        return Result.Success(new NominateResponse(campaign.Id, candidate.Id, memberId, true));
     }
 }
