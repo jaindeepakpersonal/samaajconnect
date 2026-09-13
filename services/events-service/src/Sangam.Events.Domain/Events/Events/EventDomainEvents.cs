@@ -76,3 +76,22 @@ public sealed record EventCancelledDomainEvent(
 {
     public string Topic => "events.event.cancelled.v1";
 }
+
+/// <summary>
+/// An event's own details were corrected.
+/// </summary>
+/// <remarks>
+/// Carries no field values, before or after. Title, description and venue
+/// are exactly the free text this service already keeps off every other
+/// event's own topic - the Samaaj's own copy, not audit-notification-service's
+/// to hold verbatim forever - and the numeric/date fields beside them are not
+/// worth a topic of their own that names some fields and not others. The
+/// fact that a correction happened, and when, is what this one records.
+/// </remarks>
+public sealed record EventUpdatedDomainEvent(
+    Guid EventId,
+    Guid TenantId,
+    DateTimeOffset OccurredAt) : IDomainEvent
+{
+    public string Topic => "events.event.updated.v1";
+}

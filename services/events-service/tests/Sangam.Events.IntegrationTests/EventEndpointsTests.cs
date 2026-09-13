@@ -432,4 +432,105 @@ public sealed class EventEndpointsTests(EventsApiFactory factory)
         rows[0].GetProperty("status").GetString().Should().Be("Registered");
         rows[1].GetProperty("status").GetString().Should().Be("Waitlisted");
     }
+
+    // ---- Updating -------------------------------------------------------------
+
+    private static object UpdatedEvent(int? capacity = null, bool registrationEnabled = true) => new
+    {
+        title = "Corrected Title",
+        description = "A corrected description.",
+        startAt = DateTimeOffset.UtcNow.AddDays(40),
+        endAt = DateTimeOffset.UtcNow.AddDays(40).AddHours(3),
+        venue = "New Hall",
+        eventTypeId = (string?)null,
+        registrationEnabled,
+        capacity,
+    };
+
+    [Fact]
+    public async Task Updating_a_draft_round_trips_every_field()
+    {
+        var id = await CreateAsync();
+
+        var response = await Organiser().PatchAsJsonAsync($"/v1/events/{id}", UpdatedEvent(capacity: 50));
+        response.StatusCode.Should().Be(HttpStatusCode.OK);
+
+        var body = await response.Content.ReadFromJsonAsync<JsonElement>();
+        body.GetProperty("title").GetString().Should().Be("Corrected Title");
+        body.GetProperty("venue").GetString().Should().Be("New Hall");
+        body.GetProperty("capacity").GetInt32().Should().Be(50);
+    }
+
+    [Fact]
+    public async Task Updating_a_published_event_is_allowed_and_does_not_change_its_status()
+    {
+        var id = await PublishedAsync();
+
+        var response = await Organiser().PatchAsJsonAsync($"/v1/events/{id}", UpdatedEvent());
+        response.StatusCode.Should().Be(HttpStatusCode.OK);
+
+        (await response.Content.ReadFromJsonAsync<JsonElement>())
+            .GetProperty("status").GetString().Should().Be("Published");
+    }
+
+    [Fact]
+    public async Task A_cancelled_event_cannot_be_edited()
+    {
+        var id = await PublishedAsync();
+
+        (await Organiser().PostAsJsonAsync($"/v1/events/{id}/cancel", new { reason = "Rained out." }))
+            .StatusCode.Should().Be(HttpStatusCode.OK);
+
+        var response = await Organiser().PatchAsJsonAsync($"/v1/events/{id}", UpdatedEvent());
+
+        response.StatusCode.Should().Be(HttpStatusCode.Conflict);
+    }
+
+    [Fact]
+    public async Task Capacity_cannot_be_dropped_below_who_is_already_registered()
+    {
+        var id = await PublishedAsync(capacity: 10);
+
+        await RegisterAsync(Member(), id);
+        await RegisterAsync(Member(userId: Guid.NewGuid()), id);
+
+        var response = await Organiser().PatchAsJsonAsync($"/v1/events/{id}", UpdatedEvent(capacity: 1));
+
+        response.StatusCode.Should().Be(HttpStatusCode.Conflict);
+    }
+
+    [Fact]
+    public async Task A_member_cannot_edit_an_event()
+    {
+        var id = await CreateAsync();
+
+        var response = await Member().PatchAsJsonAsync($"/v1/events/{id}", UpdatedEvent());
+
+        response.StatusCode.Should().Be(HttpStatusCode.Forbidden);
+    }
+
+    [Fact]
+    public async Task Editing_writes_one_outbox_row_in_the_same_transaction()
+    {
+        var id = await CreateAsync();
+
+        (await Organiser().PatchAsJsonAsync($"/v1/events/{id}", UpdatedEvent()))
+            .StatusCode.Should().Be(HttpStatusCode.OK);
+
+        var outbox = await factory.WithDbContextAsync(db =>
+            db.OutboxMessages.AsNoTracking().SingleAsync(m => m.Topic == "events.event.updated.v1"));
+
+        outbox.TenantId.Should().Be(TenantId);
+    }
+
+    [Fact]
+    public async Task An_event_in_a_different_Samaaj_is_not_found()
+    {
+        var id = await CreateAsync();
+
+        var response = await Organiser(tenantId: OtherTenantId)
+            .PatchAsJsonAsync($"/v1/events/{id}", UpdatedEvent());
+
+        response.StatusCode.Should().Be(HttpStatusCode.NotFound);
+    }
 }

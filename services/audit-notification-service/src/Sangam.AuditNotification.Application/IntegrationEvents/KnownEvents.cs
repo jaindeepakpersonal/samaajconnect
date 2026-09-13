@@ -566,6 +566,11 @@ public static class KnownEvents
             EntityName: "Event",
             EntityIdProperty: "eventId"),
 
+        ["events.event.updated.v1"] = new(
+            Action: "EventUpdated",
+            EntityName: "Event",
+            EntityIdProperty: "eventId"),
+
         ["pathshala.created.v1"] = new(
             Action: "PathshalaCreated",
             EntityName: "Pathshala",

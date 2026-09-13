@@ -35,8 +35,8 @@ public sealed class SamaajEvent : AggregateRoot, ITenantScopedEntity
     /// <summary>
     /// A master-data-service `LookupItem` id (`Category == EventType`), or null
     /// - a Samaaj that has not seeded any event types yet can still create
-    /// events. Added 2026-09-12; set only at creation, the same as
-    /// <see cref="Capacity"/>, since there is no update command for an event.
+    /// events. Added 2026-09-12; editable via <see cref="Update"/> as of
+    /// 2026-09-13, the same as every other field it changes alongside.
     /// </summary>
     public Guid? EventTypeId { get; private set; }
 
@@ -145,6 +145,42 @@ public sealed class SamaajEvent : AggregateRoot, ITenantScopedEntity
             Id, TenantId, OrganizerType.ToString(), OrganizerId, StartAt, Capacity, now));
 
         return true;
+    }
+
+    /// <summary>
+    /// Corrects an event's own details.
+    /// </summary>
+    /// <remarks>
+    /// Preconditions - refusing a cancelled event, and refusing a capacity
+    /// drop below how many people already hold a confirmed place - are the
+    /// handler's job, checked against this aggregate's own public state
+    /// before calling this, the same split `RegisterForCompetitionCommand`
+    /// already uses. This method only performs the write once both are known
+    /// to hold, which is why it returns nothing to check.
+    /// </remarks>
+    public void Update(
+        string title,
+        string? description,
+        DateTimeOffset startAt,
+        DateTimeOffset? endAt,
+        string? venue,
+        Guid? eventTypeId,
+        bool registrationEnabled,
+        int? capacity,
+        DateTimeOffset now)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(title);
+
+        Title = title.Trim();
+        Description = Normalize(description);
+        StartAt = startAt;
+        EndAt = endAt;
+        Venue = Normalize(venue);
+        EventTypeId = eventTypeId;
+        RegistrationEnabled = registrationEnabled;
+        Capacity = capacity;
+
+        Raise(new EventUpdatedDomainEvent(Id, TenantId, now));
     }
 
     /// <summary>

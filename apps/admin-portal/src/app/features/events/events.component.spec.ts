@@ -144,14 +144,14 @@ describe('EventsListComponent', () => {
       (b as HTMLElement).textContent?.trim(),
     );
 
-  it('offers Publish only on a draft, and Cancel on anything not already off', () => {
+  it('offers Edit and Publish only on a draft, and Cancel on anything not already off', () => {
     load([anEvent({ status: 'Draft' })]);
-    expect(rowButtons()).toEqual(['Publish', 'Cancel']);
+    expect(rowButtons()).toEqual(['Edit', 'Publish', 'Cancel']);
   });
 
-  it('offers only Cancel once an event is published', () => {
+  it('offers Edit and Cancel once an event is published, but no Publish', () => {
     load([anEvent({ status: 'Published' })]);
-    expect(rowButtons()).toEqual(['Cancel']);
+    expect(rowButtons()).toEqual(['Edit', 'Cancel']);
   });
 
   it('offers nothing on a cancelled event', () => {
@@ -261,6 +261,37 @@ describe('EventsListComponent', () => {
     component.create();
 
     http.expectNone('/v1/events');
+  });
+
+  // ---- Editing --------------------------------------------------------------
+
+  it('opens the edit modal pre-filled from the row, and never shows the Organiser field', () => {
+    load([anEvent({ venue: 'Jain Bhavan', capacity: 200 })]);
+
+    const clickEvent = { currentTarget: document.createElement('button') } as unknown as MouseEvent;
+    component.openEditModal(clickEvent, anEvent({ venue: 'Jain Bhavan', capacity: 200 }));
+    fixture.detectChanges();
+
+    expect(component.title).toBe('Paryushan Lecture');
+    expect(component.venue).toBe('Jain Bhavan');
+    expect(component.capacity).toBe(200);
+    expect(text()).toContain('Organiser:');
+    expect(fixture.nativeElement.querySelector('#event-organiser')).toBeNull();
+  });
+
+  it('sends a correction with no organiser field at all', () => {
+    load();
+
+    const clickEvent = { currentTarget: document.createElement('button') } as unknown as MouseEvent;
+    component.openEditModal(clickEvent, anEvent());
+    component.title = 'Corrected Title';
+    component.update();
+
+    const body = http.expectOne(`/v1/events/${EVENT_ID}`).request.body as Record<string, unknown>;
+
+    expect(body['title']).toBe('Corrected Title');
+    expect(body['organizerType']).toBeUndefined();
+    expect(body['organizerId']).toBeUndefined();
   });
 
   it('re-reads the list when past events are asked for', () => {

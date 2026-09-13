@@ -335,4 +335,68 @@ public sealed class SamaajEventTests
 
         published.Register(Guid.NewGuid(), Now).Should().BeNull();
     }
+
+    // ---- Updating -----------------------------------------------------------
+
+    [Fact]
+    public void Updating_replaces_every_field_it_is_given()
+    {
+        var newType = Guid.NewGuid();
+        var samaajEvent = Draft();
+
+        samaajEvent.Update(
+            "  Corrected Title  ",
+            "New description.",
+            StartAt.AddDays(1),
+            StartAt.AddDays(1).AddHours(3),
+            "New Hall",
+            newType,
+            registrationEnabled: false,
+            capacity: 50,
+            Now);
+
+        samaajEvent.Title.Should().Be("Corrected Title");
+        samaajEvent.Description.Should().Be("New description.");
+        samaajEvent.StartAt.Should().Be(StartAt.AddDays(1));
+        samaajEvent.Venue.Should().Be("New Hall");
+        samaajEvent.EventTypeId.Should().Be(newType);
+        samaajEvent.RegistrationEnabled.Should().BeFalse();
+        samaajEvent.Capacity.Should().Be(50);
+    }
+
+    [Fact]
+    public void Updating_a_published_event_is_allowed()
+    {
+        var published = Published();
+
+        published.Update(
+            "New Title", null, StartAt, null, null, null, registrationEnabled: true, null, Now);
+
+        published.Title.Should().Be("New Title");
+        published.Status.Should().Be(EventStatus.Published);
+    }
+
+    [Fact]
+    public void Updating_announces_the_correction()
+    {
+        var samaajEvent = Draft();
+        samaajEvent.ClearDomainEvents();
+
+        samaajEvent.Update(
+            "New Title", null, StartAt, null, null, null, registrationEnabled: true, null, Now);
+
+        samaajEvent.DomainEvents.Should().ContainSingle()
+            .Which.Should().BeOfType<EventUpdatedDomainEvent>();
+    }
+
+    [Fact]
+    public void Blank_title_is_refused_the_same_way_creation_refuses_it()
+    {
+        var samaajEvent = Draft();
+
+        var act = () => samaajEvent.Update(
+            "   ", null, StartAt, null, null, null, registrationEnabled: true, null, Now);
+
+        act.Should().Throw<ArgumentException>();
+    }
 }

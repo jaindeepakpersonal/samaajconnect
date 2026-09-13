@@ -21,6 +21,7 @@ button on a full event, and both are real states rather than labels.
 | Command | Policy | Status |
 |---|---|---|
 | `CreateEventCommand` | `Events.Publish` | built |
+| `UpdateEventCommand` | `Events.Publish` | built |
 | `PublishEventCommand` | `Events.Publish` | built |
 | `CancelEventCommand` | `Events.Publish` | built |
 | `RegisterForEventCommand` | `Members.Read` | built |
@@ -43,6 +44,7 @@ button on a full event, and both are real states rather than labels.
 | `EventCapacityReachedDomainEvent` | `events.capacity.reached.v1` | `SamaajEvent.Register` |
 | `EventWaitlistPromotedDomainEvent` | `events.waitlist.promoted.v1` | `SamaajEvent.CancelRegistration` |
 | `EventCancelledDomainEvent` | `events.event.cancelled.v1` | `SamaajEvent.Cancel` |
+| `EventUpdatedDomainEvent` | `events.event.updated.v1` | `SamaajEvent.Update` |
 
 ## Events consumed
 
@@ -55,6 +57,7 @@ None. A leaf service, like the other two Phase 2 contexts.
 | GET | `/v1/events` | `Members.Read` |
 | POST | `/v1/events` | `Events.Publish` |
 | GET | `/v1/events/{id}` | `Members.Read` |
+| PATCH | `/v1/events/{id}` | `Events.Publish` |
 | POST | `/v1/events/{id}/publish` | `Events.Publish` |
 | POST | `/v1/events/{id}/cancel` | `Events.Publish` |
 | GET | `/v1/events/{id}/attendees` | `Events.Publish` |
@@ -138,10 +141,7 @@ other people, and a Samaaj is a place where that matters.
 **Domain-assigned keys are `ValueGeneratedNever`.** Both of them, as everywhere
 else on this platform.
 
-**`EventTypeId` is set only at creation, and only optionally.** There is no
-update command for an event at all - `Create`/`Publish`/`Cancel` are the whole
-lifecycle - so unlike `BusinessCategory` (an id `Business` fields can be
-changed on) this one simply has nowhere to be revised once set. A Samaaj that
+**`EventTypeId` is optional and, as of 2026-09-13, editable.** A Samaaj that
 has not seeded any `EventType` lookup values yet can still create events; the
 field is null until it does. It is a `string` on the wire, not a `Guid?` -
 the same defense-in-depth matrimony-service's own opt-in command already established, so a
@@ -150,6 +150,39 @@ binder with an unhandled 400 before validation runs. Requires an additive
 migration (`AddEventTypeId`, 2026-09-12) since, unlike `LookupItem.Category`,
 this is a genuinely new column on an existing table, not a new value inside
 an existing `HasConversion<string>()` one.
+
+**Editing arrived a cycle after `EventTypeId`, and this file's own previous
+sentence here said the opposite of what is now true.** It read "there is no
+update command for an event at all... this one simply has nowhere to be
+revised once set" - correct when written, and left standing after
+`UpdateEventCommand` shipped. `Create`/`Update`/`Publish`/`Cancel` is the
+whole lifecycle now. Worth noting as the reason to distrust a doc comment
+that explains an absence: the absence is the part that goes stale first.
+
+**`UpdateEventCommand` is allowed on a Draft or a Published event, refused
+on a Cancelled one, and never touches the organiser.** There is nothing left
+to correct once an event is called off - `Cancel` already keeps the reason
+people were told, and a cancelled event cannot be republished either.
+Reassigning `OrganizerType`/`OrganizerId` is a bigger structural change than
+a correction (an event may already carry registrations against the
+organiser who is answerable for it) and nothing asked for it, so those two
+fields stay fixed at creation - the same narrow-scope choice
+`CreateEventCommand`'s own field list already made.
+
+**Dropping capacity below who is already registered is refused, not
+silently applied.** `RegisteredCount` and `IsFull` are both computed from
+the registrations table, so an organiser cutting capacity to fewer than the
+people already holding a confirmed place would either need someone bumped
+without being told, or would make the response's own numbers disagree with
+each other. The handler checks this before calling `Update`, the same split
+competition-service's own registration handler uses between a precondition
+the caller needs a specific answer about and the aggregate method that
+performs the write once it is known to be safe.
+
+**`EventUpdatedDomainEvent` carries no field values.** Title, description
+and venue are exactly the free text this service already keeps off every
+other event's own topic; the fact that a correction happened, and when, is
+what this one honestly records.
 
 ## Dependencies
 

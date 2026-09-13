@@ -6,6 +6,7 @@ using Sangam.Events.Application.Events.Commands.CancelRegistration;
 using Sangam.Events.Application.Events.Commands.CreateEvent;
 using Sangam.Events.Application.Events.Commands.PublishEvent;
 using Sangam.Events.Application.Events.Commands.RegisterForEvent;
+using Sangam.Events.Application.Events.Commands.UpdateEvent;
 using Sangam.Events.Application.Events.Queries.GetAttendees;
 using Sangam.Events.Application.Events.Queries.GetEvent;
 using Sangam.Events.Application.Events.Queries.ListEvents;
@@ -86,6 +87,37 @@ public static class EventEndpoints
             .Produces<EventResponse>()
             .ProducesProblem(StatusCodes.Status401Unauthorized)
             .ProducesProblem(StatusCodes.Status404NotFound);
+
+        group.MapPatch("/{id:guid}", async (
+                Guid id,
+                UpdateEventRequest request,
+                ISender sender,
+                CancellationToken cancellationToken) =>
+            {
+                var command = new UpdateEventCommand(
+                    id,
+                    request.Title,
+                    request.Description,
+                    request.StartAt,
+                    request.EndAt,
+                    request.Venue,
+                    request.EventTypeId,
+                    request.RegistrationEnabled,
+                    request.Capacity);
+
+                var result = await sender.Send(command, cancellationToken);
+
+                return result.ToApiResult();
+            })
+            .RequireAuthorization()
+            .WithName("UpdateEvent")
+            .WithSummary("Correct an event's own details. Refused once it is cancelled.")
+            .Produces<EventResponse>()
+            .ProducesValidationProblem()
+            .ProducesProblem(StatusCodes.Status401Unauthorized)
+            .ProducesProblem(StatusCodes.Status403Forbidden)
+            .ProducesProblem(StatusCodes.Status404NotFound)
+            .ProducesProblem(StatusCodes.Status409Conflict);
 
         group.MapPost("/{id:guid}/publish", async (
                 Guid id,
@@ -198,4 +230,15 @@ public static class EventEndpoints
 
     /// <summary>The reason is required: members who were going are told it.</summary>
     public sealed record CancelEventRequest(string? Reason);
+
+    /// <summary>Same shape as <see cref="CreateEventRequest"/>, minus the organiser - see `UpdateEventCommand`'s own remarks for why.</summary>
+    public sealed record UpdateEventRequest(
+        string Title,
+        string? Description,
+        DateTimeOffset StartAt,
+        DateTimeOffset? EndAt,
+        string? Venue,
+        string? EventTypeId,
+        bool RegistrationEnabled,
+        int? Capacity);
 }

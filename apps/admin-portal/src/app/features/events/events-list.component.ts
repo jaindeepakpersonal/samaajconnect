@@ -1,5 +1,13 @@
 import { DatePipe } from '@angular/common';
-import { Component, OnInit, computed, inject, signal } from '@angular/core';
+import {
+  Component,
+  ElementRef,
+  OnInit,
+  ViewChild,
+  computed,
+  inject,
+  signal,
+} from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { RouterLink } from '@angular/router';
 import { describeError } from '@samaajconnect/shared';
@@ -9,7 +17,7 @@ import { LookupItem, OrganizerGroup, OrganizerType, SamaajEvent } from '../../co
 import { isNotFound } from '../../core/http-status';
 
 /**
- * Events — creating them, publishing them, calling them off.
+ * Events — creating them, editing them, publishing them, calling them off.
  *
  * Wireframe `#events`.
  *
@@ -31,6 +39,18 @@ import { isNotFound } from '../../core/http-status';
  * one — somebody who rearranged their day is owed better than "Cancelled" — and
  * a cancelled event cannot be republished, so the confirmation is not
  * ceremony.
+ *
+ * **Create and Edit are one modal, added 2026-09-13, the same shape Master
+ * Data's own Add/Edit dialog already uses.** The create form used to sit
+ * permanently below the list, which put it further down the page every time
+ * the Samaaj had one more event - and there was no way to correct a typo in
+ * a title or venue at all, since `events-service` had no update command
+ * until the same change. The two share one form: Edit omits the Organiser
+ * field, because `UpdateEventCommand` deliberately does not take one -
+ * reassigning who is holding an event that may already carry registrations
+ * is a bigger change than a correction. Edit is offered on a Draft or a
+ * Published event and not on a Cancelled one, matching the service's own
+ * refusal, so the button is not one that always answers 409.
  */
 @Component({
   selector: 'app-events-list',
@@ -56,7 +76,12 @@ import { isNotFound } from '../../core/http-status';
       <p class="empty" role="status">Loading…</p>
     } @else {
       <div class="card">
-        <h2>All events</h2>
+        <div class="section-head">
+          <h2>All events</h2>
+          <button class="btn small" type="button" (click)="openCreateModal($event)">
+            Create an event
+          </button>
+        </div>
 
         <label class="inline-check">
           <input type="checkbox" name="includePast" [ngModel]="includePast()"
@@ -106,6 +131,13 @@ import { isNotFound } from '../../core/http-status';
                     </td>
                     <td>
                       <div class="row-actions">
+                        @if (event.status !== 'Cancelled') {
+                          <button class="btn small alt" type="button" [disabled]="busy()"
+                            (click)="openEditModal($event, event)">
+                            Edit
+                          </button>
+                        }
+
                         @if (event.status === 'Draft') {
                           <button class="btn small" type="button" [disabled]="busy()"
                             (click)="publish(event)">
@@ -162,96 +194,116 @@ import { isNotFound } from '../../core/http-status';
           </div>
         }
       </div>
+    }
 
-      <!-- Create --------------------------------------------------------- -->
-      <div class="card spaced">
-        <h2>Create an event</h2>
+    <!-- Create / Edit modal ---------------------------------------------- -->
+    @if (modalOpen()) {
+      <div class="modal-backdrop" (click)="closeModal()">
+        <div
+          class="card modal-card modal-dialog"
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="event-modal-title"
+          (click)="$event.stopPropagation()"
+          (keydown)="onModalKeydown($event)"
+        >
+          <h2 id="event-modal-title">
+            {{ modalMode() === 'create' ? 'Create an event' : 'Edit ' + editingEvent()?.title }}
+          </h2>
 
-        <form (ngSubmit)="create()">
-          <div class="form-grid">
-            <div class="field">
-              <label for="event-title">Title</label>
-              <input id="event-title" class="input" name="title" [(ngModel)]="title"
-                maxlength="200" placeholder="Paryushan Lecture" />
-            </div>
-
-            <div class="field">
-              <label for="event-description">Description</label>
-              <input id="event-description" class="input" name="description"
-                [(ngModel)]="description" maxlength="2000" />
-            </div>
-
-            <div class="field">
-              <label for="event-venue">Venue</label>
-              <input id="event-venue" class="input" name="venue" [(ngModel)]="venue"
-                maxlength="200" placeholder="Jain Bhavan, Hiran Magri" />
-            </div>
-
-            <div class="field">
-              <label for="event-start">Starts</label>
-              <input id="event-start" class="input" type="datetime-local" name="startAt"
-                [(ngModel)]="startAt" />
-            </div>
-
-            <div class="field">
-              <label for="event-end">Ends</label>
-              <input id="event-end" class="input" type="datetime-local" name="endAt"
-                [(ngModel)]="endAt" />
-            </div>
-
-            <div class="field">
-              <label for="event-type">Event type</label>
-              <select id="event-type" class="input" name="eventType" [(ngModel)]="eventTypeId">
-                <option value="">Not specified</option>
-                @for (option of eventTypes(); track option.id) {
-                  <option [value]="option.id">{{ option.label }}</option>
-                }
-              </select>
-            </div>
-
-            <div class="field">
-              <label for="event-organiser">Organiser</label>
-              <select id="event-organiser" class="input" name="organiser" [(ngModel)]="organizerId">
-                <option value="">{{ scope.label() }} itself</option>
-                @for (group of groups(); track group.id) {
-                  <option [value]="group.id">{{ group.name }}</option>
-                }
-              </select>
-            </div>
-
-            <label class="inline-check span-all">
-              <input type="checkbox" name="registrationEnabled" [(ngModel)]="registrationEnabled" />
-              Members may register
-            </label>
-
-            @if (registrationEnabled) {
-              <div class="field span-all">
-                <label for="event-capacity">Capacity</label>
-                <input id="event-capacity" class="input inline" type="number" min="1"
-                  name="capacity" [(ngModel)]="capacity" placeholder="Leave blank for no limit" />
-
-                <p class="small">
-                  Blank means no limit. It is not the same as zero, which the service refuses — an
-                  event nobody can attend is a mistake rather than an intention.
-                </p>
+          <form (ngSubmit)="submitModal()">
+            <div class="form-grid">
+              <div class="field">
+                <label for="event-title">Title</label>
+                <input id="event-title" class="input" name="title" [(ngModel)]="title"
+                  maxlength="200" placeholder="Paryushan Lecture" #firstField />
               </div>
-            }
 
-            <div class="span-all">
-              <button class="btn" type="submit" [disabled]="busy() || !canCreate()">
-                Create as a draft
-              </button>
+              <div class="field">
+                <label for="event-description">Description</label>
+                <input id="event-description" class="input" name="description"
+                  [(ngModel)]="description" maxlength="2000" />
+              </div>
+
+              <div class="field">
+                <label for="event-venue">Venue</label>
+                <input id="event-venue" class="input" name="venue" [(ngModel)]="venue"
+                  maxlength="200" placeholder="Jain Bhavan, Hiran Magri" />
+              </div>
+
+              <div class="field">
+                <label for="event-start">Starts</label>
+                <input id="event-start" class="input" type="datetime-local" name="startAt"
+                  [(ngModel)]="startAt" />
+              </div>
+
+              <div class="field">
+                <label for="event-end">Ends</label>
+                <input id="event-end" class="input" type="datetime-local" name="endAt"
+                  [(ngModel)]="endAt" />
+              </div>
+
+              <div class="field">
+                <label for="event-type">Event type</label>
+                <select id="event-type" class="input" name="eventType" [(ngModel)]="eventTypeId">
+                  <option value="">Not specified</option>
+                  @for (option of eventTypes(); track option.id) {
+                    <option [value]="option.id">{{ option.label }}</option>
+                  }
+                </select>
+              </div>
+
+              @if (modalMode() === 'create') {
+                <div class="field">
+                  <label for="event-organiser">Organiser</label>
+                  <select id="event-organiser" class="input" name="organiser" [(ngModel)]="organizerId">
+                    <option value="">{{ scope.label() }} itself</option>
+                    @for (group of groups(); track group.id) {
+                      <option [value]="group.id">{{ group.name }}</option>
+                    }
+                  </select>
+                </div>
+              } @else {
+                <p class="small span-all">
+                  Organiser: {{ organiser(editingEvent()!) }} (fixed once created)
+                </p>
+              }
+
+              <label class="inline-check span-all">
+                <input type="checkbox" name="registrationEnabled" [(ngModel)]="registrationEnabled" />
+                Members may register
+              </label>
+
+              @if (registrationEnabled) {
+                <div class="field span-all">
+                  <label for="event-capacity">Capacity</label>
+                  <input id="event-capacity" class="input inline" type="number" min="1"
+                    name="capacity" [(ngModel)]="capacity" placeholder="Leave blank for no limit" />
+
+                  <p class="small">
+                    Blank means no limit. It is not the same as zero, which the service refuses — an
+                    event nobody can attend is a mistake rather than an intention.
+                    @if (modalMode() === 'edit' && editingEvent()!.registeredCount > 0) {
+                      Cannot be set below the {{ editingEvent()!.registeredCount }} people already
+                      registered.
+                    }
+                  </p>
+                </div>
+              }
             </div>
-          </div>
-        </form>
+
+            <div class="actions">
+              <button class="btn" type="submit" [disabled]="busy() || !canSubmit()">
+                {{ modalMode() === 'create' ? 'Create as a draft' : 'Save' }}
+              </button>
+              <button class="btn alt" type="button" (click)="closeModal()">Cancel</button>
+            </div>
+          </form>
+        </div>
       </div>
     }
   `,
   styles: `
-    .spaced {
-      margin-top: var(--space-4);
-    }
-
     .row-actions {
       display: flex;
       gap: var(--space-2);
@@ -264,12 +316,44 @@ import { isNotFound } from '../../core/http-status';
       gap: var(--space-2);
       margin: var(--space-3) 0;
     }
+
+    .section-head {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: var(--space-3);
+      flex-wrap: wrap;
+    }
+
+    .section-head h2 {
+      margin: 0;
+    }
+
+    .modal-backdrop {
+      position: fixed;
+      inset: 0;
+      background: rgba(23, 32, 42, 0.5);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: var(--space-4);
+      z-index: 200;
+    }
+
+    .modal-dialog {
+      width: 100%;
+      max-width: 640px;
+      max-height: 90vh;
+      overflow-y: auto;
+    }
   `,
 })
 export class EventsListComponent implements OnInit {
   private readonly api = inject(AdminApi);
 
   readonly scope = inject(AdminScope);
+
+  @ViewChild('firstField') private readonly firstFieldRef?: ElementRef<HTMLInputElement>;
 
   readonly events = signal<readonly SamaajEvent[]>([]);
   readonly groups = signal<readonly OrganizerGroup[]>([]);
@@ -283,6 +367,11 @@ export class EventsListComponent implements OnInit {
 
   /** Which event is being asked about, if any. Cancelling is not undoable. */
   readonly cancelling = signal<string | null>(null);
+
+  readonly modalOpen = signal(false);
+  readonly modalMode = signal<'create' | 'edit'>('create');
+  readonly editingEvent = signal<SamaajEvent | null>(null);
+  private modalTrigger: HTMLElement | null = null;
 
   title = '';
   description = '';
@@ -305,7 +394,7 @@ export class EventsListComponent implements OnInit {
     this.loadEventTypes();
   }
 
-  canCreate(): boolean {
+  canSubmit(): boolean {
     return this.title.trim().length > 0 && this.startAt.length > 0;
   }
 
@@ -390,8 +479,103 @@ export class EventsListComponent implements OnInit {
     });
   }
 
+  // ---- Modal ----------------------------------------------------------------
+
+  openCreateModal(event: MouseEvent): void {
+    this.modalMode.set('create');
+    this.editingEvent.set(null);
+    this.title = '';
+    this.description = '';
+    this.venue = '';
+    this.startAt = '';
+    this.endAt = '';
+    this.eventTypeId = '';
+    this.organizerId = '';
+    this.registrationEnabled = true;
+    this.capacity = null;
+    this.openModal(event);
+  }
+
+  openEditModal(event: MouseEvent, samaajEvent: SamaajEvent): void {
+    this.modalMode.set('edit');
+    this.editingEvent.set(samaajEvent);
+    this.title = samaajEvent.title;
+    this.description = samaajEvent.description ?? '';
+    this.venue = samaajEvent.venue ?? '';
+    this.startAt = toLocalInputValue(samaajEvent.startAt);
+    this.endAt = samaajEvent.endAt ? toLocalInputValue(samaajEvent.endAt) : '';
+    this.eventTypeId = samaajEvent.eventTypeId ?? '';
+    this.registrationEnabled = samaajEvent.registrationEnabled;
+    this.capacity = samaajEvent.capacity;
+    this.openModal(event);
+  }
+
+  private openModal(event: MouseEvent): void {
+    this.modalTrigger = event.currentTarget as HTMLElement;
+    this.error.set(null);
+    this.done.set(null);
+    this.modalOpen.set(true);
+    setTimeout(() => this.firstFieldRef?.nativeElement.focus());
+  }
+
+  closeModal(): void {
+    if (!this.modalOpen()) {
+      return;
+    }
+
+    this.modalOpen.set(false);
+
+    const trigger = this.modalTrigger;
+    this.modalTrigger = null;
+
+    if (trigger) {
+      setTimeout(() => trigger.focus());
+    }
+  }
+
+  onModalKeydown(event: KeyboardEvent): void {
+    if (event.key === 'Escape') {
+      event.stopPropagation();
+      this.closeModal();
+
+      return;
+    }
+
+    if (event.key !== 'Tab') {
+      return;
+    }
+
+    const dialog = event.currentTarget as HTMLElement;
+    const focusable = dialog.querySelectorAll<HTMLElement>(
+      'a[href], button:not([disabled]), input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])',
+    );
+
+    if (focusable.length === 0) {
+      return;
+    }
+
+    const first = focusable[0]!;
+    const last = focusable[focusable.length - 1]!;
+
+    if (event.shiftKey && document.activeElement === first) {
+      event.preventDefault();
+      last.focus();
+    } else if (!event.shiftKey && document.activeElement === last) {
+      event.preventDefault();
+      first.focus();
+    }
+  }
+
+  submitModal(): void {
+    if (this.modalMode() === 'create') {
+      this.create();
+    } else {
+      this.update();
+    }
+  }
+
   create(): void {
-    if (!this.canCreate()) {
+    if (!this.canSubmit()) {
       return;
     }
 
@@ -414,16 +598,32 @@ export class EventsListComponent implements OnInit {
         capacity: this.registrationEnabled ? (this.capacity || null) : null,
       }),
       `${title} created as a draft. Nobody has been told yet.`,
-      () => {
-        this.title = '';
-        this.description = '';
-        this.venue = '';
-        this.startAt = '';
-        this.endAt = '';
-        this.eventTypeId = '';
-        this.organizerId = '';
-        this.capacity = null;
-      },
+      () => this.closeModal(),
+    );
+  }
+
+  update(): void {
+    const editing = this.editingEvent();
+
+    if (!editing || !this.canSubmit()) {
+      return;
+    }
+
+    const title = this.title.trim();
+
+    this.act(
+      this.api.updateEvent(editing.id, {
+        title,
+        description: blankToNull(this.description),
+        startAt: new Date(this.startAt).toISOString(),
+        endAt: this.endAt ? new Date(this.endAt).toISOString() : null,
+        venue: blankToNull(this.venue),
+        eventTypeId: this.eventTypeId || null,
+        registrationEnabled: this.registrationEnabled,
+        capacity: this.registrationEnabled ? (this.capacity || null) : null,
+      }),
+      `${title} updated.`,
+      () => this.closeModal(),
     );
   }
 
@@ -477,4 +677,20 @@ function blankToNull(value: string): string | null {
   const trimmed = value.trim();
 
   return trimmed.length === 0 ? null : trimmed;
+}
+
+/** An ISO instant to the local `datetime-local` input value it renders as. */
+function toLocalInputValue(iso: string): string {
+  const date = new Date(iso);
+
+  if (Number.isNaN(date.getTime())) {
+    return '';
+  }
+
+  const pad = (n: number) => n.toString().padStart(2, '0');
+
+  return (
+    `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}` +
+    `T${pad(date.getHours())}:${pad(date.getMinutes())}`
+  );
 }
