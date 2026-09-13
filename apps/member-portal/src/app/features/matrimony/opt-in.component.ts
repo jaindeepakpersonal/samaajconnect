@@ -144,7 +144,7 @@ import {
             </div>
 
             <div class="field">
-              <label for="cityId">City</label>
+              <label for="cityId">City/Village</label>
               <select
                 class="input"
                 id="cityId"

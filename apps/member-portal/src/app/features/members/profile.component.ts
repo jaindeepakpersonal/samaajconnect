@@ -267,7 +267,7 @@ type ProfileTab = 'basic' | 'professional' | 'educational' | 'address' | 'photo'
               </div>
 
               <div class="field">
-                <label for="permanent-city">City</label>
+                <label for="permanent-city">City/Village</label>
                 <select
                   class="input"
                   id="permanent-city"
@@ -275,7 +275,7 @@ type ProfileTab = 'basic' | 'professional' | 'educational' | 'address' | 'photo'
                   [ngModel]="form.permanentAddress.cityId"
                   (ngModelChange)="onCityChange('permanent', $event)"
                 >
-                  <option value="">Choose a city</option>
+                  <option value="">Choose a city/village</option>
                   @for (option of cities(); track option.id) {
                     <option [value]="option.id">{{ option.name }}</option>
                   }
@@ -331,7 +331,7 @@ type ProfileTab = 'basic' | 'professional' | 'educational' | 'address' | 'photo'
               </div>
 
               <div class="field">
-                <label for="temporary-city">City</label>
+                <label for="temporary-city">City/Village</label>
                 <select
                   class="input"
                   id="temporary-city"
@@ -340,7 +340,7 @@ type ProfileTab = 'basic' | 'professional' | 'educational' | 'address' | 'photo'
                   (ngModelChange)="onCityChange('temporary', $event)"
                   [disabled]="sameAsPermanent()"
                 >
-                  <option value="">Choose a city</option>
+                  <option value="">Choose a city/village</option>
                   @for (option of cities(); track option.id) {
                     <option [value]="option.id">{{ option.name }}</option>
                   }

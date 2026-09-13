@@ -178,7 +178,7 @@ import { AdminAddress, AdminMember, City, Gautra, LookupItem, Locality } from '.
 
           <div class="form-grid">
             <div class="field">
-              <label for="permanent-city">City</label>
+              <label for="permanent-city">City/Village</label>
               <select
                 class="input"
                 id="permanent-city"
@@ -186,7 +186,7 @@ import { AdminAddress, AdminMember, City, Gautra, LookupItem, Locality } from '.
                 [ngModel]="form.permanentAddress.cityId"
                 (ngModelChange)="onCityChange('permanent', $event)"
               >
-                <option value="">Choose a city</option>
+                <option value="">Choose a city/village</option>
                 @for (option of cities(); track option.id) {
                   <option [value]="option.id">{{ option.name }}</option>
                 }
@@ -239,7 +239,7 @@ import { AdminAddress, AdminMember, City, Gautra, LookupItem, Locality } from '.
 
           <div class="form-grid">
             <div class="field">
-              <label for="temporary-city">City</label>
+              <label for="temporary-city">City/Village</label>
               <select
                 class="input"
                 id="temporary-city"
@@ -248,7 +248,7 @@ import { AdminAddress, AdminMember, City, Gautra, LookupItem, Locality } from '.
                 (ngModelChange)="onCityChange('temporary', $event)"
                 [disabled]="sameAsPermanent()"
               >
-                <option value="">Choose a city</option>
+                <option value="">Choose a city/village</option>
                 @for (option of cities(); track option.id) {
                   <option [value]="option.id">{{ option.name }}</option>
                 }

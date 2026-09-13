@@ -140,7 +140,7 @@ import { City, Locality, LookupItem, Pathshala, State } from '../../core/admin.m
                 }
               </select>
 
-              <label for="pathshala-city">City</label>
+              <label for="pathshala-city">City/Village</label>
               <select id="pathshala-city" class="input" name="city"
                 [ngModel]="cityId()" (ngModelChange)="onCityChange($event)">
                 <option value="">Not specified</option>

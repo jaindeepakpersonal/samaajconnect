@@ -155,7 +155,7 @@ describe('MasterDataComponent', () => {
       'Business category',
       'Event type',
       'States',
-      'Cities',
+      'Cities/Villages',
       'Localities',
       'Gautra',
     ]);

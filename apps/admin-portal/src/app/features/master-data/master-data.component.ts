@@ -20,7 +20,7 @@ const LOOKUP_TABS: readonly { value: LookupCategory; label: string }[] = [
 const ALL_TABS: readonly { value: TabKey; label: string }[] = [
   ...LOOKUP_TABS,
   { value: 'States', label: 'States' },
-  { value: 'Cities', label: 'Cities' },
+  { value: 'Cities', label: 'Cities/Villages' },
   { value: 'Localities', label: 'Localities' },
   { value: 'Gautra', label: 'Gautra' },
 ];
@@ -295,21 +295,21 @@ const ALL_TABS: readonly { value: TabKey; label: string }[] = [
         </select>
 
         @if (selectedCountryId() === '') {
-          <p class="empty">Choose a country to see its cities.</p>
+          <p class="empty">Choose a country to see its cities and villages.</p>
         } @else {
           <div class="section-head">
-            <h2>Cities in {{ selectedCountryLabel() }}</h2>
-            <button class="btn small" type="button" (click)="openAddCity($event)">Add city</button>
+            <h2>Cities/Villages in {{ selectedCountryLabel() }}</h2>
+            <button class="btn small" type="button" (click)="openAddCity($event)">Add city/village</button>
           </div>
 
           @if (citiesLoading()) {
             <p class="empty" role="status">Loading…</p>
           } @else if (cities().length === 0) {
-            <p class="empty">No cities yet for this country.</p>
+            <p class="empty">No cities or villages yet for this country.</p>
           } @else {
             <div class="table-wrap">
               <table>
-                <caption class="sr-only">Cities in {{ selectedCountryLabel() }}</caption>
+                <caption class="sr-only">Cities/Villages in {{ selectedCountryLabel() }}</caption>
                 <thead>
                   <tr><th>Name</th><th>State</th><th>Status</th><th></th></tr>
                 </thead>
@@ -382,14 +382,14 @@ const ALL_TABS: readonly { value: TabKey; label: string }[] = [
         </select>
 
         @if (localityCountryId() !== '') {
-          <label for="locality-city">City</label>
+          <label for="locality-city">City/Village</label>
           <select
             id="locality-city"
             class="input"
             [ngModel]="selectedCityId()"
             (ngModelChange)="onCityChange($event)"
           >
-            <option value="">Choose a city…</option>
+            <option value="">Choose a city/village…</option>
             @for (city of citiesForLocality(); track city.id) {
               <option [value]="city.id">{{ city.name }}</option>
             }
@@ -397,7 +397,7 @@ const ALL_TABS: readonly { value: TabKey; label: string }[] = [
         }
 
         @if (selectedCityId() === '') {
-          <p class="empty">Choose a city to see its localities.</p>
+          <p class="empty">Choose a city/village to see its localities.</p>
         } @else {
           <div class="section-head">
             <h2>Localities in {{ selectedCityLabel() }}</h2>
@@ -409,7 +409,7 @@ const ALL_TABS: readonly { value: TabKey; label: string }[] = [
           @if (localitiesLoading()) {
             <p class="empty" role="status">Loading…</p>
           } @else if (localities().length === 0) {
-            <p class="empty">No localities yet for this city.</p>
+            <p class="empty">No localities yet for this city/village.</p>
           } @else {
             <div class="table-wrap">
               <table>
@@ -788,7 +788,7 @@ export class MasterDataComponent implements OnInit {
       case 'States':
         return `${verb} state`;
       case 'Cities':
-        return `${verb} city`;
+        return `${verb} city/village`;
       case 'Localities':
         return `${verb} locality`;
       case 'Gautra':
