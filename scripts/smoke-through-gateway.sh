@@ -4123,6 +4123,14 @@ competition_checks() {
 
   sleep 62
 
+  # Refreshed here, not just at the top of this section: this function's own
+  # two sleeps add real elapsed time on top of everything the sections before
+  # it already spent, and Master Data (the section right after this one)
+  # assumes whatever token it inherits is still fresh rather than refreshing
+  # its own. Leaving tokens stale here was found to cascade into a spurious
+  # 401 on Master Data's own first check.
+  refresh_tokens
+
   check "the competitions route then answers 404" 404 \
     "$(status -H "Authorization: Bearer $MEMBER_TOKEN" "$GATEWAY/v1/competitions")"
 }
