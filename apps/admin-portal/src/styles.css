@@ -297,6 +297,11 @@ textarea.input {
   margin: 0 0 var(--space-2);
 }
 
+.required-mark {
+  color: var(--danger);
+  margin-left: 2px;
+}
+
 .field-hint {
   color: var(--muted);
   font-size: 12px;
