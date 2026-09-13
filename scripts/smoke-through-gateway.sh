@@ -3973,6 +3973,163 @@ businesses_checks() {
 businesses_checks || echo "  ..    the rest of the Businesses checks were skipped"
 
 echo
+echo "Competitions"
+
+# Wrapped in a function for the same reason businesses_checks is: a missing id
+# can return rather than exit, so one broken extraction here does not blame
+# the sections that run after it.
+competition_checks() {
+
+  check "switching the competitions module on" 200 \
+    "$(status -X PUT "$GATEWAY/v1/identity/tenants/$TENANT_ID/modules" \
+       -H 'Content-Type: application/json' -H "Authorization: Bearer $ADMIN_TOKEN" -H "$ADMIN_TENANT_HEADER" \
+       -d '{"enabledModules":["community","competitions"]}')"
+
+  sleep 62
+
+  refresh_tokens
+
+  MEMBER_ID=$(curl -s -H "Authorization: Bearer $MEMBER_TOKEN" "$GATEWAY/v1/identity/me" | json_field userId)
+  CHILD_MEMBER_ID=$(curl -s -H "Authorization: Bearer $CHILD_TOKEN" "$GATEWAY/v1/identity/me" | json_field userId)
+  JUDGE_ID=$(curl -s -H "Authorization: Bearer $SAMAAJ_ADMIN_TOKEN" "$GATEWAY/v1/identity/me" | json_field userId)
+
+  REGISTRATION_START=$(date -u -d '-1 minute' +%Y-%m-%dT%H:%M:%SZ)
+  REGISTRATION_END=$(date -u -d '+7 days' +%Y-%m-%dT%H:%M:%SZ)
+
+  COMPETITION=$(curl -s -X POST "$GATEWAY/v1/competitions" \
+    -H 'Content-Type: application/json' -H "Authorization: Bearer $ADMIN_TOKEN" -H "$ADMIN_TENANT_HEADER" \
+    -d "{\"title\":\"Smoke Rangoli Contest\",\"description\":null,\"competitionTypeId\":null,
+         \"registrationStartAt\":\"$REGISTRATION_START\",\"registrationEndAt\":\"$REGISTRATION_END\"}")
+
+  COMPETITION_ID=$(printf '%s' "$COMPETITION" | json_field id)
+
+  if [ -n "$COMPETITION_ID" ]; then
+    echo "  ok    an administrator sets a competition up"
+    pass=$((pass + 1))
+  else
+    echo "  FAIL  setting a competition up (got '$COMPETITION')"
+    fail=$((fail + 1))
+    return 1
+  fi
+
+  check "a member cannot set one up" 403 \
+    "$(status -X POST "$GATEWAY/v1/competitions" -H 'Content-Type: application/json' \
+       -H "Authorization: Bearer $MEMBER_TOKEN" \
+       -d "{\"title\":\"Mine\",\"description\":null,\"competitionTypeId\":null,
+            \"registrationStartAt\":\"$REGISTRATION_START\",\"registrationEndAt\":\"$REGISTRATION_END\"}")"
+
+  check "registering before registration opens is refused" 409 \
+    "$(status -X POST "$GATEWAY/v1/competitions/$COMPETITION_ID/registrations" \
+       -H "Authorization: Bearer $MEMBER_TOKEN")"
+
+  check "opening registration is accepted" 200 \
+    "$(status -X POST "$GATEWAY/v1/competitions/$COMPETITION_ID/status" \
+       -H 'Content-Type: application/json' -H "Authorization: Bearer $ADMIN_TOKEN" -H "$ADMIN_TENANT_HEADER" \
+       -d '{"status":"RegistrationOpen"}')"
+
+  check "the first member registers" 200 \
+    "$(status -X POST "$GATEWAY/v1/competitions/$COMPETITION_ID/registrations" \
+       -H "Authorization: Bearer $MEMBER_TOKEN")"
+
+  check "the second member registers" 200 \
+    "$(status -X POST "$GATEWAY/v1/competitions/$COMPETITION_ID/registrations" \
+       -H "Authorization: Bearer $CHILD_TOKEN")"
+
+  check "a third member is assigned as judge" 200 \
+    "$(status -X POST "$GATEWAY/v1/competitions/$COMPETITION_ID/judges" \
+       -H 'Content-Type: application/json' -H "Authorization: Bearer $ADMIN_TOKEN" -H "$ADMIN_TENANT_HEADER" \
+       -d "{\"memberId\":\"$JUDGE_ID\",\"assign\":true}")"
+
+  ROUND=$(curl -s -X POST "$GATEWAY/v1/competitions/$COMPETITION_ID/rounds" \
+    -H 'Content-Type: application/json' -H "Authorization: Bearer $ADMIN_TOKEN" -H "$ADMIN_TENANT_HEADER" \
+    -d '{"name":"Final"}')
+
+  ROUND_ID=$(printf '%s' "$ROUND" | json_field id)
+
+  if [ -n "$ROUND_ID" ]; then
+    echo "  ok    the organiser opens a round"
+    pass=$((pass + 1))
+  else
+    echo "  FAIL  opening a round (got '$ROUND')"
+    fail=$((fail + 1))
+    return 1
+  fi
+
+  ENTRY_ONE=$(curl -s -X POST "$GATEWAY/v1/competitions/$COMPETITION_ID/rounds/$ROUND_ID/entries" \
+    -H 'Content-Type: application/json' -H "Authorization: Bearer $ADMIN_TOKEN" -H "$ADMIN_TENANT_HEADER" \
+    -d "{\"participantMemberId\":\"$MEMBER_ID\"}")
+
+  ENTRY_ONE_ID=$(printf '%s' "$ENTRY_ONE" | json_field id)
+
+  ENTRY_TWO=$(curl -s -X POST "$GATEWAY/v1/competitions/$COMPETITION_ID/rounds/$ROUND_ID/entries" \
+    -H 'Content-Type: application/json' -H "Authorization: Bearer $ADMIN_TOKEN" -H "$ADMIN_TENANT_HEADER" \
+    -d "{\"participantMemberId\":\"$CHILD_MEMBER_ID\"}")
+
+  ENTRY_TWO_ID=$(printf '%s' "$ENTRY_TWO" | json_field id)
+
+  if [ -n "$ENTRY_ONE_ID" ] && [ -n "$ENTRY_TWO_ID" ]; then
+    echo "  ok    the organiser creates an entry for each registrant"
+    pass=$((pass + 1))
+  else
+    echo "  FAIL  creating entries (got '$ENTRY_ONE' / '$ENTRY_TWO')"
+    fail=$((fail + 1))
+    return 1
+  fi
+
+  check "a member who is not a judge cannot record a score" 403 \
+    "$(status -X POST "$GATEWAY/v1/competitions/$COMPETITION_ID/entries/$ENTRY_ONE_ID/scores" \
+       -H 'Content-Type: application/json' -H "Authorization: Bearer $MEMBER_TOKEN" \
+       -d '{"value":90,"comments":null}')"
+
+  check "the judge scores the first entry" 200 \
+    "$(status -X POST "$GATEWAY/v1/competitions/$COMPETITION_ID/entries/$ENTRY_ONE_ID/scores" \
+       -H 'Content-Type: application/json' -H "Authorization: Bearer $SAMAAJ_ADMIN_TOKEN" \
+       -d '{"value":90,"comments":"Excellent pattern."}')"
+
+  check "the judge scores the second entry lower" 200 \
+    "$(status -X POST "$GATEWAY/v1/competitions/$COMPETITION_ID/entries/$ENTRY_TWO_ID/scores" \
+       -H 'Content-Type: application/json' -H "Authorization: Bearer $SAMAAJ_ADMIN_TOKEN" \
+       -d '{"value":60,"comments":null}')"
+
+  check "publishing before the round closes is refused" 409 \
+    "$(status -X POST "$GATEWAY/v1/competitions/$COMPETITION_ID/rounds/$ROUND_ID/results" \
+       -H "Authorization: Bearer $ADMIN_TOKEN" -H "$ADMIN_TENANT_HEADER")"
+
+  check "the organiser closes the round" 200 \
+    "$(status -X POST "$GATEWAY/v1/competitions/$COMPETITION_ID/rounds/$ROUND_ID/close" \
+       -H "Authorization: Bearer $ADMIN_TOKEN" -H "$ADMIN_TENANT_HEADER")"
+
+  check "the organiser publishes the result" 200 \
+    "$(status -X POST "$GATEWAY/v1/competitions/$COMPETITION_ID/rounds/$ROUND_ID/results" \
+       -H "Authorization: Bearer $ADMIN_TOKEN" -H "$ADMIN_TENANT_HEADER")"
+
+  RESULT=$(curl -s -H "Authorization: Bearer $MEMBER_TOKEN" \
+    "$GATEWAY/v1/competitions/$COMPETITION_ID/rounds/$ROUND_ID/results")
+
+  FIRST_RANKED_ENTRY_ID=$(printf '%s' "$RESULT" | grep -o '"entryId":"[^"]*"' | head -n 1 | cut -d'"' -f4)
+
+  if [ "$FIRST_RANKED_ENTRY_ID" = "$ENTRY_ONE_ID" ]; then
+    echo "  ok    the higher-scored entry is named first, visible to an ordinary member"
+    pass=$((pass + 1))
+  else
+    echo "  FAIL  the published ranking does not name the higher-scored entry first (got '$RESULT')"
+    fail=$((fail + 1))
+  fi
+
+  check "switching the competitions module off" 200 \
+    "$(status -X PUT "$GATEWAY/v1/identity/tenants/$TENANT_ID/modules" \
+       -H 'Content-Type: application/json' -H "Authorization: Bearer $ADMIN_TOKEN" -H "$ADMIN_TENANT_HEADER" \
+       -d '{"enabledModules":["community"]}')"
+
+  sleep 62
+
+  check "the competitions route then answers 404" 404 \
+    "$(status -H "Authorization: Bearer $MEMBER_TOKEN" "$GATEWAY/v1/competitions")"
+}
+
+competition_checks || echo "  ..    the rest of the Competitions checks were skipped"
+
+echo
 echo "Master data"
 
 master_data_checks() {

@@ -267,6 +267,22 @@ export const routes: Routes = [
             (m) => m.BusinessDetailComponent,
           ),
       },
+      {
+        path: 'competitions',
+        title: 'Competitions - samaajconnect',
+        loadComponent: () =>
+          import('./features/competitions/competitions-list.component').then(
+            (m) => m.CompetitionsListComponent,
+          ),
+      },
+      {
+        path: 'competitions/:id',
+        title: 'Competition - samaajconnect',
+        loadComponent: () =>
+          import('./features/competitions/competition-detail.component').then(
+            (m) => m.CompetitionDetailComponent,
+          ),
+      },
       { path: '', pathMatch: 'full', redirectTo: 'timeline' },
     ],
   },

@@ -55,6 +55,8 @@ jobs:
             solution: services/matrimony-service/Sangam.Matrimony.sln
           - name: businesses-service
             solution: services/businesses-service/Sangam.Businesses.sln
+          - name: competition-service
+            solution: services/competition-service/Sangam.Competition.sln
           - name: gateway
             solution: gateway/Sangam.Gateway.sln
 
@@ -338,6 +340,12 @@ jobs:
           dotnet dotnet-ef migrations has-pending-model-changes \
             --project services/businesses-service/src/Sangam.Businesses.Infrastructure \
             --startup-project services/businesses-service/src/Sangam.Businesses.Api
+
+      - name: Check competition-service
+        run: |
+          dotnet dotnet-ef migrations has-pending-model-changes \
+            --project services/competition-service/src/Sangam.Competition.Infrastructure \
+            --startup-project services/competition-service/src/Sangam.Competition.Api
 
   smoke:
     name: Through the gateway

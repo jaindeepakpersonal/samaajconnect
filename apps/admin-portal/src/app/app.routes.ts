@@ -158,6 +158,22 @@ export const routes: Routes = [
           ),
       },
       {
+        path: 'competitions',
+        title: 'Competitions - samaajconnect admin',
+        loadComponent: () =>
+          import('./features/competitions/competition-list.component').then(
+            (m) => m.CompetitionListComponent,
+          ),
+      },
+      {
+        path: 'competitions/:id',
+        title: 'Competition - samaajconnect admin',
+        loadComponent: () =>
+          import('./features/competitions/competition-detail.component').then(
+            (m) => m.CompetitionDetailComponent,
+          ),
+      },
+      {
         path: 'groups',
         title: 'Volunteer groups - samaajconnect admin',
         loadComponent: () =>

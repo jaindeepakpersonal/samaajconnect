@@ -130,6 +130,21 @@ personal data of any *other* party, unlike a Proposal) and de-identifies
 (strips the note from) every order they placed as a buyer, keeping the
 row so the business owner's own order history is not silently broken.
 
+### Competitions — the same open question as the other bare-id services
+
+competition-service holds a member's registration, entries and a judge's
+own marks as plain member ids alongside a competition — no name, no
+contact detail. It consumes no events (a leaf service) and, like
+celebrity-voting-service's `Vote` and boli-service's `Bid`, does not
+subscribe to `identity.user.erased.v1`. This is the identical open
+question "Six services shipped without doing that" already raises below,
+not a separately-reasoned answer: whether a bare `MemberId` left behind in
+a service holding no name or contact is still personal data once every
+service that could resolve it to a person has cleared. `Score`'s unique
+index on `(EntryId, JudgeMemberId)` gives this service the same kind of
+reason the id must stay that a vote's does — see question 6 under "Open
+questions for counsel."
+
 ### Data export
 
 Each service answers for what it holds:
@@ -320,8 +335,15 @@ them need counsel.
 and `boli` all hold member ids and none subscribes to the erasure event. The
 table above lists three services; there are ten.
 
-**For four of them the residual data is a bare id.** Events registrations,
-volunteer-group memberships, votes and bids carry a `MemberId` and nothing else
+`competition-service`, built after this pass, is the same shape and was not
+retrofitted to consume the event either — the question below was already
+open when it shipped, so it was built consistent with the platform's
+existing, unresolved posture rather than inventing a new answer of its own
+under time pressure.
+
+**For most of them the residual data is a bare id.** Events registrations,
+volunteer-group memberships, votes, bids, and competition-service's own
+registrations, entries and scores all carry a `MemberId` and nothing else
 about the person — no service outside identity and member-family stores a name
 or a contact, and both of those clear on erasure. So what survives is a GUID
 that resolves to nobody. That is the same de-identification the audit log does
@@ -329,11 +351,14 @@ deliberately, arrived at by construction rather than by design, and it is
 probably sufficient — but "probably" is not a compliance position, and it is
 question 5 below.
 
-Two of those four also have a reason the id must stay. The double-voting
+Some of those also have a reason the id must stay. The double-voting
 guarantee **is** the unique index on `(CampaignId, VoterMemberId)`; removing or
 randomising the voter id would not de-identify a vote so much as re-enable
 voting twice. A Boli bid is a financial record the Samaaj collects against, and
 retention of those is the kind of thing §8(7) contemplates other law requiring.
+competition-service's own `Score` is the same shape as the vote: its unique
+index on `(EntryId, JudgeMemberId)` is what makes recording a mark an upsert
+rather than a race, so the judge id is load-bearing there too.
 
 **For two of them it was not a bare id, and that was the real gap — now
 closed.** `timeline` holds `Post.Body` and `social-issues` holds `Issue.Title`
@@ -469,12 +494,13 @@ These are Data Fiduciary obligations that no amount of code discharges:
 5. Are the Samaaj and the platform operator joint fiduciaries, or is the
    operator a Data Processor? This changes who notifies the Board on a breach.
 6. After erasure, is a bare `MemberId` left behind in a service that holds no
-   name or contact — a registration, a group membership, a vote, a bid —
-   still personal data? Every service that could resolve it to a person has
-   cleared, so nothing on the platform can. If the answer is yes, two of those
-   ids cannot simply be removed: the voter id **is** the double-voting
-   guarantee, and a bid is a financial record. See "Six services shipped
-   without doing that" above.
+   name or contact — a registration, a group membership, a vote, a bid, a
+   competition entry or score — still personal data? Every service that
+   could resolve it to a person has cleared, so nothing on the platform can.
+   If the answer is yes, some of those ids cannot simply be removed: the
+   voter id **is** the double-voting guarantee, a bid is a financial record,
+   and a score's judge id is what makes recording a mark an upsert rather
+   than a race. See "Six services shipped without doing that" above.
 
 7. A member can now leave a household without erasing their account, which
    separates two things that used to move together. If the parent who gave a

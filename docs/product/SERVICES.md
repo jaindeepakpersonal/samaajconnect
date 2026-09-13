@@ -305,6 +305,38 @@ and expose its endpoints behind the gateway at the route prefix shown.
   Visibility is within the caller's own Samaaj only; there is no
   cross-tenant directory or order.
 
+## 14. competition-service
+
+- **First / primary aggregate:** `Competition` (owns registrations, judges
+  and rounds), with `Entry`, `Score` and `RoundResult` as separate,
+  non-owned aggregates
+- **Owns:** Competition (with `CompetitionRegistration`, `CompetitionJudge`
+  and `Round` as owned entities), Entry, Score, RoundResult
+- **Key commands:** `CreateCompetitionCommand`, `MoveCompetitionCommand`,
+  `RegisterForCompetitionCommand`, `WithdrawRegistrationCommand`,
+  `AssignJudgeCommand`, `CreateRoundCommand`, `CloseRoundCommand`,
+  `CreateEntryCommand`, `RecordScoreCommand`, `PublishRoundResultsCommand`
+- **Key queries:** `ListCompetitionsQuery`, `GetCompetitionQuery`,
+  `GetRoundQuery`, `GetRoundResultQuery`
+- **Events published:** `competition.competition.status-changed.v1`,
+  `competition.registration.created.v1`, `competition.round.closed.v1`,
+  `competition.round.results-published.v1`
+- **Events consumed:** none — a leaf service
+- **Gateway route prefix:** `/v1/competitions/**`, module-gated on
+  `competitions` (off by default, the same stance as `boli`/`matrimony`/
+  `businesses`)
+- **Tenant role(s):** new permission `Competition.Manage`, granted to
+  `SamaajAdmin`, for every organiser command; `Members.Read` for
+  registering, withdrawing, scoring as a judge, and every read
+- **Notes:** `Competition.CompetitionTypeId` is a master-data-service
+  `LookupItem` id, `Category = CompetitionType`. There is no automatic
+  advancement between rounds — the organiser creates one `Entry` per
+  round, by hand. A `Score` is an upsert while its round is open, unlike
+  celebrity-voting-service's never-amended `Vote`. Individual judge scores
+  are never shown to an ordinary member, before or after publication —
+  only the published ranking (rank and average) is. Standalone: no
+  dependency on events-service, and no change to it.
+
 ---
 
 ## Inter-service data access rule

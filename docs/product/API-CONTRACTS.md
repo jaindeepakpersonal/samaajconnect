@@ -439,3 +439,34 @@ Directory search and every order are within the caller's own Samaaj only;
 there is no cross-tenant variant. An order's total is computed
 server-side from each product's price at placement time and never
 trusted from the client.
+
+## competition-service — `/v1/competitions`
+
+Module-gated on `competitions`, off by default. New permission
+`Competition.Manage`, granted to `SamaajAdmin`, for every organiser call;
+`Members.Read` for registering, withdrawing, judging and every read — no
+role list of its own, unlike businesses-service, because this service
+does need a genuine organiser-vs-participant split.
+
+| Method | Path | Roles | Purpose |
+|---|---|---|---|
+| GET | `/` | `Members.Read` | This Samaaj's competitions, each with the caller's own registration status |
+| POST | `/` | `Competition.Manage` | Set a competition up. Starts `Draft` |
+| GET | `/{id}` | `Members.Read` | Rounds, registration count, judges, and the currently-registered member ids an organiser picks entries from |
+| POST | `/{id}/status` | `Competition.Manage` | Strictly forward: Draft → RegistrationOpen → RegistrationClosed → InProgress → Closed |
+| POST | `/{id}/registrations` | `Members.Read` | Register the caller. Only while registration is open. A repeat registration is success with `registered: false` |
+| DELETE | `/{id}/registrations/mine` | `Members.Read` | The caller's own withdrawal. Registering again later reactivates the same row |
+| POST | `/{id}/judges` | `Competition.Manage` | Assign a member as judge, or remove one — one call for both directions |
+| POST | `/{id}/rounds` | `Competition.Manage` | Open a new round. No automatic advancement from a previous one |
+| GET | `/{id}/rounds/{roundId}` | `Members.Read` | A round's entries. Marks are visible only to the organiser or an assigned judge |
+| POST | `/{id}/rounds/{roundId}/close` | `Competition.Manage` | Close a round. No new entries or scores after this |
+| POST | `/{id}/rounds/{roundId}/entries` | `Competition.Manage` | Put one registered participant into the round. 409 for a duplicate or an unregistered participant |
+| POST | `/{id}/entries/{entryId}/scores` | `Members.Read`, assigned judge only | Record or correct this judge's mark. An upsert while the round is open, unlike a vote |
+| POST | `/{id}/rounds/{roundId}/results` | `Competition.Manage` | Compute the ranking and freeze it. Only from a closed round; publishing again returns the same frozen result |
+| GET | `/{id}/rounds/{roundId}/results` | `Members.Read` | The published ranking. 404 until it has one |
+
+Standalone from events-service by design — a competition is not an Event.
+No photo endpoint, the same reason businesses-service has none. Individual
+judge marks are never returned to a caller who is neither the organiser
+nor an assigned judge, before or after publication; only the published
+ranking's rank and average are.

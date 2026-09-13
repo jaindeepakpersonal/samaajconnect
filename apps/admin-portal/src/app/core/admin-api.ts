@@ -17,6 +17,10 @@ import {
   CampaignResult,
   CampaignStatus,
   ClassExam,
+  Competition,
+  CompetitionDetail,
+  CompetitionResult,
+  CompetitionStatus,
   ModerationDecision,
   ModerationQueueEntry,
   Enrolment,
@@ -49,6 +53,8 @@ import {
   RegistrationSummary,
   ResultsVisibility,
   RoleMatrix,
+  Round,
+  RoundDetail,
   SamaajEvent,
   SecurityPolicy,
   SocialIssue,
@@ -1015,5 +1021,95 @@ export class AdminApi {
 
   deactivateGautra(id: string): Observable<Gautra> {
     return this.http.post<Gautra>(`/v1/master-data/gautras/${id}/deactivate`, {});
+  }
+
+  // ---- Competitions --------------------------------------------------------
+
+  listCompetitions(): Observable<Competition[]> {
+    return this.http.get<Competition[]>('/v1/competitions');
+  }
+
+  /** Rounds, registration count, judges, and whether the caller may manage it. */
+  competition(id: string): Observable<CompetitionDetail> {
+    return this.http.get<CompetitionDetail>(`/v1/competitions/${id}`);
+  }
+
+  /** Creates a competition. It starts as a draft until registration is opened. */
+  createCompetition(competition: {
+    title: string;
+    description: string | null;
+    competitionTypeId: string | null;
+    registrationStartAt: string;
+    registrationEndAt: string;
+  }): Observable<Competition> {
+    return this.http.post<Competition>('/v1/competitions', competition);
+  }
+
+  /**
+   * Moves a competition on one stage.
+   *
+   * Draft → RegistrationOpen → RegistrationClosed → InProgress → Closed, and
+   * never backwards.
+   */
+  moveCompetition(id: string, status: CompetitionStatus): Observable<Competition> {
+    return this.http.post<Competition>(`/v1/competitions/${id}/status`, { status });
+  }
+
+  /** Assigns a member as a judge, or removes one. One call for both directions. */
+  assignJudge(competitionId: string, memberId: string, assign: boolean): Observable<unknown> {
+    return this.http.post(`/v1/competitions/${competitionId}/judges`, { memberId, assign });
+  }
+
+  /**
+   * Opens a new round.
+   *
+   * There is no automatic advancement between rounds - entries are created one
+   * at a time, in every round including the first.
+   */
+  createRound(competitionId: string, name: string): Observable<Round> {
+    return this.http.post<Round>(`/v1/competitions/${competitionId}/rounds`, { name });
+  }
+
+  /** A round's entries. Marks are visible only to the organiser or an assigned judge. */
+  round(competitionId: string, roundId: string): Observable<RoundDetail> {
+    return this.http.get<RoundDetail>(`/v1/competitions/${competitionId}/rounds/${roundId}`);
+  }
+
+  /** Closes a round. After this, no new entries or scores are accepted. */
+  closeRound(competitionId: string, roundId: string): Observable<Round> {
+    return this.http.post<Round>(`/v1/competitions/${competitionId}/rounds/${roundId}/close`, {});
+  }
+
+  /** Puts one registered participant into a round. */
+  createEntry(
+    competitionId: string,
+    roundId: string,
+    participantMemberId: string,
+  ): Observable<unknown> {
+    return this.http.post(
+      `/v1/competitions/${competitionId}/rounds/${roundId}/entries`,
+      { participantMemberId },
+    );
+  }
+
+  /**
+   * Computes a round's ranking and freezes it. Only from a closed round.
+   *
+   * Publishing again returns the same frozen result rather than an error -
+   * unlike celebrity-voting's campaign result, a repeat call here is not
+   * refused, because there is nothing destructive about asking twice.
+   */
+  publishRoundResults(competitionId: string, roundId: string): Observable<CompetitionResult> {
+    return this.http.post<CompetitionResult>(
+      `/v1/competitions/${competitionId}/rounds/${roundId}/results`,
+      {},
+    );
+  }
+
+  /** The frozen ranking. 404 until it has been published. */
+  roundResult(competitionId: string, roundId: string): Observable<CompetitionResult> {
+    return this.http.get<CompetitionResult>(
+      `/v1/competitions/${competitionId}/rounds/${roundId}/results`,
+    );
   }
 }

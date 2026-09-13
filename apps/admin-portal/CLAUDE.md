@@ -29,6 +29,8 @@ screen. The spec is `docs/product/wireframes/admin-panel-wireframes.html`.
 | Event detail | `/events/:id` | — | built; no wireframe covers one. Who is going, who is waiting, and in what order |
 | Celebrities / Voting | `/voting` | `#celebrity` | built. Campaigns and setting one up |
 | Campaign detail | `/voting/:id` | — | built; no wireframe covers running one. Stage, ballot, nominations, tally, result |
+| Competitions | `/competitions` | — | built; no wireframe covers this new module. Competitions and setting one up |
+| Competition detail | `/competitions/:id` | — | built; no wireframe covers running one. Stage, judges, rounds, entries, publish results |
 | Volunteer Groups | `/groups` | `#groups` (member-facing) | built. Create with a president, and stand one down |
 | Social Issues | `/issues` | `#issues` | built. The reviewer's approval queue |
 | Members | `/members` | `#members` | built. Search the Samaaj directory and open somebody |
@@ -647,6 +649,39 @@ one is not a class this app needed at all: every other form here places a
 label and an input as direct siblings, so the wrapper is gone rather than
 given a rule to keep it consistent with a pattern this app doesn't otherwise
 use.
+
+**Competitions is a new module this cycle, with no wireframe to translate -
+shaped after Celebrities / Voting's own two screens instead.** A
+competition's registration window plays the same role a campaign's
+nomination/voting windows do (`acceptsRegistrations`, status-and-clock
+both), and the detail screen's "one stage, one button" reasoning is
+identical: Draft → RegistrationOpen → RegistrationClosed → InProgress →
+Closed, strictly forward, so the screen offers exactly the one move the
+competition can make rather than four buttons and three refusals.
+
+**Entries are created by the organiser, one at a time, in every round
+including the first - there is no "advance the top N" button anywhere on
+this screen, and that is deliberate.** `Round`'s own doc comment explains
+why: a top-N cutoff has its own edge cases (a tie at the cutoff, a
+withdrawal mid-competition) the backlog never asked for, and "does an
+entry exist for this round" already answers "is this participant still in
+it." The entry picker on a selected round only offers registered members
+who do not already have one, computed client-side from
+`registeredMemberIds` and the round's own entries - the same "let the
+server's shape decide, don't re-derive it" instinct the role matrix screen
+already gets right.
+
+**This screen never shows an individual judge's mark, only a computed
+average.** `RoundDetailResponse.canSeeScores` is true for the organiser
+throughout - the same "an administrator sees the tally regardless" stance
+Celebrities / Voting already takes - and recording an actual score is a
+judge's own act, on member-portal, not something this panel offers at all.
+
+**Publishing a round's result is not confirmed the way a campaign's is.**
+Unlike celebrity-voting-service, publishing a closed round twice returns
+the same frozen result rather than being refused, so there is nothing
+irreversible about a second click to warn against - the button simply
+disappears once `hasPublishedResult` is true.
 
 ## Accessibility
 

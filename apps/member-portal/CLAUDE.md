@@ -34,6 +34,8 @@ before translating another screen.
 | My businesses | `/businesses/mine` | — | built. The caller's own businesses, plus a create form |
 | Manage business | `/businesses/mine/:id` | — | built. Edit fields, activate/deactivate, and product management |
 | Orders | `/businesses/orders` | — | built. Placed/Received tabs |
+| Competitions | `/competitions` | — | built; no wireframe covers this new module. Browse, register, withdraw |
+| Competition detail | `/competitions/:id` | — | built. Rounds and entries, a judging section visible only to an assigned judge, and the published result |
 | Pathshala events | — | `#pathevents` | not built — no endpoint exists |
 | Set your password | `/activate` | — | built; no wireframe covers redeeming an activation code, and three admin screens told people to do it here |
 | Forgot password | `/forgot`, `/reset` | `#forgot`, `#otp` | built — redeems into a new password, not a session |
@@ -746,6 +748,34 @@ filters.** The nominee picker calls the same `MembersApi.search(term)` the
 Members directory uses, capped at the service's own default of 50 - a
 nomination is one member found by name, not a browse, so nothing here needs
 Locality filtering or pagination on top of it.
+
+**Competitions is a new module this cycle, standalone from Events by
+design (the user's own scope decision, not an oversight) - shaped after
+Celebrities of Samaaj's list/detail split, with one deliberate difference.**
+A campaign's ballot shows every candidate's vote count once the tally is
+visible; a competition's entries never show a mark to an ordinary member at
+all, before or after publication - only the published ranking's rank and
+average. `RoundDetailResponse.canSeeScores` is what the screen reads to
+decide, the same "ask the server, don't guess from a role" instinct
+`tallyVisible` already established.
+
+**Judging is a member-portal screen, not an admin-portal one, for the same
+reason accepting a group's join request is a member act rather than an
+admin one.** `CompetitionJudge` grants no platform role - a judge is simply
+a member the organiser named, the identical "the president is just a
+member" shape volunteer-groups-service already uses - so recording a mark
+belongs where an ordinary member's own actions live. The score box is an
+**upsert**, deliberately unlike casting a vote: submitting it again
+corrects the mark rather than being refused, because correcting a
+misrecorded score before judging closes is the ordinary case here, not
+ballot-stuffing.
+
+**Registering, withdrawing, and registering again all reach the same
+underlying row.** `CompetitionRegistration` is reactivated rather than
+duplicated, so a member who withdraws and changes their mind before the
+window closes gets back the same registration rather than a second one -
+mirrored by the screen simply calling `register()` again with no special
+case for "I withdrew earlier."
 
 ## Accessibility
 

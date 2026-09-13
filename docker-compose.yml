@@ -284,6 +284,20 @@ services:
     ports:
       - "5113:8080"
 
+  competition-service:
+    <<: *service-defaults
+    build:
+      context: .
+      dockerfile: services/competition-service/Dockerfile
+    container_name: samaajconnect-competition
+    environment:
+      <<: *service-environment
+      ConnectionStrings__Default: "Host=postgres;Port=5432;Database=samaajconnect_competition;Username=samaajconnect;Password=samaajconnect"
+      Jwt__SigningKey: "${JWT_SIGNING_KEY:-local-development-signing-key-do-not-use-in-production}"
+      Outbox__PollIntervalSeconds: "5"
+    ports:
+      - "5114:8080"
+
   gateway:
     build:
       context: .
@@ -318,6 +332,8 @@ services:
       matrimony-service:
         condition: service_started
       businesses-service:
+        condition: service_started
+      competition-service:
         condition: service_started
     environment:
       ASPNETCORE_ENVIRONMENT: Development

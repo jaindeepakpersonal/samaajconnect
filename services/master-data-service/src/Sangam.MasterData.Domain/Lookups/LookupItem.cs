@@ -116,4 +116,11 @@ public enum LookupCategory
     /// zero-migration story as every category before it.
     /// </summary>
     EventType = 7,
+
+    /// <summary>
+    /// A Samaaj competition's type (Rangoli, Elocution, Quiz, ...), for the
+    /// new competition-service's own `CompetitionTypeId`. Added 2026-09-13,
+    /// the same zero-migration story as every category before it.
+    /// </summary>
+    CompetitionType = 8,
 }

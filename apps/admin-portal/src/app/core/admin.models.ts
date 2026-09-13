@@ -800,3 +800,111 @@ export interface Gautra {
   readonly name: string;
   readonly isActive: boolean;
 }
+
+// ---- Competitions ---------------------------------------------------------
+
+/** Strictly forward. There is no route back. */
+export type CompetitionStatus =
+  | 'Draft'
+  | 'RegistrationOpen'
+  | 'RegistrationClosed'
+  | 'InProgress'
+  | 'Closed';
+
+export type RoundStatus = 'Open' | 'Closed';
+
+/** Mirrors `CompetitionResponse`. */
+export interface Competition {
+  readonly id: string;
+  readonly title: string;
+  readonly description: string | null;
+  readonly competitionTypeId: string | null;
+  readonly registrationStartAt: string;
+  readonly registrationEndAt: string;
+  readonly status: CompetitionStatus;
+
+  /** Right now: the status says so *and* the clock agrees. */
+  readonly acceptsRegistrations: boolean;
+  readonly registrationCount: number;
+
+  /** Null when this caller (the organiser, viewing as themselves) has never registered. */
+  readonly myRegistrationStatus: string | null;
+  readonly isJudge: boolean;
+  readonly createdAt: string;
+}
+
+/** Mirrors `RoundResponse`. */
+export interface Round {
+  readonly id: string;
+  readonly name: string;
+  readonly sequenceNumber: number;
+  readonly status: RoundStatus;
+  readonly createdAt: string;
+  readonly closedAt: string | null;
+  readonly entryCount: number;
+  readonly hasPublishedResult: boolean;
+}
+
+/** Mirrors `JudgeResponse`. */
+export interface CompetitionJudge {
+  readonly id: string;
+  readonly memberId: string;
+  readonly assignedAt: string;
+}
+
+/** Mirrors `CompetitionDetailResponse`. */
+export interface CompetitionDetail {
+  readonly competition: Competition;
+  readonly rounds: readonly Round[];
+  readonly judges: readonly CompetitionJudge[];
+
+  /** Currently-registered member ids, in registration order - what an entry is created from. */
+  readonly registeredMemberIds: readonly string[];
+
+  /** Whether this caller holds `Competition.Manage` - the organiser screen should show its controls. */
+  readonly canManage: boolean;
+}
+
+/**
+ * Mirrors `EntryResponse`.
+ *
+ * `averageScore` and `myScore` are both null for a caller who is neither the
+ * organiser nor an assigned judge - individual marks are never shown to an
+ * ordinary member, before or after publication. On this panel they are null
+ * only when nobody has scored the entry yet.
+ */
+export interface CompetitionEntry {
+  readonly id: string;
+  readonly participantMemberId: string;
+  readonly createdAt: string;
+  readonly averageScore: number | null;
+  readonly myScore: number | null;
+}
+
+/** Mirrors `RoundDetailResponse`. */
+export interface RoundDetail {
+  readonly round: Round;
+  readonly entries: readonly CompetitionEntry[];
+  readonly canSeeScores: boolean;
+}
+
+/** One place in a round's frozen ranking. */
+export interface CompetitionResultEntry {
+  readonly rank: number;
+  readonly entryId: string;
+  readonly participantMemberId: string;
+  readonly averageScore: number;
+}
+
+/**
+ * Mirrors `RoundResultResponse` - the ranking as it was announced.
+ *
+ * Stored, never recomputed: a result that moved after it was announced would be
+ * worse than no result at all.
+ */
+export interface CompetitionResult {
+  readonly roundId: string;
+  readonly ranking: readonly CompetitionResultEntry[];
+  readonly publishedBy: string;
+  readonly publishedAt: string;
+}

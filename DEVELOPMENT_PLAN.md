@@ -8,7 +8,57 @@ version of the plan; the reasoning behind the ordering lives in
 ## Current Status
 
 - **Stage:** every module has a service and member screens; Phase 5 hardening under way
-- **Last updated:** 2026-09-13 - **volunteer-groups-service gained
+- **Last updated:** 2026-09-13 - **a new module, competition-service:
+  Samaaj competitions end to end, module-gated off by default.**
+
+  An organiser sets a competition up, members register while its window is
+  open, the organiser runs it across one or more judged rounds, assigned
+  judges score each entry, and a round's result is computed once and frozen
+  when published. Standalone by design (backlog item #4's own scope
+  decision): no dependency on events-service, and no change to it. Mirrors
+  celebrity-voting-service's `Campaign`/`Candidate`/`Vote` shape for the
+  ranking/tie-break mechanics and boli-service's organiser-permission shape
+  for authorization, without sharing code with either.
+
+  `Competition` (aggregate root) owns bounded `CompetitionRegistration`,
+  `CompetitionJudge` and `Round` collections; `Entry`, `Score` and
+  `RoundResult` are separate, non-owned aggregates for the same
+  load-avoidance reason `Order`/`Vote` are. There is no automatic
+  advancement between rounds - the organiser creates one `Entry` per
+  participant, by hand, in every round including the first. A `Score` is
+  an **upsert** while its round is open, deliberately unlike `Vote`'s
+  never-amend stance - correcting a misrecorded mark is the ordinary case
+  here. Individual judge marks are never shown to an ordinary member,
+  before or after publication; only the published ranking (rank and
+  average) is.
+
+  New permission `Competition.Manage`, minted in identity-tenant-service
+  and granted directly to `SamaajAdmin` (mirroring `CelebrityVoting.Configure`
+  - no dedicated organiser role). master-data-service gained an eighth
+  `LookupItem` category, `CompetitionType`, with no migration needed - the
+  same zero-migration story every category since `Qualification` has had.
+  Wired into the module catalogue (`competitions`), the gateway (port
+  5114), docker-compose, CI's build/test matrix and migrations job,
+  `scripts/smoke-through-gateway.sh`, and `audit-notification-service`'s
+  `KnownEvents.cs` (4 new descriptors).
+
+  New admin-portal screens: Competitions list (create, move status) and
+  Competition detail (judges, rounds, entries, publish results). New
+  member-portal feature folder: Competitions directory and detail (my
+  registration status, each round's entries, judging section visible only
+  to an assigned judge, published results), gated in the shell nav on the
+  new `competitions` module key.
+
+  Verified with competition-service's full unit+integration suite (11 + 20,
+  both green, including a `ScoreIndexTests` proving twenty concurrent
+  upserts from one judge converge on a single row through the unique
+  index), 36 new component specs across both apps (253 admin-portal + 442
+  member-portal, all green), both apps' production builds, `tsc --noEmit`,
+  `scripts/css-class-coverage.sh`, `scripts/uncalled-api-methods.sh`,
+  `scripts/unreachable-endpoints.sh`, `scripts/module-keys.sh`,
+  `scripts/service-coverage.sh`, `scripts/audit-descriptor-coverage.sh`,
+  `scripts/pipeline-order.sh`, `scripts/service-docs.sh`.
+- **Previously:** 2026-09-13 - **volunteer-groups-service gained
   elections: a group's positions are filled by nominate-approve-vote-
   publish, not by the president's own say-so at accept-time.**
 

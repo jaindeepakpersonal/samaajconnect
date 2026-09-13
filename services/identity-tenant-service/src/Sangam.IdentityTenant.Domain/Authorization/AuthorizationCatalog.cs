@@ -63,6 +63,14 @@ public static class AuthorizationCatalog
         /// aggregate master-data-service owns.
         /// </summary>
         public static readonly Guid GautraManage = new("b0000000-0000-0000-0000-000000000018");
+
+        /// <summary>
+        /// Set a competition up, move it, assign judges, manage rounds and
+        /// entries, and publish results. Samaaj-admin-only, the same shape
+        /// `CelebrityVoting.Configure` already has - an organiser permission,
+        /// not a new platform role.
+        /// </summary>
+        public static readonly Guid CompetitionManage = new("b0000000-0000-0000-0000-000000000019");
     }
 
     public static IReadOnlyList<Role> Roles { get; } =
@@ -104,6 +112,7 @@ public static class AuthorizationCatalog
         new(PermissionIds.TenantManageSecurityPolicy, "Tenant.ManageSecurityPolicy"),
         new(PermissionIds.MasterDataManage, "MasterData.Manage"),
         new(PermissionIds.GautraManage, "Gautra.Manage"),
+        new(PermissionIds.CompetitionManage, "Competition.Manage"),
     ];
 
     /// <summary>
@@ -127,6 +136,7 @@ public static class AuthorizationCatalog
         new(RoleIds.SamaajAdmin, PermissionIds.EventsPublish),
         new(RoleIds.SamaajAdmin, PermissionIds.SocialIssuesApprove),
         new(RoleIds.SamaajAdmin, PermissionIds.CelebrityVotingConfigure),
+        new(RoleIds.SamaajAdmin, PermissionIds.CompetitionManage),
 
         // Running a Pathshala - sessions, classes, teacher assignments, placing
         // students - is the Samaaj's job. Only *creating* the master record is

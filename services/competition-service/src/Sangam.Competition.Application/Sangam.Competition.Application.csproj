@@ -1,0 +1,22 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <ItemGroup>
+    <PackageReference Include="MediatR" />
+    <PackageReference Include="FluentValidation" />
+    <PackageReference Include="FluentValidation.DependencyInjectionExtensions" />
+    <PackageReference Include="Microsoft.Extensions.DependencyInjection.Abstractions" />
+    <PackageReference Include="Microsoft.Extensions.Logging.Abstractions" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\Sangam.Competition.Domain\Sangam.Competition.Domain.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <!-- CompetitionMappings (the ranking/tie-break function) is internal but
+         is tested directly rather than only through a handler, mirroring
+         celebrity-voting-service's own CampaignMappingsTests. -->
+    <InternalsVisibleTo Include="Sangam.Competition.UnitTests" />
+  </ItemGroup>
+
+</Project>

@@ -350,3 +350,50 @@ owned outright (no other party has a stake in the row itself, only in the
 `Order`s referencing it by plain id) and de-identifies (strips `Note`)
 every `Order` they placed as a buyer, keeping the row so the business
 owner's own order history is not silently broken.
+
+## 15. Competitions
+
+**Competition** — `Id, TenantId, Title, Description (nullable),
+CompetitionTypeId (nullable, a master-data-service `LookupItem` id,
+`Category = CompetitionType`), RegistrationStartAt, RegistrationEndAt,
+Status (Draft/RegistrationOpen/RegistrationClosed/InProgress/Closed —
+strictly forward), CreatedByMemberId, CreatedAt` — owns
+`CompetitionRegistration`, `CompetitionJudge` and `Round` (all bounded, few
+per competition). Standalone: no reference to events-service.
+
+**CompetitionRegistration** — `Id, CompetitionId, MemberId, Status
+(Registered/Withdrawn), RegisteredAt, WithdrawnAt (nullable)` — one row per
+member per competition; withdrawing then registering again reactivates the
+same row rather than inserting a second one.
+
+**CompetitionJudge** — `Id, CompetitionId, MemberId, AssignedAt` — a member
+the organiser named. Grants no platform role, the same "the president is
+just a member" shape volunteer-groups-service's own group lead already
+takes.
+
+**Round** — `Id, CompetitionId, Name, SequenceNumber, Status
+(Open/Closed), CreatedAt, ClosedAt (nullable)` — no automatic advancement
+between rounds; the organiser creates entries for a round by hand, in every
+round including the first.
+
+**Entry** — `Id, TenantId, RoundId, ParticipantMemberId, CreatedAt` — a
+separate, tenant-scoped aggregate, not owned by `Competition` or `Round`,
+for the same "don't let the busy child balloon the parent" reasoning that
+keeps `Order` its own aggregate rather than nested under `Business`.
+
+**Score** — `Id, TenantId, EntryId, JudgeMemberId, Value (0-100), Comments
+(nullable), CreatedAt, UpdatedAt` — also separate and never loaded by a
+parent, the same reasoning as `Vote`/`Bid`, but an **upsert** while its
+round is open rather than a never-amended record: correcting a misrecorded
+mark before judging closes is the ordinary case here.
+
+**RoundResult** — `Id, TenantId, RoundId, RankedEntryIds (ordered, jsonb),
+PublishedBy, PublishedAt` — the frozen ranking, stored rather than
+recomputed, mirroring celebrity-voting-service's own `CampaignResult`.
+
+Not tenant-crossing: every read and write is scoped to the caller's own
+Samaaj. Individual judge marks are never shown to an ordinary member,
+before or after publication — only the published ranking's rank and
+average are. A leaf service: it consumes nothing and holds no copy of
+another service's data, so account erasure touches nothing here beyond
+what the platform's own tenant isolation already scopes away.

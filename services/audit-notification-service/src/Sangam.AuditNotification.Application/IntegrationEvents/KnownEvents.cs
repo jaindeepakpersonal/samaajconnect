@@ -791,6 +791,35 @@ public static class KnownEvents
             Action: "OrderCancelled",
             EntityName: "Order",
             EntityIdProperty: "orderId"),
+
+        // competition-service, the fourteenth service. Status changes and
+        // round closes/publishes are all the organiser's own act under
+        // Competition.Manage, the same "no distinct actor to name" shape
+        // celebrity-voting.campaign.*.v1 already takes - neither event
+        // carries a separate actor id, so there is none to point at.
+        // Registering is the member's own self-action, the same shape
+        // businesses.business.created.v1 takes: the member is both the
+        // entity and the actor, so no distinct ActorIdProperty either.
+        ["competition.competition.status-changed.v1"] = new(
+            Action: "CompetitionStatusChanged",
+            EntityName: "Competition",
+            EntityIdProperty: "competitionId",
+            BeforeProperties: ["previousStatus"]),
+
+        ["competition.registration.created.v1"] = new(
+            Action: "RegistrationCreated",
+            EntityName: "CompetitionRegistration",
+            EntityIdProperty: "registrationId"),
+
+        ["competition.round.closed.v1"] = new(
+            Action: "RoundClosed",
+            EntityName: "Round",
+            EntityIdProperty: "roundId"),
+
+        ["competition.round.results-published.v1"] = new(
+            Action: "RoundResultsPublished",
+            EntityName: "Round",
+            EntityIdProperty: "roundId"),
     };
 
     public static EventDescriptor Describe(string topic) =>

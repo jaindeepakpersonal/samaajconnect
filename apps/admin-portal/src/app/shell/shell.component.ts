@@ -290,6 +290,10 @@ const NAV: readonly NavGroup[] = [
     items: [{ label: 'Auctions / Boli', route: '/boli' }],
   },
   {
+    heading: 'Competitions',
+    items: [{ label: 'Competitions', route: '/competitions' }],
+  },
+  {
     heading: 'Operations',
     items: [
       { label: 'Notifications', route: '/notifications' },

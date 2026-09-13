@@ -71,6 +71,10 @@ const NAV: readonly NavGroup[] = [
     ],
   },
   {
+    heading: 'Competitions',
+    items: [{ label: 'Competitions', route: '/competitions', moduleKey: ModuleKeys.Competitions }],
+  },
+  {
     heading: 'Account',
     items: [{ label: 'Notifications', route: '/notifications', moduleKey: null }],
   },

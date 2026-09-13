@@ -52,6 +52,9 @@ public static class ModuleCatalog
     /// <summary>Members' own businesses, products and orders between members. Off by default - see Boli's own note.</summary>
     public const string Businesses = "businesses";
 
+    /// <summary>Samaaj competitions: registration, judged rounds and published results. Off by default - see Boli's own note.</summary>
+    public const string Competitions = "competitions";
+
     public static IReadOnlyList<ModuleDescriptor> All { get; } =
     [
         new(Community, "Timeline & Volunteer Groups", DefaultOn: true),
@@ -70,6 +73,10 @@ public static class ModuleCatalog
         // Same reasoning again: a member marketplace is optional, not every
         // Samaaj wants to run one.
         new(Businesses, "Businesses", DefaultOn: false),
+
+        // Same reasoning again: running a competition is optional, not every
+        // Samaaj wants one.
+        new(Competitions, "Competitions", DefaultOn: false),
     ];
 
     public static IReadOnlyList<string> DefaultKeys { get; } =
