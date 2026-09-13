@@ -23,6 +23,8 @@ What is here now:
 | `auth/token.store.ts` | The session, in `sessionStorage` |
 | `media/authed-image.directive.ts` | Puts a platform-hosted image into an `<img>`, fetched with the caller's token |
 | `money/money.ts` | Paise ↔ rupees, and how long a Boli has left |
+| `paging/paginate.ts` | Slices an already-fetched array into a page of `DEFAULT_PAGE_SIZE` (20), clamped into range |
+| `validation/date-range.ts` | "From ≤ to" for a date pair or a numeric pair |
 | `tenant/module-keys.ts` | The closed list of module keys |
 | `tenant/tenant.interceptor.ts` | Rewrites relative API paths to the gateway |
 
@@ -114,3 +116,24 @@ out at their first token renewal.
 programming.** `sessionStorage` throws in private-browsing modes and does not
 exist at all during server-side rendering, which the member portal does. Signing
 in still works when it throws; the session just does not survive a reload.
+
+**A reusable pagination *component* was tried here and abandoned for a concrete,
+tested reason, not a hunch.** `AuthedImageDirective`'s own note above says this
+harness "cannot compile a template" for a host-driven test; a paginator's own
+template is trivial to compile - the actual wall is what a template needs to
+*receive*. Neither `@Input()`/`@Output()` decorators (`TestBed.createComponent`
+throws "Standard Angular field decorators are not supported in JIT mode" the
+instant such a component is instantiated) nor signal `input()`/`output()`
+(`componentRef.setInput('page', 2)` compiles and runs with no error, then
+silently keeps the old value - confirmed by writing and running both variants
+against this exact harness) can be driven through Vitest's JIT compilation the
+way `ng test admin-portal`/`ng test member-portal`'s real ngtsc AOT compiler
+would drive them. A component built this way would very likely work correctly
+once wired into either app - the gap is that nothing in `libs/shared` could
+prove it, which is the one thing a shared module's own spec exists for. So
+pagination stays split: `paging/paginate.ts` (a pure function, needs no input
+binding, tests cleanly here) is shared; the few lines of Prev/Next markup that
+call it are duplicated per screen, styled from each app's own `.pager`/
+`.pager-btn` classes, the same "duplicate a small block, promote it once it
+drifts or repeats enough to be worth it" convention the modal CSS and
+`.row-actions` already follow in admin-portal.

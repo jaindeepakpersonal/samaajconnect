@@ -395,6 +395,50 @@ a.btn {
   overflow-x: auto;
 }
 
+/* Below every paginated grid. `libs/shared`'s `paginate()` does the slicing;
+   this markup is duplicated per screen rather than a shared Angular
+   component, because this app's own Vitest harness cannot verify a
+   component's input bindings (see libs/shared/CLAUDE.md) - kept
+   self-contained rather than reusing `.btn`, whose secondary/small modifiers
+   are already named differently between the two apps. */
+.pager {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+  flex-wrap: wrap;
+  padding: var(--space-3) 0;
+}
+
+.pager-summary {
+  margin: 0;
+  font-size: 13px;
+  color: var(--muted);
+}
+
+.pager-controls {
+  display: flex;
+  gap: var(--space-2);
+}
+
+.pager-btn {
+  padding: 6px 14px;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--line);
+  background: var(--panel);
+  font-size: 13px;
+  cursor: pointer;
+}
+
+.pager-btn:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+.pager-btn:hover:not(:disabled) {
+  background: #edf0f4;
+}
+
 table {
   width: 100%;
   border-collapse: collapse;

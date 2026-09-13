@@ -12,5 +12,7 @@ export * from './auth/auth.service';
 export * from './auth/token.store';
 export * from './media/authed-image.directive';
 export * from './money/money';
+export * from './paging/paginate';
+export * from './validation/date-range';
 export * from './tenant/module-keys';
 export * from './tenant/tenant.interceptor';
