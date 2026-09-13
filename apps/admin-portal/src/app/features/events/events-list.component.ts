@@ -328,24 +328,6 @@ import { isNotFound } from '../../core/http-status';
     .section-head h2 {
       margin: 0;
     }
-
-    .modal-backdrop {
-      position: fixed;
-      inset: 0;
-      background: rgba(23, 32, 42, 0.5);
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      padding: var(--space-4);
-      z-index: 200;
-    }
-
-    .modal-dialog {
-      width: 100%;
-      max-width: 640px;
-      max-height: 90vh;
-      overflow-y: auto;
-    }
   `,
 })
 export class EventsListComponent implements OnInit {

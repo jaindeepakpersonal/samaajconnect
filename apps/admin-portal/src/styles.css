@@ -443,6 +443,29 @@ tbody tr:last-child td {
   max-width: 640px;
 }
 
+/* The create/edit dialog chrome every modal screen shares - backdrop,
+   Escape, Tab focus-trap and focus-return are still each screen's own
+   TypeScript (modalOpen/modalTrigger/onModalKeydown), since that logic is
+   specific to what each form validates and which field gets initial focus.
+   Promoted here from Master Data's and Events' own local styles once a
+   third screen was about to become a third verbatim copy. */
+.modal-backdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(23, 32, 42, 0.5);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: var(--space-4);
+  z-index: 200;
+}
+
+.modal-dialog {
+  width: 100%;
+  max-height: 90vh;
+  overflow-y: auto;
+}
+
 .empty {
   padding: var(--space-5);
   text-align: center;
