@@ -650,6 +650,28 @@ export class AdminApi {
     return this.http.post<SamaajEvent>('/v1/events', event);
   }
 
+  /**
+   * Corrects an event's own details. Allowed on a Draft or a Published
+   * event, refused once it is Cancelled - there is nothing left to correct.
+   * The organiser is not part of this call; reassigning it is a bigger
+   * change than a correction and `UpdateEventCommand` does not take one.
+   */
+  updateEvent(
+    id: string,
+    event: {
+      title: string;
+      description: string | null;
+      startAt: string;
+      endAt: string | null;
+      venue: string | null;
+      eventTypeId: string | null;
+      registrationEnabled: boolean;
+      capacity: number | null;
+    },
+  ): Observable<SamaajEvent> {
+    return this.http.patch<SamaajEvent>(`/v1/events/${id}`, event);
+  }
+
   /** Tells the Samaaj. Separate from creating, because it is a separate decision. */
   publishEvent(id: string): Observable<SamaajEvent> {
     return this.http.post<SamaajEvent>(`/v1/events/${id}/publish`, {});

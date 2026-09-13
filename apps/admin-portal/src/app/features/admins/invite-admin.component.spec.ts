@@ -145,4 +145,83 @@ describe('InviteAdminComponent', () => {
     expect(component.invited()).toBeNull();
     expect(text()).toContain('already has an account');
   });
+
+  // ---- Granting an existing member a role ----------------------------------
+
+  it('searches the member directory rather than the admin roster', () => {
+    component.setMode('existing');
+    component.searchTerm = 'Ravi';
+    component.search();
+
+    const request = http.expectOne(
+      (r) => r.method === 'GET' && r.url === '/v1/members' && r.params.get('term') === 'Ravi',
+    );
+
+    request.flush([
+      { id: 'm5', fullName: 'Ravi Shah' } as never,
+      { id: 'm6', fullName: 'Ravi Mehta' } as never,
+    ]);
+
+    expect(component.searchResults().map((m) => m.fullName)).toEqual(['Ravi Shah', 'Ravi Mehta']);
+  });
+
+  it('grants each checked role with its own call, and reports the outcome', () => {
+    component.setMode('existing');
+    component.selectMember({ id: 'm5', fullName: 'Ravi Shah' } as never);
+    component.toggle('SamaajAdmin');
+    component.grant();
+
+    const request = http.expectOne('/v1/identity/admins/m5/roles/SamaajAdmin');
+    expect(request.request.method).toBe('PUT');
+    expect(request.request.body).toEqual({ granted: true });
+
+    request.flush({
+      userId: 'm5',
+      role: 'SamaajAdmin',
+      granted: true,
+      changed: true,
+      roles: ['SamaajAdmin'],
+    });
+    fixture.detectChanges();
+
+    expect(text()).toContain('Ravi Shah');
+    expect(text()).toContain('SamaajAdmin');
+    expect(text()).toContain('already have a password');
+  });
+
+  it('refuses to grant with nobody selected', () => {
+    component.setMode('existing');
+    component.toggle('SamaajAdmin');
+    component.grant();
+
+    http.expectNone((r) => r.url.startsWith('/v1/identity/admins/'));
+  });
+
+  it('does not offer roles that stayed from the invite form after switching modes', () => {
+    // Selections are per-mode: a role ticked while inviting a new person must
+    // not silently carry over to granting an existing member one.
+    component.toggle('SamaajAdmin');
+    expect(component.selected()).toEqual(['SamaajAdmin']);
+
+    component.setMode('existing');
+
+    expect(component.selected()).toEqual([]);
+  });
+
+  it('keeps a refused grant off the page and lets the member stay selected', () => {
+    component.setMode('existing');
+    component.selectMember({ id: 'm5', fullName: 'Ravi Shah' } as never);
+    component.toggle('SamaajAdmin');
+    component.grant();
+
+    http.expectOne('/v1/identity/admins/m5/roles/SamaajAdmin').flush(
+      { title: 'Forbidden', detail: 'You are not allowed to perform this action.', status: 403 },
+      { status: 403, statusText: 'Forbidden' },
+    );
+    fixture.detectChanges();
+
+    expect(component.granted()).toBeNull();
+    expect(text()).toContain('not allowed');
+    expect(component.selectedMember()?.fullName).toBe('Ravi Shah');
+  });
 });
