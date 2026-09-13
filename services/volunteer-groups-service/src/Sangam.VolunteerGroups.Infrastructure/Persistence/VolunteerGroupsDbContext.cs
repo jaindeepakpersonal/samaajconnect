@@ -3,6 +3,7 @@ using System.Text.Json;
 using Microsoft.EntityFrameworkCore;
 using Sangam.VolunteerGroups.Application.Abstractions;
 using Sangam.VolunteerGroups.Domain.Common;
+using Sangam.VolunteerGroups.Domain.Elections;
 using Sangam.VolunteerGroups.Domain.Groups;
 
 namespace Sangam.VolunteerGroups.Infrastructure.Persistence;
@@ -19,6 +20,12 @@ public sealed class VolunteerGroupsDbContext(
     public DbSet<GroupApplication> Applications => Set<GroupApplication>();
 
     public DbSet<GroupMember> GroupMembers => Set<GroupMember>();
+
+    public DbSet<GroupElection> Elections => Set<GroupElection>();
+
+    public DbSet<ElectionCandidate> ElectionCandidates => Set<ElectionCandidate>();
+
+    public DbSet<Vote> Votes => Set<Vote>();
 
     public DbSet<OutboxMessage> OutboxMessages => Set<OutboxMessage>();
 

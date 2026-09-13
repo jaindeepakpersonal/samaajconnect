@@ -5,7 +5,15 @@ import { ActivatedRoute, provideRouter } from '@angular/router';
 import { API_CONFIG, CurrentUser } from '@samaajconnect/shared';
 import { GroupDetailComponent } from './group-detail.component';
 import { GroupsListComponent } from './groups-list.component';
-import { GroupApplication, GroupDetail, GroupMember, VolunteerGroup } from './groups.models';
+import {
+  Election,
+  ElectionCandidate,
+  ElectionDetail,
+  GroupApplication,
+  GroupDetail,
+  GroupMember,
+  VolunteerGroup,
+} from './groups.models';
 import { Member } from '../members/members.models';
 
 const ME = 'u1';
@@ -78,6 +86,47 @@ function application(overrides: Partial<GroupApplication> = {}): GroupApplicatio
     createdAt: new Date().toISOString(),
     ...overrides,
   };
+}
+
+const SOON = new Date(Date.now() + 7 * 86400000).toISOString();
+
+function election(overrides: Partial<Election> = {}): Election {
+  return {
+    id: 'e1',
+    groupId: 'g1',
+    positionTitle: 'Secretary',
+    nominationStartAt: SOON,
+    nominationEndAt: SOON,
+    votingStartAt: SOON,
+    votingEndAt: SOON,
+    status: 'NominationsOpen',
+    acceptsNominations: true,
+    acceptsVotes: false,
+    myVoteCandidateId: null,
+    candidateCount: 0,
+    winnerMemberId: null,
+    publishedAt: null,
+    createdAt: new Date().toISOString(),
+    ...overrides,
+  };
+}
+
+function candidate(overrides: Partial<ElectionCandidate> = {}): ElectionCandidate {
+  return {
+    id: 'c1',
+    memberId: 'm9',
+    status: 'Nominated',
+    nominatedBy: PRESIDENT,
+    votes: 0,
+    ...overrides,
+  };
+}
+
+function electionDetail(
+  overrides: Partial<Election> = {},
+  candidates: ElectionCandidate[] = [],
+): ElectionDetail {
+  return { election: election(overrides), candidates };
 }
 
 function providers() {
@@ -229,12 +278,17 @@ describe('GroupDetailComponent', () => {
     }
   }
 
-  /** Answers /me and the group; the queue only when the reader leads it. */
-  function load(found: GroupDetail, applications: GroupApplication[] | null = null): void {
+  /** Answers /me, the group and its elections; the queue only when the reader leads it. */
+  function load(
+    found: GroupDetail,
+    applications: GroupApplication[] | null = null,
+    elections: Election[] = [],
+  ): void {
     fixture.detectChanges();
 
     http.expectOne('/v1/identity/me').flush(member);
     http.expectOne('/v1/volunteer-groups/groups/g1').flush(found);
+    http.expectOne('/v1/volunteer-groups/groups/g1/elections').flush(elections);
 
     if (applications !== null) {
       http.expectOne('/v1/volunteer-groups/groups/g1/applications').flush(applications);
@@ -296,6 +350,7 @@ describe('GroupDetailComponent', () => {
     http
       .expectOne('/v1/volunteer-groups/groups/g1')
       .flush(detail({ myApplicationStatus: 'Pending' }));
+    http.expectOne('/v1/volunteer-groups/groups/g1/elections').flush([]);
     fixture.detectChanges();
 
     expect(text()).toContain('Waiting on the president');
@@ -352,17 +407,16 @@ describe('GroupDetailComponent', () => {
     expect(component.pending().map((a) => a.id)).toEqual(['waiting']);
   });
 
-  it('sends the position the president typed alongside the acceptance', () => {
+  it('accepting carries no position - that comes from an election, or a later assignment', () => {
     load(detail({ iAmThePresident: true, iAmAMember: true }), [application()]);
 
-    component.roleDrafts['a1'] = ' Secretary ';
     component.decide(component.pending()[0]!, true);
 
     const request = http.expectOne(
       '/v1/volunteer-groups/groups/g1/applications/a1/decide',
     );
 
-    expect(request.request.body).toEqual({ accept: true, rolePosition: 'Secretary' });
+    expect(request.request.body).toEqual({ accept: true });
 
     request.flush(application({ status: 'Accepted' }));
 
@@ -370,20 +424,21 @@ describe('GroupDetailComponent', () => {
     http
       .expectOne('/v1/volunteer-groups/groups/g1')
       .flush(detail({ iAmThePresident: true, iAmAMember: true, memberCount: 83 }));
+    http.expectOne('/v1/volunteer-groups/groups/g1/elections').flush([]);
     http.expectOne('/v1/volunteer-groups/groups/g1/applications').flush([]);
     fixture.detectChanges();
 
     expect(text()).toContain('Nobody is waiting');
   });
 
-  it('sends no position when the president left the box empty', () => {
+  it('rejecting sends no position either', () => {
     load(detail({ iAmThePresident: true, iAmAMember: true }), [application()]);
 
     component.decide(component.pending()[0]!, false);
 
     expect(
       http.expectOne('/v1/volunteer-groups/groups/g1/applications/a1/decide').request.body,
-    ).toEqual({ accept: false, rolePosition: null });
+    ).toEqual({ accept: false });
   });
 
   it('keeps a refused decision beside its own application', () => {
@@ -415,6 +470,7 @@ describe('GroupDetailComponent', () => {
     http
       .expectOne('/v1/volunteer-groups/groups/g1')
       .flush(detail({ iAmThePresident: true, iAmAMember: true }));
+    http.expectOne('/v1/volunteer-groups/groups/g1/elections').flush([]);
     http
       .expectOne('/v1/volunteer-groups/groups/g1/applications')
       .flush({}, { status: 500, statusText: 'Server Error' });
@@ -586,5 +642,131 @@ describe('GroupDetailComponent', () => {
     load(detail({ myApplicationStatus: 'Pending' }));
 
     expect(text()).toContain('check back here');
+  });
+
+  // ---- Elections ------------------------------------------------------------
+
+  it('lists elections with their stage', () => {
+    load(detail({ iAmThePresident: true, iAmAMember: true }), [], [election()]);
+
+    expect(text()).toContain('Secretary');
+    expect(text()).toContain('Nominations open');
+  });
+
+  it('shows the winner once an election is published', () => {
+    load(
+      detail({ iAmThePresident: true, iAmAMember: true }, [
+        { memberId: 'm9', rolePosition: 'Secretary', joinedAt: new Date().toISOString() },
+      ]),
+      [],
+      [election({ status: 'Published', winnerMemberId: 'm9', publishedAt: new Date().toISOString() })],
+    );
+
+    expect(text()).toContain('Elected:');
+    expect(text()).toContain('Some Member');
+  });
+
+  it('lets the president open an election for a position', () => {
+    load(detail({ iAmThePresident: true, iAmAMember: true }), [], []);
+
+    component.showOpenElection.set(true);
+    component.positionTitle = 'Secretary';
+    component.nominationStartAt = '2026-04-01T00:00';
+    component.nominationEndAt = '2026-04-08T00:00';
+    component.votingStartAt = '2026-04-08T00:00';
+    component.votingEndAt = '2026-04-15T00:00';
+    component.openElection('g1');
+
+    const request = http.expectOne('/v1/volunteer-groups/groups/g1/elections');
+
+    expect(request.request.body.positionTitle).toBe('Secretary');
+
+    request.flush(election());
+    http.expectOne('/v1/volunteer-groups/groups/g1/elections').flush([election()]);
+    fixture.detectChanges();
+
+    expect(component.showOpenElection()).toBe(false);
+    expect(text()).toContain('Secretary');
+  });
+
+  it('expands a ballot, nominates a group member, and the president approves it', () => {
+    load(
+      detail({ iAmThePresident: true, iAmAMember: true }, [
+        { memberId: PRESIDENT, rolePosition: 'President', joinedAt: new Date().toISOString() },
+        { memberId: 'm9', rolePosition: null, joinedAt: new Date().toISOString() },
+      ]),
+      [],
+      [election()],
+    );
+
+    component.toggleElection('e1');
+    http.expectOne('/v1/volunteer-groups/elections/e1').flush(electionDetail());
+    fixture.detectChanges();
+
+    component.setNomineeDraft('e1', 'm9');
+    component.nominate('e1');
+
+    const nominateRequest = http.expectOne('/v1/volunteer-groups/elections/e1/candidates');
+
+    expect(nominateRequest.request.body).toEqual({ memberId: 'm9' });
+
+    nominateRequest.flush({ electionId: 'e1', candidateId: 'c1', memberId: 'm9', nominated: true });
+    http
+      .expectOne('/v1/volunteer-groups/elections/e1')
+      .flush(electionDetail({}, [candidate({ status: 'Nominated' })]));
+    fixture.detectChanges();
+
+    expect(text()).toContain('Some Member');
+
+    component.decideCandidate('e1', 'c1', true);
+
+    const decideRequest = http.expectOne('/v1/volunteer-groups/elections/e1/candidates/c1/decide');
+
+    expect(decideRequest.request.body).toEqual({ approve: true });
+
+    decideRequest.flush(electionDetail({}, [candidate({ status: 'Approved' })]));
+    fixture.detectChanges();
+
+    expect(component.approvedCandidates(component.expandedDetail()!)).toHaveLength(1);
+  });
+
+  it('casts a vote and reflects the tally', () => {
+    load(
+      detail({ iAmThePresident: true, iAmAMember: true }, [
+        { memberId: PRESIDENT, rolePosition: 'President', joinedAt: new Date().toISOString() },
+        { memberId: 'm9', rolePosition: null, joinedAt: new Date().toISOString() },
+      ]),
+      [],
+      [election({ status: 'VotingOpen', acceptsNominations: false, acceptsVotes: true })],
+    );
+
+    component.toggleElection('e1');
+    http
+      .expectOne('/v1/volunteer-groups/elections/e1')
+      .flush(electionDetail(
+        { status: 'VotingOpen', acceptsNominations: false, acceptsVotes: true },
+        [candidate({ status: 'Approved' })],
+      ));
+    fixture.detectChanges();
+
+    component.castVote('e1', 'c1');
+
+    const voteRequest = http.expectOne('/v1/volunteer-groups/elections/e1/votes');
+
+    expect(voteRequest.request.body).toEqual({ candidateId: 'c1' });
+
+    voteRequest.flush({ electionId: 'e1', candidateId: 'c1', accepted: true });
+    http
+      .expectOne('/v1/volunteer-groups/groups/g1/elections')
+      .flush([election({ status: 'VotingOpen', acceptsNominations: false, acceptsVotes: true, myVoteCandidateId: 'c1' })]);
+    http
+      .expectOne('/v1/volunteer-groups/elections/e1')
+      .flush(electionDetail(
+        { status: 'VotingOpen', acceptsNominations: false, acceptsVotes: true, myVoteCandidateId: 'c1' },
+        [candidate({ status: 'Approved', votes: 1 })],
+      ));
+    fixture.detectChanges();
+
+    expect(text()).toContain('Your vote');
   });
 });

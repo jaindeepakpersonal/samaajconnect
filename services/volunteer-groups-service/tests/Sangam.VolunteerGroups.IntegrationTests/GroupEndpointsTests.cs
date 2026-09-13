@@ -254,15 +254,17 @@ public sealed class GroupEndpointsTests(VolunteerGroupsApiFactory factory)
     // ---- Deciding ---------------------------------------------------------
 
     [Fact]
-    public async Task The_president_accepts_and_the_applicant_becomes_a_member()
+    public async Task The_president_accepts_and_the_applicant_becomes_a_member_with_no_position()
     {
+        // Positions come from an election now (or a later manual assignment),
+        // never from the accept itself.
         var id = await CreateGroupAsync();
         await ApplyAsync(Member(), id);
         var applicationId = await PendingApplicationIdAsync(id);
 
         var response = await Manager().PostAsJsonAsync(
             $"/v1/volunteer-groups/groups/{id}/applications/{applicationId}/decide",
-            new { accept = true, rolePosition = "Coordinator" });
+            new { accept = true });
 
         response.StatusCode.Should().Be(HttpStatusCode.OK);
 
@@ -271,8 +273,8 @@ public sealed class GroupEndpointsTests(VolunteerGroupsApiFactory factory)
 
         detail.GetProperty("group").GetProperty("iAmAMember").GetBoolean().Should().BeTrue();
         detail.GetProperty("members").EnumerateArray()
-            .Select(m => m.GetProperty("rolePosition").GetString())
-            .Should().Contain("Coordinator");
+            .Single(m => m.GetProperty("memberId").GetGuid() == ApplicantId)
+            .GetProperty("rolePosition").ValueKind.Should().Be(JsonValueKind.Null);
     }
 
     [Fact]
@@ -289,7 +291,7 @@ public sealed class GroupEndpointsTests(VolunteerGroupsApiFactory factory)
 
         var response = await Manager(userId: Guid.NewGuid()).PostAsJsonAsync(
             $"/v1/volunteer-groups/groups/{id}/applications/{applicationId}/decide",
-            new { accept = true, rolePosition = (string?)null });
+            new { accept = true });
 
         response.StatusCode.Should().Be(HttpStatusCode.NotFound);
     }
@@ -303,10 +305,10 @@ public sealed class GroupEndpointsTests(VolunteerGroupsApiFactory factory)
 
         var url = $"/v1/volunteer-groups/groups/{id}/applications/{applicationId}/decide";
 
-        await Manager().PostAsJsonAsync(url, new { accept = true, rolePosition = (string?)null });
+        await Manager().PostAsJsonAsync(url, new { accept = true });
 
         var again = await Manager().PostAsJsonAsync(
-            url, new { accept = false, rolePosition = (string?)null });
+            url, new { accept = false });
 
         again.StatusCode.Should().Be(HttpStatusCode.NotFound);
     }
@@ -354,7 +356,7 @@ public sealed class GroupEndpointsTests(VolunteerGroupsApiFactory factory)
 
         var decided = await asPresident.PostAsJsonAsync(
             $"/v1/volunteer-groups/groups/{id}/applications/{applicationId}/decide",
-            new { accept = true, rolePosition = "Coordinator" });
+            new { accept = true });
 
         decided.StatusCode.Should().Be(HttpStatusCode.OK);
     }
@@ -368,7 +370,7 @@ public sealed class GroupEndpointsTests(VolunteerGroupsApiFactory factory)
 
         await Manager().PostAsJsonAsync(
             $"/v1/volunteer-groups/groups/{id}/applications/{applicationId}/decide",
-            new { accept = false, rolePosition = (string?)null });
+            new { accept = false });
 
         var queue = await Manager().GetFromJsonAsync<JsonElement>(
             $"/v1/volunteer-groups/groups/{id}/applications");
@@ -387,7 +389,7 @@ public sealed class GroupEndpointsTests(VolunteerGroupsApiFactory factory)
 
         await Manager().PostAsJsonAsync(
             $"/v1/volunteer-groups/groups/{id}/applications/{applicationId}/decide",
-            new { accept = true, rolePosition = (string?)null });
+            new { accept = true });
 
         var url = $"/v1/volunteer-groups/groups/{id}/members/{ApplicantId}/position";
 
@@ -443,7 +445,7 @@ public sealed class GroupEndpointsTests(VolunteerGroupsApiFactory factory)
 
         await Manager().PostAsJsonAsync(
             $"/v1/volunteer-groups/groups/{groupId}/applications/{applicationId}/decide",
-            new { accept = true, rolePosition = (string?)null });
+            new { accept = true });
 
         return member;
     }

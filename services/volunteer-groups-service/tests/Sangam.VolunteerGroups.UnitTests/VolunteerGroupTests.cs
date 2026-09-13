@@ -96,7 +96,7 @@ public sealed class VolunteerGroupTests
         var group = Group();
         var first = group.Apply(ApplicantId, null, Now)!;
 
-        group.DecideApplication(first.Id, accepted: false, PresidentId, null, Now);
+        group.DecideApplication(first.Id, accepted: false, PresidentId, Now);
 
         var second = group.Apply(ApplicantId, null, Now.AddDays(30));
 
@@ -107,17 +107,19 @@ public sealed class VolunteerGroupTests
     // ---- Deciding ---------------------------------------------------------
 
     [Fact]
-    public void Accepting_makes_the_applicant_a_member()
+    public void Accepting_makes_the_applicant_a_member_with_no_position()
     {
+        // Positions come from an election now, or a later manual assignment -
+        // never from the accept itself.
         var group = Group();
         var application = group.Apply(ApplicantId, null, Now)!;
 
-        group.DecideApplication(application.Id, accepted: true, PresidentId, "Coordinator", Now)
+        group.DecideApplication(application.Id, accepted: true, PresidentId, Now)
             .Should().BeTrue();
 
         group.HasMember(ApplicantId).Should().BeTrue();
         group.Members.Single(m => m.MemberId == ApplicantId)
-            .RolePosition.Should().Be("Coordinator");
+            .RolePosition.Should().BeNull();
     }
 
     [Fact]
@@ -126,7 +128,7 @@ public sealed class VolunteerGroupTests
         var group = Group();
         var application = group.Apply(ApplicantId, null, Now)!;
 
-        group.DecideApplication(application.Id, accepted: false, PresidentId, null, Now);
+        group.DecideApplication(application.Id, accepted: false, PresidentId, Now);
 
         group.HasMember(ApplicantId).Should().BeFalse();
         group.FindApplication(application.Id)!.Status.Should().Be(ApplicationStatus.Rejected);
@@ -140,7 +142,7 @@ public sealed class VolunteerGroupTests
         var group = Group();
         var application = group.Apply(ApplicantId, null, Now)!;
 
-        group.DecideApplication(application.Id, accepted: true, PresidentId, null, Now);
+        group.DecideApplication(application.Id, accepted: true, PresidentId, Now);
 
         var decided = group.FindApplication(application.Id)!;
 
@@ -154,9 +156,9 @@ public sealed class VolunteerGroupTests
         var group = Group();
         var application = group.Apply(ApplicantId, null, Now)!;
 
-        group.DecideApplication(application.Id, accepted: true, PresidentId, null, Now);
+        group.DecideApplication(application.Id, accepted: true, PresidentId, Now);
 
-        group.DecideApplication(application.Id, accepted: false, PresidentId, null, Now)
+        group.DecideApplication(application.Id, accepted: false, PresidentId, Now)
             .Should().BeFalse();
         group.HasMember(ApplicantId).Should().BeTrue();
     }
@@ -170,7 +172,7 @@ public sealed class VolunteerGroupTests
         var application = group.Apply(ApplicantId, null, Now)!;
         group.ClearDomainEvents();
 
-        group.DecideApplication(application.Id, accepted: true, PresidentId, null, Now);
+        group.DecideApplication(application.Id, accepted: true, PresidentId, Now);
 
         var raised = group.DomainEvents.Should().ContainSingle()
             .Subject.Should().BeOfType<GroupApplicationDecidedDomainEvent>().Subject;
@@ -204,7 +206,7 @@ public sealed class VolunteerGroupTests
     {
         var group = Group();
         var application = group.Apply(ApplicantId, null, Now)!;
-        group.DecideApplication(application.Id, accepted: true, PresidentId, null, Now);
+        group.DecideApplication(application.Id, accepted: true, PresidentId, Now);
 
         group.AssignRolePosition(ApplicantId, "  Secretary  ", Now).Should().BeTrue();
         group.Members.Single(m => m.MemberId == ApplicantId)
@@ -236,7 +238,7 @@ public sealed class VolunteerGroupTests
         // question asked about the other end of a membership.
         var group = Group();
         group.Apply(ApplicantId, null, Now);
-        group.DecideApplication(group.Applications.Single().Id, accepted: true, PresidentId, null, Now);
+        group.DecideApplication(group.Applications.Single().Id, accepted: true, PresidentId, Now);
         group.ClearDomainEvents();
 
         var removed = group.RemoveMember(ApplicantId, PresidentId, Now.AddDays(1));
@@ -269,7 +271,7 @@ public sealed class VolunteerGroupTests
         var group = Group();
         group.Apply(ApplicantId, null, Now);
         var application = group.Applications.Single();
-        group.DecideApplication(application.Id, accepted: true, PresidentId, null, Now);
+        group.DecideApplication(application.Id, accepted: true, PresidentId, Now);
 
         group.RemoveMember(ApplicantId, PresidentId, Now.AddDays(1));
 
@@ -388,5 +390,61 @@ public sealed class VolunteerGroupTests
 
         raised.PreviousStatus.Should().Be(nameof(GroupStatus.Active));
         raised.Status.Should().Be(nameof(GroupStatus.Inactive));
+    }
+
+    // ---- Installing an election's winner -----------------------------------
+
+    [Fact]
+    public void Electing_installs_the_winner_in_the_position()
+    {
+        var group = Group();
+        var application = group.Apply(ApplicantId, null, Now)!;
+        group.DecideApplication(application.Id, accepted: true, PresidentId, Now);
+
+        group.ElectPosition("Secretary", ApplicantId, Now).Should().BeTrue();
+
+        group.Members.Single(m => m.MemberId == ApplicantId)
+            .RolePosition.Should().Be("Secretary");
+    }
+
+    [Fact]
+    public void Electing_clears_the_same_title_from_whoever_held_it_before()
+    {
+        var group = Group();
+        var firstSecretary = Guid.NewGuid();
+        group.DecideApplication(group.Apply(firstSecretary, null, Now)!.Id, true, PresidentId, Now);
+        group.AssignRolePosition(firstSecretary, "Secretary", Now);
+
+        var newSecretary = Guid.NewGuid();
+        group.DecideApplication(group.Apply(newSecretary, null, Now)!.Id, true, PresidentId, Now);
+
+        group.ElectPosition("Secretary", newSecretary, Now);
+
+        group.Members.Single(m => m.MemberId == firstSecretary).RolePosition.Should().BeNull();
+        group.Members.Single(m => m.MemberId == newSecretary).RolePosition.Should().Be("Secretary");
+    }
+
+    [Fact]
+    public void Electing_one_position_leaves_a_different_one_alone()
+    {
+        var group = Group();
+        var treasurer = Guid.NewGuid();
+        group.DecideApplication(group.Apply(treasurer, null, Now)!.Id, true, PresidentId, Now);
+        group.AssignRolePosition(treasurer, "Treasurer", Now);
+
+        var newSecretary = Guid.NewGuid();
+        group.DecideApplication(group.Apply(newSecretary, null, Now)!.Id, true, PresidentId, Now);
+
+        group.ElectPosition("Secretary", newSecretary, Now);
+
+        group.Members.Single(m => m.MemberId == treasurer).RolePosition.Should().Be("Treasurer");
+    }
+
+    [Fact]
+    public void Electing_somebody_no_longer_in_the_group_is_refused()
+    {
+        var group = Group();
+
+        group.ElectPosition("Secretary", Guid.NewGuid(), Now).Should().BeFalse();
     }
 }

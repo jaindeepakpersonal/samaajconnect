@@ -144,8 +144,7 @@ public static class GroupEndpoints
                 ISender sender,
                 CancellationToken cancellationToken) =>
             {
-                var command = new DecideApplicationCommand(
-                    id, applicationId, request.Accept, request.RolePosition);
+                var command = new DecideApplicationCommand(id, applicationId, request.Accept);
 
                 var result = await sender.Send(command, cancellationToken);
 
@@ -153,7 +152,7 @@ public static class GroupEndpoints
             })
             .RequireAuthorization()
             .WithName("DecideApplication")
-            .WithSummary("Accept or reject an application, optionally giving a position with it.")
+            .WithSummary("Accept or reject an application.")
             .Produces<GroupApplicationResponse>()
             .ProducesValidationProblem()
             .ProducesProblem(StatusCodes.Status401Unauthorized)
@@ -243,7 +242,7 @@ public static class GroupEndpoints
     /// endpoint whose safest value is implicit is one where a mistyped request
     /// quietly admits somebody.
     /// </summary>
-    public sealed record DecideRequest(bool Accept, string? RolePosition);
+    public sealed record DecideRequest(bool Accept);
 
     /// <summary>A null position clears it.</summary>
     public sealed record PositionRequest(string? RolePosition);

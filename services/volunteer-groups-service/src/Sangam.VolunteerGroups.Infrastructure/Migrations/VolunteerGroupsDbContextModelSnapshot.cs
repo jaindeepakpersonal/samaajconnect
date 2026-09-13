@@ -22,6 +22,161 @@ namespace Sangam.VolunteerGroups.Infrastructure.Migrations
 
             NpgsqlModelBuilderExtensions.UseIdentityByDefaultColumns(modelBuilder);
 
+            modelBuilder.Entity("Sangam.VolunteerGroups.Domain.Elections.ElectionCandidate", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<DateTimeOffset?>("ApprovedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("approved_at");
+
+                    b.Property<Guid?>("ApprovedBy")
+                        .HasColumnType("uuid")
+                        .HasColumnName("approved_by");
+
+                    b.Property<Guid>("ElectionId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("election_id");
+
+                    b.Property<Guid?>("GroupElectionId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("group_election_id");
+
+                    b.Property<Guid>("MemberId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("member_id");
+
+                    b.Property<DateTimeOffset>("NominatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("nominated_at");
+
+                    b.Property<Guid>("NominatedBy")
+                        .HasColumnType("uuid")
+                        .HasColumnName("nominated_by");
+
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)")
+                        .HasColumnName("status");
+
+                    b.HasKey("Id")
+                        .HasName("pk_election_candidates");
+
+                    b.HasIndex("GroupElectionId")
+                        .HasDatabaseName("ix_election_candidates_group_election_id");
+
+                    b.HasIndex("ElectionId", "MemberId")
+                        .IsUnique()
+                        .HasDatabaseName("ix_election_candidates_election_id_member_id");
+
+                    b.ToTable("election_candidates", (string)null);
+                });
+
+            modelBuilder.Entity("Sangam.VolunteerGroups.Domain.Elections.GroupElection", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<DateTimeOffset?>("ClosedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("closed_at");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at");
+
+                    b.Property<Guid>("GroupId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("group_id");
+
+                    b.Property<DateTimeOffset>("NominationEndAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("nomination_end_at");
+
+                    b.Property<DateTimeOffset>("NominationStartAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("nomination_start_at");
+
+                    b.Property<string>("PositionTitle")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)")
+                        .HasColumnName("position_title");
+
+                    b.Property<DateTimeOffset?>("PublishedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("published_at");
+
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)")
+                        .HasColumnName("status");
+
+                    b.Property<Guid>("TenantId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("tenant_id");
+
+                    b.Property<DateTimeOffset>("VotingEndAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("voting_end_at");
+
+                    b.Property<DateTimeOffset>("VotingStartAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("voting_start_at");
+
+                    b.Property<Guid?>("WinnerMemberId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("winner_member_id");
+
+                    b.HasKey("Id")
+                        .HasName("pk_group_elections");
+
+                    b.HasIndex("GroupId", "Status")
+                        .HasDatabaseName("ix_group_elections_group_id_status");
+
+                    b.ToTable("group_elections", (string)null);
+                });
+
+            modelBuilder.Entity("Sangam.VolunteerGroups.Domain.Elections.Vote", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<Guid>("CandidateId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("candidate_id");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at");
+
+                    b.Property<Guid>("ElectionId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("election_id");
+
+                    b.Property<Guid>("VoterMemberId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("voter_member_id");
+
+                    b.HasKey("Id")
+                        .HasName("pk_election_votes");
+
+                    b.HasIndex("ElectionId", "CandidateId")
+                        .HasDatabaseName("ix_election_votes_election_id_candidate_id");
+
+                    b.HasIndex("ElectionId", "VoterMemberId")
+                        .IsUnique()
+                        .HasDatabaseName("ix_election_votes_election_id_voter_member_id");
+
+                    b.ToTable("election_votes", (string)null);
+                });
+
             modelBuilder.Entity("Sangam.VolunteerGroups.Domain.Groups.GroupApplication", b =>
                 {
                     b.Property<Guid>("Id")
@@ -213,6 +368,21 @@ namespace Sangam.VolunteerGroups.Infrastructure.Migrations
                     b.ToTable("outbox_messages", (string)null);
                 });
 
+            modelBuilder.Entity("Sangam.VolunteerGroups.Domain.Elections.ElectionCandidate", b =>
+                {
+                    b.HasOne("Sangam.VolunteerGroups.Domain.Elections.GroupElection", null)
+                        .WithMany("Candidates")
+                        .HasForeignKey("ElectionId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired()
+                        .HasConstraintName("fk_election_candidates_group_elections_election_id");
+
+                    b.HasOne("Sangam.VolunteerGroups.Domain.Elections.GroupElection", null)
+                        .WithMany("Ballot")
+                        .HasForeignKey("GroupElectionId")
+                        .HasConstraintName("fk_election_candidates_elections_group_election_id");
+                });
+
             modelBuilder.Entity("Sangam.VolunteerGroups.Domain.Groups.GroupApplication", b =>
                 {
                     b.HasOne("Sangam.VolunteerGroups.Domain.Groups.VolunteerGroup", null)
@@ -231,6 +401,13 @@ namespace Sangam.VolunteerGroups.Infrastructure.Migrations
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired()
                         .HasConstraintName("fk_group_members_volunteer_groups_group_id");
+                });
+
+            modelBuilder.Entity("Sangam.VolunteerGroups.Domain.Elections.GroupElection", b =>
+                {
+                    b.Navigation("Ballot");
+
+                    b.Navigation("Candidates");
                 });
 
             modelBuilder.Entity("Sangam.VolunteerGroups.Domain.Groups.VolunteerGroup", b =>

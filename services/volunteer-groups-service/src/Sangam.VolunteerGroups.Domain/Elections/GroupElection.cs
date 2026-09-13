@@ -1,0 +1,254 @@
+using Sangam.VolunteerGroups.Domain.Common;
+using Sangam.VolunteerGroups.Domain.Elections.Events;
+
+namespace Sangam.VolunteerGroups.Domain.Elections;
+
+/// <summary>
+/// An election for one position within one volunteer group: a nomination
+/// window, a voting window, and - once closed - a single winner.
+/// </summary>
+/// <remarks>
+/// Copies the shape of celebrity-voting-service's <c>VotingCampaign</c>
+/// rather than sharing code with it: that service runs one platform-wide
+/// award with a ranked top-N result; this one runs one group's one position
+/// with exactly one winner, and the two are different enough shapes that
+/// coupling them would cost more than the duplication saves.
+///
+/// <b>Votes are deliberately not part of this aggregate</b>, for the same
+/// reason <c>VotingCampaign</c>'s own votes are not: a <see cref="Vote"/> is
+/// written directly, its uniqueness enforced by a database index rather than
+/// anything held in memory, and the tally is a GROUP BY rather than a count
+/// over a loaded collection. A volunteer group is smaller than a Samaaj, but
+/// the shape of the mistake - loading every vote to cast one more - is the
+/// same mistake at a smaller scale, and there is no reason to make it just
+/// because the size makes it survivable today.
+/// </remarks>
+public sealed class GroupElection : AggregateRoot, ITenantScopedEntity
+{
+    private readonly List<ElectionCandidate> _candidates = [];
+
+    public Guid Id { get; private set; }
+    public Guid TenantId { get; private set; }
+
+    /// <summary>The group this election fills a position for. A plain reference - see CLAUDE.md.</summary>
+    public Guid GroupId { get; private set; }
+
+    /// <summary>
+    /// What is being elected - Secretary, Coordinator. Free text, the same
+    /// label <c>GroupMember.RolePosition</c> already holds; not a closed
+    /// list, for the identical reason that field is not one.
+    /// </summary>
+    public string PositionTitle { get; private set; } = null!;
+
+    public DateTimeOffset NominationStartAt { get; private set; }
+    public DateTimeOffset NominationEndAt { get; private set; }
+    public DateTimeOffset VotingStartAt { get; private set; }
+    public DateTimeOffset VotingEndAt { get; private set; }
+
+    public ElectionStatus Status { get; private set; }
+    public DateTimeOffset CreatedAt { get; private set; }
+    public DateTimeOffset? ClosedAt { get; private set; }
+
+    /// <summary>Set once, by <see cref="Publish"/>. Null until then.</summary>
+    public Guid? WinnerMemberId { get; private set; }
+
+    public DateTimeOffset? PublishedAt { get; private set; }
+
+    public IReadOnlyCollection<ElectionCandidate> Candidates => _candidates.AsReadOnly();
+
+    private GroupElection() { }   // EF Core
+
+    public static GroupElection Open(
+        Guid tenantId,
+        Guid groupId,
+        string positionTitle,
+        DateTimeOffset nominationStartAt,
+        DateTimeOffset nominationEndAt,
+        DateTimeOffset votingStartAt,
+        DateTimeOffset votingEndAt,
+        DateTimeOffset now)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(positionTitle);
+
+        return new GroupElection
+        {
+            Id = Guid.NewGuid(),
+            TenantId = tenantId,
+            GroupId = groupId,
+            PositionTitle = positionTitle.Trim(),
+            NominationStartAt = nominationStartAt,
+            NominationEndAt = nominationEndAt,
+            VotingStartAt = votingStartAt,
+            VotingEndAt = votingEndAt,
+            Status = ElectionStatus.Draft,
+            CreatedAt = now,
+        };
+    }
+
+    public ElectionCandidate? FindCandidate(Guid candidateId) =>
+        _candidates.FirstOrDefault(c => c.Id == candidateId);
+
+    public ElectionCandidate? FindCandidateForMember(Guid memberId) =>
+        _candidates.FirstOrDefault(c => c.MemberId == memberId);
+
+    public bool HasCandidateFor(Guid memberId) => _candidates.Any(c => c.MemberId == memberId);
+
+    /// <summary>Nominations are open now: the election says so, and the clock agrees.</summary>
+    public bool AcceptsNominations(DateTimeOffset now) =>
+        Status == ElectionStatus.NominationsOpen
+        && now >= NominationStartAt
+        && now < NominationEndAt;
+
+    public bool AcceptsVotes(DateTimeOffset now) =>
+        Status == ElectionStatus.VotingOpen
+        && now >= VotingStartAt
+        && now < VotingEndAt;
+
+    /// <summary>
+    /// Moves the election on. Returns false when the move is not one this
+    /// election can make.
+    /// </summary>
+    /// <remarks>
+    /// Strictly forward - Draft -> NominationsOpen -> VotingOpen -> Closed ->
+    /// Published - the identical sequence and the identical reasoning
+    /// <c>VotingCampaign.MoveTo</c> already uses: an election that can go
+    /// backwards is not an election.
+    /// </remarks>
+    public bool MoveTo(ElectionStatus target, DateTimeOffset now)
+    {
+        var allowed = Status switch
+        {
+            ElectionStatus.Draft => target == ElectionStatus.NominationsOpen,
+            ElectionStatus.NominationsOpen => target == ElectionStatus.VotingOpen,
+            ElectionStatus.VotingOpen => target == ElectionStatus.Closed,
+            _ => false,
+        };
+
+        if (!allowed)
+        {
+            return false;
+        }
+
+        var previous = Status;
+        Status = target;
+
+        if (target == ElectionStatus.Closed)
+        {
+            ClosedAt = now;
+            Raise(new GroupElectionClosedDomainEvent(Id, TenantId, GroupId, now));
+        }
+
+        Raise(new GroupElectionStatusChangedDomainEvent(
+            Id, TenantId, GroupId, previous.ToString(), target.ToString(), now));
+
+        return true;
+    }
+
+    /// <summary>
+    /// Puts a group member forward. Returns null when nominations are not
+    /// open, or when this member already has a candidacy.
+    /// </summary>
+    /// <remarks>
+    /// Whether <paramref name="memberId"/> is actually a member of this
+    /// election's group is not this aggregate's to check - it does not hold
+    /// the group's own member list - so the handler checks it against the
+    /// loaded <c>VolunteerGroup</c> before calling this.
+    /// </remarks>
+    public ElectionCandidate? Nominate(Guid memberId, Guid nominatedBy, DateTimeOffset now)
+    {
+        if (!AcceptsNominations(now) || HasCandidateFor(memberId))
+        {
+            return null;
+        }
+
+        var candidate = new ElectionCandidate(Id, memberId, nominatedBy, now);
+
+        _candidates.Add(candidate);
+
+        return candidate;
+    }
+
+    /// <summary>Approves a nomination onto the ballot. False when there is none, or it already is.</summary>
+    public bool ApproveCandidate(Guid candidateId, Guid approvedBy, DateTimeOffset now)
+    {
+        var candidate = FindCandidate(candidateId);
+
+        if (candidate is null || candidate.Status == CandidateStatus.Approved)
+        {
+            return false;
+        }
+
+        candidate.Approve(approvedBy, now);
+
+        return true;
+    }
+
+    /// <summary>Removes a nomination before the ballot is set.</summary>
+    public bool RejectCandidate(Guid candidateId, DateTimeOffset now)
+    {
+        if (Status is ElectionStatus.VotingOpen or ElectionStatus.Closed or ElectionStatus.Published)
+        {
+            // The ballot is set. Removing now would discard votes already cast.
+            return false;
+        }
+
+        var candidate = FindCandidate(candidateId);
+
+        if (candidate is null)
+        {
+            return false;
+        }
+
+        _candidates.Remove(candidate);
+
+        return true;
+    }
+
+    /// <summary>Candidates on the ballot: approved, in nomination order.</summary>
+    public IReadOnlyList<ElectionCandidate> Ballot =>
+        [.. _candidates
+            .Where(c => c.Status == CandidateStatus.Approved)
+            .OrderBy(c => c.NominatedAt)];
+
+    /// <summary>
+    /// Picks the winner by tally, tie-broken by earliest nomination - the
+    /// identical tie-break <c>VotingCampaign.RankBy</c> already uses, held by
+    /// the same two mechanisms agreeing: this ordering, and the stable sort
+    /// LINQ's own <c>OrderBy</c> already performs.
+    /// </summary>
+    public ElectionCandidate? WinnerBy(IReadOnlyDictionary<Guid, int> tally) =>
+        Ballot
+            .OrderByDescending(c => tally.GetValueOrDefault(c.Id))
+            .ThenBy(c => c.NominatedAt)
+            .FirstOrDefault();
+
+    /// <summary>
+    /// Freezes the winner and moves to Published. Only from Closed. Returns
+    /// false on a second attempt - publishing twice would leave "the result"
+    /// with no single referent.
+    /// </summary>
+    public bool Publish(Guid winnerMemberId, DateTimeOffset now)
+    {
+        if (Status != ElectionStatus.Closed)
+        {
+            return false;
+        }
+
+        Status = ElectionStatus.Published;
+        WinnerMemberId = winnerMemberId;
+        PublishedAt = now;
+
+        Raise(new GroupElectionResultsPublishedDomainEvent(Id, TenantId, GroupId, winnerMemberId, now));
+
+        return true;
+    }
+}
+
+public enum ElectionStatus
+{
+    Draft = 1,
+    NominationsOpen = 2,
+    VotingOpen = 3,
+    Closed = 4,
+    Published = 5,
+}

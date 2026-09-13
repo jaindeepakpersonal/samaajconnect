@@ -1944,12 +1944,14 @@ fi
 check "a Samaaj admin who is not this president cannot decide it" 404 \
   "$(status -X POST "$GATEWAY/v1/volunteer-groups/groups/$GROUP_ID/applications/$APPLICATION_ID/decide" \
      -H 'Content-Type: application/json' -H "Authorization: Bearer $ADMIN_TOKEN" \
-     -H "$ADMIN_TENANT_HEADER" -d '{"accept":true,"rolePosition":null}')"
+     -H "$ADMIN_TENANT_HEADER" -d '{"accept":true}')"
 
+# Accepting carries no position, as of 2026-09-12 - positions come from an
+# election now (see below), or from a later AssignRolePositionCommand call.
 check "the president accepts it" 200 \
   "$(status -X POST "$GATEWAY/v1/volunteer-groups/groups/$GROUP_ID/applications/$APPLICATION_ID/decide" \
      -H 'Content-Type: application/json' -H "Authorization: Bearer $MEMBER_TOKEN" \
-     -d '{"accept":true,"rolePosition":"Coordinator"}')"
+     -d '{"accept":true}')"
 
 if curl -s -H "Authorization: Bearer $CHILD_TOKEN" \
    "$GATEWAY/v1/volunteer-groups/groups/$GROUP_ID" | grep -q '"iAmAMember":true'; then
@@ -1963,12 +1965,101 @@ fi
 check "deciding the same application twice is refused" 404 \
   "$(status -X POST "$GATEWAY/v1/volunteer-groups/groups/$GROUP_ID/applications/$APPLICATION_ID/decide" \
      -H 'Content-Type: application/json' -H "Authorization: Bearer $MEMBER_TOKEN" \
-     -d '{"accept":false,"rolePosition":null}')"
+     -d '{"accept":false}')"
 
 check "the president assigns a position" 200 \
   "$(status -X PUT "$GATEWAY/v1/volunteer-groups/groups/$GROUP_ID/members/$CHILD_USER_ID/position" \
      -H 'Content-Type: application/json' -H "Authorization: Bearer $MEMBER_TOKEN" \
      -d '{"rolePosition":"Secretary"}')"
+
+# ---- An election, end to end -----------------------------------------------
+#
+# No test clock at this level either, so nominations open now and close three
+# seconds later, exactly when voting opens - the same real-clock-gap shape
+# ElectionEndpointsTests uses, because the validator refuses an overlapping
+# window (voting must start at or after nominations close).
+NOW_ISO=$(date -u +"%Y-%m-%dT%H:%M:%S.000Z")
+NOMINATION_END_ISO=$(date -u -d '+3 seconds' +"%Y-%m-%dT%H:%M:%S.000Z" 2>/dev/null \
+  || date -u -v+3S +"%Y-%m-%dT%H:%M:%S.000Z")
+VOTING_END_ISO=$(date -u -d '+10 minutes' +"%Y-%m-%dT%H:%M:%S.000Z" 2>/dev/null \
+  || date -u -v+10M +"%Y-%m-%dT%H:%M:%S.000Z")
+
+ELECTION=$(curl -s -X POST "$GATEWAY/v1/volunteer-groups/groups/$GROUP_ID/elections" \
+  -H 'Content-Type: application/json' -H "Authorization: Bearer $MEMBER_TOKEN" \
+  -d "{\"positionTitle\":\"Secretary\",\"nominationStartAt\":\"$NOW_ISO\",\"nominationEndAt\":\"$NOMINATION_END_ISO\",\"votingStartAt\":\"$NOMINATION_END_ISO\",\"votingEndAt\":\"$VOTING_END_ISO\"}")
+
+ELECTION_ID=$(printf '%s' "$ELECTION" | json_field id)
+
+if [ -n "$ELECTION_ID" ]; then
+  echo "  ok    the president opens an election for Secretary"
+  pass=$((pass + 1))
+else
+  echo "  FAIL  opening an election ($ELECTION)"
+  fail=$((fail + 1))
+fi
+
+require_id election_id "$ELECTION_ID"
+
+check "nominations open" 200 \
+  "$(status -X POST "$GATEWAY/v1/volunteer-groups/elections/$ELECTION_ID/status" \
+     -H 'Content-Type: application/json' -H "Authorization: Bearer $MEMBER_TOKEN" \
+     -d '{"status":"NominationsOpen"}')"
+
+check "a non-member cannot be nominated" 409 \
+  "$(status -X POST "$GATEWAY/v1/volunteer-groups/elections/$ELECTION_ID/candidates" \
+     -H 'Content-Type: application/json' -H "Authorization: Bearer $MEMBER_TOKEN" \
+     -d "{\"memberId\":\"$(uuidgen 2>/dev/null || echo 00000000-0000-0000-0000-000000000000)\"}")"
+
+CANDIDATE=$(curl -s -X POST "$GATEWAY/v1/volunteer-groups/elections/$ELECTION_ID/candidates" \
+  -H 'Content-Type: application/json' -H "Authorization: Bearer $MEMBER_TOKEN" \
+  -d "{\"memberId\":\"$CHILD_USER_ID\"}")
+
+CANDIDATE_ID=$(printf '%s' "$CANDIDATE" | json_field candidateId)
+
+require_id candidate_id "$CANDIDATE_ID"
+
+check "the president approves the nomination" 200 \
+  "$(status -X POST "$GATEWAY/v1/volunteer-groups/elections/$ELECTION_ID/candidates/$CANDIDATE_ID/decide" \
+     -H 'Content-Type: application/json' -H "Authorization: Bearer $MEMBER_TOKEN" \
+     -d '{"approve":true}')"
+
+# Waiting out the nomination window - see the remark above.
+sleep 4
+
+check "voting opens" 200 \
+  "$(status -X POST "$GATEWAY/v1/volunteer-groups/elections/$ELECTION_ID/status" \
+     -H 'Content-Type: application/json' -H "Authorization: Bearer $MEMBER_TOKEN" \
+     -d '{"status":"VotingOpen"}')"
+
+check "the president (a group member) casts a vote" 200 \
+  "$(status -X POST "$GATEWAY/v1/volunteer-groups/elections/$ELECTION_ID/votes" \
+     -H 'Content-Type: application/json' -H "Authorization: Bearer $MEMBER_TOKEN" \
+     -d "{\"candidateId\":\"$CANDIDATE_ID\"}")"
+
+check "voting is closed" 200 \
+  "$(status -X POST "$GATEWAY/v1/volunteer-groups/elections/$ELECTION_ID/status" \
+     -H 'Content-Type: application/json' -H "Authorization: Bearer $MEMBER_TOKEN" \
+     -d '{"status":"Closed"}')"
+
+PUBLISHED=$(curl -s -X POST "$GATEWAY/v1/volunteer-groups/elections/$ELECTION_ID/publish" \
+  -H 'Content-Type: application/json' -H "Authorization: Bearer $MEMBER_TOKEN" -d '{}')
+
+if printf '%s' "$PUBLISHED" | grep -q "\"winnerMemberId\":\"$CHILD_USER_ID\""; then
+  echo "  ok    publishing names the winner"
+  pass=$((pass + 1))
+else
+  echo "  FAIL  publishing the election ($PUBLISHED)"
+  fail=$((fail + 1))
+fi
+
+if curl -s -H "Authorization: Bearer $MEMBER_TOKEN" "$GATEWAY/v1/volunteer-groups/groups/$GROUP_ID" \
+   | grep -q "\"memberId\":\"$CHILD_USER_ID\",\"rolePosition\":\"Secretary\""; then
+  echo "  ok    and installs them as Secretary on the group's own roster"
+  pass=$((pass + 1))
+else
+  echo "  FAIL  the elected winner is not reflected on the roster"
+  fail=$((fail + 1))
+fi
 
 # VolunteerGroup.RemoveMember and .ChangePresident both existed and were called
 # from nowhere until 2026-09-05 - a president could accept an application and

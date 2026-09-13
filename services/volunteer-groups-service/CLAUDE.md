@@ -16,6 +16,9 @@ module off takes both away.
 | `VolunteerGroup` | built | Tenant-scoped. The join flow is the substance of it. |
 | `GroupApplication` | built | A request and its outcome. Kept after the decision. |
 | `GroupMember` | built | Somebody who is in the group, with an optional position. |
+| `GroupElection` | built | Aggregate root. An election for one position in one group - nominate, approve, vote, close, publish. See "Elections" below. |
+| `ElectionCandidate` | built | Owned by `GroupElection`. Nominated, then Approved onto the ballot. |
+| `Vote` | built | One member's one vote in one election. Written directly, outside the aggregate - see "The guarantee" below. |
 
 ## Commands
 
@@ -28,6 +31,12 @@ module off takes both away.
 | `AssignRolePositionCommand` | `VolunteerGroups.Lead` + is this group's president | built |
 | `RemoveGroupMemberCommand` | `VolunteerGroups.Lead` + is this group's president | built |
 | `ChangeGroupPresidentCommand` | `VolunteerGroups.Manage` | built |
+| `OpenElectionCommand` | `VolunteerGroups.Lead` + is this group's president | built |
+| `MoveElectionCommand` | `VolunteerGroups.Lead` + is this group's president | built |
+| `NominateCandidateCommand` | `VolunteerGroups.Lead` + caller is a member of the group | built |
+| `DecideCandidateCommand` | `VolunteerGroups.Lead` + is this group's president | built |
+| `CastVoteCommand` | `VolunteerGroups.Lead` + caller is a member of the group | built |
+| `PublishElectionResultsCommand` | `VolunteerGroups.Lead` + is this group's president | built |
 
 ## Queries
 
@@ -36,6 +45,8 @@ module off takes both away.
 | `ListGroupsQuery` | `Members.Read` | built |
 | `GetGroupQuery` | `Members.Read` | built |
 | `GetApplicationsQuery` | `VolunteerGroups.Lead` + is this group's president | built |
+| `ListElectionsQuery` | `Members.Read` | built |
+| `GetElectionQuery` | `Members.Read` | built |
 
 ## Events published
 
@@ -44,10 +55,13 @@ module off takes both away.
 | `GroupCreatedDomainEvent` | `volunteer-groups.group.created.v1` | `VolunteerGroup.Create` |
 | `GroupApplicationSubmittedDomainEvent` | `volunteer-groups.application.submitted.v1` | `VolunteerGroup.Apply` |
 | `GroupApplicationDecidedDomainEvent` | `volunteer-groups.application.decided.v1` | `VolunteerGroup.DecideApplication` |
-| `GroupRolePositionAssignedDomainEvent` | `volunteer-groups.role-position.assigned.v1` | `VolunteerGroup.AssignRolePosition` |
+| `GroupRolePositionAssignedDomainEvent` | `volunteer-groups.role-position.assigned.v1` | `VolunteerGroup.AssignRolePosition`, `VolunteerGroup.ElectPosition` |
 | `GroupMemberRemovedDomainEvent` | `volunteer-groups.member.removed.v1` | `VolunteerGroup.RemoveMember` |
 | `GroupPresidentChangedDomainEvent` | `volunteer-groups.president.changed.v1` | `VolunteerGroup.ChangePresident` |
 | `GroupStatusChangedDomainEvent` | `volunteer-groups.group.status-changed.v1` | `VolunteerGroup.ChangeStatus` |
+| `GroupElectionStatusChangedDomainEvent` | `volunteer-groups.election.status-changed.v1` | `GroupElection.MoveTo` |
+| `GroupElectionClosedDomainEvent` | `volunteer-groups.election.closed.v1` | `GroupElection.MoveTo` |
+| `GroupElectionResultsPublishedDomainEvent` | `volunteer-groups.election.results-published.v1` | `GroupElection.Publish` |
 
 **Both `GroupMemberRemovedDomainEvent` and `GroupPresidentChangedDomainEvent` were
 fiction until 2026-09-05.** This table said "Raised by `VolunteerGroup
@@ -76,6 +90,14 @@ here and no Kafka in its integration tests.
 | PUT | `/v1/volunteer-groups/groups/{id}/members/{memberId}/position` | `VolunteerGroups.Lead` + president |
 | DELETE | `/v1/volunteer-groups/groups/{id}/members/{memberId}` | `VolunteerGroups.Lead` + president |
 | PATCH | `/v1/volunteer-groups/groups/{id}/president` | `VolunteerGroups.Manage` |
+| GET | `/v1/volunteer-groups/groups/{id}/elections` | `Members.Read` |
+| POST | `/v1/volunteer-groups/groups/{id}/elections` | `VolunteerGroups.Lead` + president |
+| GET | `/v1/volunteer-groups/elections/{id}` | `Members.Read` |
+| POST | `/v1/volunteer-groups/elections/{id}/status` | `VolunteerGroups.Lead` + president |
+| POST | `/v1/volunteer-groups/elections/{id}/candidates` | `VolunteerGroups.Lead` + group member |
+| POST | `/v1/volunteer-groups/elections/{id}/candidates/{candidateId}/decide` | `VolunteerGroups.Lead` + president |
+| POST | `/v1/volunteer-groups/elections/{id}/votes` | `VolunteerGroups.Lead` + group member |
+| POST | `/v1/volunteer-groups/elections/{id}/publish` | `VolunteerGroups.Lead` + president |
 | GET | `/health` | anonymous |
 
 ## Authorization: two permissions, and why
@@ -106,6 +128,71 @@ This is the **third** time this shape has bitten:
 The permission is only ever the outer gate. Being *this* group's president is
 the inner one, checked against the data in each handler — a stronger check than
 a role claim, and the same shape as member-family-service's family head.
+
+## Elections
+
+Added 2026-09-12. A group position - Secretary, Coordinator - used to be
+whatever free text the president typed at accept-time or afterwards. It still
+can be, through `AssignRolePositionCommand`, but the intended path now is an
+election: the president opens one for a named position, group members
+nominate each other, the president approves nominations onto the ballot,
+voting opens, and publishing installs the winner.
+
+**This copies celebrity-voting-service's Campaign -> Candidate -> Vote ->
+published-result shape, deliberately not by sharing code with it.**
+celebrity-voting-service runs one platform-wide award with a ranked top-N
+result; `GroupElection` runs one group's one position with exactly one
+winner. Different enough shapes that coupling them would cost more than the
+duplication saves - the same "copy the template, don't couple the services"
+choice this repo already made when `businesses-service`'s `Order` took its
+state machine from this service's own `GroupApplication`.
+
+**The electorate is the group, not the Samaaj.** Celebrity-voting's ballot is
+open to any Samaaj member; here, only a current `GroupMember` of the group an
+election belongs to may be nominated, may nominate, or may vote.
+`NominateCandidateCommand` and `CastVoteCommand` both load the owning
+`VolunteerGroup` and check `HasMember` before touching the election itself.
+
+**Votes are deliberately not part of the `GroupElection` aggregate**, for the
+identical reason celebrity-voting-service's own votes are not part of
+`VotingCampaign`: a `Vote` is written directly, and the unique index on
+`(ElectionId, VoterMemberId)` - not a check-then-insert in a handler, and not
+a distributed lock - is what actually prevents a double vote. See
+celebrity-voting-service's own `CLAUDE.md` "The guarantee" section; the
+mechanism here is the identical one, copied rather than reinvented, at a
+smaller scale that does not make the mistake any less of a mistake.
+
+**Self-votes are refused**, matching celebrity-voting-service's own rule -
+confirmed with the user rather than assumed, since a real election
+reasonably could go either way on this.
+
+**Publishing is what installs the winner, not merely what announces
+them.** Confirmed with the user before this was built: `PublishElection
+ResultsCommand` freezes the winner on `GroupElection` and then calls
+`VolunteerGroup.ElectPosition`, which sets the winner's `RolePosition` to the
+election's own `PositionTitle` and clears that exact title from anyone else
+in the group who held it. Two aggregates, one transaction, one handler - the
+same shape `businesses-service`'s own `Order` handler already uses when it
+touches a `Business`.
+
+**There is no `ElectionResult` aggregate, unlike celebrity-voting-service's
+`CampaignResult`.** A `GroupElection` has exactly one winner, not a ranked
+list, so the frozen outcome is just `WinnerMemberId`/`PublishedAt` on the
+election itself - there is nothing here a separate table would buy.
+
+**The tie-break is the identical mechanism celebrity-voting-service's
+`RankBy` uses**: `WinnerBy` orders by tally descending, then by earliest
+nomination - held by two things agreeing, the ordering and LINQ's own stable
+sort, the same reasoning that service's own `CLAUDE.md` gives for testing it
+with candidates created deliberately out of order.
+
+**Accepting a join request no longer carries a position at all.**
+`DecideApplicationCommand` used to take an optional `RolePosition` and set it
+on the new member in the same call - a unilateral president decision with no
+request, no nomination, no vote. That parameter is gone; a new member has no
+position until an election gives them one, or the president assigns one
+directly through `AssignRolePositionCommand`, which is untouched and remains
+the manual override path this plan deliberately left alone.
 
 ## Decisions worth knowing before you change this service
 
@@ -197,11 +284,19 @@ timeline-service's note; this repo has hit that default three times.
 
 - `Sangam.VolunteerGroups.UnitTests` — the aggregate. The join flow, the
   presidency rules and the status transitions are all pure decisions.
+  `GroupElectionTests` covers the election's own forward-only sequence, the
+  ballot, the tie-break, and publishing; `VolunteerGroupTests` covers
+  `ElectPosition` installing a winner and clearing a same-titled predecessor.
 - `Sangam.VolunteerGroups.IntegrationTests` — Testcontainers Postgres, no Kafka.
   The tenant query filter is applied by the DbContext rather than any handler,
   and the outbox guarantee is transactional; neither can be shown against a
   substituted repository. There is a named regression test for the permission
   split — `A_president_who_is_only_an_ordinary_member_can_still_run_their_group`.
+  `ElectionEndpointsTests` walks nominate -> approve -> vote -> close -> publish
+  end to end through the endpoints and asserts the winner lands on the group's
+  own roster; `VoteIndexTests` names the double-voting guarantee directly
+  against `pg_indexes`, the same proof celebrity-voting-service's own test of
+  the same name already runs.
 
 ```
 dotnet test services/volunteer-groups-service/Sangam.VolunteerGroups.sln

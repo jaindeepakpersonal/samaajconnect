@@ -465,6 +465,24 @@ so a 403 cannot confirm a group has applications pending - so asking
 speculatively would mean a 404 on every ordinary member's visit, and a console
 full of them is how a real 404 stops being noticed.
 
+**A group position is filled by election now, added 2026-09-12.** Accepting
+a join request used to carry an optional free-text position in the same
+click - a unilateral president decision with no request, no nomination, no
+vote. That input is gone from the review queue; the group detail screen's
+new "Positions" section is where a position actually comes from: the
+president opens an election naming a position, any current group member
+nominates another, the president approves nominations onto the ballot,
+voting opens, and publishing installs the winner - who then shows up with
+that title in the Members table above, the same table `AssignRolePosition`'s
+own "Give a position" control still edits directly, for a manual correction
+outside an election.
+
+**The nominee picker is a `<select>` built from the group's own already-
+loaded roster, not a name search.** Celebrities of Samaaj needed
+`MembersApi.search()` and an autosuggest because its ballot is Samaaj-wide;
+a volunteer group's roster is already on screen and typically small, so
+there is nothing here for that fix to solve.
+
 **Names the portal cannot resolve are not invented.** Timeline, Events and
 Groups all carry member ids and no names: names live in member-family-service
 and resolving them would be a call per row. Each screen says the thing it *can*

@@ -8,7 +8,41 @@ version of the plan; the reasoning behind the ordering lives in
 ## Current Status
 
 - **Stage:** every module has a service and member screens; Phase 5 hardening under way
-- **Last updated:** 2026-09-12 - **a new module, businesses-service:
+- **Last updated:** 2026-09-13 - **volunteer-groups-service gained
+  elections: a group's positions are filled by nominate-approve-vote-
+  publish, not by the president's own say-so at accept-time.**
+
+  `DecideApplicationCommand` no longer carries a position at all - accepting
+  an application just accepts it. In its place, `GroupElection` (a new
+  aggregate, copying celebrity-voting-service's Campaign/Candidate/Vote
+  shape rather than sharing code with it) runs one election for one named
+  position in one group: the president opens it, any current group member
+  nominates another, the president approves nominations onto the ballot,
+  voting opens, self-votes are refused, and publishing both freezes the
+  winner and calls a new `VolunteerGroup.ElectPosition` method that installs
+  them - clearing that exact title from anyone else in the group who held
+  it. `AssignRolePositionCommand` is untouched and remains the manual
+  override path.
+
+  Six new commands (`OpenElection`, `MoveElection`, `NominateCandidate`,
+  `DecideCandidate`, `CastVote`, `PublishElectionResults`) and two queries
+  (`ListElections`, `GetElection`), all reusing the existing
+  `VolunteerGroups.Lead` permission with the same president-or-group-member
+  data checks this service already used. member-portal's group detail
+  screen gained a "Positions" section - a `<select>` sourced from the
+  group's own already-loaded roster for nominating, not a name search,
+  since unlike Celebrities of Samaaj a group's own roster needs no
+  autosuggest to browse.
+
+  Verified with volunteer-groups-service's full unit+integration suite
+  (48 + 35, both green, including a `VoteIndexTests` proving the double-
+  voting guarantee directly against `pg_indexes`), 7 new member-portal
+  component specs (422 total, all green), the production build,
+  `tsc --noEmit`, `scripts/css-class-coverage.sh`,
+  `scripts/uncalled-api-methods.sh`, `scripts/audit-descriptor-coverage.sh`,
+  `scripts/pipeline-order.sh`, `scripts/service-docs.sh`,
+  `scripts/service-coverage.sh`, `scripts/module-keys.sh`.
+- **Previously:** 2026-09-12 - **a new module, businesses-service:
   members' own businesses, products and orders within a Samaaj, module-gated
   off by default.**
 

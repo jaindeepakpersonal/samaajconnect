@@ -8,8 +8,7 @@ using Sangam.VolunteerGroups.Application.Security;
 namespace Sangam.VolunteerGroups.Application.Groups.Commands.DecideApplication;
 
 /// <summary>
-/// The president accepts or rejects an application, optionally giving the new
-/// member a position in the same breath.
+/// The president accepts or rejects an application.
 /// </summary>
 /// <remarks>
 /// VolunteerGroups.Lead is the outer gate and every member holds it; being
@@ -17,13 +16,19 @@ namespace Sangam.VolunteerGroups.Application.Groups.Commands.DecideApplication;
 /// data here. A Samaaj admin who is not this group's president still cannot
 /// decide its applications - who is in a group is the president's business, the
 /// same shape as a family head deciding their own household's join requests.
+///
+/// Accepting no longer carries a position, as of 2026-09-12. A position given
+/// in the same breath as accepting somebody was never anything but the
+/// president's own unilateral say-so; positions now come from an election
+/// (<c>OpenElectionCommand</c> and what follows it), and
+/// <c>AssignRolePositionCommand</c> remains for a manual correction outside
+/// one.
 /// </remarks>
 [RequiresPermission(PermissionKeys.VolunteerGroupsLead)]
 public sealed record DecideApplicationCommand(
     Guid GroupId,
     Guid ApplicationId,
-    bool Accept,
-    string? RolePosition) : ICommand<GroupApplicationResponse>;
+    bool Accept) : ICommand<GroupApplicationResponse>;
 
 public sealed class DecideApplicationCommandValidator : AbstractValidator<DecideApplicationCommand>
 {
@@ -31,7 +36,6 @@ public sealed class DecideApplicationCommandValidator : AbstractValidator<Decide
     {
         RuleFor(x => x.GroupId).NotEmpty();
         RuleFor(x => x.ApplicationId).NotEmpty();
-        RuleFor(x => x.RolePosition).MaximumLength(100);
     }
 }
 
@@ -73,8 +77,7 @@ public sealed class DecideApplicationCommandHandler(
                 Error.NotFound("Group.NotFound", "No such group in this Samaaj."));
         }
 
-        if (!group.DecideApplication(
-            command.ApplicationId, command.Accept, actorId, command.RolePosition, clock.UtcNow))
+        if (!group.DecideApplication(command.ApplicationId, command.Accept, actorId, clock.UtcNow))
         {
             // No pending application by that id: already decided, or never
             // existed. Either way there is nothing to decide.

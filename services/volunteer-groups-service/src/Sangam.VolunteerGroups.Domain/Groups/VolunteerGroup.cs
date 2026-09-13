@@ -132,14 +132,16 @@ public sealed class VolunteerGroup : AggregateRoot, ITenantScopedEntity
     }
 
     /// <summary>
-    /// The president's decision. Accepting also makes the applicant a member.
-    /// Returns false when there was no pending application by that id.
+    /// The president's decision. Accepting also makes the applicant a member,
+    /// with no position - positions are given afterwards, either directly via
+    /// <see cref="AssignRolePosition"/> or through an election's own
+    /// <see cref="ElectPosition"/>. Returns false when there was no pending
+    /// application by that id.
     /// </summary>
     public bool DecideApplication(
         Guid applicationId,
         bool accepted,
         Guid decidedBy,
-        string? rolePosition,
         DateTimeOffset now)
     {
         var application = _applications.FirstOrDefault(
@@ -154,8 +156,7 @@ public sealed class VolunteerGroup : AggregateRoot, ITenantScopedEntity
 
         if (accepted && !HasMember(application.MemberId))
         {
-            _members.Add(new GroupMember(
-                Id, application.MemberId, Normalize(rolePosition), now));
+            _members.Add(new GroupMember(Id, application.MemberId, rolePosition: null, now));
         }
 
         Raise(new GroupApplicationDecidedDomainEvent(
@@ -187,6 +188,45 @@ public sealed class VolunteerGroup : AggregateRoot, ITenantScopedEntity
 
         Raise(new GroupRolePositionAssignedDomainEvent(
             Id, TenantId, memberId, member.RolePosition, now));
+
+        return true;
+    }
+
+    /// <summary>
+    /// Installs the winner of a published election in the position it was run
+    /// for, and clears that exact title from anyone else currently holding it.
+    /// Returns false when the winner is no longer a member of this group -
+    /// which the election itself should already have prevented, but this
+    /// method does not trust that promise from the other side of a
+    /// cross-aggregate call.
+    /// </summary>
+    /// <remarks>
+    /// Called only from <c>PublishElectionResultsCommand</c>, after
+    /// <c>GroupElection</c> has already frozen its own winner. A published
+    /// election is what actually installs someone in a position - not merely
+    /// an announcement - so this is the one place besides
+    /// <see cref="AssignRolePosition"/> that ever changes a
+    /// <see cref="GroupMember.RolePosition"/>.
+    /// </remarks>
+    public bool ElectPosition(string positionTitle, Guid winnerMemberId, DateTimeOffset now)
+    {
+        var winner = _members.FirstOrDefault(m => m.MemberId == winnerMemberId);
+
+        if (winner is null)
+        {
+            return false;
+        }
+
+        foreach (var previousHolder in _members.Where(m =>
+            m.MemberId != winnerMemberId
+            && string.Equals(m.RolePosition, positionTitle, StringComparison.Ordinal)))
+        {
+            previousHolder.SetRolePosition(null);
+        }
+
+        winner.SetRolePosition(positionTitle);
+
+        Raise(new GroupRolePositionAssignedDomainEvent(Id, TenantId, winnerMemberId, positionTitle, now));
 
         return true;
     }

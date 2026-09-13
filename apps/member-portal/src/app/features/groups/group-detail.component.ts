@@ -4,7 +4,13 @@ import { ActivatedRoute, RouterLink } from '@angular/router';
 import { AuthService, describeError } from '@samaajconnect/shared';
 import { MembersApi } from '../members/members.api';
 import { GroupsApi } from './groups.api';
-import { GroupApplication, GroupDetail } from './groups.models';
+import {
+  Election,
+  ElectionDetail,
+  GroupApplication,
+  GroupDetail,
+  electionStageLabel,
+} from './groups.models';
 
 /**
  * Group detail, from the member-portal wireframe's `#groupdetail` screen.
@@ -38,6 +44,24 @@ import { GroupApplication, GroupDetail } from './groups.models';
  * directory, so it stays correct however large the Samaaj is. A name still
  * reads as "You" for the viewer's own row, and falls back to "A member"
  * only while a name is still loading or if that one lookup fails.
+ *
+ * **Positions are filled by election now, added 2026-09-12.** Accepting a
+ * join request used to carry an optional free-text position in the same
+ * breath - a unilateral president decision with no request, no nomination,
+ * no vote - and that input is gone from the review queue below. The
+ * "Positions" section is new: the president opens an election for a named
+ * position, any current group member nominates another, the president
+ * approves nominations onto the ballot, voting opens, and publishing installs
+ * the winner - which then shows up in the Members table above like any other
+ * position. `AssignRolePositionCommand`'s own "Give a position"/"Change
+ * position" control on each member row is untouched and still there as the
+ * manual override it always was; nothing about elections removes it.
+ *
+ * The nominee picker is a `<select>` built from this group's own roster
+ * (`found.members`), not a name search: unlike Celebrities of Samaaj's
+ * Samaaj-wide ballot, a group's roster is already loaded and small, so there
+ * is no case here for the same autosuggest-over-typed-id fix that screen
+ * needed.
  */
 @Component({
   selector: 'app-group-detail',
@@ -255,18 +279,6 @@ import { GroupApplication, GroupDetail } from './groups.models';
                     <p class="notice error" role="alert">{{ message }}</p>
                   }
 
-                  <label [for]="'role-' + application.id">
-                    Position to give them (optional)
-                  </label>
-                  <input
-                    class="input"
-                    [id]="'role-' + application.id"
-                    [name]="'role-' + application.id"
-                    [(ngModel)]="roleDrafts[application.id]"
-                    maxlength="100"
-                    placeholder="Volunteer"
-                  />
-
                   <div class="actions">
                     <button
                       class="btn"
@@ -289,6 +301,230 @@ import { GroupApplication, GroupDetail } from './groups.models';
               }
             </div>
           }
+        }
+
+        <!-- Positions, filled by election ---------------------------- -->
+        <h2 class="section-heading">Positions</h2>
+        <p class="small">
+          A position comes from an election now, not from the president's own say-so.
+        </p>
+
+        @if (found.group.iAmThePresident) {
+          <div class="actions">
+            <button
+              class="btn secondary"
+              type="button"
+              (click)="showOpenElection.set(!showOpenElection())"
+            >
+              {{ showOpenElection() ? 'Cancel' : 'Open an election' }}
+            </button>
+          </div>
+
+          @if (showOpenElection()) {
+            <form class="card" (ngSubmit)="openElection(found.group.id)">
+              <div class="form-grid">
+                <div class="field span-all">
+                  <label for="election-position">Position</label>
+                  <input
+                    class="input"
+                    id="election-position"
+                    name="positionTitle"
+                    [(ngModel)]="positionTitle"
+                    maxlength="100"
+                    placeholder="Secretary"
+                  />
+                </div>
+
+                <div class="field">
+                  <label for="nomination-start">Nominations open</label>
+                  <input
+                    class="input"
+                    id="nomination-start"
+                    type="datetime-local"
+                    name="nominationStartAt"
+                    [(ngModel)]="nominationStartAt"
+                  />
+                </div>
+
+                <div class="field">
+                  <label for="nomination-end">Nominations close</label>
+                  <input
+                    class="input"
+                    id="nomination-end"
+                    type="datetime-local"
+                    name="nominationEndAt"
+                    [(ngModel)]="nominationEndAt"
+                  />
+                </div>
+
+                <div class="field">
+                  <label for="voting-start">Voting opens</label>
+                  <input
+                    class="input"
+                    id="voting-start"
+                    type="datetime-local"
+                    name="votingStartAt"
+                    [(ngModel)]="votingStartAt"
+                  />
+                </div>
+
+                <div class="field">
+                  <label for="voting-end">Voting closes</label>
+                  <input
+                    class="input"
+                    id="voting-end"
+                    type="datetime-local"
+                    name="votingEndAt"
+                    [(ngModel)]="votingEndAt"
+                  />
+                </div>
+              </div>
+
+              @if (openElectionError(); as message) {
+                <p class="notice error" role="alert">{{ message }}</p>
+              }
+
+              <div class="actions">
+                <button class="btn" type="submit" [disabled]="electionBusy() || !positionTitle.trim()">
+                  Open
+                </button>
+              </div>
+            </form>
+          }
+        }
+
+        @if (loadingElections()) {
+          <p role="status">Loading elections…</p>
+        } @else if (elections().length === 0) {
+          <p class="small">No elections have been run for this group yet.</p>
+        } @else {
+          <div class="queue">
+            @for (election of elections(); track election.id) {
+              <div class="card">
+                <h3>{{ election.positionTitle }}</h3>
+                <p>
+                  <span class="pill" [class]="electionPillClass(election)">
+                    {{ electionStage(election) }}
+                  </span>
+                </p>
+
+                @if (election.winnerMemberId; as winnerId) {
+                  <p>
+                    Elected:
+                    <a [routerLink]="['/members', winnerId]">{{ nameFor(winnerId, found) }}</a>
+                  </p>
+                }
+
+                @if (electionActionError()[election.id]; as message) {
+                  <p class="notice error" role="alert">{{ message }}</p>
+                }
+
+                <div class="actions">
+                  <button class="btn link" type="button" (click)="toggleElection(election.id)">
+                    {{ expandedElectionId() === election.id ? 'Hide ballot' : 'View ballot' }}
+                  </button>
+
+                  @if (found.group.iAmThePresident) {
+                    @if (election.status === 'Draft') {
+                      <button class="btn small" type="button" [disabled]="electionBusy()"
+                        (click)="moveElection(election.id, 'NominationsOpen')">
+                        Open nominations
+                      </button>
+                    } @else if (election.status === 'NominationsOpen') {
+                      <button class="btn small" type="button" [disabled]="electionBusy()"
+                        (click)="moveElection(election.id, 'VotingOpen')">
+                        Open voting
+                      </button>
+                    } @else if (election.status === 'VotingOpen') {
+                      <button class="btn small" type="button" [disabled]="electionBusy()"
+                        (click)="moveElection(election.id, 'Closed')">
+                        Close
+                      </button>
+                    } @else if (election.status === 'Closed') {
+                      <button class="btn small" type="button" [disabled]="electionBusy()"
+                        (click)="publishElection(election.id)">
+                        Publish result
+                      </button>
+                    }
+                  }
+                </div>
+
+                @if (expandedElectionId() === election.id && expandedDetail(); as detail) {
+                  @if (election.acceptsNominations) {
+                    <h3 class="section-heading">Nominate somebody</h3>
+
+                    <div class="actions">
+                      <label class="sr-only" [for]="'nominee-' + election.id">Nominee</label>
+                      <select
+                        class="input"
+                        [id]="'nominee-' + election.id"
+                        [name]="'nominee-' + election.id"
+                        [ngModel]="nomineeDrafts()[election.id] ?? ''"
+                        (ngModelChange)="setNomineeDraft(election.id, $event)"
+                      >
+                        <option value="">Choose a member…</option>
+                        @for (person of found.members; track person.memberId) {
+                          <option [value]="person.memberId">{{ nameFor(person.memberId, found) }}</option>
+                        }
+                      </select>
+                      <button
+                        class="btn small"
+                        type="button"
+                        [disabled]="electionBusy() || !(nomineeDrafts()[election.id])"
+                        (click)="nominate(election.id)"
+                      >
+                        Nominate
+                      </button>
+                    </div>
+                  }
+
+                  @if (found.group.iAmThePresident) {
+                    @for (candidate of waitingCandidates(detail); track candidate.id) {
+                      <div class="candidate-row">
+                        <span>{{ nameFor(candidate.memberId, found) }}</span>
+                        <div class="actions">
+                          <button class="btn small" type="button" [disabled]="electionBusy()"
+                            (click)="decideCandidate(election.id, candidate.id, true)">
+                            Approve
+                          </button>
+                          <button class="btn small secondary" type="button" [disabled]="electionBusy()"
+                            (click)="decideCandidate(election.id, candidate.id, false)">
+                            Remove
+                          </button>
+                        </div>
+                      </div>
+                    }
+                  }
+
+                  <h3 class="section-heading">{{ election.status === 'Published' ? 'Result' : 'Ballot' }}</h3>
+
+                  @if (approvedCandidates(detail).length === 0) {
+                    <p class="small">Nobody is on the ballot yet.</p>
+                  } @else {
+                    @for (candidate of approvedCandidates(detail); track candidate.id) {
+                      <div class="candidate-row">
+                        <span>{{ nameFor(candidate.memberId, found) }}</span>
+                        <span class="small">{{ candidate.votes }} {{ candidate.votes === 1 ? 'vote' : 'votes' }}</span>
+
+                        @if (election.myVoteCandidateId === candidate.id) {
+                          <span class="pill ok">Your vote</span>
+                        } @else if (election.acceptsVotes && election.myVoteCandidateId === null) {
+                          @if (candidate.memberId === me()) {
+                            <span class="small">You cannot vote for yourself.</span>
+                          } @else {
+                            <button class="btn small" type="button" [disabled]="electionBusy()"
+                              (click)="castVote(election.id, candidate.id)">
+                              Vote
+                            </button>
+                          }
+                        }
+                      </div>
+                    }
+                  }
+                }
+              </div>
+            }
+          </div>
         }
       }
     </div>
@@ -321,7 +557,31 @@ export class GroupDetailComponent implements OnInit {
 
   note = '';
   positionDraft = '';
-  roleDrafts: Record<string, string> = {};
+
+  // ---- Elections ----------------------------------------------------------
+
+  readonly elections = signal<readonly Election[]>([]);
+  readonly loadingElections = signal(false);
+
+  readonly showOpenElection = signal(false);
+  readonly openElectionError = signal<string | null>(null);
+  readonly electionBusy = signal(false);
+
+  positionTitle = '';
+  nominationStartAt = '';
+  nominationEndAt = '';
+  votingStartAt = '';
+  votingEndAt = '';
+
+  /** Which election's ballot is expanded, and its full detail once fetched. */
+  readonly expandedElectionId = signal<string | null>(null);
+  readonly expandedDetail = signal<ElectionDetail | null>(null);
+
+  /** Per-election nominee-picker draft, so opening one ballot does not clear another's. */
+  readonly nomineeDrafts = signal<Record<string, string>>({});
+
+  /** Per-election action failures, so one refusal does not blank the list. */
+  readonly electionActionError = signal<Record<string, string>>({});
 
   readonly me = computed(() => this.auth.user()?.userId ?? null);
 
@@ -362,6 +622,7 @@ export class GroupDetailComponent implements OnInit {
         this.detail.set(found);
         this.loading.set(false);
         this.resolveNames(found.members.map((person) => person.memberId));
+        this.loadElections(found.group.id);
 
         // Only the president may read these, and the endpoint answers 404 to
         // anyone else - asking speculatively would mean a 404 on every
@@ -391,6 +652,22 @@ export class GroupDetailComponent implements OnInit {
         // become a page-level error.
         this.applications.set([]);
         this.loadingApplications.set(false);
+      },
+    });
+  }
+
+  private loadElections(groupId: string): void {
+    this.loadingElections.set(true);
+
+    this.api.listElections(groupId).subscribe({
+      next: (found) => {
+        this.elections.set(found);
+        this.loadingElections.set(false);
+      },
+      error: () => {
+        // The group is still readable without its election history.
+        this.elections.set([]);
+        this.loadingElections.set(false);
       },
     });
   }
@@ -483,24 +760,19 @@ export class GroupDetailComponent implements OnInit {
     this.busy.set(true);
     this.clearDecisionError(application.id);
 
-    const role = (this.roleDrafts[application.id] ?? '').trim();
+    this.api.decide(found.group.id, application.id, accept).subscribe({
+      next: () => {
+        this.busy.set(false);
 
-    this.api
-      .decide(found.group.id, application.id, accept, role.length > 0 ? role : null)
-      .subscribe({
-        next: () => {
-          delete this.roleDrafts[application.id];
-          this.busy.set(false);
-
-          // Accepting adds a member, so both the group and the queue have
-          // moved; `load` re-reads the queue too when the reader is president.
-          this.load();
-        },
-        error: (failure: unknown) => {
-          this.setDecisionError(application.id, describeError(failure));
-          this.busy.set(false);
-        },
-      });
+        // Accepting adds a member, so both the group and the queue have
+        // moved; `load` re-reads the queue too when the reader is president.
+        this.load();
+      },
+      error: (failure: unknown) => {
+        this.setDecisionError(application.id, describeError(failure));
+        this.busy.set(false);
+      },
+    });
   }
 
   editPosition(memberId: string, current: string | null): void {
@@ -561,6 +833,214 @@ export class GroupDetailComponent implements OnInit {
         this.busy.set(false);
       },
     });
+  }
+
+  // ---- Elections ----------------------------------------------------------
+
+  openElection(groupId: string): void {
+    const title = this.positionTitle.trim();
+
+    if (title.length === 0) {
+      return;
+    }
+
+    this.electionBusy.set(true);
+    this.openElectionError.set(null);
+
+    this.api
+      .openElection(
+        groupId,
+        title,
+        new Date(this.nominationStartAt).toISOString(),
+        new Date(this.nominationEndAt).toISOString(),
+        new Date(this.votingStartAt).toISOString(),
+        new Date(this.votingEndAt).toISOString(),
+      )
+      .subscribe({
+        next: () => {
+          this.electionBusy.set(false);
+          this.showOpenElection.set(false);
+          this.positionTitle = '';
+          this.nominationStartAt = '';
+          this.nominationEndAt = '';
+          this.votingStartAt = '';
+          this.votingEndAt = '';
+          this.loadElections(groupId);
+        },
+        error: (failure: unknown) => {
+          this.openElectionError.set(describeError(failure));
+          this.electionBusy.set(false);
+        },
+      });
+  }
+
+  toggleElection(electionId: string): void {
+    if (this.expandedElectionId() === electionId) {
+      this.expandedElectionId.set(null);
+      this.expandedDetail.set(null);
+      return;
+    }
+
+    this.expandedElectionId.set(electionId);
+    this.expandedDetail.set(null);
+
+    this.api.getElection(electionId).subscribe({
+      next: (found) => this.expandedDetail.set(found),
+      error: (failure: unknown) => {
+        this.setElectionActionError(electionId, describeError(failure));
+        this.expandedElectionId.set(null);
+      },
+    });
+  }
+
+  private refreshExpanded(electionId: string): void {
+    this.api.getElection(electionId).subscribe({
+      next: (found) => this.expandedDetail.set(found),
+      error: () => {
+        /* The election list itself still reflects the latest status. */
+      },
+    });
+  }
+
+  moveElection(electionId: string, status: string): void {
+    const found = this.detail();
+
+    if (found === null) {
+      return;
+    }
+
+    this.electionBusy.set(true);
+    this.clearElectionActionError(electionId);
+
+    this.api.moveElection(electionId, status).subscribe({
+      next: () => {
+        this.electionBusy.set(false);
+        this.loadElections(found.group.id);
+
+        if (this.expandedElectionId() === electionId) {
+          this.refreshExpanded(electionId);
+        }
+      },
+      error: (failure: unknown) => {
+        this.setElectionActionError(electionId, describeError(failure));
+        this.electionBusy.set(false);
+      },
+    });
+  }
+
+  publishElection(electionId: string): void {
+    const found = this.detail();
+
+    if (found === null) {
+      return;
+    }
+
+    this.electionBusy.set(true);
+    this.clearElectionActionError(electionId);
+
+    this.api.publishElectionResults(electionId).subscribe({
+      next: () => {
+        this.electionBusy.set(false);
+        this.loadElections(found.group.id);
+
+        // Publishing installs the winner on the group's own roster.
+        this.load();
+      },
+      error: (failure: unknown) => {
+        this.setElectionActionError(electionId, describeError(failure));
+        this.electionBusy.set(false);
+      },
+    });
+  }
+
+  setNomineeDraft(electionId: string, memberId: string): void {
+    this.nomineeDrafts.update((current) => ({ ...current, [electionId]: memberId }));
+  }
+
+  nominate(electionId: string): void {
+    const memberId = this.nomineeDrafts()[electionId];
+
+    if (!memberId) {
+      return;
+    }
+
+    this.electionBusy.set(true);
+    this.clearElectionActionError(electionId);
+
+    this.api.nominate(electionId, memberId).subscribe({
+      next: () => {
+        this.electionBusy.set(false);
+        this.nomineeDrafts.update((current) => ({ ...current, [electionId]: '' }));
+        this.refreshExpanded(electionId);
+      },
+      error: (failure: unknown) => {
+        this.setElectionActionError(electionId, describeError(failure));
+        this.electionBusy.set(false);
+      },
+    });
+  }
+
+  decideCandidate(electionId: string, candidateId: string, approve: boolean): void {
+    this.electionBusy.set(true);
+    this.clearElectionActionError(electionId);
+
+    this.api.decideCandidate(electionId, candidateId, approve).subscribe({
+      next: (updated) => {
+        this.electionBusy.set(false);
+        this.expandedDetail.set(updated);
+      },
+      error: (failure: unknown) => {
+        this.setElectionActionError(electionId, describeError(failure));
+        this.electionBusy.set(false);
+      },
+    });
+  }
+
+  castVote(electionId: string, candidateId: string): void {
+    this.electionBusy.set(true);
+    this.clearElectionActionError(electionId);
+
+    this.api.castVote(electionId, candidateId).subscribe({
+      next: () => {
+        this.electionBusy.set(false);
+        this.loadElections(this.detail()!.group.id);
+        this.refreshExpanded(electionId);
+      },
+      error: (failure: unknown) => {
+        this.setElectionActionError(electionId, describeError(failure));
+        this.electionBusy.set(false);
+      },
+    });
+  }
+
+  waitingCandidates(detail: ElectionDetail): readonly { id: string; memberId: string }[] {
+    return detail.candidates.filter((c) => c.status === 'Nominated');
+  }
+
+  approvedCandidates(detail: ElectionDetail) {
+    return detail.candidates.filter((c) => c.status === 'Approved');
+  }
+
+  electionStage(election: Election): string {
+    return electionStageLabel(election);
+  }
+
+  electionPillClass(election: Election): string {
+    if (election.status === 'Published') {
+      return 'ok';
+    }
+
+    return election.acceptsVotes || election.acceptsNominations ? 'warn' : '';
+  }
+
+  private setElectionActionError(id: string, message: string): void {
+    this.electionActionError.set({ ...this.electionActionError(), [id]: message });
+  }
+
+  private clearElectionActionError(id: string): void {
+    const { [id]: _removed, ...rest } = this.electionActionError();
+
+    this.electionActionError.set(rest);
   }
 
   // ---- Rendering --------------------------------------------------------

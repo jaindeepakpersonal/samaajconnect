@@ -77,7 +77,8 @@ public sealed class VolunteerGroupsApiFactory : WebApplicationFactory<Program>, 
         var dbContext = scope.ServiceProvider.GetRequiredService<VolunteerGroupsDbContext>();
 
         await dbContext.Database.ExecuteSqlRawAsync(
-            "TRUNCATE TABLE group_members, group_applications, volunteer_groups, "
+            "TRUNCATE TABLE election_votes, election_candidates, group_elections, "
+            + "group_members, group_applications, volunteer_groups, "
             + "outbox_messages RESTART IDENTITY CASCADE;");
     }
 

@@ -1,7 +1,15 @@
 import { HttpClient } from '@angular/common/http';
 import { Injectable, inject } from '@angular/core';
 import { Observable } from 'rxjs';
-import { GroupApplication, GroupDetail, VolunteerGroup } from './groups.models';
+import {
+  CastVoteResult,
+  Election,
+  ElectionDetail,
+  GroupApplication,
+  GroupDetail,
+  NominateResult,
+  VolunteerGroup,
+} from './groups.models';
 
 /**
  * Every call this app makes to volunteer-groups-service.
@@ -48,15 +56,15 @@ export class GroupsApi {
     return this.http.get<GroupApplication[]>(`/v1/volunteer-groups/groups/${id}/applications`);
   }
 
-  decide(
-    id: string,
-    applicationId: string,
-    accept: boolean,
-    rolePosition: string | null,
-  ): Observable<GroupApplication> {
+  /**
+   * Accepts or rejects an application. Carries no position - a new member's
+   * position comes from an election now, or a later {@link setPosition} call,
+   * never from the accept itself.
+   */
+  decide(id: string, applicationId: string, accept: boolean): Observable<GroupApplication> {
     return this.http.post<GroupApplication>(
       `/v1/volunteer-groups/groups/${id}/applications/${applicationId}/decide`,
-      { accept, rolePosition },
+      { accept },
     );
   }
 
@@ -81,5 +89,69 @@ export class GroupsApi {
     return this.http.delete<GroupDetail>(
       `/v1/volunteer-groups/groups/${id}/members/${memberId}`,
     );
+  }
+
+  // ---- Elections -----------------------------------------------------------
+
+  /** This group's elections, newest first, each with the asking member's own vote. */
+  listElections(groupId: string): Observable<Election[]> {
+    return this.http.get<Election[]>(`/v1/volunteer-groups/groups/${groupId}/elections`);
+  }
+
+  /** The president sets an election up for a position. It stays a draft until opened. */
+  openElection(
+    groupId: string,
+    positionTitle: string,
+    nominationStartAt: string,
+    nominationEndAt: string,
+    votingStartAt: string,
+    votingEndAt: string,
+  ): Observable<Election> {
+    return this.http.post<Election>(`/v1/volunteer-groups/groups/${groupId}/elections`, {
+      positionTitle,
+      nominationStartAt,
+      nominationEndAt,
+      votingStartAt,
+      votingEndAt,
+    });
+  }
+
+  getElection(id: string): Observable<ElectionDetail> {
+    return this.http.get<ElectionDetail>(`/v1/volunteer-groups/elections/${id}`);
+  }
+
+  /** Opens nominations, opens voting, or closes. Strictly forward. */
+  moveElection(id: string, status: string): Observable<Election> {
+    return this.http.post<Election>(`/v1/volunteer-groups/elections/${id}/status`, { status });
+  }
+
+  /** Puts a group member forward. The president decides whether they reach the ballot. */
+  nominate(id: string, memberId: string): Observable<NominateResult> {
+    return this.http.post<NominateResult>(`/v1/volunteer-groups/elections/${id}/candidates`, {
+      memberId,
+    });
+  }
+
+  /** The president puts a nomination on the ballot, or removes it before voting opens. */
+  decideCandidate(id: string, candidateId: string, approve: boolean): Observable<ElectionDetail> {
+    return this.http.post<ElectionDetail>(
+      `/v1/volunteer-groups/elections/${id}/candidates/${candidateId}/decide`,
+      { approve },
+    );
+  }
+
+  /**
+   * Casts this member's one vote. Voting twice is reported as success with
+   * `accepted: false` - the unique index, not this call, is what enforces it.
+   */
+  castVote(id: string, candidateId: string): Observable<CastVoteResult> {
+    return this.http.post<CastVoteResult>(`/v1/volunteer-groups/elections/${id}/votes`, {
+      candidateId,
+    });
+  }
+
+  /** The president picks the winner, freezes it, and installs them in the position. */
+  publishElectionResults(id: string): Observable<Election> {
+    return this.http.post<Election>(`/v1/volunteer-groups/elections/${id}/publish`, {});
   }
 }

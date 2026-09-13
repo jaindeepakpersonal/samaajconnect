@@ -366,6 +366,25 @@ public static class KnownEvents
             EntityIdProperty: "groupId",
             BeforeProperties: ["previousStatus"]),
 
+        ["volunteer-groups.election.status-changed.v1"] = new(
+            Action: "ElectionStatusChanged",
+            EntityName: "GroupElection",
+            EntityIdProperty: "electionId",
+            BeforeProperties: ["previousStatus"]),
+
+        ["volunteer-groups.election.closed.v1"] = new(
+            Action: "ElectionClosed",
+            EntityName: "GroupElection",
+            EntityIdProperty: "electionId"),
+
+        // WinnerMemberId is who the event is about, not who published it - the
+        // event carries no publisher id at all, the same shape celebrity-
+        // voting-service's own ResultsPublishedDomainEvent already has.
+        ["volunteer-groups.election.results-published.v1"] = new(
+            Action: "ElectionResultsPublished",
+            EntityName: "GroupElection",
+            EntityIdProperty: "electionId"),
+
         // social-issues-service's IssueStatusChangedDomainEvent already
         // carries a distinct ActorUserId - separate from SubmittedByMemberId,
         // its own doc comment explains why ("the author who is waiting on the
