@@ -1,7 +1,7 @@
 import { HttpClient, HttpParams } from '@angular/common/http';
 import { Injectable, inject } from '@angular/core';
 import { Observable } from 'rxjs';
-import { City, Gautra, Locality, LookupItem } from './members.models';
+import { City, Gautra, Locality, LookupItem, State } from './members.models';
 
 /**
  * Every call this app makes to master-data-service, first wired up for My
@@ -61,6 +61,23 @@ export class MasterDataApi {
     return this.http.get<LookupItem[]>('/v1/master-data/lookup-items', {
       params: new HttpParams().set('category', 'BusinessCategory').set('includeInactive', false),
     });
+  }
+
+  /** The Country category, first called from the Pathshala directory to name a location. */
+  listCountries(): Observable<LookupItem[]> {
+    return this.http.get<LookupItem[]>('/v1/master-data/lookup-items', {
+      params: new HttpParams().set('category', 'Country').set('includeInactive', false),
+    });
+  }
+
+  listStates(countryId?: string | null): Observable<State[]> {
+    let params = new HttpParams().set('includeInactive', false);
+
+    if (countryId) {
+      params = params.set('countryId', countryId);
+    }
+
+    return this.http.get<State[]>('/v1/master-data/states', { params });
   }
 
   listCities(countryId?: string | null): Observable<City[]> {

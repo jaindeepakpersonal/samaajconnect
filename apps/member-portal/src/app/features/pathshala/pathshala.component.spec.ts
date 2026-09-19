@@ -23,7 +23,7 @@ function pathshala(overrides: Partial<Pathshala> = {}): Pathshala {
   return {
     id: 'p1',
     name: 'Shri Mahavir Jain Pathshala',
-    address: '12 Temple Road',
+    address: { line: '12 Temple Road', countryId: null, stateId: null, cityId: null, localityId: null },
     contactPerson: null,
     status: 'Active',
     currentSessionLabel: '2026-27',
@@ -164,6 +164,69 @@ describe('PathshalaListComponent', () => {
   function text(): string {
     return fixture.nativeElement.textContent as string;
   }
+
+  // ---- Where it is ---------------------------------------------------------
+  //
+  // The service sends ids, never names, so the directory resolves them once from
+  // master-data-service rather than one lookup per tile.
+
+  const located = () =>
+    pathshala({
+      address: { line: '12 Temple Road', countryId: 'IN', stateId: 'RJ', cityId: 'UDR', localityId: 'HM' },
+    });
+
+  function settleLocation(): void {
+    http.expectOne((r) => r.url === '/v1/master-data/lookup-items' && r.params.get('category') === 'Country')
+      .flush([{ id: 'IN', category: 'Country', code: 'IN', label: 'India', sortOrder: 1, isActive: true }]);
+    http.expectOne((r) => r.url === '/v1/master-data/states')
+      .flush([{ id: 'RJ', countryId: 'IN', name: 'Rajasthan', isActive: true }]);
+    http.expectOne((r) => r.url === '/v1/master-data/cities')
+      .flush([{ id: 'UDR', countryId: 'IN', stateId: 'RJ', name: 'Udaipur', isActive: true }]);
+    http.expectOne((r) => r.url === '/v1/master-data/localities')
+      .flush([{ id: 'HM', cityId: 'UDR', name: 'Hiran Magri', isActive: true }]);
+    fixture.detectChanges();
+  }
+
+  it('shows the address line, locality, city, state and country on the tile', () => {
+    load({ pathshalas: [located()] });
+    settleLocation();
+
+    expect(text()).toContain('12 Temple Road, Hiran Magri, Udaipur, Rajasthan, India');
+    expect(text()).not.toContain('[object Object]');
+  });
+
+  it('shows just the free-text line when no ids were picked, and asks master data for nothing', () => {
+    load({});
+
+    expect(text()).toContain('12 Temple Road');
+    // http.verify() in afterEach is the assertion: no master-data request went out.
+  });
+
+  it('leaves out a place that does not resolve rather than printing its id', () => {
+    load({ pathshalas: [located()] });
+
+    http.expectOne((r) => r.params.get('category') === 'Country').flush([]);
+    http.expectOne((r) => r.url === '/v1/master-data/states').flush([]);
+    http.expectOne((r) => r.url === '/v1/master-data/cities')
+      .flush([{ id: 'UDR', countryId: 'IN', stateId: 'RJ', name: 'Udaipur', isActive: true }]);
+    http.expectOne((r) => r.url === '/v1/master-data/localities').flush([]);
+    fixture.detectChanges();
+
+    expect(text()).toContain('12 Temple Road, Udaipur');
+    expect(text()).not.toContain('RJ');
+  });
+
+  it('still shows the directory when the location lists cannot be read', () => {
+    load({ pathshalas: [located()] });
+
+    for (const req of http.match((r) => r.url.startsWith('/v1/master-data/'))) {
+      req.flush(null, { status: 500, statusText: 'Error' });
+    }
+    fixture.detectChanges();
+
+    expect(component.error()).toBeNull();
+    expect(text()).toContain('12 Temple Road');
+  });
 
   it('names the child rather than printing their id', () => {
     // The one place this app does resolve a name: a parent's own children are

@@ -22,10 +22,23 @@ export type AttendanceStatus = 'Present' | 'Absent' | 'Excused';
  */
 export type ExamStatus = 'Upcoming' | 'AwaitingResult' | 'Completed';
 
+/**
+ * Where a Pathshala is: a free-text line plus master-data ids. The service sends
+ * ids and never names - resolving one per Pathshala would be a lookup per tile -
+ * so the directory loads each list once and resolves them client-side.
+ */
+export interface PathshalaAddress {
+  readonly line: string | null;
+  readonly countryId: string | null;
+  readonly stateId: string | null;
+  readonly cityId: string | null;
+  readonly localityId: string | null;
+}
+
 export interface Pathshala {
   readonly id: string;
   readonly name: string;
-  readonly address: string | null;
+  readonly address: PathshalaAddress | null;
   readonly contactPerson: string | null;
   readonly status: string;
   readonly currentSessionLabel: string | null;

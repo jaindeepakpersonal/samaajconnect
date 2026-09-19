@@ -192,6 +192,15 @@ export interface LookupItem {
 export interface City {
   readonly id: string;
   readonly countryId: string;
+  /** Null for a city named before States existed. */
+  readonly stateId?: string | null;
+  readonly name: string;
+  readonly isActive: boolean;
+}
+
+export interface State {
+  readonly id: string;
+  readonly countryId: string;
   readonly name: string;
   readonly isActive: boolean;
 }

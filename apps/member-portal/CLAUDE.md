@@ -613,6 +613,15 @@ opaque id would be useless to the only person the Pathshala screens are for. The
 teachers on the same screen stay a count, because those are exactly the ids the
 rule is about.
 
+**A Pathshala tile shows where it is, and it was printing "[object Object]".**
+`address` used to be a string; the service has sent a structured address
+(line plus country/state/city/locality ids) since the admin create form became a
+cascade, and this screen's model never followed - the spec's fixture still used
+the old string, so nothing failed. The directory now loads the Country, State,
+City and Locality lists once and resolves ids through them, never a call per
+tile; an id that does not resolve is left out rather than printed, and a failed
+lookup leaves the free-text line on its own instead of failing the directory.
+
 **Waiting for a place is a state, not a failure.** An unplaced enrolment has no
 class, so `my-class` answers 409 by design and the exam list comes back empty.
 The enrolment screen reads `classId` off the enrolment it already has and asks

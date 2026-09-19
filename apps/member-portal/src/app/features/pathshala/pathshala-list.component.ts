@@ -5,7 +5,8 @@ import { describeError } from '@samaajconnect/shared';
 import { forkJoin, of } from 'rxjs';
 import { catchError } from 'rxjs/operators';
 import { MembersApi } from '../members/members.api';
-import { Child } from '../members/members.models';
+import { MasterDataApi } from '../members/master-data.api';
+import { Child, City, Locality, LookupItem, State } from '../members/members.models';
 import { PathshalaApi } from './pathshala.api';
 import { Enrolment, EnrolmentStatusLabels, Pathshala } from './pathshala.models';
 
@@ -91,8 +92,8 @@ import { Enrolment, EnrolmentStatusLabels, Pathshala } from './pathshala.models'
               <div class="card">
                 <h2>{{ pathshala.name }}</h2>
 
-                @if (pathshala.address; as address) {
-                  <p class="small">{{ address }}</p>
+                @if (location(pathshala); as where) {
+                  <p class="small">{{ where }}</p>
                 }
 
                 <!-- The wireframe's "3 teachers • 8 classes • 126 students".
@@ -165,6 +166,7 @@ import { Enrolment, EnrolmentStatusLabels, Pathshala } from './pathshala.models'
 export class PathshalaListComponent implements OnInit {
   private readonly api = inject(PathshalaApi);
   private readonly members = inject(MembersApi);
+  private readonly master = inject(MasterDataApi);
 
   readonly pathshalas = signal<readonly Pathshala[]>([]);
   readonly enrolments = signal<readonly Enrolment[]>([]);
@@ -173,6 +175,16 @@ export class PathshalaListComponent implements OnInit {
   readonly loading = signal(true);
   readonly error = signal<string | null>(null);
   readonly busy = signal(false);
+
+  /**
+   * The master-data lists, fetched once so a Pathshala's ids read as names. A
+   * failure leaves the free-text line on its own rather than failing the
+   * directory: the location is a courtesy, enrolling is the point.
+   */
+  private readonly countries = signal<readonly LookupItem[]>([]);
+  private readonly states = signal<readonly State[]>([]);
+  private readonly cities = signal<readonly City[]>([]);
+  private readonly localities = signal<readonly Locality[]>([]);
 
   /** Per-Pathshala, so one refusal does not blank the directory. */
   readonly enrolError = signal<Record<string, string>>({});
@@ -212,12 +224,58 @@ export class PathshalaListComponent implements OnInit {
         }
 
         this.loading.set(false);
+        this.loadLocationNames(pathshalas);
       },
       error: (failure: unknown) => {
         this.loading.set(false);
         this.error.set(describeError(failure));
       },
     });
+  }
+
+  private loadLocationNames(pathshalas: readonly Pathshala[]): void {
+    const hasIds = pathshalas.some(
+      (p) => p.address !== null && (p.address.cityId || p.address.localityId || p.address.stateId || p.address.countryId),
+    );
+
+    if (!hasIds) {
+      return;
+    }
+
+    forkJoin({
+      countries: this.master.listCountries().pipe(catchError(() => of([] as LookupItem[]))),
+      states: this.master.listStates().pipe(catchError(() => of([] as State[]))),
+      cities: this.master.listCities().pipe(catchError(() => of([] as City[]))),
+      localities: this.master.listLocalities().pipe(catchError(() => of([] as Locality[]))),
+    }).subscribe(({ countries, states, cities, localities }) => {
+      this.countries.set(countries);
+      this.states.set(states);
+      this.cities.set(cities);
+      this.localities.set(localities);
+    });
+  }
+
+  /**
+   * "12 Temple Road, Hiran Magri, Udaipur, Rajasthan, India" - the free-text
+   * line, then whichever of locality, city, state and country resolve to a
+   * name. Anything that does not resolve is left out rather than shown as an id.
+   */
+  location(pathshala: Pathshala): string {
+    const address = pathshala.address;
+
+    if (address === null) {
+      return '';
+    }
+
+    const parts = [
+      address.line,
+      this.localities().find((x) => x.id === address.localityId)?.name,
+      this.cities().find((x) => x.id === address.cityId)?.name,
+      this.states().find((x) => x.id === address.stateId)?.name,
+      this.countries().find((x) => x.id === address.countryId)?.label,
+    ];
+
+    return parts.filter((part): part is string => !!part && part.trim().length > 0).join(', ');
   }
 
   enrol(pathshala: Pathshala): void {
