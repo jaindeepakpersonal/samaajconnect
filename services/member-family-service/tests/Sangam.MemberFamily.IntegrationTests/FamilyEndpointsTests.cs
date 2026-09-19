@@ -56,7 +56,7 @@ public sealed class FamilyEndpointsTests(MemberFamilyApiFactory factory)
     }
 
     [Fact]
-    public async Task A_member_creates_a_family_and_becomes_its_head()
+    public async Task A_member_creates_a_family_and_becomes_its_admin()
     {
         var response = await MemberClient(_head, TenantA).PostAsync("/v1/families", null);
 
@@ -64,8 +64,9 @@ public sealed class FamilyEndpointsTests(MemberFamilyApiFactory factory)
 
         var body = await response.Content.ReadFromJsonAsync<JsonElement>();
 
-        body.GetProperty("viewerIsHead").GetBoolean().Should().BeTrue();
-        body.GetProperty("familyHeadMemberId").GetGuid().Should().Be(_head);
+        body.GetProperty("viewerIsAdmin").GetBoolean().Should().BeTrue();
+        body.GetProperty("familyAdminMemberId").GetGuid().Should().Be(_head);
+        body.GetProperty("familyHeadMemberId").ValueKind.Should().Be(JsonValueKind.Null);
         body.GetProperty("familyCode").GetString().Should().NotBeNullOrWhiteSpace();
     }
 
@@ -471,5 +472,93 @@ public sealed class FamilyEndpointsTests(MemberFamilyApiFactory factory)
         child.MarkConverted(Guid.NewGuid());
 
         await db.SaveChangesAsync();
+    }
+
+    /// <summary>A household of the admin and one accepted relative.</summary>
+    private async Task<(HttpClient Admin, HttpClient Relative)> HouseholdWithRelativeAsync()
+    {
+        var admin = MemberClient(_head, TenantA);
+        var relative = MemberClient(_joiner, TenantA);
+
+        var family = await (await admin.PostAsync("/v1/families", null)).Content.ReadFromJsonAsync<JsonElement>();
+        var familyId = family.GetProperty("id").GetGuid();
+
+        var requested = await (await relative.PostAsJsonAsync(
+                "/v1/families/join-requests",
+                new { familyCode = family.GetProperty("familyCode").GetString(), relationship = "Parent" }))
+            .Content.ReadFromJsonAsync<JsonElement>();
+
+        var requestId = requested.GetProperty("members").EnumerateArray()
+            .Single(m => m.GetProperty("memberProfileId").GetGuid() == _joiner)
+            .GetProperty("id").GetGuid();
+
+        (await admin.PostAsJsonAsync(
+                $"/v1/families/{familyId}/join-requests/{requestId}/decide", new { accept = true }))
+            .StatusCode.Should().Be(HttpStatusCode.OK);
+
+        return (admin, relative);
+    }
+
+    [Fact]
+    public async Task The_admin_names_an_eldest_member_as_head_without_giving_up_the_admin_role()
+    {
+        var (admin, _) = await HouseholdWithRelativeAsync();
+
+        var response = await admin.PutAsJsonAsync(
+            "/v1/families/mine/head", new { memberProfileId = _joiner.ToString() });
+
+        response.StatusCode.Should().Be(HttpStatusCode.OK);
+
+        var body = await response.Content.ReadFromJsonAsync<JsonElement>();
+
+        body.GetProperty("familyHeadMemberId").GetGuid().Should().Be(_joiner);
+        body.GetProperty("familyAdminMemberId").GetGuid().Should().Be(_head);
+        body.GetProperty("viewerIsAdmin").GetBoolean().Should().BeTrue();
+    }
+
+    [Fact]
+    public async Task Only_the_family_admin_may_choose_the_head()
+    {
+        var (_, relative) = await HouseholdWithRelativeAsync();
+
+        var response = await relative.PutAsJsonAsync(
+            "/v1/families/mine/head", new { memberProfileId = _joiner.ToString() });
+
+        response.StatusCode.Should().Be(HttpStatusCode.Forbidden);
+    }
+
+    [Fact]
+    public async Task A_head_must_be_in_the_household()
+    {
+        var (admin, _) = await HouseholdWithRelativeAsync();
+
+        var response = await admin.PutAsJsonAsync(
+            "/v1/families/mine/head", new { memberProfileId = Guid.NewGuid().ToString() });
+
+        response.StatusCode.Should().Be(HttpStatusCode.Conflict);
+    }
+
+    [Fact]
+    public async Task A_malformed_head_id_is_a_validation_error_not_a_crash()
+    {
+        var (admin, _) = await HouseholdWithRelativeAsync();
+
+        var response = await admin.PutAsJsonAsync(
+            "/v1/families/mine/head", new { memberProfileId = "not-a-guid" });
+
+        response.StatusCode.Should().Be(HttpStatusCode.BadRequest);
+    }
+
+    [Fact]
+    public async Task An_empty_id_clears_the_head()
+    {
+        var (admin, _) = await HouseholdWithRelativeAsync();
+        await admin.PutAsJsonAsync("/v1/families/mine/head", new { memberProfileId = _joiner.ToString() });
+
+        var response = await admin.PutAsJsonAsync("/v1/families/mine/head", new { memberProfileId = (string?)null });
+
+        response.StatusCode.Should().Be(HttpStatusCode.OK);
+        (await response.Content.ReadFromJsonAsync<JsonElement>())
+            .GetProperty("familyHeadMemberId").ValueKind.Should().Be(JsonValueKind.Null);
     }
 }

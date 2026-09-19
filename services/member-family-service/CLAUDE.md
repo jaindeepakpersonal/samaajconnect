@@ -30,9 +30,10 @@ worked example of a cross-service flow with no synchronous call.
 | `CorrectMemberDetailsCommand` | `SamaajAdmin` + `Members.Write`, never self | built |
 | `CreateFamilyCommand` | any member | built |
 | `RequestJoinFamilyCommand` | any member | built |
-| `DecideJoinRequestCommand` | head of that family | built |
-| `CreateChildProfileCommand` | head of that family + `Family.Write` | built |
-| `RequestChildConversionCommand` | head of that family + `Family.Write` | built |
+| `SetFamilyHeadCommand` | family admin of that family | built |
+| `DecideJoinRequestCommand` | family admin of that family | built |
+| `CreateChildProfileCommand` | family admin + `Family.Write` | built |
+| `RequestChildConversionCommand` | family admin + `Family.Write` | built |
 | `DecideChildConversionCommand` | `SamaajAdmin` + `Family.ApproveConversion` | built |
 | `EraseMemberDataCommand` | `[InternalRequest]` | built |
 | `CompleteChildConversionCommand` | `[InternalRequest]` | built |
@@ -67,6 +68,7 @@ worked example of a cross-service flow with no synchronous call.
 |---|---|---|
 | `MemberProfileUpdatedDomainEvent` | `members.profile.updated.v1` | `MemberProfile.Update` |
 | `FamilyCreatedDomainEvent` | `members.family.created.v1` | `Family.Create` |
+| `FamilyHeadChangedDomainEvent` | `members.family.head-changed.v1` | `Family.SetHead` |
 | `ChildConversionApprovedDomainEvent` | `members.child-conversion.approved.v1` | `ChildConversionRequest.Approve` |
 | `ParentalConsentWithdrawnDomainEvent` | `members.child.consent-withdrawn.v1` | `ChildProfile.WithdrawParentalConsent` |
 
@@ -99,11 +101,12 @@ here, which looks exactly like a broker problem and is not one.
 | POST | `/v1/families/join-requests` | any member |
 | DELETE | `/v1/families/join-requests/mine` | any member, their own request |
 | DELETE | `/v1/families/mine/membership` | any member, their own membership |
-| POST | `/v1/families/{familyId}/join-requests/{requestId}/decide` | head of that family |
+| PUT | `/v1/families/mine/head` | family admin |
+| POST | `/v1/families/{familyId}/join-requests/{requestId}/decide` | family admin |
 | GET | `/v1/children` | any member |
-| POST | `/v1/children` | head of that family + `Family.Write` |
+| POST | `/v1/children` | family admin + `Family.Write` |
 | DELETE | `/v1/children/{id}/parental-consent` | the member who gave that consent |
-| POST | `/v1/children/{id}/conversion` | head of that family + `Family.Write` |
+| POST | `/v1/children/{id}/conversion` | family admin + `Family.Write` |
 | GET | `/v1/children/conversion-requests` | `SamaajAdmin` + `Family.ApproveConversion` |
 | POST | `/v1/children/conversion-requests/{requestId}/decide` | `SamaajAdmin` + `Family.ApproveConversion` |
 | GET | `/v1/children/names` | `SamaajAdmin`, `SuperAdmin` + `Members.Read` |
@@ -112,6 +115,25 @@ here, which looks exactly like a broker problem and is not one.
 | GET | `/health` | anonymous |
 
 ## Decisions worth knowing before you change this service
+
+**A household has an admin and, separately, a head - added 2026-09-19, and until
+then the code said "head" for what is really the admin.** The person who sets a
+household up on the platform is often not its eldest member, so one word for two
+jobs was wrong. The **family admin** (`FamilyAdminMemberId`, whoever created
+it, passed on by `SucceedAdminAfterRemoval` when they leave or erase) keeps every
+power this file ever gave the "head": the family code, deciding join requests,
+adding children, starting conversions. The **family head** (`FamilyHeadMemberId`,
+nullable) is a label - the eldest member - that the admin chooses from the
+household's *active* members through `SetFamilyHeadCommand` and that grants
+nothing. Choosing a head never moves the admin role, and a head who leaves or
+erases is quietly cleared (the leave/erase is the record). The choice is the
+admin's rather than derived from dates of birth, which are optional and private
+here and would leave the label blank or wrong for most households. The
+migration renames the old column with its values rather than adding a new one,
+because a plain add would have given every existing household an empty admin.
+Wherever older paragraphs below say "the head" they mean the admin. The
+identity-tenant-service role called `FamilyHead` predates this and is unrelated
+to the head label.
 
 **An administrator held a permission they could not use, and using it would
 have been worse than not.** `Members.Write` has been granted to SamaajAdmin

@@ -116,8 +116,10 @@ name, because a listing is a name. It hides them from the directory search and
 from nothing else - a profile stays reachable by id, which is what group
 applications, post authorship and household membership need.
 
-**Family** — `Id, TenantId, FamilyHeadUserId, FamilyCode (unique per
-tenant, used for join requests), CreatedAt`
+**Family** — `Id, TenantId, FamilyAdminMemberId, FamilyHeadMemberId (nullable),
+FamilyCode (unique per tenant, used for join requests), CreatedAt`. The
+**admin** manages the household (code, join requests, children, conversions);
+the **head** is its eldest member, a label the admin picks that grants nothing.
 
 **FamilyMember** — `Id, FamilyId, MemberProfileId, Relationship
 (Spouse/Parent/Sibling/Other), Status (Active/PendingJoinRequest)`

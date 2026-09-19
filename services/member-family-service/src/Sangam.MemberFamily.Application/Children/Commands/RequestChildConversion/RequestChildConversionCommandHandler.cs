@@ -43,10 +43,10 @@ public sealed class RequestChildConversionCommandHandler(
 
         var family = await families.GetForMemberAsync(memberId, cancellationToken);
 
-        if (family is null || family.Id != child.FamilyId || !family.IsHead(memberId))
+        if (family is null || family.Id != child.FamilyId || !family.IsAdmin(memberId))
         {
             return Result.Failure<ConversionRequestResponse>(Error.Forbidden(
-                "Child.NotYours", "Only the head of this child's family can request their conversion."));
+                "Child.NotYours", "Only the family admin of this child's family can request their conversion."));
         }
 
         if (child.Status == ChildStatus.Converted)

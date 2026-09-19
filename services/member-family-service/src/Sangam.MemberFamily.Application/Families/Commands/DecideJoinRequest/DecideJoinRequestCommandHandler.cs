@@ -40,11 +40,11 @@ public sealed class DecideJoinRequestCommandHandler(
         }
 
         // Deliberately not relaxed for Samaaj admins. Deciding who is in
-        // someone's household is the head's call, not an administrative one.
-        if (!family.IsHead(memberId))
+        // someone's household is the family admin's call, not an administrative one.
+        if (!family.IsAdmin(memberId))
         {
             return Result.Failure<FamilyResponse>(Error.Forbidden(
-                "Family.NotHead", "Only the head of this family can decide join requests."));
+                "Family.NotAdmin", "Only the family admin of this family can decide join requests."));
         }
 
         if (!family.DecideJoinRequest(command.RequestId, command.Accept, memberId, clock.UtcNow))

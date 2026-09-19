@@ -4,7 +4,7 @@ using Sangam.MemberFamily.Application.Security;
 namespace Sangam.MemberFamily.Application.Families.Commands.DecideJoinRequest;
 
 /// <summary>
-/// Accepts or rejects someone's request to join. Only the head of that family
+/// Accepts or rejects someone's request to join. Only the family admin of that family
 /// may decide, which the handler checks - the role gate here cannot know which
 /// family is being decided about.
 /// </summary>

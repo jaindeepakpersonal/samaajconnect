@@ -58,9 +58,10 @@ function familyMember(overrides: Partial<FamilyMember> = {}): FamilyMember {
 function family(overrides: Partial<Family> = {}): Family {
   return {
     id: 'f1',
-    familyHeadMemberId: ME,
+    familyAdminMemberId: ME,
+    familyHeadMemberId: null,
     familyCode: 'JAIN-4821',
-    viewerIsHead: true,
+    viewerIsAdmin: true,
     members: [familyMember()],
     createdAt: new Date().toISOString(),
     ...overrides,
@@ -380,12 +381,12 @@ describe('FamilyComponent', () => {
     component.familyCode = 'JAIN-4821';
     component.join();
 
-    http.expectOne('/v1/families/join-requests').flush(family({ viewerIsHead: false }));
+    http.expectOne('/v1/families/join-requests').flush(family({ viewerIsAdmin: false }));
     fixture.detectChanges();
 
     // The head has not decided yet.
     expect(component.family()).toBeNull();
-    expect(text()).toContain('The family head decides');
+    expect(text()).toContain('The family admin decides');
   });
 
   it('reports a real failure loading the household as an error', () => {
@@ -397,10 +398,95 @@ describe('FamilyComponent', () => {
     expect(component.error()).not.toBeNull();
   });
 
+  // ---- The family head ----------------------------------------------------
+  //
+  // The family admin manages the household; the family head is its eldest
+  // member, a label the admin chooses and that grants nothing.
+
+  const headSelect = () => fixture.nativeElement.querySelector('#family-head') as HTMLSelectElement | null;
+
+  it('lets the family admin choose a head from the active members', () => {
+    load(
+      family({
+        members: [
+          familyMember(),
+          familyMember({ id: 'fm2', memberProfileId: 'p2', fullName: 'Anil Shah' }),
+          familyMember({ id: 'fm3', memberProfileId: 'p3', fullName: 'Waiting Person', status: 'PendingJoinRequest' }),
+        ],
+      }),
+    );
+
+    const options = Array.from(headSelect()!.options).map((o) => o.textContent?.trim());
+
+    expect(options).toContain('Anil Shah');
+    expect(options).not.toContain('Waiting Person');
+  });
+
+  it('offers no head control to somebody who is not the admin', () => {
+    load(family({ viewerIsAdmin: false, familyCode: null, familyAdminMemberId: HEAD }));
+
+    expect(headSelect()).toBeNull();
+  });
+
+  it('saves the chosen head without touching who administers the household', () => {
+    load(
+      family({
+        members: [familyMember(), familyMember({ id: 'fm2', memberProfileId: 'p2', fullName: 'Anil Shah' })],
+      }),
+    );
+
+    component.headChoice = 'p2';
+    component.saveHead(component.family()!);
+
+    const call = http.expectOne('/v1/families/mine/head');
+    expect(call.request.method).toBe('PUT');
+    expect(call.request.body).toEqual({ memberProfileId: 'p2' });
+
+    call.flush(family({ familyHeadMemberId: 'p2' }));
+    fixture.detectChanges();
+
+    expect(component.family()?.familyHeadMemberId).toBe('p2');
+    expect(component.family()?.familyAdminMemberId).toBe(ME);
+  });
+
+  it('clears the head when Not chosen is picked', () => {
+    load(family({ familyHeadMemberId: 'p2' }));
+
+    component.headChoice = '';
+    component.saveHead(component.family()!);
+
+    expect(http.expectOne('/v1/families/mine/head').request.body).toEqual({ memberProfileId: null });
+  });
+
+  it('shows why a refused head choice was refused', () => {
+    load(family());
+
+    component.headChoice = 'stranger';
+    component.saveHead(component.family()!);
+    http.expectOne('/v1/families/mine/head').flush(
+      { title: 'Family.HeadNotAMember', detail: 'The family head has to be an active member of this household.' },
+      { status: 409, statusText: 'Conflict' },
+    );
+    fixture.detectChanges();
+
+    expect(component.headError()).not.toBeNull();
+  });
+
+  it('marks the family head in the list of people', () => {
+    load(
+      family({
+        familyHeadMemberId: 'p2',
+        members: [familyMember(), familyMember({ id: 'fm2', memberProfileId: 'p2', fullName: 'Anil Shah' })],
+      }),
+    );
+
+    expect(text()).toContain('Anil Shah (family head)');
+  });
+
   // ---- The family code ----------------------------------------------------
 
-  it('shows the family code to the head', () => {
-    load(family({ viewerIsHead: true, familyCode: 'JAIN-4821' }));
+  it('shows the family code to the family admin', () => {
+    load(family({ viewerIsAdmin: true, familyCode: 'JAIN-4821' }));
 
     expect(text()).toContain('JAIN-4821');
   });
@@ -408,13 +494,13 @@ describe('FamilyComponent', () => {
   it('shows no code to an ordinary member, because the service sends none', () => {
     // It is the token anyone needs to request to join; handing it to every
     // member would let any one of them invite the Samaaj into the household.
-    load(family({ viewerIsHead: false, familyCode: null, familyHeadMemberId: HEAD }));
+    load(family({ viewerIsAdmin: false, familyCode: null, familyAdminMemberId: HEAD }));
 
     expect(text()).not.toContain('JAIN-4821');
-    expect(text()).toContain('Only the family head');
+    expect(text()).toContain('Only the family admin');
   });
 
-  it('offers the head the requests waiting on them', () => {
+  it('offers the family admin the requests waiting on them', () => {
     load(
       family({
         members: [
@@ -804,8 +890,8 @@ describe('FamilyComponent', () => {
 
   function waitingOn(headId: string) {
     return family({
-      familyHeadMemberId: headId,
-      viewerIsHead: false,
+      familyAdminMemberId: headId,
+      viewerIsAdmin: false,
       members: [
         familyMember({ id: 'fm-head', memberProfileId: headId, fullName: 'Anil Shah' }),
         familyMember({
@@ -882,7 +968,7 @@ describe('FamilyComponent', () => {
   });
 
   it('draws the ordinary household screen once the request is accepted', () => {
-    load(family({ viewerIsHead: false }));
+    load(family({ viewerIsAdmin: false }));
 
     expect(text()).toContain('Your household');
     expect(text()).not.toContain('Waiting to join a household');
@@ -891,7 +977,7 @@ describe('FamilyComponent', () => {
   // ---- Leaving a household ------------------------------------------------
 
   it('offers leaving to an ordinary member, not only the head', () => {
-    load(family({ viewerIsHead: false }));
+    load(family({ viewerIsAdmin: false }));
 
     expect(text()).toContain('Leave this household');
   });
@@ -919,7 +1005,7 @@ describe('FamilyComponent', () => {
   });
 
   it('warns the head that the household passes on', () => {
-    load(family({ viewerIsHead: true }));
+    load(family({ viewerIsAdmin: true }));
 
     component.askToLeave();
     fixture.detectChanges();
@@ -928,7 +1014,7 @@ describe('FamilyComponent', () => {
   });
 
   it('does not warn an ordinary member about succession', () => {
-    load(family({ viewerIsHead: false }));
+    load(family({ viewerIsAdmin: false }));
 
     component.askToLeave();
     fixture.detectChanges();

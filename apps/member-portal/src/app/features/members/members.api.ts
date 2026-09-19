@@ -125,12 +125,12 @@ export class MembersApi {
     return this.http.get<Family>('/v1/families/mine');
   }
 
-  /** Creates one, and makes the caller its head. */
+  /** Creates one, and makes the caller its family admin. */
   createFamily(): Observable<Family> {
     return this.http.post<Family>('/v1/families', {});
   }
 
-  /** Asks to join, using the code the head has. */
+  /** Asks to join, using the code the family admin has. */
   requestToJoin(familyCode: string, relationship: Relationship): Observable<Family> {
     return this.http.post<Family>('/v1/families/join-requests', { familyCode, relationship });
   }
@@ -159,7 +159,12 @@ export class MembersApi {
     );
   }
 
-  /** The head accepts or turns down a request. */
+  /** Names (or, with null, clears) the household head. Family admin only. */
+  setFamilyHead(memberProfileId: string | null): Observable<Family> {
+    return this.http.put<Family>('/v1/families/mine/head', { memberProfileId });
+  }
+
+  /** The family admin accepts or turns down a request. */
   decideJoinRequest(
     familyId: string,
     requestId: string,

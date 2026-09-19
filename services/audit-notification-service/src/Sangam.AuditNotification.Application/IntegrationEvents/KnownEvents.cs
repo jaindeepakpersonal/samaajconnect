@@ -445,7 +445,13 @@ public static class KnownEvents
             Action: "FamilyCreated",
             EntityName: "Family",
             EntityIdProperty: "familyId",
-            ActorIdProperty: "familyHeadMemberId"),
+            ActorIdProperty: "familyAdminMemberId"),
+
+        ["members.family.head-changed.v1"] = new(
+            Action: "FamilyHeadChanged",
+            EntityName: "Family",
+            EntityIdProperty: "familyId",
+            ActorIdProperty: "changedBy"),
 
         ["members.child-conversion.approved.v1"] = new(
             Action: "ChildConversionApproved",

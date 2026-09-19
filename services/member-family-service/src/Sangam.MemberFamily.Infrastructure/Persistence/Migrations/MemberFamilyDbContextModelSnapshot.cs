@@ -153,13 +153,17 @@ namespace Sangam.MemberFamily.Infrastructure.Persistence.Migrations
                         .HasColumnType("timestamp with time zone")
                         .HasColumnName("created_at");
 
+                    b.Property<Guid>("FamilyAdminMemberId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("family_admin_member_id");
+
                     b.Property<string>("FamilyCode")
                         .IsRequired()
                         .HasMaxLength(16)
                         .HasColumnType("character varying(16)")
                         .HasColumnName("family_code");
 
-                    b.Property<Guid>("FamilyHeadMemberId")
+                    b.Property<Guid?>("FamilyHeadMemberId")
                         .HasColumnType("uuid")
                         .HasColumnName("family_head_member_id");
 

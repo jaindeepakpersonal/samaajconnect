@@ -253,7 +253,7 @@ public sealed class ErasureConsumerTests(MemberFamilyApiFactory factory)
     /// </summary>
     /// <remarks>
     /// Until this existed the household kept the erased member's id as its
-    /// head, so `IsHead` was false for everybody and four things stopped at
+    /// head, so `IsAdmin` was false for everybody and four things stopped at
     /// once: deciding a join request, adding a child, starting a conversion,
     /// and seeing the family code to invite anyone. Five people frozen because
     /// one of them exercised a right.
@@ -290,9 +290,9 @@ public sealed class ErasureConsumerTests(MemberFamilyApiFactory factory)
         var headed = await factory.EventuallyAsync(
             db => db.Families.IgnoreQueryFilters().AsNoTracking()
                 .SingleAsync(f => f.Id == household.FamilyId),
-            found => found.FamilyHeadMemberId == survivor);
+            found => found.FamilyAdminMemberId == survivor);
 
-        headed.FamilyHeadMemberId.Should().Be(survivor);
-        headed.IsHead(survivor).Should().BeTrue();
+        headed.FamilyAdminMemberId.Should().Be(survivor);
+        headed.IsAdmin(survivor).Should().BeTrue();
     }
 }

@@ -5,7 +5,7 @@ namespace Sangam.MemberFamily.Domain.Families;
 
 /// <summary>
 /// A household within one Samaaj. Other members join it by quoting its
-/// <see cref="FamilyCode"/>, which the head then accepts or rejects.
+/// <see cref="FamilyCode"/>, which the family admin then accepts or rejects.
 /// </summary>
 public sealed class Family : AggregateRoot, ITenantScopedEntity
 {
@@ -22,7 +22,20 @@ public sealed class Family : AggregateRoot, ITenantScopedEntity
 
     public Guid Id { get; private set; }
     public Guid TenantId { get; private set; }
-    public Guid FamilyHeadMemberId { get; private set; }
+    /// <summary>
+    /// The member who manages the household: holds the family code, decides
+    /// join requests, adds children and starts conversions. Whoever creates
+    /// the household starts as its admin.
+    /// </summary>
+    public Guid FamilyAdminMemberId { get; private set; }
+
+    /// <summary>
+    /// The household's head - conventionally its eldest member - which is a
+    /// label the admin chooses and grants nothing. Deliberately separate from
+    /// <see cref="FamilyAdminMemberId"/>: the person who set the household up
+    /// on the platform is often not its eldest member. Null until chosen.
+    /// </summary>
+    public Guid? FamilyHeadMemberId { get; private set; }
 
     /// <summary>Unique per Samaaj, not platform-wide: two Samaaj may share a code without confusion.</summary>
     public string FamilyCode { get; private set; } = null!;
@@ -33,7 +46,7 @@ public sealed class Family : AggregateRoot, ITenantScopedEntity
 
     private Family() { }
 
-    public static Family Create(Guid tenantId, Guid headMemberId, string familyCode, DateTimeOffset createdAt)
+    public static Family Create(Guid tenantId, Guid adminMemberId, string familyCode, DateTimeOffset createdAt)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(familyCode);
 
@@ -41,17 +54,17 @@ public sealed class Family : AggregateRoot, ITenantScopedEntity
         {
             Id = Guid.NewGuid(),
             TenantId = tenantId,
-            FamilyHeadMemberId = headMemberId,
+            FamilyAdminMemberId = adminMemberId,
             FamilyCode = familyCode.Trim().ToUpperInvariant(),
             CreatedAt = createdAt,
         };
 
-        // The head is a member of their own family from the start, and needs no
+        // The admin is a member of their own family from the start, and needs no
         // approval to be one.
         family._members.Add(new FamilyMember(
-            family.Id, headMemberId, Relationship.Other, FamilyMemberStatus.Active, createdAt));
+            family.Id, adminMemberId, Relationship.Other, FamilyMemberStatus.Active, createdAt));
 
-        family.Raise(new FamilyCreatedDomainEvent(family.Id, tenantId, headMemberId, createdAt));
+        family.Raise(new FamilyCreatedDomainEvent(family.Id, tenantId, adminMemberId, createdAt));
 
         return family;
     }
@@ -65,12 +78,37 @@ public sealed class Family : AggregateRoot, ITenantScopedEntity
     public FamilyMember? FindMember(Guid memberProfileId) =>
         _members.FirstOrDefault(m => m.MemberProfileId == memberProfileId);
 
-    public bool IsHead(Guid memberProfileId) => FamilyHeadMemberId == memberProfileId;
+    public bool IsAdmin(Guid memberProfileId) => FamilyAdminMemberId == memberProfileId;
+
+    /// <summary>
+    /// Names the household's head, or clears it with null. The head must be an
+    /// Active member - somebody who has only asked to join is not yet in the
+    /// household. Returns false, changing nothing, when they are not.
+    /// </summary>
+    public bool SetHead(Guid? memberProfileId, Guid changedBy, DateTimeOffset changedAt)
+    {
+        if (memberProfileId is { } id
+            && !_members.Any(m => m.MemberProfileId == id && m.Status == FamilyMemberStatus.Active))
+        {
+            return false;
+        }
+
+        if (FamilyHeadMemberId == memberProfileId)
+        {
+            return true;
+        }
+
+        FamilyHeadMemberId = memberProfileId;
+
+        Raise(new FamilyHeadChangedDomainEvent(Id, TenantId, memberProfileId, changedBy, changedAt));
+
+        return true;
+    }
 
     /// <summary>
     /// Records a request to join. Returns null when this member already has a
     /// standing request or membership, so a repeated click is a no-op rather
-    /// than a second row for the head to decide twice.
+    /// than a second row for the family admin to decide twice.
     /// </summary>
     public FamilyMember? RequestJoin(Guid memberProfileId, Relationship relationship, DateTimeOffset requestedAt)
     {
@@ -108,7 +146,7 @@ public sealed class Family : AggregateRoot, ITenantScopedEntity
         NothingPending,
 
         /// <summary>
-        /// The head accepted between the member asking and withdrawing, so this
+        /// The family admin accepted between the member asking and withdrawing, so this
         /// is now a membership rather than a request.
         /// </summary>
         AlreadyAccepted,
@@ -121,17 +159,17 @@ public sealed class Family : AggregateRoot, ITenantScopedEntity
     /// <para>
     /// <b>Without this a member could be stuck forever.</b> A pending request
     /// counts as belonging to a household, deliberately - otherwise somebody
-    /// could ask two families at once and both heads could accept. But nothing
-    /// could cancel one, so a request the head never got round to deciding left
+    /// could ask two families at once and both family admins could accept. But nothing
+    /// could cancel one, so a request the family admin never got round to deciding left
     /// that member unable to join any other household or create their own, with
     /// no way out that did not involve someone else acting. That is not an
-    /// erasure edge case; it is what happens when a head is simply slow.
+    /// erasure edge case; it is what happens when a family admin is simply slow.
     /// </para>
     /// <para>
     /// <b>Only a pending request, never a membership.</b> Leaving a household
     /// you are actually in is a different act with different consequences - the
-    /// children in it are held on somebody's consent, and the head's departure
-    /// is what <see cref="SucceedHeadAfterRemoval"/> exists for. Collapsing the
+    /// children in it are held on somebody's consent, and the family admin's departure
+    /// is what <see cref="SucceedAdminAfterRemoval"/> exists for. Collapsing the
     /// two into one call would let "cancel my request" quietly mean "leave my
     /// family" for anyone whose request had just been accepted, which is why
     /// that case is refused by name rather than treated as success.
@@ -171,14 +209,14 @@ public sealed class Family : AggregateRoot, ITenantScopedEntity
             .ThenBy(m => m.Id)];
 
     /// <summary>
-    /// Hands headship to the longest-standing remaining member, and answers who
-    /// that is — or null when the household has nobody left to head it.
+    /// Hands the admin role to the longest-standing remaining member, and answers who
+    /// that is — or null when the household has nobody left to administer it.
     /// </summary>
     /// <remarks>
     /// <para>
-    /// Called when the head's own membership row has just been removed, which
+    /// Called when the family admin's own membership row has just been removed, which
     /// happens when they erase their account. Until this existed the household
-    /// kept the erased member's id as its head, so <see cref="IsHead"/> was
+    /// kept the erased member's id as its admin, so <see cref="IsAdmin"/> was
     /// false for everybody and four things stopped working at once: deciding a
     /// join request, adding a child, starting a conversion, and seeing the
     /// family code to invite anyone. A household of five people was frozen
@@ -186,11 +224,11 @@ public sealed class Family : AggregateRoot, ITenantScopedEntity
     /// </para>
     /// <para>
     /// <b>This is a deliberate change of mind.</b> The erasure consumer used to
-    /// say re-heading "belongs in an admin command, not here". An admin command
+    /// say re-appointing an admin "belongs in an admin command, not here". An admin command
     /// needs an administrator to notice, and nothing tells them - so the
     /// household stays broken until somebody complains, which is a worse
     /// failure than the consumer making a small, explicable decision. Succeeding
-    /// at the moment of erasure also means the headless state never exists,
+    /// at the moment of erasure also means the family adminless state never exists,
     /// rather than existing until repaired.
     /// </para>
     /// <para>
@@ -201,9 +239,9 @@ public sealed class Family : AggregateRoot, ITenantScopedEntity
     /// years because they filled a form first.
     /// </para>
     /// </remarks>
-    public Guid? SucceedHeadAfterRemoval(Guid removedMemberId)
+    public Guid? SucceedAdminAfterRemoval(Guid removedMemberId)
     {
-        if (FamilyHeadMemberId != removedMemberId)
+        if (FamilyAdminMemberId != removedMemberId)
         {
             return null;
         }
@@ -216,16 +254,16 @@ public sealed class Family : AggregateRoot, ITenantScopedEntity
 
         if (successor is null)
         {
-            // Nobody left. The household keeps the departed id as its head and
+            // Nobody left. The household keeps the departed id as its admin and
             // is inert: no member can see it and no request can be made to it,
-            // because the code is only ever shown to a head. Leaving the field
-            // alone is better than inventing a head who is not there.
+            // because the code is only ever shown to a family admin. Leaving the field
+            // alone is better than inventing a family admin who is not there.
             return null;
         }
 
-        FamilyHeadMemberId = successor.MemberProfileId;
+        FamilyAdminMemberId = successor.MemberProfileId;
 
-        return FamilyHeadMemberId;
+        return FamilyAdminMemberId;
     }
 
     /// <summary>
@@ -243,6 +281,14 @@ public sealed class Family : AggregateRoot, ITenantScopedEntity
         }
 
         _members.Remove(existing);
+
+        // A head who is no longer in the household is not its head. Cleared
+        // quietly rather than raising an event: the leave/erase that caused it
+        // is itself the record.
+        if (FamilyHeadMemberId == memberProfileId)
+        {
+            FamilyHeadMemberId = null;
+        }
 
         return true;
     }

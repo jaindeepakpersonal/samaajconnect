@@ -10,7 +10,8 @@ synonyms — it keeps the ER diagram, the API, and the UI copy consistent.
 | **Tenant** | The technical unit of isolation corresponding 1:1 with a Samaaj. Every tenant-owned database row carries a `TenantId`. |
 | **Super Admin** | Platform-level administrator. Not scoped to any tenant; manages tenant creation, Pathshala master records, and platform configuration. |
 | **Samaaj Admin** | Administrator scoped to exactly one tenant. |
-| **Family Head** | The member designated as the primary/owning member of a Family record. |
+| **Family Admin** | The member who manages a Family record: holds its code, decides join requests, adds children and starts conversions. Whoever creates the household starts as its admin. |
+| **Family Head** | The household's eldest member - a label the Family Admin chooses from its members. Grants nothing. (The identity role named `FamilyHead` predates this split and is unrelated to the label.) |
 | **Child Profile** | A dependent profile under a Family, with no independent login until the adult-child conversion flow is completed. |
 | **Adult-child conversion** | The flow triggered when a Child Profile's age passes 18: the child can create their own member login while the family relationship and historical child records are preserved. |
 | **Timeline** | The tenant's social feed: Samaaj announcements plus approved member posts. |

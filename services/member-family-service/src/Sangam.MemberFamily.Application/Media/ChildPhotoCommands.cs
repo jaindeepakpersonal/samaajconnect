@@ -23,7 +23,7 @@ namespace Sangam.MemberFamily.Application.Media;
 /// The permission is the household's, not the Samaaj's. Unlike a member photo,
 /// <c>Members.Write</c> does not open this: an administrator correcting a
 /// member's own details is administrative work, and a child's photograph is
-/// not. That matches <c>DecideJoinRequestCommand</c>, which stays with the head
+/// not. That matches <c>DecideJoinRequestCommand</c>, which stays with the family admin
 /// even for administrators, and the reasoning is the same — who is in a
 /// household, and what their children look like, is not administration.
 /// </para>

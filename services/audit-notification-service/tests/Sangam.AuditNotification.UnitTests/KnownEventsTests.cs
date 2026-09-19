@@ -339,7 +339,18 @@ public sealed class KnownEventsTests
         descriptor.Action.Should().Be("FamilyCreated");
         descriptor.EntityName.Should().Be("Family");
         descriptor.EntityIdProperty.Should().Be("familyId");
-        descriptor.ActorIdProperty.Should().Be("familyHeadMemberId");
+        descriptor.ActorIdProperty.Should().Be("familyAdminMemberId");
+    }
+
+    [Fact]
+    public void A_changed_family_head_is_recorded_against_the_family_admin_who_chose_it()
+    {
+        var descriptor = KnownEvents.Describe("members.family.head-changed.v1");
+
+        descriptor.Action.Should().Be("FamilyHeadChanged");
+        descriptor.EntityName.Should().Be("Family");
+        descriptor.EntityIdProperty.Should().Be("familyId");
+        descriptor.ActorIdProperty.Should().Be("changedBy");
     }
 
     [Fact]

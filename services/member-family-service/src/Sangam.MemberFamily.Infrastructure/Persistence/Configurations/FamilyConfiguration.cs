@@ -19,7 +19,8 @@ public sealed class FamilyConfiguration : IEntityTypeConfiguration<Family>
         builder.Property(f => f.Id).ValueGeneratedNever();
 
         builder.Property(f => f.TenantId).IsRequired();
-        builder.Property(f => f.FamilyHeadMemberId).IsRequired();
+        builder.Property(f => f.FamilyAdminMemberId).IsRequired();
+        builder.Property(f => f.FamilyHeadMemberId);
         builder.Property(f => f.FamilyCode).HasMaxLength(16).IsRequired();
         builder.Property(f => f.CreatedAt).IsRequired();
 

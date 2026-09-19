@@ -339,7 +339,7 @@ public sealed class ChildEndpointsTests(MemberFamilyApiFactory factory)
             .Should().Be("Ravi Shah " + _run);
 
         export.GetProperty("children").EnumerateArray().Should().ContainSingle();
-        export.GetProperty("family").GetProperty("viewerIsHead").GetBoolean().Should().BeTrue();
+        export.GetProperty("family").GetProperty("viewerIsAdmin").GetBoolean().Should().BeTrue();
 
         export.GetProperty("heldElsewhere").EnumerateArray()
             .Select(e => e.GetString())

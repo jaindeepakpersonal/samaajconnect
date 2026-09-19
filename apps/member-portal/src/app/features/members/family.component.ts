@@ -30,7 +30,7 @@ import {
  *
  * The wireframe's "Invite" button is not built: there is no notification
  * channel, so an invitation could not be delivered. Joining works the other way
- * round - the head shares the family code, which only they can see.
+ * round - the family admin shares the family code, which only they can see.
  */
 @Component({
   selector: 'app-family',
@@ -47,7 +47,7 @@ import {
 
       <!-- Page level, not inside the waiting card, and that is the point.
            Withdrawing re-reads so the screen stops claiming to be waiting - but
-           the one refusal worth showing is "the head accepted while you were
+           the one refusal worth showing is "the family admin accepted while you were
            deciding", and the re-read is exactly what takes the waiting card
            away. A message inside it would be removed by the same reload that
            made it true. -->
@@ -68,7 +68,7 @@ import {
              to somebody whose request is only pending, so the page rendered it
              as theirs - and there was no way to take the request back, while a
              pending request blocks joining anywhere else or creating one of
-             your own. A head who never answered left that member stuck with no
+             your own. An admin who never answered left that member stuck with no
              way out that did not run through somebody else. -->
         <div class="card">
           <h2>Waiting to join a household</h2>
@@ -101,8 +101,8 @@ import {
             <h2>Your household</h2>
 
             <div class="badges">
-              @if (household.viewerIsHead) {
-                <span class="pill ok">Family head</span>
+              @if (household.viewerIsAdmin) {
+                <span class="pill ok">Family admin</span>
               } @else {
                 <span class="pill">Member</span>
               }
@@ -132,10 +132,10 @@ import {
 
           <!-- The code, or the queue ------------------------------------- -->
           <div class="card">
-            @if (household.viewerIsHead) {
+            @if (household.viewerIsAdmin) {
               <h2>Invite someone</h2>
 
-              <!-- Present only for the head: it is the token anyone needs to
+              <!-- Present only for the family admin: it is the token anyone needs to
                    request to join, so handing it to every member would let any
                    one of them invite the Samaaj into the household. -->
               @if (household.familyCode; as code) {
@@ -188,10 +188,45 @@ import {
                   </div>
                 }
               }
+
+              <h2>Family head</h2>
+              <p class="small">
+                The family head is your household's eldest member. Choosing one is a label - it
+                does not give them the admin's controls.
+              </p>
+
+              @if (headError(); as message) {
+                <p class="notice error" role="alert">{{ message }}</p>
+              }
+
+              <label for="family-head">Who is the family head?</label>
+              <select
+                class="input"
+                id="family-head"
+                name="familyHead"
+                [ngModel]="household.familyHeadMemberId ?? ''"
+                (ngModelChange)="headChoice = $event"
+              >
+                <option value="">Not chosen</option>
+                @for (person of activeMembers(household); track person.id) {
+                  <option [value]="person.memberProfileId">{{ person.fullName }}</option>
+                }
+              </select>
+
+              <div class="actions">
+                <button
+                  class="btn small"
+                  type="button"
+                  [disabled]="busy()"
+                  (click)="saveHead(household)"
+                >
+                  Save family head
+                </button>
+              </div>
             } @else {
               <h2>Your household</h2>
               <p class="small">
-                Only the family head can invite people or decide requests to join.
+                Only the family admin can invite people or decide requests to join.
               </p>
             }
 
@@ -210,8 +245,8 @@ import {
                 <p>
                   You will no longer be in this household, and you will be free to join
                   another or start your own. Nothing else about you changes.
-                  @if (household.viewerIsHead) {
-                    Because you are the family head, the longest-standing member takes
+                  @if (household.viewerIsAdmin) {
+                    Because you are the family admin, the longest-standing member takes
                     over.
                   }
                 </p>
@@ -408,7 +443,7 @@ import {
           }
 
           <!-- Add a child ------------------------------------------------ -->
-          @if (household.viewerIsHead) {
+          @if (household.viewerIsAdmin) {
             <div class="card">
               <h2>Add a child</h2>
 
@@ -498,7 +533,7 @@ import {
           <div class="card">
             <h2>Start a household</h2>
             <p class="small">
-              You become its head, and get a code to give to the rest of your family.
+              You become its family admin, and get a code to give to the rest of your family.
             </p>
 
             @if (startError(); as message) {
@@ -521,7 +556,7 @@ import {
                 id="family-code"
                 name="familyCode"
                 [(ngModel)]="familyCode"
-                placeholder="The code your family head gave you"
+                placeholder="The code your family admin gave you"
                 required
               />
 
@@ -539,7 +574,7 @@ import {
 
               @if (joinSent()) {
                 <p class="notice info" role="status">
-                  Sent. The family head decides; check back here.
+                  Sent. The family admin decides; check back here.
                 </p>
               }
 
@@ -577,6 +612,10 @@ export class FamilyComponent implements OnInit {
 
   /** Per-request failures, so one refusal does not blank the queue. */
   readonly actionError = signal<Record<string, string>>({});
+  readonly headError = signal<string | null>(null);
+
+  /** The family-head select's pending choice; '' means not chosen. Null until touched. */
+  headChoice: string | null = null;
   readonly convertError = signal<Record<string, string>>({});
 
   /** Which child's photo is being uploaded or removed, if any. */
@@ -695,11 +734,11 @@ export class FamilyComponent implements OnInit {
 
   /** Who is being asked, so the screen names them rather than an id. */
   headName(household: Family): string {
-    const head = household.members.find(
-      (person) => person.memberProfileId === household.familyHeadMemberId,
+    const admin = household.members.find(
+      (person) => person.memberProfileId === household.familyAdminMemberId,
     );
 
-    return head?.fullName ?? 'this household';
+    return admin?.fullName ?? 'this household';
   }
 
   /**
@@ -835,6 +874,26 @@ export class FamilyComponent implements OnInit {
       },
       error: (failure: unknown) => {
         this.addTo(this.actionError, request.id, describeError(failure));
+        this.busy.set(false);
+      },
+    });
+  }
+
+  /** Saves the admin's choice of family head, or clears it. */
+  saveHead(household: Family): void {
+    const chosen = this.headChoice ?? household.familyHeadMemberId ?? '';
+
+    this.busy.set(true);
+    this.headError.set(null);
+
+    this.api.setFamilyHead(chosen === '' ? null : chosen).subscribe({
+      next: (updated) => {
+        this.family.set(updated);
+        this.headChoice = null;
+        this.busy.set(false);
+      },
+      error: (failure: unknown) => {
+        this.headError.set(describeError(failure));
         this.busy.set(false);
       },
     });
@@ -1009,7 +1068,7 @@ export class FamilyComponent implements OnInit {
     }
 
     return person.memberProfileId === household.familyHeadMemberId
-      ? `${person.fullName} (head)`
+      ? `${person.fullName} (family head)`
       : person.fullName;
   }
 

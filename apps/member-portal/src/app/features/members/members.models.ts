@@ -113,15 +113,18 @@ export interface FamilyMember {
 /**
  * A household.
  *
- * `familyCode` is present **only for the head**. It is the token anyone needs
+ * `familyCode` is present **only for the family admin**. It is the token anyone needs
  * to request to join, so the service withholds it from ordinary members - a
  * screen must not assume it is there.
  */
 export interface Family {
   readonly id: string;
-  readonly familyHeadMemberId: string;
+  /** Manages the household: code, join requests, children, conversions. */
+  readonly familyAdminMemberId: string;
+  /** The eldest member, as the admin sees it - a label that grants nothing. Null until chosen. */
+  readonly familyHeadMemberId: string | null;
   readonly familyCode: string | null;
-  readonly viewerIsHead: boolean;
+  readonly viewerIsAdmin: boolean;
   readonly members: readonly FamilyMember[];
   readonly createdAt: string;
 }

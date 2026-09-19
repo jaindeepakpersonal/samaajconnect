@@ -122,10 +122,10 @@ public sealed class EraseMemberDataCommandHandler(
         // was invisible because only a head is shown it. Four things broken for
         // everyone left, because one person exercised a right.
         //
-        // Doing it here means the headless state never exists rather than
+        // Doing it here means the adminless state never exists rather than
         // existing until repaired, and the decision is small enough to explain
         // in a sentence: the longest-standing member takes over.
-        if (family?.SucceedHeadAfterRemoval(payload.UserId) is { } successor)
+        if (family?.SucceedAdminAfterRemoval(payload.UserId) is { } successor)
         {
             logger.LogInformation(
                 "Household {FamilyId} is now headed by {MemberId} after its head erased",

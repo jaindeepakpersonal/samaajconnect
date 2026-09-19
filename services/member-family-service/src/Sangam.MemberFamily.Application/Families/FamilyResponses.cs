@@ -10,14 +10,15 @@ public sealed record FamilyMemberResponse(
     DateTimeOffset? DecidedAt);
 
 /// <summary>
-/// <paramref name="FamilyCode"/> is present only for the head. It is the token
+/// <paramref name="FamilyCode"/> is present only for the family admin. It is the token
 /// anyone needs to request to join, so handing it to every member would mean
 /// any one of them could invite the whole Samaaj into the household.
 /// </summary>
 public sealed record FamilyResponse(
     Guid Id,
-    Guid FamilyHeadMemberId,
+    Guid FamilyAdminMemberId,
+    Guid? FamilyHeadMemberId,
     string? FamilyCode,
-    bool ViewerIsHead,
+    bool ViewerIsAdmin,
     IReadOnlyList<FamilyMemberResponse> Members,
     DateTimeOffset CreatedAt);

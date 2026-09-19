@@ -117,7 +117,7 @@ public sealed class LeaveFamilyCommandHandler(
 
         family.RemoveMember(memberId);
 
-        var newHead = family.SucceedHeadAfterRemoval(memberId);
+        var newHead = family.SucceedAdminAfterRemoval(memberId);
 
         await unitOfWork.SaveChangesAsync(cancellationToken);
 

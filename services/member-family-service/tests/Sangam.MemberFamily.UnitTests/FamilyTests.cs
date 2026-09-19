@@ -13,7 +13,7 @@ public sealed class FamilyTests
     private static Family NewFamily() => Family.Create(TenantId, Head, "ABCD2345", Now);
 
     [Fact]
-    public void The_head_is_an_active_member_of_their_own_family_from_the_start()
+    public void The_admin_is_an_active_member_of_their_own_family_from_the_start()
     {
         var family = NewFamily();
 
@@ -21,7 +21,7 @@ public sealed class FamilyTests
 
         member.MemberProfileId.Should().Be(Head);
         member.Status.Should().Be(FamilyMemberStatus.Active);
-        family.IsHead(Head).Should().BeTrue();
+        family.IsAdmin(Head).Should().BeTrue();
     }
 
     [Fact]
@@ -137,5 +137,88 @@ public sealed class FamilyTests
     public void A_family_code_is_stored_uppercased()
     {
         Family.Create(TenantId, Head, " abcd2345 ", Now).FamilyCode.Should().Be("ABCD2345");
+    }
+
+    private static (Family Family, Guid Relative) FamilyWithActiveRelative()
+    {
+        var family = NewFamily();
+        var relative = Guid.NewGuid();
+
+        var request = family.RequestJoin(relative, Relationship.Parent, Now)!;
+        family.DecideJoinRequest(request.Id, accepted: true, Head, Now).Should().BeTrue();
+        family.ClearDomainEvents();
+
+        return (family, relative);
+    }
+
+    [Fact]
+    public void A_new_household_has_an_admin_and_no_head_yet()
+    {
+        var family = NewFamily();
+
+        family.FamilyAdminMemberId.Should().Be(Head);
+        family.FamilyHeadMemberId.Should().BeNull();
+    }
+
+    [Fact]
+    public void The_admin_can_name_a_different_active_member_as_head()
+    {
+        // The person who set the household up on the platform is often not its
+        // eldest member - which is why head and admin are separate things.
+        var (family, relative) = FamilyWithActiveRelative();
+
+        family.SetHead(relative, Head, Now).Should().BeTrue();
+
+        family.FamilyHeadMemberId.Should().Be(relative);
+        family.FamilyAdminMemberId.Should().Be(Head, "choosing a head grants nothing");
+        family.IsAdmin(relative).Should().BeFalse();
+        family.DomainEvents.Should().ContainSingle().Which.Should().BeOfType<FamilyHeadChangedDomainEvent>();
+    }
+
+    [Fact]
+    public void Somebody_who_has_only_asked_to_join_cannot_be_head()
+    {
+        var family = NewFamily();
+        var asked = Guid.NewGuid();
+        family.RequestJoin(asked, Relationship.Sibling, Now);
+
+        family.SetHead(asked, Head, Now).Should().BeFalse();
+
+        family.FamilyHeadMemberId.Should().BeNull();
+    }
+
+    [Fact]
+    public void Naming_the_same_head_again_raises_nothing()
+    {
+        var (family, relative) = FamilyWithActiveRelative();
+        family.SetHead(relative, Head, Now);
+        family.ClearDomainEvents();
+
+        family.SetHead(relative, Head, Now).Should().BeTrue();
+
+        family.DomainEvents.Should().BeEmpty();
+    }
+
+    [Fact]
+    public void The_head_can_be_cleared()
+    {
+        var (family, relative) = FamilyWithActiveRelative();
+        family.SetHead(relative, Head, Now);
+
+        family.SetHead(null, Head, Now).Should().BeTrue();
+
+        family.FamilyHeadMemberId.Should().BeNull();
+    }
+
+    [Fact]
+    public void A_head_who_leaves_the_household_is_no_longer_its_head()
+    {
+        var (family, relative) = FamilyWithActiveRelative();
+        family.SetHead(relative, Head, Now);
+
+        family.RemoveMember(relative);
+
+        family.FamilyHeadMemberId.Should().BeNull();
+        family.FamilyAdminMemberId.Should().Be(Head);
     }
 }

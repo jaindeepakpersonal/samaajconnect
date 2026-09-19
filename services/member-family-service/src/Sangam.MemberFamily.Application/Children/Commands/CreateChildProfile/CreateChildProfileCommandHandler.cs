@@ -32,13 +32,13 @@ public sealed class CreateChildProfileCommandHandler(
                 "Family.None", "Create or join a family before adding children to it."));
         }
 
-        // Only the head adds children. Any member of the household being able
+        // Only the family admin adds children. Any member of the household being able
         // to would mean a record nobody agreed to, in a family they merely
         // belong to.
-        if (!family.IsHead(memberId))
+        if (!family.IsAdmin(memberId))
         {
             return Result.Failure<ChildResponse>(Error.Forbidden(
-                "Family.NotHead", "Only the head of this family can add children."));
+                "Family.NotAdmin", "Only the family admin of this family can add children."));
         }
 
         var child = ChildProfile.Create(

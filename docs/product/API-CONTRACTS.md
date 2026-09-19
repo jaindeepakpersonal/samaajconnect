@@ -93,18 +93,19 @@ enforced by `TenantAuthorizationBehavior`, not just UI hiding.
 | POST | `/children/{id}/photo` | The child's household | As above. **Not** opened by `Members.Write` |
 | GET | `/children/{id}/photo` | The child's household | |
 | DELETE | `/children/{id}/photo` | The child's household | Idempotent |
-| POST | `/families` | Member | Create family, become head |
+| POST | `/families` | Member | Create family, become its **family admin** |
+| PUT | `/families/mine/head` | Family admin | Name the household's **family head** (its eldest member, a label that grants nothing) from its active members, or clear it with an empty id. **403** to anybody but the family admin, **409** if the person is not an active member |
 | POST | `/families/join-requests` | Member | Request to join via family code |
-| DELETE | `/families/join-requests/mine` | Member | Take back a request nobody has decided. No id: a member has at most one. Idempotent, but **409** if the head accepted in the meantime — you are in that household now |
-| DELETE | `/families/mine/membership` | Member | Leave the household you are in. Headship passes to the longest-standing member if you held it. Idempotent. **409** if you have only asked to join (withdraw instead), or if you are the last member and it has children |
-| POST | `/families/join-requests/{id}/decide` | FamilyHead | Accept/reject |
+| DELETE | `/families/join-requests/mine` | Member | Take back a request nobody has decided. No id: a member has at most one. Idempotent, but **409** if the family admin accepted in the meantime — you are in that household now |
+| DELETE | `/families/mine/membership` | Member | Leave the household you are in. The admin role passes to the longest-standing member if you held it; a family head who leaves is cleared. Idempotent. **409** if you have only asked to join (withdraw instead), or if you are the last member and it has children |
+| POST | `/families/join-requests/{id}/decide` | Family admin | Accept/reject |
 | GET | `/children` | Member | Children in your own household |
-| POST | `/children` | FamilyHead | Add child profile |
-| DELETE | `/children/{id}/parental-consent` | The member who gave that consent | Withdraw it (DPDP s.6(4)). Removes the child's record: name, date of birth and photograph go, the row stays because other services hold the id. **404** to anybody else, including the household head, because the consent is not theirs. **409** on a converted child, whose data is held on their own consent now |
+| POST | `/children` | Family admin | Add child profile |
+| DELETE | `/children/{id}/parental-consent` | The member who gave that consent | Withdraw it (DPDP s.6(4)). Removes the child's record: name, date of birth and photograph go, the row stays because other services hold the id. **404** to anybody else, including the family admin, because the consent is not theirs. **409** on a converted child, whose data is held on their own consent now |
 | GET | `/children/names?ids=…` | SamaajAdmin, SuperAdmin + `Members.Read` | Names for children the caller already holds the ids of — the Pathshala placement queue. **Names only**, never the child record: that carries a date of birth and the parental-consent record. Ids from another Samaaj are absent rather than refused, and at most 200 per call |
 | GET | `/children/data-notice` | Member | What a parent is shown before adding a child (DPDP s.9) |
 | GET | `/members/me/data-export` | Authenticated | Profile, family and children (DPDP s.11) |
-| POST | `/children/{id}/conversion` | FamilyHead | Start adult-child conversion |
+| POST | `/children/{id}/conversion` | Family admin | Start adult-child conversion |
 | GET | `/children/conversion-requests` | SamaajAdmin | Requests awaiting a decision |
 | POST | `/children/conversion-requests/{id}/decide` | SamaajAdmin | Approve or reject (admin-approved, decided 2026-08-28) |
 

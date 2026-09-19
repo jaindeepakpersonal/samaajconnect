@@ -15,7 +15,7 @@ public static class FamilyMappings
         Guid viewerMemberId,
         IReadOnlyCollection<MemberProfile> profiles)
     {
-        var isHead = family.IsHead(viewerMemberId);
+        var isAdmin = family.IsAdmin(viewerMemberId);
         var names = profiles.ToDictionary(p => p.Id, p => p.FullName);
 
         var members = family.Members
@@ -33,11 +33,12 @@ public static class FamilyMappings
 
         return new FamilyResponse(
             family.Id,
+            family.FamilyAdminMemberId,
             family.FamilyHeadMemberId,
-            // Only the head sees the code: it is the token for joining, so
+            // Only the family admin sees the code: it is the token for joining, so
             // sharing it with everyone would let any member invite anyone.
-            isHead ? family.FamilyCode : null,
-            isHead,
+            isAdmin ? family.FamilyCode : null,
+            isAdmin,
             members,
             family.CreatedAt);
     }

@@ -5,6 +5,7 @@ using Sangam.MemberFamily.Application.Families.Commands.CreateFamily;
 using Sangam.MemberFamily.Application.Families.Commands.DecideJoinRequest;
 using Sangam.MemberFamily.Application.Families.Commands.LeaveFamily;
 using Sangam.MemberFamily.Application.Families.Commands.RequestJoinFamily;
+using Sangam.MemberFamily.Application.Families.Commands.SetFamilyHead;
 using Sangam.MemberFamily.Application.Families.Commands.WithdrawJoinRequest;
 using Sangam.MemberFamily.Application.Families.Queries.GetMyFamily;
 
@@ -24,7 +25,7 @@ public static class FamilyEndpoints
                     Results.Created($"/v1/families/{family.Id}", family));
             })
             .WithName("CreateFamily")
-            .WithSummary("Create a household with you as its head.")
+            .WithSummary("Create a household with you as its family admin.")
             .Produces<FamilyResponse>(StatusCodes.Status201Created)
             .ProducesProblem(StatusCodes.Status409Conflict);
 
@@ -35,7 +36,7 @@ public static class FamilyEndpoints
                 return result.ToApiResult();
             })
             .WithName("GetMyFamily")
-            .WithSummary("Your household. The family code is returned only to its head.")
+            .WithSummary("Your household. The family code is returned only to its family admin.")
             .Produces<FamilyResponse>()
             .ProducesProblem(StatusCodes.Status404NotFound);
 
@@ -50,7 +51,7 @@ public static class FamilyEndpoints
                 return result.ToApiResult();
             })
             .WithName("RequestJoinFamily")
-            .WithSummary("Ask to join a household using the code its head shared.")
+            .WithSummary("Ask to join a household using the code its family admin shared.")
             .Produces<FamilyResponse>()
             .ProducesValidationProblem()
             .ProducesProblem(StatusCodes.Status404NotFound)
@@ -101,13 +102,33 @@ public static class FamilyEndpoints
                 return result.ToApiResult();
             })
             .WithName("DecideJoinRequest")
-            .WithSummary("Accept or reject a join request. Head of that family only.")
+            .WithSummary("Accept or reject a join request. Family admin of that family only.")
             .Produces<FamilyResponse>()
             .ProducesProblem(StatusCodes.Status403Forbidden)
             .ProducesProblem(StatusCodes.Status404NotFound);
 
+        group.MapPut("/mine/head", async (
+                SetHeadRequest request,
+                ISender sender,
+                CancellationToken cancellationToken) =>
+            {
+                var result = await sender.Send(
+                    new SetFamilyHeadCommand(request.MemberProfileId), cancellationToken);
+
+                return result.ToApiResult();
+            })
+            .WithName("SetFamilyHead")
+            .WithSummary("Name (or clear) the household's head. Family admin only.")
+            .Produces<FamilyResponse>()
+            .ProducesValidationProblem()
+            .ProducesProblem(StatusCodes.Status403Forbidden)
+            .ProducesProblem(StatusCodes.Status404NotFound)
+            .ProducesProblem(StatusCodes.Status409Conflict);
+
         return app;
     }
+
+    public sealed record SetHeadRequest(string? MemberProfileId);
 
     public sealed record JoinRequest(string FamilyCode, string Relationship);
 

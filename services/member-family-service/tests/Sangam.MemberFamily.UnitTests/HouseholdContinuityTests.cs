@@ -28,7 +28,7 @@ public sealed class HouseholdContinuityTests
 
         if (accept)
         {
-            family.DecideJoinRequest(request.Id, accepted: true, household.FamilyHeadMemberId, at);
+            family.DecideJoinRequest(request.Id, accepted: true, household.FamilyAdminMemberId, at);
         }
 
         return memberId;
@@ -128,9 +128,9 @@ public sealed class HouseholdContinuityTests
 
         family.RemoveMember(headId);
 
-        family.SucceedHeadAfterRemoval(headId).Should().Be(older);
-        family.IsHead(older).Should().BeTrue();
-        family.IsHead(newer).Should().BeFalse();
+        family.SucceedAdminAfterRemoval(headId).Should().Be(older);
+        family.IsAdmin(older).Should().BeTrue();
+        family.IsAdmin(newer).Should().BeFalse();
     }
 
     /// <summary>
@@ -154,7 +154,7 @@ public sealed class HouseholdContinuityTests
 
         family.RemoveMember(headId);
 
-        family.SucceedHeadAfterRemoval(headId).Should().Be(acceptedSooner);
+        family.SucceedAdminAfterRemoval(headId).Should().Be(acceptedSooner);
     }
 
     [Fact]
@@ -170,8 +170,8 @@ public sealed class HouseholdContinuityTests
 
         // Nobody active is left, so there is no successor - and somebody who
         // has only asked to join is not somebody to hand a household to.
-        family.SucceedHeadAfterRemoval(headId).Should().BeNull();
-        family.IsHead(waiting).Should().BeFalse();
+        family.SucceedAdminAfterRemoval(headId).Should().BeNull();
+        family.IsAdmin(waiting).Should().BeFalse();
     }
 
     [Fact]
@@ -182,8 +182,8 @@ public sealed class HouseholdContinuityTests
 
         family.RemoveMember(headId);
 
-        family.SucceedHeadAfterRemoval(headId).Should().BeNull();
-        family.FamilyHeadMemberId.Should().Be(headId);
+        family.SucceedAdminAfterRemoval(headId).Should().BeNull();
+        family.FamilyAdminMemberId.Should().Be(headId);
     }
 
     /// <summary>
@@ -200,8 +200,8 @@ public sealed class HouseholdContinuityTests
 
         family.RemoveMember(other);
 
-        family.SucceedHeadAfterRemoval(other).Should().BeNull();
-        family.IsHead(headId).Should().BeTrue();
+        family.SucceedAdminAfterRemoval(other).Should().BeNull();
+        family.IsAdmin(headId).Should().BeTrue();
     }
 
   /// <summary>
@@ -223,8 +223,8 @@ public sealed class HouseholdContinuityTests
 
       family.RemoveMember(headId);
 
-      family.SucceedHeadAfterRemoval(headId).Should().Be(successor);
-      family.IsHead(successor).Should().BeTrue();
+      family.SucceedAdminAfterRemoval(headId).Should().Be(successor);
+      family.IsAdmin(successor).Should().BeTrue();
       family.FindMember(headId).Should().BeNull();
   }
 

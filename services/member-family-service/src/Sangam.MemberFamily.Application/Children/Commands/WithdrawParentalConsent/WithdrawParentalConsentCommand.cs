@@ -23,7 +23,7 @@ namespace Sangam.MemberFamily.Application.Children.Commands.WithdrawParentalCons
 /// is not comparable ease.
 /// </para>
 /// <para>
-/// <b>The consent-giver, and nobody else.</b> Not the current head of the
+/// <b>The consent-giver, and nobody else.</b> Not the current family admin of the
 /// household, not a Samaaj administrator, not another parent in it. The consent
 /// is that person's and s.6(4) is their right; a head who inherited the
 /// household did not give it and cannot take it back. The same reasoning that

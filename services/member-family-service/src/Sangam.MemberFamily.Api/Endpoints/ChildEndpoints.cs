@@ -77,7 +77,7 @@ public static class ChildEndpoints
                 return result.ToApiResult(child => Results.Created($"/v1/children/{child.Id}", child));
             })
             .WithName("CreateChildProfile")
-            .WithSummary("Add a child to your household. Family head only.")
+            .WithSummary("Add a child to your household. Family admin only.")
             .Produces<ChildResponse>(StatusCodes.Status201Created)
             .ProducesValidationProblem()
             .ProducesProblem(StatusCodes.Status403Forbidden);
