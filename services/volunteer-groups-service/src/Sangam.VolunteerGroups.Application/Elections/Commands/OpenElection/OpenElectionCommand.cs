@@ -2,6 +2,7 @@ using FluentValidation;
 using MediatR;
 using Sangam.VolunteerGroups.Application.Abstractions;
 using Sangam.VolunteerGroups.Application.Common;
+using Sangam.VolunteerGroups.Application.Groups;
 using Sangam.VolunteerGroups.Application.Elections;
 using Sangam.VolunteerGroups.Application.Security;
 using Sangam.VolunteerGroups.Domain.Elections;
@@ -81,7 +82,7 @@ public sealed class OpenElectionCommandHandler(
         // "Not found", the same answer every other president-only command in
         // this service gives a non-president - it does not confirm the group
         // exists to somebody who may not run it.
-        if (!group.IsPresident(actorId))
+        if (!group.CanRunElection(actorId, currentUser.IsGroupAdmin(), command.PositionTitle))
         {
             return Result.Failure<ElectionResponse>(
                 Error.NotFound("Group.NotFound", "No such group in this Samaaj."));

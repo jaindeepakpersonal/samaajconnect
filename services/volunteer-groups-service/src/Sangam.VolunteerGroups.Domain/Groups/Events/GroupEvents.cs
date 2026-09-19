@@ -10,7 +10,7 @@ namespace Sangam.VolunteerGroups.Domain.Groups;
 public sealed record GroupCreatedDomainEvent(
     Guid GroupId,
     Guid TenantId,
-    Guid PresidentMemberId,
+    Guid? PresidentMemberId,
     DateTimeOffset OccurredAt) : IDomainEvent
 {
     public string Topic => "volunteer-groups.group.created.v1";
@@ -81,7 +81,7 @@ public sealed record GroupMemberRemovedDomainEvent(
 public sealed record GroupPresidentChangedDomainEvent(
     Guid GroupId,
     Guid TenantId,
-    Guid PreviousPresidentMemberId,
+    Guid? PreviousPresidentMemberId,
     Guid PresidentMemberId,
     DateTimeOffset OccurredAt) : IDomainEvent
 {

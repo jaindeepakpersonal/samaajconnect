@@ -8,7 +8,8 @@ namespace Sangam.VolunteerGroups.Application.Groups;
 /// </summary>
 internal static class GroupMappings
 {
-    public static GroupResponse ToResponse(this VolunteerGroup group, Guid viewerId) => new(
+    public static GroupResponse ToResponse(
+        this VolunteerGroup group, Guid viewerId, bool viewerIsGroupAdmin = false) => new(
         group.Id,
         group.Name,
         group.Description,
@@ -17,19 +18,21 @@ internal static class GroupMappings
         group.Status.ToString(),
         group.Members.Count,
 
-        // Only the president is told how many people are waiting. To anyone
-        // else it is a fact about other members' pending requests.
-        group.IsPresident(viewerId)
+        // Only whoever can decide them is told how many people are waiting. To
+        // anyone else it is a fact about other members' pending requests.
+        group.CanLead(viewerId, viewerIsGroupAdmin)
             ? group.Applications.Count(a => a.Status == ApplicationStatus.Pending)
             : 0,
         group.Applications
             .FirstOrDefault(a => a.MemberId == viewerId)?.Status.ToString(),
         group.HasMember(viewerId),
         group.IsPresident(viewerId),
+        group.CanLead(viewerId, viewerIsGroupAdmin),
         group.CreatedAt);
 
-    public static GroupDetailResponse ToDetail(this VolunteerGroup group, Guid viewerId) => new(
-        group.ToResponse(viewerId),
+    public static GroupDetailResponse ToDetail(
+        this VolunteerGroup group, Guid viewerId, bool viewerIsGroupAdmin = false) => new(
+        group.ToResponse(viewerId, viewerIsGroupAdmin),
         [.. group.Members
             .OrderBy(m => m.JoinedAt)
             .Select(m => new GroupMemberResponse(m.MemberId, m.RolePosition, m.JoinedAt))]);

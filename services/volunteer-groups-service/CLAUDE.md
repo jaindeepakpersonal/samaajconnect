@@ -196,6 +196,38 @@ the manual override path this plan deliberately left alone.
 
 ## Decisions worth knowing before you change this service
 
+**A group may be created without a president, added 2026-09-19.** Until then a
+president was required in three places (the command, the aggregate, a NOT NULL
+column), on the reasoning that a group with nobody able to decide its
+applications is one whose join requests go nowhere. That reasoning was right
+about the consequence and wrong about the remedy: a Super Admin often sets a
+group up before anyone has been chosen to lead it. `PresidentMemberId` is
+nullable now and a president-less group starts with no members at all.
+
+It gets a president two ways, and both are real: a Samaaj admin picks an
+existing member through `ChangeGroupPresidentCommand` (which already worked on
+"the group has a different president" and now also on "has none"), or the group
+elects one. **Electing the position titled "President" now installs an actual
+president** - `VolunteerGroup.ElectPosition` hands off to `ChangePresident`.
+Before, only the label moved, so a winner would have read "President" while
+`IsPresident` stayed false for them and the previous president kept every
+power.
+
+**So that election can happen at all, an admin has a narrow, temporary
+authority - and only while there is no president.** A president-less group has
+no members, so nobody can be nominated or vote, and only a president could
+accept a joiner or open an election: without something, "elect a president"
+would be a path nobody could start. `GroupAuthority` (Application/Groups)
+lets a `SamaajAdmin`/`SuperAdmin` decide join requests, read the queue, and
+open, advance and publish the *President* election - and nothing else.
+Assigning positions, removing members and any other election keep waiting for
+a president, and the moment one exists the admin's powers stop, because the
+check reads the group's state each time rather than granting a standing role.
+`GroupResponse.ICanLead` is that answer computed once on the server, so the
+portals never re-derive it from a role. Nominating and voting were already open
+to every member.
+
+
 **Creating a group is the Samaaj's decision; who joins it is the president's.**
 That asymmetry is the whole service. A Samaaj admin who is not a given group's
 president cannot decide its applications, and gets the same answer a stranger

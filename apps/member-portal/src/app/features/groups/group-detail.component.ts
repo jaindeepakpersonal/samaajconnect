@@ -9,6 +9,7 @@ import {
   ElectionDetail,
   GroupApplication,
   GroupDetail,
+  VolunteerGroup,
   electionStageLabel,
 } from './groups.models';
 
@@ -250,8 +251,8 @@ import {
           </div>
         }
 
-        <!-- The president's queue --------------------------------------- -->
-        @if (found.group.iAmThePresident) {
+        <!-- The queue: the president's, or an admin's while there is none --- -->
+        @if (found.group.iCanLead) {
           <h2 class="section-heading">Applications</h2>
 
           @if (loadingApplications()) {
@@ -303,18 +304,25 @@ import {
           }
         }
 
+        @if (found.group.presidentMemberId === null) {
+          <p class="notice info" role="status">
+            This group has no president yet. A Samaaj admin accepts its joiners and can set a
+            president, or run a "President" election that members nominate and vote in.
+          </p>
+        }
+
         <!-- Positions, filled by election ---------------------------- -->
         <h2 class="section-heading">Positions</h2>
         <p class="small">
           A position comes from an election now, not from the president's own say-so.
         </p>
 
-        @if (found.group.iAmThePresident) {
+        @if (found.group.iCanLead) {
           <div class="actions">
             <button
               class="btn secondary"
               type="button"
-              (click)="showOpenElection.set(!showOpenElection())"
+              (click)="openElectionForm(found.group)"
             >
               {{ showOpenElection() ? 'Cancel' : 'Open an election' }}
             </button>
@@ -330,6 +338,7 @@ import {
                     id="election-position"
                     name="positionTitle"
                     [(ngModel)]="positionTitle"
+                    [readonly]="!found.group.iAmThePresident"
                     maxlength="100"
                     placeholder="Secretary"
                   />
@@ -424,7 +433,7 @@ import {
                     {{ expandedElectionId() === election.id ? 'Hide ballot' : 'View ballot' }}
                   </button>
 
-                  @if (found.group.iAmThePresident) {
+                  @if (found.group.iCanLead) {
                     @if (election.status === 'Draft') {
                       <button class="btn small" type="button" [disabled]="electionBusy()"
                         (click)="moveElection(election.id, 'NominationsOpen')">
@@ -478,7 +487,7 @@ import {
                     </div>
                   }
 
-                  @if (found.group.iAmThePresident) {
+                  @if (found.group.iCanLead) {
                     @for (candidate of waitingCandidates(detail); track candidate.id) {
                       <div class="candidate-row">
                         <span>{{ nameFor(candidate.memberId, found) }}</span>
@@ -568,6 +577,24 @@ export class GroupDetailComponent implements OnInit {
   readonly electionBusy = signal(false);
 
   positionTitle = '';
+
+  /**
+   * Opens the election form. An admin running a group that has no president may
+   * run only the "President" election, so the field is filled in and locked for
+   * them; the president may name any position.
+   */
+  openElectionForm(group: VolunteerGroup): void {
+    if (this.showOpenElection()) {
+      this.showOpenElection.set(false);
+      return;
+    }
+
+    if (!group.iAmThePresident) {
+      this.positionTitle = 'President';
+    }
+
+    this.showOpenElection.set(true);
+  }
   nominationStartAt = '';
   nominationEndAt = '';
   votingStartAt = '';
@@ -627,7 +654,7 @@ export class GroupDetailComponent implements OnInit {
         // Only the president may read these, and the endpoint answers 404 to
         // anyone else - asking speculatively would mean a 404 on every
         // ordinary member's visit.
-        if (found.group.iAmThePresident) {
+        if (found.group.iCanLead) {
           this.loadApplications(found.group.id);
         }
       },

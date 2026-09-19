@@ -33,7 +33,17 @@ public sealed class VolunteerGroup : AggregateRoot, ITenantScopedEntity
     /// <summary>What the group is for. The wireframe's tag: Social Service, Youth, Education.</summary>
     public string? FocusArea { get; private set; }
 
-    public Guid PresidentMemberId { get; private set; }
+    /// <summary>The title a president holds, and the position whose election installs one.</summary>
+    public const string PresidentPosition = "President";
+
+    /// <summary>
+    /// Null until one is set - by a Samaaj admin choosing an existing member,
+    /// or by a "President" election. A group may be created without one.
+    /// </summary>
+    public Guid? PresidentMemberId { get; private set; }
+
+    public bool HasNoPresident => PresidentMemberId is null;
+
     public GroupStatus Status { get; private set; }
     public DateTimeOffset CreatedAt { get; private set; }
 
@@ -47,18 +57,17 @@ public sealed class VolunteerGroup : AggregateRoot, ITenantScopedEntity
         string name,
         string? description,
         string? focusArea,
-        Guid presidentMemberId,
+        Guid? presidentMemberId,
         DateTimeOffset createdAt)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(name);
 
         if (presidentMemberId == Guid.Empty)
         {
-            // A group with no president has nobody to decide its applications,
-            // so every request to join would queue forever with no way to tell
-            // that is what was happening.
+            // Null means "not chosen yet" and is allowed. An empty id is a
+            // mistake, not an absence.
             throw new ArgumentException(
-                "A volunteer group must have a president.", nameof(presidentMemberId));
+                "A president id, when given, must not be empty.", nameof(presidentMemberId));
         }
 
         var group = new VolunteerGroup
@@ -73,9 +82,13 @@ public sealed class VolunteerGroup : AggregateRoot, ITenantScopedEntity
             CreatedAt = createdAt,
         };
 
-        // The president is a member of their own group from the start, and
-        // needs no application to be one.
-        group._members.Add(new GroupMember(group.Id, presidentMemberId, "President", createdAt));
+        // A president, when there is one, is a member of their own group from
+        // the start and needs no application to be one. A group created without
+        // one starts with no members at all.
+        if (presidentMemberId is { } president)
+        {
+            group._members.Add(new GroupMember(group.Id, president, PresidentPosition, createdAt));
+        }
 
         group.Raise(new GroupCreatedDomainEvent(
             group.Id, tenantId, presidentMemberId, createdAt));
@@ -217,6 +230,15 @@ public sealed class VolunteerGroup : AggregateRoot, ITenantScopedEntity
             return false;
         }
 
+        // Electing the "President" installs a real president. Before, only the
+        // label moved: the winner would have read "President" while
+        // IsPresident stayed false for them, and the previous president kept
+        // every power.
+        if (string.Equals(positionTitle.Trim(), PresidentPosition, StringComparison.OrdinalIgnoreCase))
+        {
+            return IsPresident(winnerMemberId) || ChangePresident(winnerMemberId, now);
+        }
+
         foreach (var previousHolder in _members.Where(m =>
             m.MemberId != winnerMemberId
             && string.Equals(m.RolePosition, positionTitle, StringComparison.Ordinal)))
@@ -277,17 +299,20 @@ public sealed class VolunteerGroup : AggregateRoot, ITenantScopedEntity
 
         if (member is null)
         {
-            _members.Add(new GroupMember(Id, newPresidentMemberId, "President", now));
+            _members.Add(new GroupMember(Id, newPresidentMemberId, PresidentPosition, now));
         }
         else
         {
-            member.SetRolePosition("President");
+            member.SetRolePosition(PresidentPosition);
         }
 
         // The outgoing president stays in the group as an ordinary member.
         // Removing them would lose the group its most experienced volunteer as
         // a side effect of an administrative change.
-        _members.FirstOrDefault(m => m.MemberId == previous)?.SetRolePosition(null);
+        if (previous is { } outgoing)
+        {
+            _members.FirstOrDefault(m => m.MemberId == outgoing)?.SetRolePosition(null);
+        }
 
         Raise(new GroupPresidentChangedDomainEvent(
             Id, TenantId, previous, newPresidentMemberId, now));

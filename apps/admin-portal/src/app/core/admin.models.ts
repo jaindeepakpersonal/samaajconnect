@@ -610,8 +610,8 @@ export interface VolunteerGroup {
   readonly description: string | null;
   readonly focusArea: string | null;
 
-  /** An id. Names live in member-family-service and are resolved here. */
-  readonly presidentMemberId: string;
+  /** An id, or null until one is set. Names live in member-family-service and are resolved here. */
+  readonly presidentMemberId: string | null;
   readonly status: GroupStatus;
   readonly memberCount: number;
 }

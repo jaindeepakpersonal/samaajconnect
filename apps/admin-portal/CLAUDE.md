@@ -31,7 +31,7 @@ screen. The spec is `docs/product/wireframes/admin-panel-wireframes.html`.
 | Campaign detail | `/voting/:id` | — | built; no wireframe covers running one. Stage, ballot, nominations, tally, result |
 | Competitions | `/competitions` | — | built; no wireframe covers this new module. Competitions and setting one up |
 | Competition detail | `/competitions/:id` | — | built; no wireframe covers running one. Stage, judges, rounds, entries, publish results |
-| Volunteer Groups | `/groups` | `#groups` (member-facing) | built. Create with a president, and stand one down |
+| Volunteer Groups | `/groups` | `#groups` (member-facing) | built. Create (president optional), set a president later, and stand one down |
 | Social Issues | `/issues` | `#issues` | built. The reviewer's approval queue |
 | Members | `/members` | `#members` | built. Search the Samaaj directory and open somebody |
 | Member detail | `/members/:id` | — | built; the wireframe's "View" had no screen behind it. The correction form |
@@ -270,10 +270,14 @@ session, class, register and exam result is kept — a Pathshala that closed sti
 taught the children who attended it. The screen says which of those two things
 is happening, because "deactivate" alone reads like deletion.
 
-**A volunteer group is created with its president, not after it.** The command
-takes the president's member id and installs them, because a group with nobody
-able to decide its applications is a group whose join requests go nowhere — the
-same dead end as a Pathshala enrolment nobody could place. Standing one down
+**A volunteer group may be created with or without a president (changed
+2026-09-19; it was required before).** The create form's president select
+starts on "No president yet" and the list says "Not set" for such a group, with
+a "Set president" control that is the same panel as "Change". A group with none
+is not a dead end any more: a Samaaj admin accepts its joiners and can run a
+"President" election in the member portal until one exists, and that election's
+winner becomes the real president (see volunteer-groups-service's own notes).
+Standing one down
 keeps its members and history and is reversible, so the screen offers "Bring
 back" rather than leaving it looking deleted.
 

@@ -47,6 +47,8 @@ function group(overrides: Partial<VolunteerGroup> = {}): VolunteerGroup {
     iAmThePresident: false,
     createdAt: new Date().toISOString(),
     ...overrides,
+    // Whoever is president can lead; a test naming neither says nothing else.
+    iCanLead: overrides.iCanLead ?? overrides.iAmThePresident ?? false,
   };
 }
 
@@ -394,6 +396,50 @@ describe('GroupDetailComponent', () => {
     load(detail());
 
     expect(text()).not.toContain('Applications');
+  });
+
+  it('tells everybody a group has no president yet, and says how one gets set', () => {
+    load(detail({ presidentMemberId: null, iAmAMember: true }));
+
+    expect(text()).toContain('This group has no president yet');
+  });
+
+  it('shows no such notice once a group has a president', () => {
+    load(detail({ iAmAMember: true }));
+
+    expect(text()).not.toContain('This group has no president yet');
+  });
+
+  it('gives an admin running a president-less group the queue, though they are not its president', () => {
+    // iCanLead is the server's answer: the president, or an admin while there
+    // is none. The screen does not re-derive it from a role.
+    load(detail({ presidentMemberId: null, iAmThePresident: false, iCanLead: true }), [application()]);
+
+    expect(component.pending().length).toBe(1);
+    expect(text()).toContain('Applications');
+  });
+
+  it('fills in and locks the position to President for an admin opening the election', async () => {
+    load(detail({ presidentMemberId: null, iAmThePresident: false, iCanLead: true }), []);
+
+    component.openElectionForm(component.detail()!.group);
+    fixture.detectChanges();
+    // ngModel writes the value to the input a microtask later.
+    await fixture.whenStable();
+
+    const field = fixture.nativeElement.querySelector('#election-position') as HTMLInputElement;
+    expect(field.value).toBe('President');
+    expect(field.readOnly).toBe(true);
+  });
+
+  it('leaves the position free for the president', () => {
+    load(detail({ iAmThePresident: true, iAmAMember: true }), []);
+
+    component.openElectionForm(component.detail()!.group);
+    fixture.detectChanges();
+
+    const field = fixture.nativeElement.querySelector('#election-position') as HTMLInputElement;
+    expect(field.readOnly).toBe(false);
   });
 
   it('asks for it when they do, and shows only what is still waiting', () => {

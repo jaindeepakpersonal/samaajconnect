@@ -30,6 +30,6 @@ public sealed class GetGroupQueryHandler(IGroupRepository groups, ICurrentUser c
         return group is null
             ? Result.Failure<GroupDetailResponse>(
                 Error.NotFound("Group.NotFound", "No such group in this Samaaj."))
-            : Result.Success(group.ToDetail(memberId));
+            : Result.Success(group.ToDetail(memberId, currentUser.IsGroupAdmin()));
     }
 }

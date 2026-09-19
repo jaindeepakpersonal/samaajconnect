@@ -67,19 +67,40 @@ describe('GroupsListComponent', () => {
     expect(fixture.nativeElement.querySelector('[role="alert"]')).toBeNull();
   });
 
-  it('will not create a group without a president', () => {
-    // A group with nobody able to decide its applications is a group whose join
-    // requests go nowhere — the same dead end as a Pathshala enrolment nobody
-    // could place. The service requires one; so does the form.
+  it('creates a group with no president when none is chosen, sending null', () => {
+    // A group may exist before anyone is chosen to lead it; until then a Samaaj
+    // admin accepts joiners, and a president is set later.
     load();
 
     component.name = 'Seva Group';
     component.presidentMemberId = '';
 
-    expect(component.canCreate()).toBe(false);
+    expect(component.canCreate()).toBe(true);
 
     component.create();
-    http.expectNone('/v1/volunteer-groups/groups');
+
+    const call = http.expectOne('/v1/volunteer-groups/groups');
+    expect(call.request.body).toEqual({
+      name: 'Seva Group',
+      description: null,
+      focusArea: null,
+      presidentMemberId: null,
+    });
+  });
+
+  it('still needs a name', () => {
+    load();
+
+    component.name = '   ';
+
+    expect(component.canCreate()).toBe(false);
+  });
+
+  it('shows Not set and offers Set president for a group with no president', () => {
+    load([group({ presidentMemberId: null })]);
+
+    expect(text()).toContain('Not set');
+    expect(text()).toContain('Set president');
   });
 
   it('creates a group with its president, sending no blanks', () => {

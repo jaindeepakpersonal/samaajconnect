@@ -24,7 +24,7 @@ export interface VolunteerGroup {
    * card. The screen says whether the reader is the president instead, which
    * is the part that changes what they can do.
    */
-  readonly presidentMemberId: string;
+  readonly presidentMemberId: string | null;
   readonly status: GroupStatus;
   readonly memberCount: number;
 
@@ -35,6 +35,12 @@ export interface VolunteerGroup {
   readonly myApplicationStatus: ApplicationStatus | null;
   readonly iAmAMember: boolean;
   readonly iAmThePresident: boolean;
+
+  /**
+   * May decide join requests and run elections: the president, or - while the
+   * group has none - a Samaaj admin. Read this rather than re-deriving it.
+   */
+  readonly iCanLead: boolean;
   readonly createdAt: string;
 }
 

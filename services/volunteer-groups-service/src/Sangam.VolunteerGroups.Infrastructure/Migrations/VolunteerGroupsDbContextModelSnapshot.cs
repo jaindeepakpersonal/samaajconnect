@@ -286,7 +286,7 @@ namespace Sangam.VolunteerGroups.Infrastructure.Migrations
                         .HasColumnType("character varying(150)")
                         .HasColumnName("name");
 
-                    b.Property<Guid>("PresidentMemberId")
+                    b.Property<Guid?>("PresidentMemberId")
                         .HasColumnType("uuid")
                         .HasColumnName("president_member_id");
 

@@ -34,7 +34,7 @@ import { isNotFound } from '../../core/http-status';
   imports: [FormsModule],
   template: `
     <h1 class="title">Volunteer groups</h1>
-    <p class="sub">Set a group up, name its president, and stand one down.</p>
+    <p class="sub">Set a group up, optionally name its president, and stand one down.</p>
 
     @if (error(); as message) {
       <p class="notice error" role="alert">{{ message }}</p>
@@ -78,7 +78,11 @@ import { isNotFound } from '../../core/http-status';
                     </td>
                     <td>{{ group.focusArea ?? '—' }}</td>
                     <td>
-                      {{ memberName(group.presidentMemberId) }}
+                      @if (group.presidentMemberId) {
+                        {{ memberName(group.presidentMemberId) }}
+                      } @else {
+                        <span class="muted">Not set</span>
+                      }
                       <div>
                         <button
                           class="btn link small"
@@ -86,7 +90,7 @@ import { isNotFound } from '../../core/http-status';
                           [attr.aria-expanded]="presidentFor() === group.id"
                           (click)="openChangePresident(group)"
                         >
-                          Change
+                          {{ group.presidentMemberId ? 'Change' : 'Set president' }}
                         </button>
                       </div>
                     </td>
@@ -115,7 +119,7 @@ import { isNotFound } from '../../core/http-status';
                     <tr>
                       <td colspan="6">
                         <div class="notice" role="status">
-                          <label [for]="group.id + '-newpres'">New president</label>
+                          <label [for]="group.id + '-newpres'">{{ group.presidentMemberId ? 'New president' : 'President' }}</label>
                           <select
                             class="input"
                             [id]="group.id + '-newpres'"
@@ -127,11 +131,18 @@ import { isNotFound } from '../../core/http-status';
                             }
                           </select>
 
-                          <p class="small">
-                            The outgoing president, {{ memberName(group.presidentMemberId) }},
-                            stays in the group as an ordinary member rather than being removed
-                            as a side effect of this change.
-                          </p>
+                          @if (group.presidentMemberId) {
+                            <p class="small">
+                              The outgoing president, {{ memberName(group.presidentMemberId) }},
+                              stays in the group as an ordinary member rather than being removed
+                              as a side effect of this change.
+                            </p>
+                          } @else {
+                            <p class="small">
+                              They join the group if they are not already in it. A "President"
+                              election, run by the group itself, can also fill this.
+                            </p>
+                          }
 
                           <div class="actions">
                             <button
@@ -194,7 +205,7 @@ import { isNotFound } from '../../core/http-status';
               <label for="group-president">President</label>
               <select id="group-president" class="input" name="president"
                 [(ngModel)]="presidentMemberId">
-                <option value="">Choose a member…</option>
+                <option value="">No president yet</option>
                 @for (member of members(); track member.id) {
                   <option [value]="member.id">{{ member.fullName }}</option>
                 }
@@ -202,8 +213,8 @@ import { isNotFound } from '../../core/http-status';
             </div>
 
             <p class="small span-all">
-              A group needs one from the start: the president is who decides its applications, and
-              a group without one is a group whose join requests go nowhere.
+              Optional. Until a group has a president, a Samaaj admin accepts its joiners and can
+              run a "President" election; choose one later with "Set president".
             </p>
 
             <div class="span-all">
@@ -249,11 +260,11 @@ export class GroupsListComponent implements OnInit {
   }
 
   canCreate(): boolean {
-    return this.name.trim().length > 0 && this.presidentMemberId.length > 0;
+    return this.name.trim().length > 0;
   }
 
-  memberName(memberId: string): string {
-    return this.names().get(memberId) ?? 'A member';
+  memberName(memberId: string | null): string {
+    return (memberId && this.names().get(memberId)) || 'A member';
   }
 
   private load(): void {
@@ -304,9 +315,11 @@ export class GroupsListComponent implements OnInit {
         name,
         blankToNull(this.description),
         blankToNull(this.focusArea),
-        this.presidentMemberId,
+        this.presidentMemberId || null,
       ),
-      `${name} created, with ${this.memberName(this.presidentMemberId)} as president.`,
+      this.presidentMemberId
+        ? `${name} created, with ${this.memberName(this.presidentMemberId)} as president.`
+        : `${name} created, with no president yet.`,
       () => {
         this.name = '';
         this.description = '';

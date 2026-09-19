@@ -45,7 +45,7 @@ public sealed class ListGroupsQueryHandler(IGroupRepository groups, ICurrentUser
 
         var found = await groups.ListAsync(status, cancellationToken);
 
-        IReadOnlyList<GroupResponse> results = [.. found.Select(g => g.ToResponse(memberId))];
+        IReadOnlyList<GroupResponse> results = [.. found.Select(g => g.ToResponse(memberId, currentUser.IsGroupAdmin()))];
 
         return Result.Success(results);
     }

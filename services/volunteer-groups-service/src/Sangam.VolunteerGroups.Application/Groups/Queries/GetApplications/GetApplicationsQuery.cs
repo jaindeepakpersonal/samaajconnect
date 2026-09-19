@@ -40,7 +40,7 @@ public sealed class GetApplicationsQueryHandler(IGroupRepository groups, ICurren
                 Error.NotFound("Group.NotFound", "No such group in this Samaaj."));
         }
 
-        if (!group.IsPresident(actorId))
+        if (!group.CanLead(actorId, currentUser.IsGroupAdmin()))
         {
             // "Not found" rather than "forbidden": whether a group has
             // applications waiting is itself the president's business.

@@ -2,6 +2,7 @@ using FluentValidation;
 using MediatR;
 using Sangam.VolunteerGroups.Application.Abstractions;
 using Sangam.VolunteerGroups.Application.Common;
+using Sangam.VolunteerGroups.Application.Groups;
 using Sangam.VolunteerGroups.Application.Security;
 using Sangam.VolunteerGroups.Domain.Elections;
 
@@ -61,7 +62,7 @@ public sealed class MoveElectionCommandHandler(
 
         var group = await groups.GetByIdAsync(election.GroupId, cancellationToken);
 
-        if (group is null || !group.IsPresident(actorId))
+        if (group is null || !group.CanRunElection(actorId, currentUser.IsGroupAdmin(), election.PositionTitle))
         {
             return Result.Failure<ElectionResponse>(
                 Error.NotFound("Election.NotFound", "No such election in this Samaaj."));

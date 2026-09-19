@@ -56,7 +56,7 @@ public static class GroupEndpoints
             })
             .RequireAuthorization()
             .WithName("CreateGroup")
-            .WithSummary("Create a group and name its president (Samaaj admins).")
+            .WithSummary("Create a group, optionally naming its president (Samaaj admins).")
             .Produces<GroupResponse>(StatusCodes.Status201Created)
             .ProducesValidationProblem()
             .ProducesProblem(StatusCodes.Status401Unauthorized)
@@ -230,7 +230,7 @@ public static class GroupEndpoints
         string Name,
         string? Description,
         string? FocusArea,
-        Guid PresidentMemberId);
+        string? PresidentMemberId);
 
     public sealed record ChangeStatusRequest(string Status);
 

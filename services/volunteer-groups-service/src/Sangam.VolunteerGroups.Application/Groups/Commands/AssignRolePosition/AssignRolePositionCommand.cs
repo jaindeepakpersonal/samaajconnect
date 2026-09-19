@@ -75,6 +75,6 @@ public sealed class AssignRolePositionCommandHandler(
 
         await unitOfWork.SaveChangesAsync(cancellationToken);
 
-        return Result.Success(group.ToDetail(actorId));
+        return Result.Success(group.ToDetail(actorId, currentUser.IsGroupAdmin()));
     }
 }

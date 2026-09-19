@@ -81,7 +81,7 @@ import { VolunteerGroup } from './groups.models';
                   <span class="pill warn">Not taking new members</span>
                 }
 
-                @if (group.iAmThePresident && group.pendingApplicationCount > 0) {
+                @if (group.iCanLead && group.pendingApplicationCount > 0) {
                   <span class="pill warn">
                     {{ group.pendingApplicationCount }} waiting
                   </span>
@@ -108,7 +108,7 @@ export class GroupsListComponent implements OnInit {
   /** How many people are waiting on this member across every group they lead. */
   readonly waitingOnMe = computed(() =>
     this.groups()
-      .filter((group) => group.iAmThePresident)
+      .filter((group) => group.iCanLead)
       .reduce((total, group) => total + group.pendingApplicationCount, 0),
   );
 

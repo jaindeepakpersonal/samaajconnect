@@ -69,6 +69,6 @@ public sealed class ChangeGroupStatusCommandHandler(
 
         await unitOfWork.SaveChangesAsync(cancellationToken);
 
-        return Result.Success(group.ToResponse(actorId));
+        return Result.Success(group.ToResponse(actorId, currentUser.IsGroupAdmin()));
     }
 }

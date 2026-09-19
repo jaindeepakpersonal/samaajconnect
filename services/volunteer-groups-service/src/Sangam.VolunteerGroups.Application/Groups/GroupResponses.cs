@@ -4,7 +4,7 @@ namespace Sangam.VolunteerGroups.Application.Groups;
 /// A group as the list and detail screens show it.
 /// </summary>
 /// <remarks>
-/// <paramref name="PresidentMemberId"/> is an id, not a name. Names live in
+/// <paramref name="PresidentMemberId"/> is an id, not a name, and null until a president is set. Names live in
 /// member-family-service, and resolving one here would mean a call per group
 /// for a list - the synchronous reach across a service boundary this repo
 /// avoids. The portals already load the member directory and can map ids to
@@ -15,7 +15,7 @@ public sealed record GroupResponse(
     string Name,
     string? Description,
     string? FocusArea,
-    Guid PresidentMemberId,
+    Guid? PresidentMemberId,
     string Status,
     int MemberCount,
 
@@ -28,6 +28,13 @@ public sealed record GroupResponse(
     /// <summary>Whether the asking member is in this group.</summary>
     bool IAmAMember,
     bool IAmThePresident,
+
+    /// <summary>
+    /// Whether the asking member may decide join requests and run elections: the
+    /// president, or an admin while the group has none. Portals read this rather
+    /// than re-deriving it from <c>IAmThePresident</c> and a role.
+    /// </summary>
+    bool ICanLead,
     DateTimeOffset CreatedAt);
 
 public sealed record GroupMemberResponse(

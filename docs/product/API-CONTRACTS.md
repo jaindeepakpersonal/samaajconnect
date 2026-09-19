@@ -138,12 +138,12 @@ who never passed the check that produced it.
 | Method | Path | Roles | Purpose |
 |---|---|---|---|
 | GET | `/groups` | `Members.Read` | This Samaaj's groups, each with the asking member's standing |
-| POST | `/groups` | `VolunteerGroups.Manage` | Create a group and name its president |
+| POST | `/groups` | `VolunteerGroups.Manage` | Create a group. `presidentMemberId` is **optional** (a string, empty or omitted for none): a group may exist before anyone leads it |
 | GET | `/groups/{id}` | `Members.Read` | One group with its members |
 | PATCH | `/groups/{id}/status` | `VolunteerGroups.Manage` | Activate or deactivate. A deactivated group keeps its members |
 | POST | `/groups/{id}/applications` | `Members.Read` | Ask to join |
-| GET | `/groups/{id}/applications` | `VolunteerGroups.Lead` + this group's president | The president's review queue |
-| POST | `/groups/{id}/applications/{applicationId}/decide` | `VolunteerGroups.Lead` + president | `{accept, rolePosition}` |
+| GET | `/groups/{id}/applications` | `VolunteerGroups.Lead` + this group's president, or a Samaaj admin while it has none | The review queue |
+| POST | `/groups/{id}/applications/{applicationId}/decide` | `VolunteerGroups.Lead` + president, or a Samaaj admin while it has none | `{accept, rolePosition}` |
 | PUT | `/groups/{id}/members/{memberId}/position` | `VolunteerGroups.Lead` + president | Give a position, or clear it |
 | DELETE | `/groups/{id}/members/{memberId}` | `VolunteerGroups.Lead` + president | Remove a member. **409** on the president — see below |
 | PATCH | `/groups/{id}/president` | `VolunteerGroups.Manage` | Hand the group to a different member, who joins it if they were not in it. The outgoing president stays on as an ordinary member |

@@ -71,7 +71,7 @@ public sealed class DecideApplicationCommandHandler(
         // Refusing with 403 would confirm to a non-president that this group
         // and this application both exist - and whose applications are waiting
         // is exactly what the presidency check is protecting.
-        if (!group.IsPresident(actorId))
+        if (!group.CanLead(actorId, currentUser.IsGroupAdmin()))
         {
             return Result.Failure<GroupApplicationResponse>(
                 Error.NotFound("Group.NotFound", "No such group in this Samaaj."));

@@ -149,7 +149,7 @@ approved), DecidedBy, DecidedAt`
 ## 5. Volunteer Groups
 
 **VolunteerGroup** — `Id, TenantId, Name, Description, FocusArea,
-PresidentMemberId, Status (Active/Inactive), CreatedAt`
+PresidentMemberId (nullable - set later by an admin or a "President" election), Status (Active/Inactive), CreatedAt`
 
 **GroupApplication** — `Id, GroupId, MemberId, Status
 (Pending/Accepted/Rejected), DecidedBy, DecidedAt`

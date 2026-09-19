@@ -8,7 +8,7 @@ using Sangam.VolunteerGroups.Domain.Groups;
 namespace Sangam.VolunteerGroups.Application.Groups.Commands.CreateGroup;
 
 /// <summary>
-/// Creates a volunteer group and names its president.
+/// Creates a volunteer group, optionally naming its president.
 /// </summary>
 /// <remarks>
 /// A Samaaj admin's decision, not a member's: a group is part of how a Samaaj
@@ -20,7 +20,7 @@ public sealed record CreateGroupCommand(
     string Name,
     string? Description,
     string? FocusArea,
-    Guid PresidentMemberId) : ICommand<GroupResponse>;
+    string? PresidentMemberId) : ICommand<GroupResponse>;
 
 public sealed class CreateGroupCommandValidator : AbstractValidator<CreateGroupCommand>
 {
@@ -30,9 +30,13 @@ public sealed class CreateGroupCommandValidator : AbstractValidator<CreateGroupC
         RuleFor(x => x.Description).MaximumLength(2000);
         RuleFor(x => x.FocusArea).MaximumLength(100);
 
+        // Optional: a group may be created before anyone is chosen to lead it.
+        // A string on the wire, parsed only in the handler, so a malformed id
+        // fails here rather than crashing the JSON binder before validation runs.
         RuleFor(x => x.PresidentMemberId)
-            .NotEmpty()
-            .WithMessage("Name a president. A group without one has nobody to decide who joins it.");
+            .Must(value => string.IsNullOrWhiteSpace(value)
+                || (Guid.TryParse(value, out var id) && id != Guid.Empty))
+            .WithMessage("PresidentMemberId must be a valid member id, or left empty.");
     }
 }
 
@@ -73,13 +77,13 @@ public sealed class CreateGroupCommandHandler(
             command.Name,
             command.Description,
             command.FocusArea,
-            command.PresidentMemberId,
+            string.IsNullOrWhiteSpace(command.PresidentMemberId) ? null : Guid.Parse(command.PresidentMemberId),
             clock.UtcNow);
 
         groups.Add(group);
 
         await unitOfWork.SaveChangesAsync(cancellationToken);
 
-        return Result.Success(group.ToResponse(actorId));
+        return Result.Success(group.ToResponse(actorId, currentUser.IsGroupAdmin()));
     }
 }

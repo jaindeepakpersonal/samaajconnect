@@ -42,6 +42,57 @@ public sealed class VolunteerGroupTests
     }
 
     [Fact]
+    public void A_group_can_be_created_without_a_president_and_starts_with_no_members()
+    {
+        var group = VolunteerGroup.Create(TenantId, "No-president group", null, null, null, Now);
+
+        group.PresidentMemberId.Should().BeNull();
+        group.HasNoPresident.Should().BeTrue();
+        group.Members.Should().BeEmpty();
+        group.IsPresident(PresidentId).Should().BeFalse();
+    }
+
+    [Fact]
+    public void A_president_can_be_set_on_a_group_that_has_none()
+    {
+        var group = VolunteerGroup.Create(TenantId, "No-president group", null, null, null, Now);
+
+        group.ChangePresident(ApplicantId, Now).Should().BeTrue();
+
+        group.PresidentMemberId.Should().Be(ApplicantId);
+        group.Members.Should().ContainSingle().Which.RolePosition.Should().Be("President");
+    }
+
+    [Fact]
+    public void Electing_the_President_position_installs_a_real_president()
+    {
+        // Before, only the label moved, so the winner read "President" while
+        // IsPresident stayed false for them and the old president kept every power.
+        var group = Group();
+        var request = group.Apply(ApplicantId, null, Now)!;
+        group.DecideApplication(request.Id, accepted: true, PresidentId, Now);
+
+        group.ElectPosition("President", ApplicantId, Now).Should().BeTrue();
+
+        group.IsPresident(ApplicantId).Should().BeTrue();
+        group.IsPresident(PresidentId).Should().BeFalse();
+        group.Members.Single(m => m.MemberId == PresidentId).RolePosition.Should().BeNull();
+        group.Members.Single(m => m.MemberId == ApplicantId).RolePosition.Should().Be("President");
+    }
+
+    [Fact]
+    public void Re_electing_the_sitting_president_changes_nothing()
+    {
+        var group = Group();
+        group.ClearDomainEvents();
+
+        group.ElectPosition("president", PresidentId, Now).Should().BeTrue();
+
+        group.IsPresident(PresidentId).Should().BeTrue();
+        group.DomainEvents.Should().BeEmpty();
+    }
+
+    [Fact]
     public void Creating_trims_the_name()
     {
         Group().Name.Should().Be("Seva Group");

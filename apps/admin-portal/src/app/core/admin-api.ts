@@ -459,17 +459,17 @@ export class AdminApi {
   }
 
   /**
-   * Creates a group and installs its president in one act.
+   * Creates a group, optionally installing its president in the same act.
    *
-   * The president is not optional: a group with nobody able to decide its
-   * applications is a group whose join requests go nowhere, which is the shape
-   * of gap this whole run of work has been closing.
+   * The president may be left out: a group can exist before anyone is chosen to
+   * lead it, and gets one later - an admin choosing an existing member, or a
+   * "President" election. While it has none, a Samaaj admin runs it.
    */
   createGroup(
     name: string,
     description: string | null,
     focusArea: string | null,
-    presidentMemberId: string,
+    presidentMemberId: string | null,
   ): Observable<VolunteerGroup> {
     return this.http.post<VolunteerGroup>('/v1/volunteer-groups/groups', {
       name,
