@@ -1,6 +1,7 @@
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;
 using Sangam.MasterData.Domain.Locations;
+using Sangam.MasterData.Domain.Seeding;
 
 namespace Sangam.MasterData.Infrastructure.Persistence.Configurations;
 
@@ -19,5 +20,8 @@ public sealed class StateConfiguration : IEntityTypeConfiguration<State>
         builder.HasIndex(s => new { s.CountryId, s.Name });
 
         builder.Ignore(s => s.DomainEvents);
+
+        // India's default states and union territories - see DefaultMasterData.
+        builder.HasData(DefaultMasterData.States);
     }
 }

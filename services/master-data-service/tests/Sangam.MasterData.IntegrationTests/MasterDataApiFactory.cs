@@ -69,7 +69,7 @@ public sealed class MasterDataApiFactory : WebApplicationFactory<Program>, IAsyn
         var dbContext = scope.ServiceProvider.GetRequiredService<MasterDataDbContext>();
 
         await dbContext.Database.ExecuteSqlRawAsync(
-            "TRUNCATE TABLE gautras, localities, cities, lookup_items, outbox_messages RESTART IDENTITY CASCADE;");
+            "TRUNCATE TABLE gautras, localities, cities, states, lookup_items, outbox_messages RESTART IDENTITY CASCADE;");
     }
 
     public async Task<T> WithDbContextAsync<T>(Func<MasterDataDbContext, Task<T>> action)

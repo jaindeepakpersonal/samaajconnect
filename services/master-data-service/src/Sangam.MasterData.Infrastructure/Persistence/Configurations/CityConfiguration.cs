@@ -1,6 +1,7 @@
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;
 using Sangam.MasterData.Domain.Locations;
+using Sangam.MasterData.Domain.Seeding;
 
 namespace Sangam.MasterData.Infrastructure.Persistence.Configurations;
 
@@ -24,5 +25,8 @@ public sealed class CityConfiguration : IEntityTypeConfiguration<City>
         builder.HasIndex(c => c.StateId);
 
         builder.Ignore(c => c.DomainEvents);
+
+        // A modest starter list of India's cities - see DefaultMasterData.
+        builder.HasData(DefaultMasterData.Cities);
     }
 }

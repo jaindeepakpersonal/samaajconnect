@@ -1,6 +1,7 @@
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;
 using Sangam.MasterData.Domain.Lookups;
+using Sangam.MasterData.Domain.Seeding;
 
 namespace Sangam.MasterData.Infrastructure.Persistence.Configurations;
 
@@ -21,5 +22,10 @@ public sealed class LookupItemConfiguration : IEntityTypeConfiguration<LookupIte
         builder.HasIndex(i => new { i.Category, i.Code }).IsUnique();
 
         builder.Ignore(i => i.DomainEvents);
+
+        // Default rows, applied by the same migration every service already
+        // runs on startup in Development - see DefaultMasterData's own
+        // remarks for why these are silent (no Create(), no domain event).
+        builder.HasData(DefaultMasterData.LookupItems);
     }
 }

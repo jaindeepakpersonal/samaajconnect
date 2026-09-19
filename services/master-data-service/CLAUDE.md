@@ -51,6 +51,34 @@ services hold these rows' ids as plain foreign keys across a service boundary
 with no referential integrity to enforce it — a hard delete would leave those
 references dangling with nothing to say so.
 
+**Default seed data, added 2026-09-19.** Until then this service shipped with
+nothing in it: every `LookupItem`, `State` and `City` had to be created by
+hand through the admin API on a fresh database, so a new deployment's
+registration form, My Profile and every admin dropdown reading one of these
+lists was empty until a Samaaj Admin populated it. `Domain/Seeding/
+DefaultMasterData.cs` now carries a starter set - all 8 `LookupItem`
+categories (India plus the diaspora countries with the largest Jain
+communities outside it for `Country`; a short ordinary list for the other
+seven), India's 28 states and 8 union territories, and a modest, curated
+(not exhaustive) starter city list weighted toward Rajasthan, Gujarat,
+Maharashtra, Madhya Pradesh, Delhi/NCR and Karnataka.
+
+It is wired in the same way identity-tenant-service's own
+`AuthorizationCatalog` seeds Roles and Permissions: hand-assigned, stable
+ids, attached via `builder.HasData(...)` in `LookupItemConfiguration`/
+`StateConfiguration`/`CityConfiguration`, and baked into a migration's
+`InsertData` calls at `dotnet ef migrations add` time rather than run by a
+separate seed script - the same `dbContext.Database.MigrateAsync()` call
+every service already runs on startup in `Development` applies it, so it
+lands the next time `docker compose up -d --build` runs a fresh database.
+That also means these rows raise no domain event and write no Outbox row -
+they never call `LookupItem.Create()`/`State.Create()`/`City.Create()`, the
+same silence identity-tenant-service's own seeded roles and permissions
+already have. `Gautra` is deliberately not seeded: it is the one
+tenant-scoped entity here, a Samaaj's own list, so there is no sensible
+platform-wide default for it. `Locality` stays unseeded too - too
+fine-grained for a default list to get right.
+
 ## Commands
 
 | Command | Permission | Notes |
