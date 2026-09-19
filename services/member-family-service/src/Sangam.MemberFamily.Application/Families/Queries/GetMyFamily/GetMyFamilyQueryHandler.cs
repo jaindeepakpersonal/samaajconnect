@@ -33,7 +33,7 @@ public sealed class GetMyFamilyQueryHandler(
         // own family, and a relative who came back as a blank row would be the
         // reading nobody intends.
         var memberProfiles = await profiles.SearchAsync(
-            null, null, 200, includeUnlisted: true, cancellationToken);
+            null, null, 0, 200, includeUnlisted: true, cancellationToken);
 
         return Result.Success(family.ToResponse(memberId, memberProfiles));
     }

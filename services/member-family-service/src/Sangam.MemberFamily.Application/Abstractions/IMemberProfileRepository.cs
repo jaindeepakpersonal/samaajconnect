@@ -35,9 +35,15 @@ public interface IMemberProfileRepository
     /// find - correcting a member's details is part of the job, and a member
     /// nobody can look up is a member nobody can help.
     /// </param>
+    /// <param name="limit">
+    /// The caller (`SearchMembersQueryHandler`) asks for one more row than a
+    /// page actually holds, so it can tell whether there is a next page
+    /// without a second `COUNT(*)` query.
+    /// </param>
     Task<IReadOnlyList<MemberProfile>> SearchAsync(
         string? term,
         Guid? localityId,
+        int skip,
         int limit,
         bool includeUnlisted,
         CancellationToken cancellationToken = default);

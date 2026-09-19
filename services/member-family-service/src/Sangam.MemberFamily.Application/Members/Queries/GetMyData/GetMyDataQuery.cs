@@ -68,7 +68,7 @@ public sealed class GetMyDataQueryHandler(
             // an export that hides a household member because of a directory
             // setting is an incomplete answer to a right.
             var householdProfiles = await profiles.SearchAsync(
-                null, null, 200, includeUnlisted: true, cancellationToken);
+                null, null, 0, 200, includeUnlisted: true, cancellationToken);
             familyResponse = family.ToResponse(memberId, householdProfiles);
 
             var pending = await conversions.ListPendingAsync(cancellationToken);

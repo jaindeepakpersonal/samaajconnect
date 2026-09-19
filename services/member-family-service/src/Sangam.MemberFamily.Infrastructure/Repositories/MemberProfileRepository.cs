@@ -20,6 +20,7 @@ public sealed class MemberProfileRepository(MemberFamilyDbContext dbContext) : I
     public async Task<IReadOnlyList<MemberProfile>> SearchAsync(
         string? term,
         Guid? localityId,
+        int skip,
         int limit,
         bool includeUnlisted,
         CancellationToken cancellationToken = default)

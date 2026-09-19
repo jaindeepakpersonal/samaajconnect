@@ -1,5 +1,6 @@
 using MediatR;
 using Sangam.MemberFamily.Api.Extensions;
+using Sangam.MemberFamily.Application.Common;
 using Sangam.MemberFamily.Application.Members;
 using Sangam.MemberFamily.Application.Members.Commands.CorrectMemberDetails;
 using Sangam.MemberFamily.Application.Members.Commands.UpdateProfile;
@@ -20,18 +21,19 @@ public static class MemberEndpoints
         group.MapGet("/", async (
                 string? term,
                 Guid? localityId,
-                int? limit,
+                int? skip,
+                int? take,
                 ISender sender,
                 CancellationToken cancellationToken) =>
             {
                 var result = await sender.Send(
-                    new SearchMembersQuery(term, localityId, limit ?? 50), cancellationToken);
+                    new SearchMembersQuery(term, localityId, skip ?? 0, take ?? 20), cancellationToken);
 
                 return result.ToApiResult();
             })
             .WithName("SearchMembers")
             .WithSummary("Search this Samaaj's member directory. Fields respect each member's privacy settings.")
-            .Produces<IReadOnlyList<MemberResponse>>()
+            .Produces<PagedResult<MemberResponse>>()
             .ProducesValidationProblem()
             .ProducesProblem(StatusCodes.Status403Forbidden);
 

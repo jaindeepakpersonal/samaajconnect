@@ -77,7 +77,7 @@ public sealed class DirectoryListingTests(MemberFamilyApiFactory factory)
     {
         var directory = await client.GetFromJsonAsync<JsonElement>("/v1/members");
 
-        return [.. directory.EnumerateArray().Select(m => m.GetProperty("id").GetGuid())];
+        return [.. directory.GetProperty("items").EnumerateArray().Select(m => m.GetProperty("id").GetGuid())];
     }
 
     [Fact]
@@ -97,7 +97,7 @@ public sealed class DirectoryListingTests(MemberFamilyApiFactory factory)
         var directory = await MemberClient(_listed)
             .GetFromJsonAsync<JsonElement>($"/v1/members?term={Uri.EscapeDataString(Named("Meera Shah"))}");
 
-        directory.EnumerateArray().Should().BeEmpty();
+        directory.GetProperty("items").EnumerateArray().Should().BeEmpty();
     }
 
     [Fact]

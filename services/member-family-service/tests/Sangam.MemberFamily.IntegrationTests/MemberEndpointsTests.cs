@@ -128,7 +128,7 @@ public sealed class MemberEndpointsTests(MemberFamilyApiFactory factory)
     {
         var directory = await MemberClient(_ravi, TenantA).GetFromJsonAsync<JsonElement>("/v1/members");
 
-        var names = directory.EnumerateArray()
+        var names = directory.GetProperty("items").EnumerateArray()
             .Select(m => m.GetProperty("fullName").GetString())
             .ToList();
 
@@ -141,7 +141,7 @@ public sealed class MemberEndpointsTests(MemberFamilyApiFactory factory)
     {
         var directory = await MemberClient(_ravi, TenantA).GetFromJsonAsync<JsonElement>("/v1/members");
 
-        var meera = directory.EnumerateArray().Single(m => m.GetProperty("id").GetGuid() == _meera);
+        var meera = directory.GetProperty("items").EnumerateArray().Single(m => m.GetProperty("id").GetGuid() == _meera);
 
         meera.GetProperty("mobile").GetString().Should().NotBeNullOrEmpty();
         meera.GetProperty("email").ValueKind.Should().Be(JsonValueKind.Null);
@@ -153,7 +153,7 @@ public sealed class MemberEndpointsTests(MemberFamilyApiFactory factory)
     {
         var directory = await AdminClient(TenantA).GetFromJsonAsync<JsonElement>("/v1/members");
 
-        var meera = directory.EnumerateArray().Single(m => m.GetProperty("id").GetGuid() == _meera);
+        var meera = directory.GetProperty("items").EnumerateArray().Single(m => m.GetProperty("id").GetGuid() == _meera);
 
         meera.GetProperty("email").GetString().Should().NotBeNullOrEmpty();
     }
@@ -164,7 +164,7 @@ public sealed class MemberEndpointsTests(MemberFamilyApiFactory factory)
         var directory = await MemberClient(_ravi, TenantA)
             .GetFromJsonAsync<JsonElement>("/v1/members?term=" + Uri.EscapeDataString(Named("Meera Shah")));
 
-        directory.EnumerateArray().Should().ContainSingle()
+        directory.GetProperty("items").EnumerateArray().Should().ContainSingle()
             .Which.GetProperty("fullName").GetString().Should().Be(Named("Meera Shah"));
     }
 
@@ -176,7 +176,7 @@ public sealed class MemberEndpointsTests(MemberFamilyApiFactory factory)
         var directory = await MemberClient(_ravi, TenantA)
             .GetFromJsonAsync<JsonElement>("/v1/members?term=919812345678");
 
-        directory.EnumerateArray().Should().BeEmpty();
+        directory.GetProperty("items").EnumerateArray().Should().BeEmpty();
     }
 
     [Fact]
@@ -188,7 +188,7 @@ public sealed class MemberEndpointsTests(MemberFamilyApiFactory factory)
         var directory = await MemberClient(_ravi, TenantA)
             .GetFromJsonAsync<JsonElement>("/v1/members?localityId=" + UdaipurLocalityId);
 
-        var names = directory.EnumerateArray()
+        var names = directory.GetProperty("items").EnumerateArray()
             .Select(m => m.GetProperty("fullName").GetString())
             .ToList();
 
@@ -202,7 +202,7 @@ public sealed class MemberEndpointsTests(MemberFamilyApiFactory factory)
         var directory = await MemberClient(_ravi, TenantA)
             .GetFromJsonAsync<JsonElement>("/v1/members?localityId=" + Guid.NewGuid());
 
-        directory.EnumerateArray().Should().BeEmpty();
+        directory.GetProperty("items").EnumerateArray().Should().BeEmpty();
     }
 
     [Fact]
@@ -226,7 +226,7 @@ public sealed class MemberEndpointsTests(MemberFamilyApiFactory factory)
         var directory = await MemberClient(_ravi, TenantA)
             .GetFromJsonAsync<JsonElement>("/v1/members");
 
-        var fromList = directory.EnumerateArray()
+        var fromList = directory.GetProperty("items").EnumerateArray()
             .Single(m => m.GetProperty("id").GetGuid() == _meera);
 
         var direct = await MemberClient(_ravi, TenantA)

@@ -354,6 +354,20 @@ mask still leaks length and shape.
 profession and qualification to SamaajOnly. Closed by default and opened
 deliberately, rather than open by default and hoping the member notices.
 
+**`SearchMembersQuery` paginates for real now, not just a capped `Limit`.**
+Added 2026-09-19, part of a platform-wide pagination pass: `Skip`/`Take`
+(default `Take=20`, matching every grid's own default page size) replace the
+single `Limit` this query used to take. The handler asks the repository for
+`Take + 1` rows and slices the extra one off, so `PagedResult<T>.HasMore` is
+known without a second `COUNT(*)` query - cheaper than an exact total, and
+every backend-paginated screen in this pass only ever needed "is there a
+next page," never a precise count. `GET /v1/members` now answers
+`{ items, hasMore }` instead of a bare
+array; the three internal callers that fetch a whole household
+(`GetMyFamilyQueryHandler`, `GetMyDataQuery`, `DecideJoinRequestCommandHandler`)
+pass `skip: 0, take: 200` unchanged - they read every member of one family,
+not a page of the directory, so pagination does not apply to them.
+
 **Search matches names by substring and Locality by exact id.** Never contact
 details, whatever their privacy level says — matching on a private mobile
 number would let anyone confirm one digit-guess at a time, and the filtering
