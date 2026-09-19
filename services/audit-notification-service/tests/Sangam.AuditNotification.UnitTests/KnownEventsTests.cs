@@ -343,6 +343,16 @@ public sealed class KnownEventsTests
     }
 
     [Fact]
+    public void A_corrected_campaign_is_recorded_against_the_campaign()
+    {
+        var descriptor = KnownEvents.Describe("celebrity-voting.campaign.updated.v1");
+
+        descriptor.Action.Should().Be("CampaignUpdated");
+        descriptor.EntityName.Should().Be("Campaign");
+        descriptor.EntityIdProperty.Should().Be("campaignId");
+    }
+
+    [Fact]
     public void A_changed_family_head_is_recorded_against_the_family_admin_who_chose_it()
     {
         var descriptor = KnownEvents.Describe("members.family.head-changed.v1");

@@ -27,6 +27,7 @@ before changing anything under `Vote`.
 | Command | Permission | Notes |
 |---|---|---|
 | `CreateCampaignCommand` | `CelebrityVoting.Configure` | Starts as `Draft` |
+| `UpdateCampaignCommand` | `CelebrityVoting.Configure` | Corrects a campaign's details in `Draft` or `NominationsOpen`; refused (409) from `VotingOpen` on |
 | `MoveCampaignCommand` | `CelebrityVoting.Configure` | Strictly forward. Refuses `VotingOpen` on an empty ballot |
 | `NominateCandidateCommand` | `Members.Read` | A repeat nomination is a no-op reported as success |
 | `DecideCandidateCommand` | `CelebrityVoting.Configure` | Approve onto the ballot, or remove before voting opens |
@@ -43,6 +44,7 @@ before changing anything under `Vote`.
 
 ## Events published
 
+- `CampaignUpdatedDomainEvent`
 - `CampaignStatusChangedDomainEvent`
 - `CampaignClosedDomainEvent`
 - `ResultsPublishedDomainEvent`

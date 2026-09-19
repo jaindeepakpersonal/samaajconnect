@@ -17,6 +17,20 @@ public sealed record CampaignStatusChangedDomainEvent(
 }
 
 /// <summary>
+/// A campaign's details were corrected. Carries no field values - the title
+/// and description are the Samaaj's own copy, and audit-notification-service
+/// records payloads verbatim into an append-only table; the fact and the time
+/// are what an audit trail honestly needs.
+/// </summary>
+public sealed record CampaignUpdatedDomainEvent(
+    Guid CampaignId,
+    Guid TenantId,
+    DateTimeOffset OccurredAt) : IDomainEvent
+{
+    public string Topic => "celebrity-voting.campaign.updated.v1";
+}
+
+/// <summary>
 /// Voting is over. Separate from the status change because it is the moment a
 /// notification channel would care about most - everyone who voted is waiting
 /// to hear - and filtering every status move for it is work a consumer should

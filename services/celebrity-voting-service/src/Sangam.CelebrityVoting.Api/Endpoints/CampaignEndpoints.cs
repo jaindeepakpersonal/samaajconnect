@@ -3,6 +3,7 @@ using Sangam.CelebrityVoting.Api.Extensions;
 using Sangam.CelebrityVoting.Application.Campaigns;
 using Sangam.CelebrityVoting.Application.Campaigns.Commands.CastVote;
 using Sangam.CelebrityVoting.Application.Campaigns.Commands.CreateCampaign;
+using Sangam.CelebrityVoting.Application.Campaigns.Commands.UpdateCampaign;
 using Sangam.CelebrityVoting.Application.Campaigns.Commands.DecideCandidate;
 using Sangam.CelebrityVoting.Application.Campaigns.Commands.MoveCampaign;
 using Sangam.CelebrityVoting.Application.Campaigns.Commands.NominateCandidate;
@@ -61,6 +62,37 @@ public static class CampaignEndpoints
             .ProducesValidationProblem()
             .ProducesProblem(StatusCodes.Status401Unauthorized)
             .ProducesProblem(StatusCodes.Status403Forbidden);
+
+        group.MapPatch("/campaigns/{id:guid}", async (
+                Guid id,
+                CreateCampaignRequest request,
+                ISender sender,
+                CancellationToken cancellationToken) =>
+            {
+                var command = new UpdateCampaignCommand(
+                    id,
+                    request.Title,
+                    request.Description,
+                    request.NominationStartAt,
+                    request.NominationEndAt,
+                    request.VotingStartAt,
+                    request.VotingEndAt,
+                    request.TopN,
+                    request.ResultsVisibility);
+
+                var result = await sender.Send(command, cancellationToken);
+
+                return result.ToApiResult();
+            })
+            .RequireAuthorization()
+            .WithName("UpdateCampaign")
+            .WithSummary("Correct a campaign's details. Refused once voting has opened.")
+            .Produces<CampaignResponse>()
+            .ProducesValidationProblem()
+            .ProducesProblem(StatusCodes.Status401Unauthorized)
+            .ProducesProblem(StatusCodes.Status403Forbidden)
+            .ProducesProblem(StatusCodes.Status404NotFound)
+            .ProducesProblem(StatusCodes.Status409Conflict);
 
         group.MapGet("/campaigns/{id:guid}", async (
                 Guid id,

@@ -197,6 +197,7 @@ who never passed the check that produced it.
 |---|---|---|---|
 | GET | `/campaigns` | `Members.Read` | This Samaaj's campaigns, with the caller's own vote on each |
 | POST | `/campaigns` | `CelebrityVoting.Configure` | Create a campaign (starts as a draft) |
+| PATCH | `/campaigns/{id}` | `CelebrityVoting.Configure` | Correct a campaign's details (same rules as create). **409** from `VotingOpen` on |
 | GET | `/campaigns/{id}` | `Members.Read` | One campaign with its ballot, and the tally if the caller may see it |
 | POST | `/campaigns/{id}/status` | `CelebrityVoting.Configure` | Open nominations, open voting, or close |
 | POST | `/campaigns/{id}/candidates` | `Members.Read` | Nominate a member |

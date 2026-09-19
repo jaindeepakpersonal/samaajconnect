@@ -113,7 +113,7 @@ describe('CampaignListComponent', () => {
     component.votingEndAt = '2026-09-20T00:00';
 
     expect(component.windowsOverlap()).toBe(true);
-    expect(component.canCreate()).toBe(false);
+    expect(component.canSubmit()).toBe(false);
 
     component.create();
     http.expectNone('/v1/celebrity-voting/campaigns');
@@ -140,6 +140,101 @@ describe('CampaignListComponent', () => {
     expect(body['topN']).toBe(10);
     expect(body['resultsVisibility']).toBe('HiddenUntilClose');
     expect(body['description']).toBeNull();
+  });
+
+  it('refuses a window that closes before it opens, in either window', () => {
+    load();
+
+    component.title = 'X';
+    component.topN = 3;
+    component.nominationStartAt = '2026-08-20T00:00';
+    component.nominationEndAt = '2026-08-01T00:00';
+    component.votingStartAt = '2026-09-01T00:00';
+    component.votingEndAt = '2026-09-20T00:00';
+
+    expect(component.closesBeforeOpening(component.nominationStartAt, component.nominationEndAt)).toBe(true);
+    expect(component.canSubmit()).toBe(false);
+
+    component.nominationEndAt = '2026-08-25T00:00';
+    component.votingEndAt = '2026-08-30T00:00';
+
+    expect(component.closesBeforeOpening(component.votingStartAt, component.votingEndAt)).toBe(true);
+    expect(component.canSubmit()).toBe(false);
+  });
+
+  // ---- Editing ---------------------------------------------------------------
+
+  const editButtons = () =>
+    Array.from(fixture.nativeElement.querySelectorAll('tbody button')).map((b) =>
+      (b as HTMLElement).textContent?.trim(),
+    );
+
+  it('offers Edit for a draft and for a campaign taking nominations, and for nothing later', () => {
+    load([
+      campaign({ id: 'c1', status: 'Draft' }),
+      campaign({ id: 'c2', status: 'NominationsOpen' }),
+      campaign({ id: 'c3', status: 'VotingOpen' }),
+      campaign({ id: 'c4', status: 'Closed' }),
+      campaign({ id: 'c5', status: 'Published' }),
+    ]);
+
+    expect(editButtons().filter((t) => t?.startsWith('Edit')).length).toBe(2);
+  });
+
+  it('opens the edit modal filled in, and sends a PATCH to that campaign', () => {
+    const existing = campaign({
+      id: 'c1',
+      title: 'Celebrities 2026',
+      description: 'About it',
+      topN: 4,
+      resultsVisibility: 'Live',
+      nominationStartAt: '2026-08-01T00:00:00Z',
+      nominationEndAt: '2026-08-20T00:00:00Z',
+      votingStartAt: '2026-09-01T00:00:00Z',
+      votingEndAt: '2026-09-20T00:00:00Z',
+    });
+    load([existing]);
+
+    component.openEditModal(new MouseEvent('click'), existing);
+    fixture.detectChanges();
+
+    expect(component.modalOpen()).toBe(true);
+    expect(component.modalMode()).toBe('edit');
+    expect(component.title).toBe('Celebrities 2026');
+    expect(component.topN).toBe(4);
+    expect(component.resultsVisibility).toBe('Live');
+    expect(component.nominationStartAt).not.toBe('');
+
+    component.title = '  Renamed  ';
+    component.submitModal();
+
+    const call = http.expectOne('/v1/celebrity-voting/campaigns/c1');
+    expect(call.request.method).toBe('PATCH');
+    expect((call.request.body as Record<string, unknown>)['title']).toBe('Renamed');
+
+    call.flush(campaign({ id: 'c1', title: 'Renamed' }));
+    http.expectOne('/v1/celebrity-voting/campaigns').flush([campaign({ id: 'c1', title: 'Renamed' })]);
+    fixture.detectChanges();
+
+    expect(component.modalOpen()).toBe(false);
+    expect(text()).toContain('Renamed updated.');
+  });
+
+  it('shows the service refusal and keeps the modal open when an edit is refused', () => {
+    const existing = campaign({ id: 'c1', status: 'NominationsOpen' });
+    load([existing]);
+
+    component.openEditModal(new MouseEvent('click'), existing);
+    component.submitModal();
+
+    http.expectOne('/v1/celebrity-voting/campaigns/c1').flush(
+      { title: 'Campaign.NotEditable', detail: 'Voting has opened.' },
+      { status: 409, statusText: 'Conflict' },
+    );
+    fixture.detectChanges();
+
+    expect(component.modalOpen()).toBe(true);
+    expect(component.error()).not.toBeNull();
   });
 
   it('says nothing about overlap until both dates are filled in', () => {

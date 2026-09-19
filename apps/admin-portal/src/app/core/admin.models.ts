@@ -528,6 +528,18 @@ export type ResultsVisibility = 'Live' | 'HiddenUntilClose';
 export type CandidateStatus = 'Nominated' | 'Approved';
 
 /** Mirrors `CampaignResponse`. */
+/** What creating or editing a campaign sends. */
+export interface CampaignInput {
+  readonly title: string;
+  readonly description: string | null;
+  readonly nominationStartAt: string;
+  readonly nominationEndAt: string;
+  readonly votingStartAt: string;
+  readonly votingEndAt: string;
+  readonly topN: number;
+  readonly resultsVisibility: ResultsVisibility;
+}
+
 export interface Campaign {
   readonly id: string;
   readonly title: string;

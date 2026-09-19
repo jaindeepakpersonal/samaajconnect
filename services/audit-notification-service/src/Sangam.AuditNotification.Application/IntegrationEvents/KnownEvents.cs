@@ -531,6 +531,11 @@ public static class KnownEvents
             EntityIdProperty: "campaignId",
             BeforeProperties: ["previousStatus"]),
 
+        ["celebrity-voting.campaign.updated.v1"] = new(
+            Action: "CampaignUpdated",
+            EntityName: "Campaign",
+            EntityIdProperty: "campaignId"),
+
         ["celebrity-voting.campaign.closed.v1"] = new(
             Action: "CampaignClosed",
             EntityName: "Campaign",

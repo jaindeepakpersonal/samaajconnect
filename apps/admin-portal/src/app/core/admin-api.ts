@@ -15,6 +15,7 @@ import {
   BoliType,
   Campaign,
   CampaignDetail,
+  CampaignInput,
   CampaignResult,
   CampaignStatus,
   ClassExam,
@@ -52,7 +53,6 @@ import {
   PendingResult,
   RegisterEntry,
   RegistrationSummary,
-  ResultsVisibility,
   RoleMatrix,
   Round,
   RoundDetail,
@@ -545,17 +545,17 @@ export class AdminApi {
    * so that members who vote early see the same ballot as members who vote
    * late.
    */
-  createCampaign(campaign: {
-    title: string;
-    description: string | null;
-    nominationStartAt: string;
-    nominationEndAt: string;
-    votingStartAt: string;
-    votingEndAt: string;
-    topN: number;
-    resultsVisibility: ResultsVisibility;
-  }): Observable<Campaign> {
+  createCampaign(campaign: CampaignInput): Observable<Campaign> {
     return this.http.post<Campaign>('/v1/celebrity-voting/campaigns', campaign);
+  }
+
+  /**
+   * Corrects a campaign's details, under the same rules as creating one. The
+   * service refuses (409) once voting has opened: people have been told the
+   * windows and whether the tally is live, and votes may exist.
+   */
+  updateCampaign(id: string, campaign: CampaignInput): Observable<Campaign> {
+    return this.http.patch<Campaign>(`/v1/celebrity-voting/campaigns/${id}`, campaign);
   }
 
   /**

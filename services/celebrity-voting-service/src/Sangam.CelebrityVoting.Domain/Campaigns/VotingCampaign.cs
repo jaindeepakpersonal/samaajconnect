@@ -90,6 +90,48 @@ public sealed class VotingCampaign : AggregateRoot, ITenantScopedEntity
         };
     }
 
+    /// <summary>
+    /// Whether the campaign's details can still be corrected: while it is a
+    /// draft or taking nominations, and no longer once voting opens.
+    /// </summary>
+    /// <remarks>
+    /// From <c>VotingOpen</c> on, votes may exist, and the windows and
+    /// <see cref="ResultsVisibility"/> are what every voter was told - moving
+    /// them under people who have already voted changes the election after the
+    /// fact. <c>HiddenUntilClose</c> in particular has to be settled before
+    /// anybody votes, which is why it is on the editable side of this line.
+    /// </remarks>
+    public bool CanBeEdited => Status is CampaignStatus.Draft or CampaignStatus.NominationsOpen;
+
+    /// <summary>
+    /// Replaces the campaign's details. The caller has already checked
+    /// <see cref="CanBeEdited"/> and the window rules; this only does the write.
+    /// </summary>
+    public void Update(
+        string title,
+        string? description,
+        DateTimeOffset nominationStartAt,
+        DateTimeOffset nominationEndAt,
+        DateTimeOffset votingStartAt,
+        DateTimeOffset votingEndAt,
+        int topN,
+        ResultsVisibility resultsVisibility,
+        DateTimeOffset now)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(title);
+
+        Title = title.Trim();
+        Description = string.IsNullOrWhiteSpace(description) ? null : description.Trim();
+        NominationStartAt = nominationStartAt;
+        NominationEndAt = nominationEndAt;
+        VotingStartAt = votingStartAt;
+        VotingEndAt = votingEndAt;
+        TopN = topN;
+        ResultsVisibility = resultsVisibility;
+
+        Raise(new CampaignUpdatedDomainEvent(Id, TenantId, now));
+    }
+
     public Candidate? FindCandidate(Guid candidateId) =>
         _candidates.FirstOrDefault(c => c.Id == candidateId);
 

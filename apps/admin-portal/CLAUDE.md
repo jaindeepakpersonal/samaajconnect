@@ -27,7 +27,7 @@ screen. The spec is `docs/product/wireframes/admin-panel-wireframes.html`.
 | Occasion detail | `/boli/:id` | — | built; no wireframe covers running an auction. Types, opening a Boli, closing, recording |
 | Events | `/events` | `#events` | built. Drafts and published together, create, publish, cancel |
 | Event detail | `/events/:id` | — | built; no wireframe covers one. Who is going, who is waiting, and in what order |
-| Celebrities / Voting | `/voting` | `#celebrity` | built. Campaigns and setting one up |
+| Celebrities / Voting | `/voting` | `#celebrity` | built. Campaigns, setting one up, and editing one (a modal, until voting opens) |
 | Campaign detail | `/voting/:id` | — | built; no wireframe covers running one. Stage, ballot, nominations, tally, result |
 | Competitions | `/competitions` | — | built; no wireframe covers this new module. Competitions and setting one up |
 | Competition detail | `/competitions/:id` | — | built; no wireframe covers running one. Stage, judges, rounds, entries, publish results |
@@ -653,6 +653,16 @@ one is not a class this app needed at all: every other form here places a
 label and an input as direct siblings, so the wrapper is gone rather than
 given a rule to keep it consistent with a pattern this app doesn't otherwise
 use.
+
+**A campaign can be edited until voting opens, and the form is a modal now.** There
+was no update command at all, so a wrong date or title meant a new campaign.
+`UpdateCampaignCommand` (`PATCH /campaigns/{id}`, the same permission as
+creating one) allows a Draft or a campaign taking nominations and answers 409
+from voting onward: people have been told the windows and whether the tally is
+live, and votes may exist. The screen mirrors that - Edit is not drawn for a
+campaign the service would refuse - and the create form moved into the same
+modal Master Data and Events use, with each window's own order now checked
+beside the existing "voting starts after nominations close" rule.
 
 **Competitions is a new module this cycle, with no wireframe to translate -
 shaped after Celebrities / Voting's own two screens instead.** A
