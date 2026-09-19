@@ -1,7 +1,7 @@
 import { Component, OnInit, computed, inject, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { RouterLink } from '@angular/router';
-import { AuthService, describeError } from '@samaajconnect/shared';
+import { AuthService, DEFAULT_PAGE_SIZE, describeError } from '@samaajconnect/shared';
 import { AdminApi } from '../../core/admin-api';
 import { AdminScope } from '../../core/admin-scope';
 import { AdminMember, Locality } from '../../core/admin.models';
@@ -143,12 +143,27 @@ import { AdminMember, Locality } from '../../core/admin.models';
           </table>
         </div>
 
-        @if (members().length === 100) {
-          <p class="small">
-            Showing the first 100. Narrow the search to see the rest — the directory endpoint
-            caps a page at a hundred.
-          </p>
-        }
+        <nav class="pager" aria-label="Member pages">
+          <p class="pager-summary">Page {{ page() }}</p>
+          <div class="pager-controls">
+            <button
+              class="pager-btn"
+              type="button"
+              [disabled]="page() <= 1 || loading()"
+              (click)="goTo(page() - 1)"
+            >
+              Previous
+            </button>
+            <button
+              class="pager-btn"
+              type="button"
+              [disabled]="!hasMore() || loading()"
+              (click)="goTo(page() + 1)"
+            >
+              Next
+            </button>
+          </div>
+        </nav>
       }
     }
   `,
@@ -175,6 +190,8 @@ export class MemberListComponent implements OnInit {
   readonly members = signal<readonly AdminMember[]>([]);
   readonly loading = signal(true);
   readonly error = signal<string | null>(null);
+  readonly page = signal(1);
+  readonly hasMore = signal(false);
 
   readonly needsSamaaj = computed(
     () => this.auth.roles().includes('SuperAdmin') && this.scope.tenantId() === null,
@@ -196,13 +213,22 @@ export class MemberListComponent implements OnInit {
     this.search();
   }
 
+  /** A new search starts again from the first page. */
   search(): void {
+    this.goTo(1);
+  }
+
+  goTo(page: number): void {
+    this.page.set(page);
     this.loading.set(true);
     this.error.set(null);
 
-    this.api.searchMembers(this.term, this.localityId || null).subscribe({
+    this.api
+      .searchMembers(this.term, this.localityId || null, (page - 1) * DEFAULT_PAGE_SIZE, DEFAULT_PAGE_SIZE)
+      .subscribe({
       next: (found) => {
-        this.members.set(found);
+        this.members.set(found.items);
+        this.hasMore.set(found.hasMore);
         this.loading.set(false);
       },
       error: (failure: unknown) => {

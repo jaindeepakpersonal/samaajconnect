@@ -56,7 +56,7 @@ describe('ModerationQueueComponent', () => {
 
   function load(entries: ModerationQueueEntry[], members: { id: string; fullName: string }[] = []) {
     fixture.detectChanges();
-    http.expectOne('/v1/members?limit=100').flush(members);
+    http.expectOne('/v1/members?take=100').flush({ items: members, hasMore: false });
     http.expectOne('/v1/timeline/posts/moderation-queue').flush(entries);
     fixture.detectChanges();
   }
@@ -164,7 +164,7 @@ describe('ModerationQueueComponent', () => {
     // so a Samaaj without the module is indistinguishable from a platform with
     // no such feature. Reporting it as a failure sends an admin hunting a bug.
     fixture.detectChanges();
-    http.expectOne('/v1/members?limit=100').flush([]);
+    http.expectOne('/v1/members?take=100').flush({ items: [], hasMore: false });
     http
       .expectOne('/v1/timeline/posts/moderation-queue')
       .flush({}, { status: 404, statusText: 'Not Found' });
@@ -176,7 +176,7 @@ describe('ModerationQueueComponent', () => {
 
   it('shows a real failure as an error', () => {
     fixture.detectChanges();
-    http.expectOne('/v1/members?limit=100').flush([]);
+    http.expectOne('/v1/members?take=100').flush({ items: [], hasMore: false });
     http
       .expectOne('/v1/timeline/posts/moderation-queue')
       .flush({}, { status: 500, statusText: 'Server Error' });

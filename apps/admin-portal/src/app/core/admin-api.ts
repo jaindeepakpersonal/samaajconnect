@@ -1,6 +1,7 @@
 import { HttpClient, HttpParams } from '@angular/common/http';
 import { Injectable, inject } from '@angular/core';
-import { Observable } from 'rxjs';
+import { Paged } from '@samaajconnect/shared';
+import { Observable, map } from 'rxjs';
 import {
   ActivationCode,
   Attendee,
@@ -296,8 +297,10 @@ export class AdminApi {
    * taken themselves out of it, so a moderator never meets an unresolvable id
    * because the author chose to be unlisted.
    */
-  listMembers(): Observable<{ id: string; fullName: string }[]> {
-    return this.http.get<{ id: string; fullName: string }[]>('/v1/members?limit=100');
+  listMembers(): Observable<readonly { id: string; fullName: string }[]> {
+    return this.http
+      .get<Paged<{ id: string; fullName: string }>>('/v1/members?take=100')
+      .pipe(map((page) => page.items));
   }
 
   // ---- Member administration ---------------------------------------------
@@ -311,8 +314,13 @@ export class AdminApi {
    * on it. Both follow from the same decision, that correcting somebody's
    * details is administrative work.
    */
-  searchMembers(term: string | null, localityId: string | null): Observable<AdminMember[]> {
-    let params = new HttpParams().set('limit', 100);
+  searchMembers(
+    term: string | null,
+    localityId: string | null,
+    skip = 0,
+    take = 20,
+  ): Observable<Paged<AdminMember>> {
+    let params = new HttpParams().set('skip', skip).set('take', take);
 
     if (term && term.trim() !== '') {
       params = params.set('term', term.trim());
@@ -322,7 +330,7 @@ export class AdminApi {
       params = params.set('localityId', localityId);
     }
 
-    return this.http.get<AdminMember[]>('/v1/members', { params });
+    return this.http.get<Paged<AdminMember>>('/v1/members', { params });
   }
 
   member(id: string): Observable<AdminMember> {

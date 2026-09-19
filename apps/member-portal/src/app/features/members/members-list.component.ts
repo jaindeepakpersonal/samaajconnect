@@ -1,7 +1,7 @@
 import { Component, OnInit, computed, inject, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { RouterLink } from '@angular/router';
-import { describeError } from '@samaajconnect/shared';
+import { DEFAULT_PAGE_SIZE, describeError } from '@samaajconnect/shared';
 import { MasterDataApi } from './master-data.api';
 import { MembersApi } from './members.api';
 import { Locality, LookupItem, Member } from './members.models';
@@ -119,11 +119,29 @@ import { Locality, LookupItem, Member } from './members.models';
             </table>
           </div>
 
-          <p class="small">
-            {{ members().length }}
-            {{ members().length === 1 ? 'member' : 'members' }} shown.
-            Fields each member chose to keep private are not listed.
-          </p>
+          <nav class="pager" aria-label="Member pages">
+            <p class="pager-summary">Page {{ page() }}</p>
+            <div class="pager-controls">
+              <button
+                class="pager-btn"
+                type="button"
+                [disabled]="page() <= 1 || loading()"
+                (click)="goTo(page() - 1)"
+              >
+                Previous
+              </button>
+              <button
+                class="pager-btn"
+                type="button"
+                [disabled]="!hasMore() || loading()"
+                (click)="goTo(page() + 1)"
+              >
+                Next
+              </button>
+            </div>
+          </nav>
+
+          <p class="small">Fields each member chose to keep private are not listed.</p>
         }
       </div>
     </div>
@@ -136,6 +154,8 @@ export class MembersListComponent implements OnInit {
   readonly members = signal<readonly Member[]>([]);
   readonly loading = signal(true);
   readonly error = signal<string | null>(null);
+  readonly page = signal(1);
+  readonly hasMore = signal(false);
 
   term = '';
   localityId = '';
@@ -178,14 +198,23 @@ export class MembersListComponent implements OnInit {
     this.load();
   }
 
+  /** A new search starts again from the first page. */
   load(): void {
+    this.goTo(1);
+  }
+
+  goTo(page: number): void {
+    this.page.set(page);
     this.loading.set(true);
     this.error.set(null);
 
-    this.api.search(this.term, this.localityId || null).subscribe({
+    this.api
+      .searchPage(this.term, this.localityId || null, (page - 1) * DEFAULT_PAGE_SIZE, DEFAULT_PAGE_SIZE)
+      .subscribe({
       next: (found) => {
-        this.members.set(found);
-        this.rememberLocalities(found);
+        this.members.set(found.items);
+        this.hasMore.set(found.hasMore);
+        this.rememberLocalities(found.items);
         this.loading.set(false);
       },
       error: (failure: unknown) => {

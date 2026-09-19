@@ -168,13 +168,13 @@ describe('CompetitionDetailComponent', () => {
   function load(subject: CompetitionDetail = detail()) {
     fixture.detectChanges();
     http.expectOne(`/v1/competitions/${COMPETITION_ID}`).flush(subject);
-    http.expectOne('/v1/members?limit=100').flush(MEMBERS);
+    http.expectOne('/v1/members?take=100').flush({ items: MEMBERS, hasMore: false });
     fixture.detectChanges();
   }
 
   function reload(subject: CompetitionDetail = detail()) {
     http.expectOne(`/v1/competitions/${COMPETITION_ID}`).flush(subject);
-    http.expectOne('/v1/members?limit=100').flush(MEMBERS);
+    http.expectOne('/v1/members?take=100').flush({ items: MEMBERS, hasMore: false });
     fixture.detectChanges();
   }
 

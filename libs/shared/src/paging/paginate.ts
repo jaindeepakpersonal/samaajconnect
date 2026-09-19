@@ -10,6 +10,16 @@
  * `hasMore` flag rather than this function's `pageCount`.
  */
 
+/**
+ * A page of a server-paginated list, as the backend's `PagedResult<T>` puts it
+ * on the wire. There is no total: the server asks its repository for one row
+ * more than a page holds and reports only whether that extra row existed.
+ */
+export interface Paged<T> {
+  items: readonly T[];
+  hasMore: boolean;
+}
+
 /** Every grid on this platform defaults to this, per the user's own instruction. */
 export const DEFAULT_PAGE_SIZE = 20;
 

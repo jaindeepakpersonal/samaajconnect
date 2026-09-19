@@ -54,7 +54,7 @@ describe('MemberListComponent', () => {
     fixture.detectChanges();
     http.expectOne((r) => r.url === '/v1/master-data/localities')
       .flush([{ id: 'loc-udaipur', cityId: 'city-1', name: 'Udaipur', isActive: true }]);
-    http.expectOne((r) => r.url === '/v1/members').flush(members);
+    http.expectOne((r) => r.url === '/v1/members').flush({ items: members, hasMore: false });
     fixture.detectChanges();
   }
 
@@ -76,9 +76,10 @@ describe('MemberListComponent', () => {
 
     expect(request.request.params.get('term')).toBe('Meera');
     expect(request.request.params.get('localityId')).toBe('loc-udaipur');
-    expect(request.request.params.get('limit')).toBe('100');
+    expect(request.request.params.get('skip')).toBe('0');
+    expect(request.request.params.get('take')).toBe('20');
 
-    request.flush([]);
+    request.flush({ items: [], hasMore: false });
     fixture.detectChanges();
   });
 
@@ -95,7 +96,7 @@ describe('MemberListComponent', () => {
     // whose name contains nothing in particular.
     expect(request.request.params.has('term')).toBe(false);
 
-    request.flush([]);
+    request.flush({ items: [], hasMore: false });
     fixture.detectChanges();
   });
 
@@ -113,16 +114,37 @@ describe('MemberListComponent', () => {
     expect(text()).toContain('carries a privacy level');
   });
 
-  it('warns when the page is full, because the endpoint caps at a hundred', () => {
-    load(Array.from({ length: 100 }, (_, i) => member({ id: 'm' + i })));
+  const pagerButtons = () =>
+    Array.from(fixture.nativeElement.querySelectorAll('.pager-btn')) as HTMLButtonElement[];
 
-    expect(text()).toContain('Showing the first 100');
-  });
-
-  it('does not warn when the page is not full', () => {
+  it('disables Next when the server says there is no further page', () => {
     load([member()]);
 
-    expect(text()).not.toContain('Showing the first 100');
+    const [previous, next] = pagerButtons();
+    expect(previous!.disabled).toBe(true);
+    expect(next!.disabled).toBe(true);
+  });
+
+  it('asks for the next page by skipping the ones already shown', () => {
+    fixture.detectChanges();
+    http.expectOne((r) => r.url === '/v1/master-data/localities').flush([]);
+    http
+      .expectOne((r) => r.url === '/v1/members')
+      .flush({ items: Array.from({ length: 20 }, (_, i) => member({ id: 'm' + i })), hasMore: true });
+    fixture.detectChanges();
+
+    const [, next] = pagerButtons();
+    expect(next!.disabled).toBe(false);
+    next!.click();
+
+    const request = http.expectOne((r) => r.url === '/v1/members');
+    expect(request.request.params.get('skip')).toBe('20');
+    expect(request.request.params.get('take')).toBe('20');
+    request.flush({ items: [member({ id: 'last' })], hasMore: false });
+    fixture.detectChanges();
+
+    expect(component.page()).toBe(2);
+    expect(pagerButtons()[0]!.disabled).toBe(false);
   });
 });
 

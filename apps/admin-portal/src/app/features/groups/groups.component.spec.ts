@@ -52,7 +52,7 @@ describe('GroupsListComponent', () => {
   function load(groups: VolunteerGroup[] = [], members = MEMBERS) {
     fixture.detectChanges();
     http.expectOne('/v1/volunteer-groups/groups').flush(groups);
-    http.expectOne('/v1/members?limit=100').flush(members);
+    http.expectOne('/v1/members?take=100').flush({ items: members, hasMore: false });
     fixture.detectChanges();
   }
 
@@ -207,7 +207,7 @@ describe('GroupsListComponent', () => {
 
   function reload() {
     http.expectOne('/v1/volunteer-groups/groups').flush([group()]);
-    http.expectOne('/v1/members?limit=100').flush(MEMBERS);
+    http.expectOne('/v1/members?take=100').flush({ items: MEMBERS, hasMore: false });
     fixture.detectChanges();
   }
 });

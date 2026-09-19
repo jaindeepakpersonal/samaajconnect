@@ -102,7 +102,7 @@ describe('ClassDetailComponent', () => {
 
     if (school.classes.some((c) => c.id === CLASS_ID)) {
       http.expectOne(`/v1/pathshala/classes/${CLASS_ID}/exams`).flush(exams);
-      http.expectOne('/v1/members?limit=100').flush(members);
+      http.expectOne('/v1/members?take=100').flush({ items: members, hasMore: false });
       http.expectOne(`/v1/pathshala/classes/${CLASS_ID}/roll`).flush(roll);
 
       if (roll.length > 0) {
@@ -352,7 +352,7 @@ describe('ClassDetailComponent', () => {
   function reload() {
     http.expectOne(`/v1/pathshala/pathshalas/${PATHSHALA_ID}`).flush(detail());
     http.expectOne(`/v1/pathshala/classes/${CLASS_ID}/exams`).flush([]);
-    http.expectOne('/v1/members?limit=100').flush([]);
+    http.expectOne('/v1/members?take=100').flush({ items: [], hasMore: false });
     http.expectOne(`/v1/pathshala/classes/${CLASS_ID}/roll`).flush([]);
     http.expectOne(`/v1/pathshala/classes/${CLASS_ID}/register?date=${date()}`).flush([]);
     fixture.detectChanges();

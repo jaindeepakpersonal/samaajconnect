@@ -126,7 +126,7 @@ describe('MembersListComponent', () => {
     http
       .expectOne((r) => r.url === '/v1/master-data/lookup-items' && r.params.get('category') === 'ProfessionType')
       .flush([{ id: 'prof-business', category: 'ProfessionType', code: 'BIZ', label: 'Business', sortOrder: 1, isActive: true }]);
-    http.expectOne((r) => r.url === '/v1/members').flush(members);
+    http.expectOne((r) => r.url === '/v1/members').flush({ items: members, hasMore: false });
     fixture.detectChanges();
   }
 
@@ -180,7 +180,7 @@ describe('MembersListComponent', () => {
 
     component.localityId = surajpole.id;
     component.load();
-    http.expectOne((r) => r.url === '/v1/members').flush([memberIn(surajpole)]);
+    http.expectOne((r) => r.url === '/v1/members').flush({ items: [memberIn(surajpole)], hasMore: false });
     fixture.detectChanges();
 
     expect(component.localityOptions()).toEqual([hiranMagri, surajpole]);
@@ -198,7 +198,7 @@ describe('MembersListComponent', () => {
     expect(request.request.params.get('term')).toBe('Neha');
     expect(request.request.params.get('localityId')).toBe(surajpole.id);
 
-    request.flush([]);
+    request.flush({ items: [], hasMore: false });
   });
 
   it('tells an empty search apart from an empty directory', () => {
@@ -208,7 +208,7 @@ describe('MembersListComponent', () => {
 
     component.term = 'Nobody';
     component.load();
-    http.expectOne((r) => r.url === '/v1/members').flush([]);
+    http.expectOne((r) => r.url === '/v1/members').flush({ items: [], hasMore: false });
     fixture.detectChanges();
 
     expect(text()).toContain('Nobody matches that');

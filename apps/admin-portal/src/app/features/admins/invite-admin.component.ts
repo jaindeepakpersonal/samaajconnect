@@ -461,7 +461,7 @@ export class InviteAdminComponent implements OnInit {
 
     this.api.searchMembers(term, null).subscribe({
       next: (found) => {
-        this.searchResults.set(found);
+        this.searchResults.set(found.items);
         this.searching.set(false);
         this.searched.set(true);
       },

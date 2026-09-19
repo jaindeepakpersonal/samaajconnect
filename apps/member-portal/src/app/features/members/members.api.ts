@@ -1,6 +1,7 @@
 import { HttpClient, HttpParams } from '@angular/common/http';
 import { Injectable, inject } from '@angular/core';
-import { Observable } from 'rxjs';
+import { Paged } from '@samaajconnect/shared';
+import { Observable, map } from 'rxjs';
 import {
   Child,
   ChildDataNotice,
@@ -36,8 +37,18 @@ export class MembersApi {
    * let a caller confirm a private value one query at a time. See the list
    * screen for what that costs the wireframe.
    */
-  search(term?: string | null, localityId?: string | null): Observable<Member[]> {
-    let params = new HttpParams();
+  search(term?: string | null, localityId?: string | null): Observable<readonly Member[]> {
+    return this.searchPage(term, localityId, 0, 50).pipe(map((page) => page.items));
+  }
+
+  /** One page of the directory, and whether another follows it. */
+  searchPage(
+    term: string | null | undefined,
+    localityId: string | null | undefined,
+    skip: number,
+    take: number,
+  ): Observable<Paged<Member>> {
+    let params = new HttpParams().set('skip', skip).set('take', take);
 
     if (term && term.length > 0) {
       params = params.set('term', term);
@@ -47,7 +58,7 @@ export class MembersApi {
       params = params.set('localityId', localityId);
     }
 
-    return this.http.get<Member[]>('/v1/members', { params });
+    return this.http.get<Paged<Member>>('/v1/members', { params });
   }
 
   /** One member, through the same per-field privacy mapper the directory uses. */

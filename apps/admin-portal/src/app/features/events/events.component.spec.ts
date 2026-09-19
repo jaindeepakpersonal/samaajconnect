@@ -351,7 +351,7 @@ describe('EventDetailComponent', () => {
       .expectOne('/v1/master-data/lookup-items?category=EventType&includeInactive=false')
       .flush([]);
     http.expectOne(`/v1/events/${EVENT_ID}/attendees`).flush(list);
-    http.expectOne('/v1/members?limit=100').flush(members);
+    http.expectOne('/v1/members?take=100').flush({ items: members, hasMore: false });
     fixture.detectChanges();
   }
 

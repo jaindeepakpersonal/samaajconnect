@@ -399,10 +399,13 @@ describe('CampaignDetailComponent', () => {
     const request = http.expectOne(
       (r) => r.method === 'GET' && r.url === '/v1/members' && r.params.get('term') === 'Ravi',
     );
-    request.flush([
-      { id: 'm5', fullName: 'Ravi Shah' } as never,
-      { id: 'm6', fullName: 'Ravi Mehta' } as never,
-    ]);
+    request.flush({
+      items: [
+        { id: 'm5', fullName: 'Ravi Shah' } as never,
+        { id: 'm6', fullName: 'Ravi Mehta' } as never,
+      ],
+      hasMore: false,
+    });
 
     expect(component.nomineeResults().map((m) => m.fullName)).toEqual([
       'Ravi Shah',

@@ -200,7 +200,7 @@ describe('CampaignDetailComponent', () => {
   function load(subject: CampaignDetail = detail(), ranking?: CampaignResult) {
     fixture.detectChanges();
     http.expectOne(`/v1/celebrity-voting/campaigns/${CAMPAIGN_ID}`).flush(subject);
-    http.expectOne('/v1/members?limit=100').flush(MEMBERS);
+    http.expectOne('/v1/members?take=100').flush({ items: MEMBERS, hasMore: false });
 
     if (subject.campaign.status === 'Published') {
       const call = http.expectOne(`/v1/celebrity-voting/campaigns/${CAMPAIGN_ID}/results`);
@@ -455,7 +455,7 @@ describe('CampaignDetailComponent', () => {
     http
       .expectOne(`/v1/celebrity-voting/campaigns/${CAMPAIGN_ID}`)
       .flush(detail({ candidates: [candidate({ memberId: 'm9', nominatedBy: 'm9' })] }));
-    http.expectOne('/v1/members?limit=100').flush([]);
+    http.expectOne('/v1/members?take=100').flush({ items: [], hasMore: false });
     fixture.detectChanges();
 
     expect(text()).toContain('A member');
@@ -477,14 +477,14 @@ describe('CampaignDetailComponent', () => {
   function load2(subject: CampaignDetail) {
     component.ngOnInit();
     http.expectOne(`/v1/celebrity-voting/campaigns/${CAMPAIGN_ID}`).flush(subject);
-    http.expectOne('/v1/members?limit=100').flush(MEMBERS);
+    http.expectOne('/v1/members?take=100').flush({ items: MEMBERS, hasMore: false });
     fixture.detectChanges();
   }
 
   /** Answers the re-read every action fires. */
   function reload() {
     http.expectOne(`/v1/celebrity-voting/campaigns/${CAMPAIGN_ID}`).flush(detail());
-    http.expectOne('/v1/members?limit=100').flush(MEMBERS);
+    http.expectOne('/v1/members?take=100').flush({ items: MEMBERS, hasMore: false });
     fixture.detectChanges();
   }
 });
