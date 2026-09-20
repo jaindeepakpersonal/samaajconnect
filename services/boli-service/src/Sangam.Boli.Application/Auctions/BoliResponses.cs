@@ -8,7 +8,10 @@ public sealed record OccasionResponse(
     DateOnly OccasionDate,
     string Status,
     int TypeCount,
-    int BoliCount);
+    int BoliCount,
+
+    /// <summary>Null for a Samaaj-wide occasion. A loose reference into master-data-service's Locality.</summary>
+    Guid? LocalityId);
 
 public sealed record OccasionDetailResponse(
     Guid Id,
@@ -16,6 +19,7 @@ public sealed record OccasionDetailResponse(
     string? Description,
     DateOnly OccasionDate,
     string Status,
+    Guid? LocalityId,
     IReadOnlyList<BoliTypeResponse> Types,
     IReadOnlyList<BoliResponse> Boli);
 

@@ -14,12 +14,20 @@ public sealed class OccasionRepository(BoliDbContext context) : IOccasionReposit
             .FirstOrDefaultAsync(o => o.Id == occasionId, cancellationToken);
 
     public async Task<IReadOnlyList<BoliOccasion>> ListAsync(
-        CancellationToken cancellationToken = default) =>
-        await context.Occasions
-            .Include(o => o.Types)
+        Guid? localityId = null, CancellationToken cancellationToken = default)
+    {
+        var query = context.Occasions.Include(o => o.Types).AsQueryable();
+
+        if (localityId is { } id)
+        {
+            query = query.Where(o => o.LocalityId == id);
+        }
+
+        return await query
             .OrderByDescending(o => o.OccasionDate)
             .ThenByDescending(o => o.CreatedAt)
             .ToListAsync(cancellationToken);
+    }
 
     public void Add(BoliOccasion occasion) => context.Occasions.Add(occasion);
 }

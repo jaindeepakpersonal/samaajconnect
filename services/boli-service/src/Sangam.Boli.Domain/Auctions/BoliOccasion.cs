@@ -24,6 +24,20 @@ public sealed class BoliOccasion : AggregateRoot, ITenantScopedEntity
 
     public Guid Id { get; private set; }
     public Guid TenantId { get; private set; }
+
+    /// <summary>
+    /// A loose reference into master-data-service's <c>Locality</c>, with no
+    /// referential integrity across the service boundary - the same
+    /// convention every other consumer of Locality already uses
+    /// (<c>Business.LocalityId</c>, <c>Trust.LocalityId</c>). Null is a
+    /// legitimate, permanent state: a Samaaj too small to split its Boli by
+    /// locality runs one Samaaj-wide occasion, exactly as before this field
+    /// existed. It is a tag/filter only in this phase - see this service's
+    /// own CLAUDE.md for what locality-gated manager authority would still
+    /// need.
+    /// </summary>
+    public Guid? LocalityId { get; private set; }
+
     public string Title { get; private set; } = null!;
     public string? Description { get; private set; }
 
@@ -42,7 +56,8 @@ public sealed class BoliOccasion : AggregateRoot, ITenantScopedEntity
         string title,
         string? description,
         DateOnly occasionDate,
-        DateTimeOffset now)
+        DateTimeOffset now,
+        Guid? localityId = null)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(title);
 
@@ -50,6 +65,7 @@ public sealed class BoliOccasion : AggregateRoot, ITenantScopedEntity
         {
             Id = Guid.NewGuid(),
             TenantId = tenantId,
+            LocalityId = localityId,
             Title = title.Trim(),
             Description = string.IsNullOrWhiteSpace(description) ? null : description.Trim(),
             OccasionDate = occasionDate,

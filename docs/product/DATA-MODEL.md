@@ -237,7 +237,13 @@ Description`
 ## 10. Auctions / Boli
 
 **BoliOccasion** — `Id, TenantId, Title, Description, OccasionDate,
-Status (Upcoming/Active/Closed)`
+Status (Upcoming/Active/Closed), LocalityId (nullable)` — `LocalityId` is a
+loose reference into master-data-service's `Locality`, with no referential
+integrity across the service boundary, the same convention `Business
+.LocalityId` and `Trust.LocalityId` already use. Null is a permanent,
+legitimate state for a Samaaj too small to split its Boli by locality; it is
+a tag/filter only so far — `Boli.Manage`/`Boli.PublishResults` are still
+Samaaj-wide permissions, not gated by locality yet.
 
 **BoliType** — `Id, OccasionId, Name, Description`
 

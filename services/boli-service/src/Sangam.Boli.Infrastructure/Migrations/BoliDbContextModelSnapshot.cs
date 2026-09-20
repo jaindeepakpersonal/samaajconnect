@@ -152,6 +152,10 @@ namespace Sangam.Boli.Infrastructure.Migrations
                         .HasColumnType("character varying(2000)")
                         .HasColumnName("description");
 
+                    b.Property<Guid?>("LocalityId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("locality_id");
+
                     b.Property<DateOnly>("OccasionDate")
                         .HasColumnType("date")
                         .HasColumnName("occasion_date");
@@ -174,6 +178,9 @@ namespace Sangam.Boli.Infrastructure.Migrations
 
                     b.HasKey("Id")
                         .HasName("pk_boli_occasions");
+
+                    b.HasIndex("TenantId", "LocalityId")
+                        .HasDatabaseName("ix_boli_occasions_tenant_id_locality_id");
 
                     b.HasIndex("TenantId", "Status")
                         .HasDatabaseName("ix_boli_occasions_tenant_id_status");

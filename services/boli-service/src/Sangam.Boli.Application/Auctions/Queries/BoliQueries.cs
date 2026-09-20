@@ -8,9 +8,13 @@ namespace Sangam.Boli.Application.Auctions.Queries;
 
 // ---- Occasions ---------------------------------------------------------------
 
-/// <summary>Every occasion this Samaaj has held or announced, newest first.</summary>
+/// <summary>
+/// Every occasion this Samaaj has held or announced, newest first.
+/// <paramref name="LocalityId"/> narrows to one locality; null lists every
+/// occasion, including Samaaj-wide ones with no locality of their own.
+/// </summary>
 [RequiresPermission(PermissionKeys.MembersRead)]
-public sealed record ListOccasionsQuery : IQuery<IReadOnlyList<OccasionResponse>>;
+public sealed record ListOccasionsQuery(Guid? LocalityId = null) : IQuery<IReadOnlyList<OccasionResponse>>;
 
 public sealed class ListOccasionsQueryHandler(
     IOccasionRepository occasions, IBoliRepository boli)
@@ -19,7 +23,7 @@ public sealed class ListOccasionsQueryHandler(
     public async Task<Result<IReadOnlyList<OccasionResponse>>> Handle(
         ListOccasionsQuery query, CancellationToken cancellationToken)
     {
-        var all = await occasions.ListAsync(cancellationToken);
+        var all = await occasions.ListAsync(query.LocalityId, cancellationToken);
         var responses = new List<OccasionResponse>(all.Count);
 
         foreach (var occasion in all)
@@ -81,6 +85,7 @@ public sealed class GetOccasionQueryHandler(
             occasion.Description,
             occasion.OccasionDate,
             occasion.Status.ToString(),
+            occasion.LocalityId,
             [.. occasion.Types.Select(BoliMappings.ToResponse)],
             described));
     }
@@ -88,9 +93,13 @@ public sealed class GetOccasionQueryHandler(
 
 // ---- Boli --------------------------------------------------------------------
 
-/// <summary>Every Boli currently taking bids. The wireframe's "Active Boli".</summary>
+/// <summary>
+/// Every Boli currently taking bids. The wireframe's "Active Boli".
+/// <paramref name="LocalityId"/> narrows to Boli under an occasion for that
+/// locality; null returns every locality's, including Samaaj-wide occasions.
+/// </summary>
 [RequiresPermission(PermissionKeys.MembersRead)]
-public sealed record GetActiveBoliQuery : IQuery<IReadOnlyList<BoliResponse>>;
+public sealed record GetActiveBoliQuery(Guid? LocalityId = null) : IQuery<IReadOnlyList<BoliResponse>>;
 
 public sealed class GetActiveBoliQueryHandler(
     IOccasionRepository occasions,
@@ -119,6 +128,12 @@ public sealed class GetActiveBoliQueryHandler(
             }
 
             var occasion = await occasions.GetByIdAsync(lot.OccasionId, cancellationToken);
+
+            if (query.LocalityId is { } localityId && occasion?.LocalityId != localityId)
+            {
+                continue;
+            }
+
             var bids = await boli.ListBidsAsync(lot.Id, cancellationToken);
             var top = bids.Count > 0 ? bids[0] : null;
 

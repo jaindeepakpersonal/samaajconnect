@@ -17,7 +17,7 @@ highest". Read "The guarantee" before changing anything under `Bid`.
 
 | Entity | Notes |
 |---|---|
-| `BoliOccasion` | Aggregate root. Title, date, status. Owns its `BoliType`s and **not** its Boli |
+| `BoliOccasion` | Aggregate root. Title, date, status, `LocalityId` (nullable). Owns its `BoliType`s and **not** its Boli |
 | `BoliType` | A label a Samaaj reuses — "Mangal Deep", "Swapna". Nobody bids on a type |
 | `Boli` | Aggregate root. One item being bid for: window, floor, increment, status. Owns **no** bids |
 | `Bid` | One offer. Written directly, outside the aggregate. Never amended or deleted |
@@ -27,7 +27,7 @@ highest". Read "The guarantee" before changing anything under `Bid`.
 
 | Command | Permission | Notes |
 |---|---|---|
-| `CreateOccasionCommand` | `Boli.Manage` | Starts `Upcoming` |
+| `CreateOccasionCommand` | `Boli.Manage` | Starts `Upcoming`. Takes an optional `LocalityId` |
 | `DefineBoliTypeCommand` | `Boli.Manage` | One name per occasion, case-insensitively |
 | `MoveOccasionCommand` | `Boli.Manage` | Upcoming → Active → Closed. Never backwards |
 | `OpenBoliCommand` | `Boli.Manage` | Creates it `Scheduled` and starts it. Takes the anti-sniping window |
@@ -40,9 +40,9 @@ highest". Read "The guarantee" before changing anything under `Bid`.
 
 | Query | Permission | Notes |
 |---|---|---|
-| `ListOccasionsQuery` | `Members.Read` | Newest first |
+| `ListOccasionsQuery` | `Members.Read` | Newest first. Optional `?localityId=` narrows to one locality |
 | `GetOccasionQuery` | `Members.Read` | Types and the Boli under it, each with its live highest |
-| `GetActiveBoliQuery` | `Members.Read` | Only those actually taking bids — status *and* clock |
+| `GetActiveBoliQuery` | `Members.Read` | Only those actually taking bids — status *and* clock. Optional `?localityId=` narrows to one locality's occasions |
 | `GetBoliQuery` | `Members.Read` | One Boli, its highest, and the minimum next bid |
 | `GetBidHistoryQuery` | `Members.Read` | Amounts and times. Never who bid |
 | `GetBoliResultQuery` | `Members.Read` | 404 until recorded; no winner named until published |
@@ -112,6 +112,21 @@ their form was open has done nothing wrong, and a 409 would be telling
 them off for being slow.
 
 ## Decisions worth knowing before you change this service
+
+**`LocalityId` is a tag/filter only in this phase, deliberately.** A
+Samaaj's Boli can now be told apart by locality — `BoliOccasion.LocalityId`
+is a loose reference into master-data-service's `Locality`, the same
+no-referential-integrity convention `Trust.LocalityId` and
+`Business.LocalityId` already use — but `Boli.Manage`/`Boli.PublishResults`
+stay Samaaj-wide permissions, unchanged. A manager who can run one locality's
+Boli can still run every locality's. Gating that by a caller's position on
+`trust-service`'s own Trust for the locality is the intended next step, once
+that service's roster is something this service can check against, and was
+deliberately deferred so neither build blocked the other. `LocalityId` is
+nullable and additive: every occasion that existed before this field, and
+every one a Samaaj chooses to create without picking a locality, keeps
+running exactly as before — a Samaaj too small to split by locality has no
+reason to ever set it.
 
 **A Boli should not be won by arriving last.** Without an auto-extend
 window, whoever bids a second before the close takes it — not because
@@ -243,7 +258,10 @@ path that must stay fast exactly when it is busiest. The highest is a
 - `Sangam.Boli.IntegrationTests` — Testcontainers against a real
   Postgres. `BidIndexTests` names the mechanism; `ConcurrentBiddingTests`
   proves the behaviour; `BoliLifecycleTests` walks a Boli from announced
-  to announced.
+  to announced. `OccasionLocalityTests` proves `LocalityId` is additive and
+  non-breaking (an occasion created without one behaves exactly as before)
+  and that both `ListOccasionsQuery` and `GetActiveBoliQuery` filter
+  correctly when a locality is given and return everything when it is not.
 - `scripts/smoke-through-gateway.sh` runs the same walk through YARP.
   **This service had no gateway coverage at all until the admin screens
   were built**, which root `CLAUDE.md` §9 asks for on every service — the

@@ -26,15 +26,17 @@ public static class BoliEndpoints
 
     private static void MapOccasions(RouteGroupBuilder group)
     {
-        group.MapGet("/occasions", async (ISender sender, CancellationToken cancellationToken) =>
+        group.MapGet("/occasions", async (
+                Guid? localityId, ISender sender, CancellationToken cancellationToken) =>
             {
-                var result = await sender.Send(new ListOccasionsQuery(), cancellationToken);
+                var result = await sender.Send(new ListOccasionsQuery(localityId), cancellationToken);
 
                 return result.ToApiResult();
             })
             .RequireAuthorization()
             .WithName("ListOccasions")
-            .WithSummary("Every occasion this Samaaj has announced or held.")
+            .WithSummary(
+                "Every occasion this Samaaj has announced or held. ?localityId= narrows to one locality.")
             .Produces<IReadOnlyList<OccasionResponse>>()
             .ProducesProblem(StatusCodes.Status401Unauthorized);
 
@@ -42,7 +44,8 @@ public static class BoliEndpoints
                 CreateOccasionRequest request, ISender sender, CancellationToken cancellationToken) =>
             {
                 var result = await sender.Send(
-                    new CreateOccasionCommand(request.Title, request.Description, request.OccasionDate),
+                    new CreateOccasionCommand(
+                        request.Title, request.Description, request.OccasionDate, request.LocalityId),
                     cancellationToken);
 
                 return result.ToApiResult();
@@ -148,15 +151,17 @@ public static class BoliEndpoints
     {
         // Declared before "/boli/{id:guid}" so the literal segment is not
         // shadowed by the route parameter.
-        group.MapGet("/boli/active", async (ISender sender, CancellationToken cancellationToken) =>
+        group.MapGet("/boli/active", async (
+                Guid? localityId, ISender sender, CancellationToken cancellationToken) =>
             {
-                var result = await sender.Send(new GetActiveBoliQuery(), cancellationToken);
+                var result = await sender.Send(new GetActiveBoliQuery(localityId), cancellationToken);
 
                 return result.ToApiResult();
             })
             .RequireAuthorization()
             .WithName("GetActiveBoli")
-            .WithSummary("Every Boli taking bids right now.")
+            .WithSummary(
+                "Every Boli taking bids right now. ?localityId= narrows to one locality's occasions.")
             .Produces<IReadOnlyList<BoliResponse>>()
             .ProducesProblem(StatusCodes.Status401Unauthorized);
 
@@ -302,7 +307,7 @@ public static class BoliEndpoints
     // ---- Request bodies ------------------------------------------------------
 
     public sealed record CreateOccasionRequest(
-        string Title, string? Description, DateOnly OccasionDate);
+        string Title, string? Description, DateOnly OccasionDate, Guid? LocalityId = null);
 
     public sealed record DefineTypeRequest(string Name, string? Description);
 

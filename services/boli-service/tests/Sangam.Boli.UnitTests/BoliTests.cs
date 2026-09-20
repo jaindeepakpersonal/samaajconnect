@@ -284,6 +284,23 @@ public sealed class BoliOccasionTests
     }
 
     [Fact]
+    public void An_occasion_has_no_locality_unless_one_is_given()
+    {
+        Create().LocalityId.Should().BeNull("a Samaaj too small to split by locality runs one Samaaj-wide occasion");
+    }
+
+    [Fact]
+    public void An_occasion_records_the_locality_it_was_created_for()
+    {
+        var localityId = Guid.NewGuid();
+
+        var occasion = BoliOccasion.Create(
+            Guid.NewGuid(), "Paryushan 2026", null, new DateOnly(2026, 9, 10), Noon, localityId);
+
+        occasion.LocalityId.Should().Be(localityId);
+    }
+
+    [Fact]
     public void Two_types_cannot_share_a_name_however_it_is_cased()
     {
         // Two "Mangal Deep" types would leave every published result ambiguous

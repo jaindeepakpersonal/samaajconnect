@@ -7,7 +7,9 @@ public interface IOccasionRepository
 {
     Task<BoliOccasion?> GetByIdAsync(Guid occasionId, CancellationToken cancellationToken = default);
 
-    Task<IReadOnlyList<BoliOccasion>> ListAsync(CancellationToken cancellationToken = default);
+    /// <summary><paramref name="localityId"/> narrows to one locality; null lists every occasion.</summary>
+    Task<IReadOnlyList<BoliOccasion>> ListAsync(
+        Guid? localityId = null, CancellationToken cancellationToken = default);
 
     void Add(BoliOccasion occasion);
 }

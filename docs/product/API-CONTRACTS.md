@@ -292,13 +292,13 @@ the resource under it, the same shape as `/v1/pathshala/pathshalas`.
 
 | Method | Path | Permission | Purpose |
 |---|---|---|---|
-| GET | `/occasions` | `Members.Read` | Occasions, newest first |
-| POST | `/occasions` | `Boli.Manage` | Create occasion |
+| GET | `/occasions` | `Members.Read` | Occasions, newest first. `?localityId=` narrows to one locality |
+| POST | `/occasions` | `Boli.Manage` | Create occasion. Optional `localityId` - null runs it Samaaj-wide |
 | GET | `/occasions/{id}` | `Members.Read` | Types and the Boli under it |
 | POST | `/occasions/{id}/boli-types` | `Boli.Manage` | Define Boli type. One name per occasion |
 | POST | `/occasions/{id}/status` | `Boli.Manage` | Activate or close. Never backwards |
 | POST | `/occasions/{id}/boli` | `Boli.Manage` | Open a Boli for bidding |
-| GET | `/boli/active` | `Members.Read` | Every Boli taking bids right now |
+| GET | `/boli/active` | `Members.Read` | Every Boli taking bids right now. `?localityId=` narrows to one locality's occasions |
 | GET | `/boli/{id}` | `Members.Read` | One Boli, its highest and the minimum next bid |
 | POST | `/boli/{id}/bids` | `Members.Read` | Place bid. Being outbid answers **200** with `accepted: false` |
 | GET | `/boli/{id}/bids` | `Members.Read` | Bid history: amounts and times, never who bid |
@@ -312,6 +312,14 @@ the resource under it, the same shape as `/v1/pathshala/pathshalas`.
 Amounts are integers in paise. A Boli is money, and a floating-point
 field accumulates error that shows up as a winning bid a rupee off what
 somebody actually offered.
+
+`localityId` is a loose reference into master-data-service's `Locality`,
+with no referential integrity across the service boundary, and no
+authorization effect in this phase - `Boli.Manage`/`Boli.PublishResults`
+stay Samaaj-wide permissions regardless of which locality an occasion names.
+Null (the default) is a permanent, legitimate state, not a migration
+transient - a Samaaj too small to split its Boli by locality never needs to
+set it.
 
 Opening a Boli takes `autoExtendSeconds` (0–3600, default 0 = off).
 A bid arriving within that many seconds of the close moves the close to

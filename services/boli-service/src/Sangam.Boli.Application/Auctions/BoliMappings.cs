@@ -28,7 +28,8 @@ public static class BoliMappings
             occasion.OccasionDate,
             occasion.Status.ToString(),
             occasion.Types.Count,
-            boliCount);
+            boliCount,
+            occasion.LocalityId);
 
     public static BoliTypeResponse ToResponse(BoliType type) =>
         new(type.Id, type.Name, type.Description);

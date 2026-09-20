@@ -9,10 +9,20 @@ namespace Sangam.Boli.Application.Auctions.Commands.ManageOccasion;
 
 // ---- Create an occasion ------------------------------------------------------
 
-/// <summary>Announces an occasion. Starts as Upcoming, with no Boli under it.</summary>
+/// <summary>
+/// Announces an occasion. Starts as Upcoming, with no Boli under it.
+/// </summary>
+/// <remarks>
+/// <paramref name="LocalityId"/> is optional - a Samaaj too small to split
+/// its Boli by locality leaves it null and runs one Samaaj-wide occasion, as
+/// before this field existed. It is a loose reference into
+/// master-data-service's <c>Locality</c>, with no referential integrity
+/// across the service boundary and no authorization effect in this phase.
+/// </remarks>
 [RequiresPermission(PermissionKeys.BoliManage)]
 public sealed record CreateOccasionCommand(
-    string Title, string? Description, DateOnly OccasionDate) : ICommand<OccasionResponse>;
+    string Title, string? Description, DateOnly OccasionDate, Guid? LocalityId = null)
+    : ICommand<OccasionResponse>;
 
 public sealed class CreateOccasionCommandValidator : AbstractValidator<CreateOccasionCommand>
 {
@@ -41,7 +51,8 @@ public sealed class CreateOccasionCommandHandler(
         }
 
         var occasion = BoliOccasion.Create(
-            tenantId, command.Title, command.Description, command.OccasionDate, clock.UtcNow);
+            tenantId, command.Title, command.Description, command.OccasionDate, clock.UtcNow,
+            command.LocalityId);
 
         occasions.Add(occasion);
 
