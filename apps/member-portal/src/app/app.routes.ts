@@ -167,6 +167,18 @@ export const routes: Routes = [
           import('./features/panch/election.component').then((m) => m.ElectionComponent),
       },
       {
+        path: 'trust',
+        title: 'Trusts - samaajconnect',
+        loadComponent: () =>
+          import('./features/trust/trusts-list.component').then((m) => m.TrustsListComponent),
+      },
+      {
+        path: 'trust/:id',
+        title: 'Trust - samaajconnect',
+        loadComponent: () =>
+          import('./features/trust/trust-detail.component').then((m) => m.TrustDetailComponent),
+      },
+      {
         path: 'pathshala',
         title: 'Jain Pathshala - samaajconnect',
         loadComponent: () =>

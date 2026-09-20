@@ -1,0 +1,80 @@
+import { HttpClient, HttpParams } from '@angular/common/http';
+import { Injectable, inject } from '@angular/core';
+import { Observable } from 'rxjs';
+import {
+  CastTrustVoteResult,
+  NominateTrustCandidateResult,
+  Trust,
+  TrustElection,
+  TrustElectionDetail,
+  TrustMember,
+} from './trust.models';
+
+/**
+ * Every call this app makes to trust-service.
+ *
+ * Module-gated on `trust`, its own key.
+ *
+ * Membership is admin-curated (root `CLAUDE.md`'s "add/update/delete trust
+ * members" - confirmed with the user rather than derived from a member's
+ * own locality), and running an election - opening it, approving a
+ * nomination, publishing - needs `Trust.Manage`, a Samaaj admin's. Those
+ * calls belong to the admin panel and are not here. This app only reads,
+ * nominates and votes.
+ */
+@Injectable({ providedIn: 'root' })
+export class TrustApi {
+  private readonly http = inject(HttpClient);
+
+  /** This Samaaj's Trusts, optionally narrowed to one locality. */
+  list(localityId?: string | null): Observable<Trust[]> {
+    let params = new HttpParams();
+
+    if (localityId) {
+      params = params.set('localityId', localityId);
+    }
+
+    return this.http.get<Trust[]>('/v1/trust/trusts', { params });
+  }
+
+  get(id: string): Observable<Trust> {
+    return this.http.get<Trust>(`/v1/trust/trusts/${id}`);
+  }
+
+  /** A Trust's roster, active members first - this is also the electorate for its elections. */
+  members(trustId: string): Observable<TrustMember[]> {
+    return this.http.get<TrustMember[]>(`/v1/trust/trusts/${trustId}/members`);
+  }
+
+  /** A Trust's elections, newest first, each with this member's own vote. */
+  elections(trustId: string): Observable<TrustElection[]> {
+    return this.http.get<TrustElection[]>(`/v1/trust/trusts/${trustId}/elections`);
+  }
+
+  election(id: string): Observable<TrustElectionDetail> {
+    return this.http.get<TrustElectionDetail>(`/v1/trust/elections/${id}`);
+  }
+
+  /**
+   * Puts a fellow active trustee forward. A repeat is success with
+   * `nominated: false` - the second nominator has done nothing wrong, and one
+   * candidacy per member keeps a vote from splitting.
+   */
+  nominate(electionId: string, memberId: string): Observable<NominateTrustCandidateResult> {
+    return this.http.post<NominateTrustCandidateResult>(
+      `/v1/trust/elections/${electionId}/candidates`,
+      { memberId },
+    );
+  }
+
+  /**
+   * Casts this member's one vote. A second vote is reported as success with
+   * `accepted: false` - the unique index on (election, voter) is what
+   * prevents it, not this call. Self-votes are refused.
+   */
+  castVote(electionId: string, candidateId: string): Observable<CastTrustVoteResult> {
+    return this.http.post<CastTrustVoteResult>(`/v1/trust/elections/${electionId}/votes`, {
+      candidateId,
+    });
+  }
+}

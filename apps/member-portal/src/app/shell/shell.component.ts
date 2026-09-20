@@ -49,6 +49,7 @@ const NAV: readonly NavGroup[] = [
       { label: 'Social Issues', route: '/issues', moduleKey: ModuleKeys.SocialIssues },
       { label: 'Celebrities of Samaaj', route: '/voting', moduleKey: ModuleKeys.CelebrityVoting },
       { label: 'Samaaj Panch', route: '/panch', moduleKey: ModuleKeys.Panch },
+      { label: 'Trusts', route: '/trust', moduleKey: ModuleKeys.Trust },
     ],
   },
   {

@@ -38,6 +38,8 @@ before translating another screen.
 | Competition detail | `/competitions/:id` | — | built. Rounds and entries, a judging section visible only to an assigned judge, and the published result |
 | Samaaj Panch | `/panch` | — | built; no wireframe covers it. Who sits on the Panch, and the elections |
 | Panch election | `/panch/:id` | — | built. Nominate somebody by name, cast one final ballot of up to ten, read the result |
+| Trusts | `/trust` | — | built; no wireframe covers this new module. Our Samaaj's locality Trusts, read-only |
+| Trust detail | `/trust/:id` | — | built. Roster, and its elections - nominate a fellow trustee, vote, see the result |
 | Pathshala events | — | `#pathevents` | not built — no endpoint exists |
 | Set your password | `/activate` | — | built; no wireframe covers redeeming an activation code, and three admin screens told people to do it here |
 | Forgot password | `/forgot`, `/reset` | `#forgot`, `#otp` | built — redeems into a new password, not a session |
@@ -882,3 +884,17 @@ counts at all. **Open means the flags, not the status:** the screens read
 `acceptsNominations`/`acceptsVotes`, because only the server knows the time
 it is deciding against. Names are resolved once per seated member or
 candidate through the directory (`members.get`) and fall back to "A member".
+
+**Trusts is another new module, behind its own key (`ModuleKeys.Trust`, off
+by default), and shipped with no screen in either app until now** -
+`trust-service` itself landed across two backend-only cycles. **The roster is
+read-only here on purpose**: membership is admin-curated (confirmed with the
+user rather than derived from where a member lives), so unlike Volunteer
+Groups this screen has no "Apply to join" at all, only the roster and the
+elections. **The electorate is this Trust's own active roster, not the whole
+Samaaj** - the identical rule volunteer-groups-service's own elections use -
+so the nominee picker is a `<select>` built from the roster already loaded on
+screen, the same reasoning the group detail screen gives for its own picker
+rather than Celebrities of Samaaj's name search. Self-votes are refused and a
+repeat vote or nomination comes back as success with `accepted`/`nominated:
+false`, matching every other election on this platform.
