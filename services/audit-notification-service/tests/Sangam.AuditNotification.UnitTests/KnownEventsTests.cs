@@ -281,6 +281,17 @@ public sealed class KnownEventsTests
         descriptor.ActorIdProperty.Should().BeNull();
     }
 
+    [Fact]
+    public void A_decided_issue_is_recorded_against_the_Panch_member_who_decided_it()
+    {
+        var descriptor = KnownEvents.Describe("social-issues.issue.decided.v1");
+
+        descriptor.Action.Should().Be("IssueDecided");
+        descriptor.EntityName.Should().Be("Issue");
+        descriptor.EntityIdProperty.Should().Be("issueId");
+        descriptor.ActorIdProperty.Should().Be("decidedByMemberId");
+    }
+
     // ---- timeline-service --------------------------------------------
     //
     // The same shape a third time: PostModeratedDomainEvent carries a

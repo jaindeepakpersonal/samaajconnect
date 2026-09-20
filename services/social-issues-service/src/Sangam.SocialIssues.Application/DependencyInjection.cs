@@ -2,6 +2,7 @@ using System.Reflection;
 using FluentValidation;
 using Microsoft.Extensions.DependencyInjection;
 using Sangam.SocialIssues.Application.Behaviors;
+using Sangam.SocialIssues.Application.Issues;
 
 namespace Sangam.SocialIssues.Application;
 
@@ -29,6 +30,10 @@ public static class DependencyInjection
         });
 
         services.AddValidatorsFromAssembly(assembly, includeInternalTypes: true);
+
+        // Scoped: it reads the caller and the request's tenant, so one instance
+        // per request is what makes the answer the same everywhere in it.
+        services.AddScoped<ReviewAccessResolver>();
 
         return services;
     }

@@ -2,6 +2,8 @@ import { Component, OnInit, computed, inject, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { ActivatedRoute, RouterLink } from '@angular/router';
 import { AuthService, describeError } from '@samaajconnect/shared';
+import { GroupsApi } from '../groups/groups.api';
+import { VolunteerGroup } from '../groups/groups.models';
 import { IssuesApi } from './issues.api';
 import {
   IssueCategories,
@@ -28,9 +30,17 @@ import {
  * would be confidently wrong.
  *
  * That also means this one screen serves a member and a reviewer without
- * knowing which it is talking to. A reviewer sees Approve, Reject and Ask for
- * changes because the service put them in the list; an author sees Submit or
- * Close for the same reason.
+ * knowing which it is talking to. A reviewer sees Reject, Ask for changes and
+ * Put in front of the Panch because the service put them in the list; an
+ * author sees Submit or Close for the same reason.
+ *
+ * **The Panch's decision is a separate form, not a transition button.**
+ * `RecordDecisionCommand` needs a decision text and an optional volunteer
+ * group, so it cannot be one more entry in `availableTransitions` the way a
+ * plain status move is. The service says whether this form belongs on screen
+ * with `issue.canDecide`, which is the same "a seated Panch member, or an
+ * administrator while no Panch is seated" rule the queue is gated on - never
+ * derived here from role or status alone.
  */
 @Component({
   selector: 'app-issue-detail',
@@ -152,7 +162,11 @@ import {
 
             @if (found.issue.availableTransitions.length === 0) {
               <p class="small">
-                There is nothing for you to do here. {{ describe(found.issue.status) }}
+                @if (found.issue.canDecide) {
+                  Record the Panch's decision below.
+                } @else {
+                  There is nothing for you to do here. {{ describe(found.issue.status) }}
+                }
               </p>
             } @else {
               @if (actionError(); as message) {
@@ -205,6 +219,76 @@ import {
           </div>
         </div>
 
+        <!-- The Panch's decision ---------------------------------------- -->
+        @if (found.issue.decision; as decision) {
+          <div class="card spaced">
+            <h2>The Panch's decision</h2>
+            <p class="issue-body">{{ decision }}</p>
+            @if (found.issue.monitoringGroupId; as groupId) {
+              <p class="small">
+                Monitoring handed to <b>{{ groupName(groupId) }}</b>.
+              </p>
+            }
+            @if (found.issue.decidedAt; as decidedAt) {
+              <p class="small">Decided {{ when(decidedAt) }}.</p>
+            }
+          </div>
+        } @else if (found.issue.canDecide) {
+          <div class="card spaced">
+            <h2>Record the Panch's decision</h2>
+            <p class="small">
+              Say what the Panch decided. Hand the monitoring to a volunteer group if one is
+              needed - this closes the issue.
+            </p>
+
+            <form (ngSubmit)="decide()">
+              <div class="form-grid">
+                <div class="field span-all">
+                  <label for="decision-text">Decision</label>
+                  <textarea
+                    class="input"
+                    id="decision-text"
+                    name="decision"
+                    [(ngModel)]="decisionText"
+                    rows="4"
+                    maxlength="2000"
+                    required
+                  ></textarea>
+                </div>
+
+                <div class="field">
+                  <label for="decision-group">Hand monitoring to (optional)</label>
+                  <select
+                    class="input"
+                    id="decision-group"
+                    name="monitoringGroup"
+                    [(ngModel)]="monitoringGroupId"
+                  >
+                    <option value="">No group</option>
+                    @for (group of groups(); track group.id) {
+                      <option [value]="group.id">{{ group.name }}</option>
+                    }
+                  </select>
+                </div>
+
+                @if (decisionError(); as message) {
+                  <p class="notice error span-all" role="alert">{{ message }}</p>
+                }
+
+                <div class="actions span-all">
+                  <button
+                    class="btn"
+                    type="submit"
+                    [disabled]="busy() || decisionText.trim().length === 0"
+                  >
+                    {{ busy() ? 'Recording…' : 'Record decision and close' }}
+                  </button>
+                </div>
+              </div>
+            </form>
+          </div>
+        }
+
         <!-- History ----------------------------------------------------- -->
         <h2 class="section-heading">History</h2>
 
@@ -239,6 +323,7 @@ import {
 })
 export class IssueDetailComponent implements OnInit {
   private readonly api = inject(IssuesApi);
+  private readonly groupsApi = inject(GroupsApi);
   private readonly auth = inject(AuthService);
   private readonly route = inject(ActivatedRoute);
 
@@ -255,11 +340,17 @@ export class IssueDetailComponent implements OnInit {
   /** The move waiting on a reason, if the one chosen needs one. */
   readonly pendingMove = signal<IssueStatus | null>(null);
 
+  /** Loaded only once, and only for somebody who might decide - see `load()`. */
+  readonly groups = signal<readonly VolunteerGroup[]>([]);
+  readonly decisionError = signal<string | null>(null);
+
   title = '';
   description = '';
   category: string = IssueCategories[0];
   locality = '';
   reason = '';
+  decisionText = '';
+  monitoringGroupId = '';
 
   private readonly me = computed(() => this.auth.user()?.userId ?? null);
 
@@ -307,11 +398,24 @@ export class IssueDetailComponent implements OnInit {
       next: (found) => {
         this.detail.set(found);
         this.loading.set(false);
+
+        // Needed to fill the picker, or to resolve a name already recorded.
+        if (found.issue.canDecide || found.issue.monitoringGroupId !== null) {
+          this.loadGroups();
+        }
       },
       error: (failure: unknown) => {
         this.loading.set(false);
         this.error.set(describeError(failure));
       },
+    });
+  }
+
+  /** For the monitoring-group picker. Only fetched when a decision might be made here. */
+  private loadGroups(): void {
+    this.groupsApi.list().subscribe({
+      next: (found) => this.groups.set(found),
+      error: () => this.groups.set([]),
     });
   }
 
@@ -371,6 +475,43 @@ export class IssueDetailComponent implements OnInit {
         this.busy.set(false);
       },
     });
+  }
+
+  // ---- The Panch's decision -----------------------------------------------
+
+  decide(): void {
+    const found = this.detail();
+
+    if (found === null || this.decisionText.trim().length === 0) {
+      return;
+    }
+
+    this.busy.set(true);
+    this.decisionError.set(null);
+
+    this.api
+      .decide(
+        found.issue.id,
+        this.decisionText.trim(),
+        this.monitoringGroupId.length > 0 ? this.monitoringGroupId : null,
+      )
+      .subscribe({
+        next: () => {
+          this.decisionText = '';
+          this.monitoringGroupId = '';
+          this.busy.set(false);
+          this.load();
+        },
+        error: (failure: unknown) => {
+          this.decisionError.set(describeError(failure));
+          this.busy.set(false);
+        },
+      });
+  }
+
+  /** A group's name, resolved from the same list the picker offers. Falls back to "a group". */
+  groupName(groupId: string): string {
+    return this.groups().find((group) => group.id === groupId)?.name ?? 'a group';
   }
 
   // ---- Correcting it -----------------------------------------------------
@@ -441,7 +582,7 @@ export class IssueDetailComponent implements OnInit {
       return 'warn';
     }
 
-    return status === 'Published' ? 'ok' : '';
+    return status === 'DecisionPending' || status === 'Closed' ? 'ok' : '';
   }
 
   reasonHeading(status: IssueStatus): string {
@@ -454,8 +595,8 @@ export class IssueDetailComponent implements OnInit {
 
   describe(status: IssueStatus): string {
     switch (status) {
-      case 'Published':
-        return 'It is visible to your Samaaj.';
+      case 'DecisionPending':
+        return 'It is in front of the Samaaj Panch, awaiting its decision.';
       case 'Closed':
         return 'It has been closed.';
       case 'Rejected':

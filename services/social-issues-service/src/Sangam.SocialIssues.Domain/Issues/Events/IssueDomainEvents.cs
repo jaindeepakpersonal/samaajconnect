@@ -46,16 +46,22 @@ public sealed record IssueStatusChangedDomainEvent(
 }
 
 /// <summary>
-/// The issue is now visible to the Samaaj. Separate from the status change so a
-/// consumer that only cares about publication does not have to filter every
-/// move in an eight-state workflow.
+/// The Panch decided the issue and closed it. Separate from the status change
+/// so a consumer that only cares about decisions does not have to filter every
+/// move in the workflow.
 /// </summary>
-public sealed record IssuePublishedDomainEvent(
+/// <remarks>
+/// Ids only. The decision text is a paragraph a Panch member wrote about a
+/// member's concern, and audit-notification-service records payloads verbatim
+/// into an append-only table. It stays on the issue, where erasure can reach it.
+/// </remarks>
+public sealed record IssueDecidedDomainEvent(
     Guid IssueId,
     Guid TenantId,
-    string Category,
-    string? Locality,
+    Guid SubmittedByMemberId,
+    Guid DecidedByMemberId,
+    Guid? MonitoringGroupId,
     DateTimeOffset OccurredAt) : IDomainEvent
 {
-    public string Topic => "social-issues.issue.published.v1";
+    public string Topic => "social-issues.issue.decided.v1";
 }

@@ -170,13 +170,21 @@ RegistrationEnabled, Capacity (nullable), Status
 
 **SocialIssue** — `Id, TenantId, Title, Description, Category,
 Locality, SubmittedByMemberId, Status
-(Draft/Submitted/UnderReview/Approved/Rejected/ChangesRequested/Published/Closed),
-CreatedAt`
+(Draft/Submitted/UnderReview/DecisionPending/Rejected/ChangesRequested/Closed),
+CreatedAt, Decision (nullable, <= 2000), MonitoringGroupId (nullable, a
+volunteer-groups-service id, loose), DecidedAt (nullable), DecidedBy (nullable
+member id)` — judged by the Samaaj Panch: a reviewer's approval moves an issue
+to `DecisionPending`, and any seated Panch member records `Decision` and closes
+it. `Approved`/`Published` retired 2026-09-20; existing rows migrated
+(Approved → DecisionPending, Published → Closed).
 
 **IssueAttachment** — `Id, IssueId, Url, ScanStatus`
 
 **IssueStatusHistory** — `Id, IssueId, FromStatus, ToStatus, ActorUserId,
 Reason, CreatedAt`
+
+**PanelMember** (social-issues-service's own copy) — `Id, TenantId, MemberId` —
+fed by `panch.panel.changed.v1`; see §16.
 
 ## 8. Celebrity Voting
 

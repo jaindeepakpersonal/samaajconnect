@@ -16,9 +16,13 @@ internal static class IssueMappings
     /// buttons a screen shows and the moves the server accepts cannot drift
     /// apart. A screen that offers Approve on something the server will refuse
     /// is worse than one that offers nothing.
+    ///
+    /// The reviewer's moves are offered only to somebody who <i>can act</i> - a
+    /// Panch member, or an administrator while no Panch is seated - which is why
+    /// an administrator sees an empty list once a Panch exists.
     /// </remarks>
     public static IReadOnlyList<string> AvailableTransitions(
-        this SocialIssue issue, Guid viewerId, bool canReview)
+        this SocialIssue issue, Guid viewerId, ReviewAccess access)
     {
         var isAuthor = issue.IsAuthor(viewerId);
 
@@ -28,13 +32,13 @@ internal static class IssueMappings
                 .Where(issue.CanMoveTo)
                 .Where(target => SocialIssue.IsAuthorMove(issue.Status, target)
                     ? isAuthor
-                    : canReview)
+                    : access.CanAct)
                 .Select(target => target.ToString())
         ];
     }
 
     public static IssueResponse ToResponse(
-        this SocialIssue issue, Guid viewerId, bool canReview) => new(
+        this SocialIssue issue, Guid viewerId, ReviewAccess access) => new(
         issue.Id,
         issue.Title,
         issue.Description,
@@ -43,13 +47,16 @@ internal static class IssueMappings
         issue.SubmittedByMemberId,
         issue.Status.ToString(),
         issue.IsAuthor(viewerId),
-        issue.AvailableTransitions(viewerId, canReview),
+        issue.AvailableTransitions(viewerId, access),
+        access.CanAct && issue.Status == IssueStatus.DecisionPending,
         issue.CreatedAt,
-        issue.PublishedAt);
+        issue.Decision,
+        issue.MonitoringGroupId,
+        issue.DecidedAt);
 
     public static IssueDetailResponse ToDetail(
-        this SocialIssue issue, Guid viewerId, bool canReview) => new(
-        issue.ToResponse(viewerId, canReview),
+        this SocialIssue issue, Guid viewerId, ReviewAccess access) => new(
+        issue.ToResponse(viewerId, access),
         [
             .. issue.History
                 .OrderBy(h => h.CreatedAt)

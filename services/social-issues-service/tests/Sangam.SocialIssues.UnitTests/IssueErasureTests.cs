@@ -51,7 +51,7 @@ public sealed class IssueErasureTests
     [Fact]
     public void The_status_is_not_moved()
     {
-        // A published issue that vanished would leave a Samaaj wondering what
+        // An issue that vanished would leave a Samaaj wondering what
         // happened to something it was told about. What it said is gone; that it
         // existed is not the submitter's alone to erase.
         var submitter = Guid.NewGuid();
@@ -59,11 +59,11 @@ public sealed class IssueErasureTests
         var reviewer = Guid.NewGuid();
 
         issue.MoveTo(IssueStatus.UnderReview, reviewer, null, Now);
-        issue.MoveTo(IssueStatus.Approved, reviewer, null, Now);
+        issue.MoveTo(IssueStatus.DecisionPending, reviewer, null, Now);
 
         issue.ErasePersonalDataOf(submitter);
 
-        issue.Status.Should().Be(IssueStatus.Approved);
+        issue.Status.Should().Be(IssueStatus.DecisionPending);
     }
 
     [Fact]
@@ -120,5 +120,40 @@ public sealed class IssueErasureTests
 
         issue.ErasePersonalDataOf(submitter).Should().BeTrue();
         issue.ErasePersonalDataOf(submitter).Should().BeFalse();
+    }
+
+    [Fact]
+    public void A_Panch_member_decision_words_go_with_them_and_the_fact_of_it_stays()
+    {
+        var submitter = Guid.NewGuid();
+        var panchMember = Guid.NewGuid();
+        var issue = Submitted(submitter);
+
+        issue.MoveTo(IssueStatus.DecisionPending, panchMember, null, Now);
+        issue.RecordDecision("Speak to the neighbour at number 4.", null, panchMember, Now);
+
+        issue.ErasePersonalDataOf(panchMember).Should().BeTrue();
+
+        issue.Decision.Should().Be(SocialIssue.ErasedPlaceholder);
+        issue.Status.Should().Be(IssueStatus.Closed);
+        issue.DecidedAt.Should().Be(Now);
+        issue.DecidedBy.Should().Be(panchMember, "an id, like SubmittedByMemberId - counsel question 6");
+
+        issue.ErasePersonalDataOf(panchMember).Should().BeFalse("redelivery changes nothing");
+    }
+
+    [Fact]
+    public void Erasing_the_submitter_leaves_the_Panch_decision_alone()
+    {
+        var submitter = Guid.NewGuid();
+        var panchMember = Guid.NewGuid();
+        var issue = Submitted(submitter);
+
+        issue.MoveTo(IssueStatus.DecisionPending, panchMember, null, Now);
+        issue.RecordDecision("Repaint the crossing.", null, panchMember, Now);
+
+        issue.ErasePersonalDataOf(submitter);
+
+        issue.Decision.Should().Be("Repaint the crossing.");
     }
 }

@@ -8,7 +8,8 @@ public interface IIssueRepository
     Task<SocialIssue?> GetByIdAsync(Guid id, CancellationToken cancellationToken = default);
 
     /// <summary>
-    /// Issues the Samaaj can see: published and closed ones, newest first.
+    /// Issues the Samaaj can see: in front of the Panch, or decided by it, newest
+    /// first.
     /// </summary>
     Task<IReadOnlyList<SocialIssue>> ListPublicAsync(
         string? category, CancellationToken cancellationToken = default);
@@ -21,10 +22,10 @@ public interface IIssueRepository
         Guid authorMemberId, CancellationToken cancellationToken = default);
 
     /// <summary>
-    /// Waiting for a reviewer to act: submitted, under review, or approved
-    /// and still waiting to be published. Same queue for all three - a
-    /// reviewer's next move on an issue is still a review action, whether
-    /// that move is a first decision or publishing one already decided.
+    /// Waiting for the Panch to act: submitted, under review, or in front of the
+    /// Panch awaiting its decision. Same queue for all three - the next move on
+    /// an issue is still a review action, whether it is a first look or the
+    /// decision itself.
     /// </summary>
     Task<IReadOnlyList<SocialIssue>> ListAwaitingDecisionAsync(
         CancellationToken cancellationToken = default);

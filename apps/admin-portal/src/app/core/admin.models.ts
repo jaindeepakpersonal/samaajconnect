@@ -711,12 +711,15 @@ export interface VolunteerGroup {
 
 // ---- Social issues -------------------------------------------------------
 
+/**
+ * `Approved` and `Published` are retired: a reviewer's approval now puts an
+ * issue in `DecisionPending`, and the Samaaj Panch decides it and closes it.
+ */
 export type IssueStatus =
   | 'Draft'
   | 'Submitted'
   | 'UnderReview'
-  | 'Approved'
-  | 'Published'
+  | 'DecisionPending'
   | 'Rejected'
   | 'ChangesRequested'
   | 'Closed';
@@ -728,7 +731,10 @@ export type IssueStatus =
  * caller's permission. The screen renders exactly those and derives nothing
  * from the status — the same rule the moderation queue follows, and for the
  * same reason: a second copy of the workflow in the panel is a copy that can
- * drift.
+ * drift. `availableTransitions` is empty for an administrator once a Samaaj
+ * has seated a Panch — reviewing is the Panch's from that point, and this
+ * screen becomes read-only for it rather than lying about what will be
+ * accepted.
  */
 export interface SocialIssue {
   readonly id: string;
@@ -740,8 +746,19 @@ export interface SocialIssue {
   readonly status: IssueStatus;
   readonly isMine: boolean;
   readonly availableTransitions: readonly IssueStatus[];
+  readonly canDecide: boolean;
   readonly createdAt: string;
-  readonly publishedAt: string | null;
+  readonly decision: string | null;
+  readonly monitoringGroupId: string | null;
+  readonly decidedAt: string | null;
+}
+
+/** Mirrors `ReviewAccessResponse`. */
+export interface IssueReviewAccess {
+  readonly canReview: boolean;
+  readonly canSeeQueue: boolean;
+  readonly panelSeated: boolean;
+  readonly isPanelMember: boolean;
 }
 
 /**

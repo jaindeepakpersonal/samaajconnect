@@ -48,6 +48,7 @@ public sealed class ReviseIssueCommandHandler(
     IUnitOfWork unitOfWork,
     ICurrentUser currentUser,
     ITenantContext tenantContext,
+    ReviewAccessResolver reviewAccess,
     IDateTimeProvider clock)
     : IRequestHandler<ReviseIssueCommand, Result<IssueDetailResponse>>
 {
@@ -84,6 +85,6 @@ public sealed class ReviseIssueCommandHandler(
         await unitOfWork.SaveChangesAsync(cancellationToken);
 
         return Result.Success(issue.ToDetail(
-            actorId, currentUser.HasPermission(PermissionKeys.SocialIssuesApprove)));
+            actorId, await reviewAccess.ResolveAsync(cancellationToken)));
     }
 }

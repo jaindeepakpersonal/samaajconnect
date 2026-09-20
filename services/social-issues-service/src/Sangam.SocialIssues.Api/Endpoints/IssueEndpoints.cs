@@ -2,10 +2,12 @@ using MediatR;
 using Sangam.SocialIssues.Api.Extensions;
 using Sangam.SocialIssues.Application.Issues;
 using Sangam.SocialIssues.Application.Issues.Commands.MoveIssue;
+using Sangam.SocialIssues.Application.Issues.Commands.RecordDecision;
 using Sangam.SocialIssues.Application.Issues.Commands.ReviseIssue;
 using Sangam.SocialIssues.Application.Issues.Commands.SubmitIssue;
 using Sangam.SocialIssues.Application.Issues.Queries.GetApprovalQueue;
 using Sangam.SocialIssues.Application.Issues.Queries.GetIssue;
+using Sangam.SocialIssues.Application.Issues.Queries.GetReviewAccess;
 using Sangam.SocialIssues.Application.Issues.Queries.ListIssues;
 
 namespace Sangam.SocialIssues.Api.Endpoints;
@@ -31,7 +33,8 @@ public static class IssueEndpoints
             })
             .RequireAuthorization()
             .WithName("ListIssues")
-            .WithSummary("Published issues, plus this member's own whatever their status.")
+            .WithSummary(
+                "Issues in front of the Panch or decided by it, plus this member's own whatever their status.")
             .Produces<IReadOnlyList<IssueResponse>>()
             .ProducesProblem(StatusCodes.Status401Unauthorized)
             .ProducesProblem(StatusCodes.Status403Forbidden);
@@ -48,8 +51,23 @@ public static class IssueEndpoints
             })
             .RequireAuthorization()
             .WithName("GetApprovalQueue")
-            .WithSummary("What a reviewer has to decide about, oldest first.")
+            .WithSummary("What the Samaaj Panch has to look at, oldest first. Panch members, and administrators read-only.")
             .Produces<IReadOnlyList<IssueResponse>>()
+            .ProducesProblem(StatusCodes.Status401Unauthorized)
+            .ProducesProblem(StatusCodes.Status403Forbidden);
+
+        group.MapGet("/review-access", async (
+                ISender sender,
+                CancellationToken cancellationToken) =>
+            {
+                var result = await sender.Send(new GetReviewAccessQuery(), cancellationToken);
+
+                return result.ToApiResult();
+            })
+            .RequireAuthorization()
+            .WithName("GetReviewAccess")
+            .WithSummary("Whether the caller reviews issues, and whether this Samaaj has a Panch.")
+            .Produces<ReviewAccessResponse>()
             .ProducesProblem(StatusCodes.Status401Unauthorized)
             .ProducesProblem(StatusCodes.Status403Forbidden);
 
@@ -139,6 +157,30 @@ public static class IssueEndpoints
             .ProducesProblem(StatusCodes.Status404NotFound)
             .ProducesProblem(StatusCodes.Status409Conflict);
 
+        group.MapPost("/{id:guid}/decision", async (
+                Guid id,
+                DecisionRequest request,
+                ISender sender,
+                CancellationToken cancellationToken) =>
+            {
+                var result = await sender.Send(
+                    new RecordDecisionCommand(id, request.Decision, request.MonitoringGroupId),
+                    cancellationToken);
+
+                return result.ToApiResult();
+            })
+            .RequireAuthorization()
+            .WithName("RecordDecision")
+            .WithSummary(
+                "The Panch decides an issue that is in front of it, and closes it. "
+                + "Optionally hands the monitoring to a volunteer group.")
+            .Produces<IssueDetailResponse>()
+            .ProducesValidationProblem()
+            .ProducesProblem(StatusCodes.Status401Unauthorized)
+            .ProducesProblem(StatusCodes.Status403Forbidden)
+            .ProducesProblem(StatusCodes.Status404NotFound)
+            .ProducesProblem(StatusCodes.Status409Conflict);
+
         return app;
     }
 
@@ -165,4 +207,11 @@ public static class IssueEndpoints
     /// quietly publishes something.
     /// </summary>
     public sealed record MoveRequest(string Status, string? Reason);
+
+    /// <summary>
+    /// <paramref name="MonitoringGroupId"/> is a string, not a Guid: a Guid-typed
+    /// wire field crashes ASP.NET Core's own model binding with an unhandled 400
+    /// the moment the value cannot be parsed. Validated and parsed in the command.
+    /// </summary>
+    public sealed record DecisionRequest(string Decision, string? MonitoringGroupId);
 }

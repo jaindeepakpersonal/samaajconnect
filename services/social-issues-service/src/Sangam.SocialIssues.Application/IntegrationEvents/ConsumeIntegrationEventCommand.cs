@@ -30,12 +30,15 @@ public sealed record ConsumeIntegrationEventCommand(IntegrationEventEnvelope Env
 
 public sealed class ConsumeIntegrationEventCommandHandler(
     IIssueRepository issues,
+    IPanelRepository panel,
     IUnitOfWork unitOfWork,
     ILogger<ConsumeIntegrationEventCommandHandler> logger)
     : IRequestHandler<ConsumeIntegrationEventCommand, Result<int>>
 {
-    /// <summary>The one topic this service subscribes to.</summary>
     public const string UserErasedTopic = "identity.user.erased.v1";
+
+    /// <summary>The Samaaj Panch changed. Carries the whole roster.</summary>
+    public const string PanelChangedTopic = "panch.panel.changed.v1";
 
     private static readonly JsonSerializerOptions PayloadOptions = new(JsonSerializerDefaults.Web);
 
@@ -43,6 +46,11 @@ public sealed class ConsumeIntegrationEventCommandHandler(
         ConsumeIntegrationEventCommand command, CancellationToken cancellationToken)
     {
         var envelope = command.Envelope;
+
+        if (envelope.Topic == PanelChangedTopic)
+        {
+            return await ApplyPanelChangedAsync(envelope, cancellationToken);
+        }
 
         if (envelope.Topic != UserErasedTopic)
         {
@@ -108,7 +116,67 @@ public sealed class ConsumeIntegrationEventCommandHandler(
 
         return Result.Success(changed);
     }
+
+    /// <summary>
+    /// Makes this Samaaj's copy of the Panch match the roster the event carries.
+    /// </summary>
+    /// <remarks>
+    /// The event carries the whole roster, not a delta, so this <i>replaces</i>:
+    /// applying the same snapshot twice leaves the same rows, which is what makes
+    /// at-least-once delivery harmless here. A Samaaj's events share a partition
+    /// key, so they arrive in order.
+    /// </remarks>
+    private async Task<Result<int>> ApplyPanelChangedAsync(
+        IntegrationEventEnvelope envelope, CancellationToken cancellationToken)
+    {
+        PanelChangedPayload? payload;
+
+        try
+        {
+            payload = JsonSerializer.Deserialize<PanelChangedPayload>(envelope.Payload, PayloadOptions);
+        }
+        catch (JsonException exception)
+        {
+            // Retrying will not fix a payload that does not parse.
+            logger.LogError(
+                exception, "Could not read {MessageId} from {Topic}", envelope.MessageId, envelope.Topic);
+
+            return Result.Success(0);
+        }
+
+        var tenantId = payload?.TenantId is { } fromPayload && fromPayload != Guid.Empty
+            ? fromPayload
+            : envelope.TenantId;
+
+        if (payload is null || payload.MemberIds is null || tenantId == Guid.Empty)
+        {
+            logger.LogWarning(
+                "{MessageId} from {Topic} carried no roster or named no Samaaj",
+                envelope.MessageId,
+                envelope.Topic);
+
+            return Result.Success(0);
+        }
+
+        if (!await panel.ReplaceAsync(tenantId, payload.MemberIds, cancellationToken))
+        {
+            // A redelivery of a roster already applied.
+            return Result.Success(0);
+        }
+
+        await unitOfWork.SaveChangesAsync(cancellationToken);
+
+        logger.LogInformation(
+            "Samaaj {TenantId} now has {Count} members on its Panch", tenantId, payload.MemberIds.Count);
+
+        return Result.Success(payload.MemberIds.Count);
+    }
 }
+
+/// <summary>
+/// The payload of <c>panch.panel.changed.v1</c>: the whole roster as member ids.
+/// </summary>
+public sealed record PanelChangedPayload(Guid TenantId, IReadOnlyList<Guid>? MemberIds);
 
 /// <summary>
 /// The payload of <c>identity.user.erased.v1</c>. Two ids and a timestamp —

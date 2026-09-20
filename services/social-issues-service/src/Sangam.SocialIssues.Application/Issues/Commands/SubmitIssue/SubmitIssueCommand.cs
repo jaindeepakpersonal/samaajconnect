@@ -58,6 +58,7 @@ public sealed class SubmitIssueCommandHandler(
     IUnitOfWork unitOfWork,
     ICurrentUser currentUser,
     ITenantContext tenantContext,
+    ReviewAccessResolver reviewAccess,
     IDateTimeProvider clock)
     : IRequestHandler<SubmitIssueCommand, Result<IssueResponse>>
 {
@@ -92,6 +93,6 @@ public sealed class SubmitIssueCommandHandler(
         await unitOfWork.SaveChangesAsync(cancellationToken);
 
         return Result.Success(issue.ToResponse(
-            memberId, currentUser.HasPermission(PermissionKeys.SocialIssuesApprove)));
+            memberId, await reviewAccess.ResolveAsync(cancellationToken)));
     }
 }

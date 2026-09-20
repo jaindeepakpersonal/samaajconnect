@@ -44,6 +44,7 @@ import {
   InviteAdminResult,
   City,
   Gautra,
+  IssueReviewAccess,
   IssueStatus,
   Locality,
   LookupCategory,
@@ -517,7 +518,20 @@ export class AdminApi {
 
   // ---- Social issues -----------------------------------------------------
 
-  /** What a reviewer has to decide about, oldest first. */
+  /**
+   * Whether this administrator still reviews issues.
+   *
+   * True only while no Samaaj Panch is seated — the fallback that keeps every
+   * issue reviewable before a Samaaj has elected one. Once a Panch exists the
+   * queue is still readable (`canSeeQueue`), so an administrator can tell
+   * whether it is being worked, but `canReview` goes false and this screen
+   * stops offering any move.
+   */
+  issueReviewAccess(): Observable<IssueReviewAccess> {
+    return this.http.get<IssueReviewAccess>('/v1/social-issues/review-access');
+  }
+
+  /** What is waiting on a decision, oldest first. */
   issueApprovalQueue(): Observable<SocialIssue[]> {
     return this.http.get<SocialIssue[]>('/v1/social-issues/approval-queue');
   }

@@ -10,6 +10,7 @@ public sealed class SocialIssueTests
     private static readonly Guid TenantId = Guid.NewGuid();
     private static readonly Guid AuthorId = Guid.NewGuid();
     private static readonly Guid ReviewerId = Guid.NewGuid();
+    private static readonly Guid PanchMemberId = Guid.NewGuid();
 
     private static SocialIssue Issue(bool submitNow = true) =>
         SocialIssue.Create(
@@ -22,7 +23,10 @@ public sealed class SocialIssueTests
             submitNow,
             Now);
 
-    /// <summary>Walks an issue to a status by making each legal move in turn.</summary>
+    /// <summary>
+    /// Walks an issue to a status by making each legal move in turn. <c>Closed</c>
+    /// here is the Panch's decision, the one way an issue gets a decision.
+    /// </summary>
     private static SocialIssue At(IssueStatus status)
     {
         var issue = Issue();
@@ -32,25 +36,19 @@ public sealed class SocialIssueTests
             return issue;
         }
 
-        if (status is IssueStatus.UnderReview or IssueStatus.Approved
-            or IssueStatus.Published or IssueStatus.Closed)
+        if (status is IssueStatus.UnderReview or IssueStatus.DecisionPending or IssueStatus.Closed)
         {
             issue.MoveTo(IssueStatus.UnderReview, ReviewerId, null, Now);
         }
 
-        if (status is IssueStatus.Approved or IssueStatus.Published or IssueStatus.Closed)
+        if (status is IssueStatus.DecisionPending or IssueStatus.Closed)
         {
-            issue.MoveTo(IssueStatus.Approved, ReviewerId, null, Now);
-        }
-
-        if (status is IssueStatus.Published or IssueStatus.Closed)
-        {
-            issue.MoveTo(IssueStatus.Published, ReviewerId, null, Now);
+            issue.MoveTo(IssueStatus.DecisionPending, ReviewerId, null, Now);
         }
 
         if (status == IssueStatus.Closed)
         {
-            issue.MoveTo(IssueStatus.Closed, ReviewerId, "Dealt with.", Now);
+            issue.RecordDecision("Repaint the crossing.", null, PanchMemberId, Now);
         }
 
         if (status is IssueStatus.Rejected or IssueStatus.ChangesRequested)
@@ -103,7 +101,7 @@ public sealed class SocialIssueTests
     public void The_submitted_event_carries_no_description()
     {
         // What a member says is wrong in their community can name neighbours or
-        // be the very thing a reviewer decides not to publish, and
+        // be the very thing a reviewer decides not to show, and
         // audit-notification-service stores payloads verbatim.
         var issue = Issue();
 
@@ -116,33 +114,44 @@ public sealed class SocialIssueTests
     // ---- The transition table --------------------------------------------
 
     [Theory]
-    [InlineData(IssueStatus.Submitted, IssueStatus.Approved)]
+    [InlineData(IssueStatus.Submitted, IssueStatus.DecisionPending)]
     [InlineData(IssueStatus.Submitted, IssueStatus.Rejected)]
     [InlineData(IssueStatus.Submitted, IssueStatus.UnderReview)]
-    [InlineData(IssueStatus.UnderReview, IssueStatus.Approved)]
-    [InlineData(IssueStatus.Approved, IssueStatus.Published)]
-    [InlineData(IssueStatus.Published, IssueStatus.Closed)]
+    [InlineData(IssueStatus.UnderReview, IssueStatus.DecisionPending)]
+    [InlineData(IssueStatus.Rejected, IssueStatus.Closed)]
     public void A_legal_move_is_allowed(IssueStatus from, IssueStatus to)
     {
         At(from).CanMoveTo(to).Should().BeTrue();
     }
 
     [Theory]
-    [InlineData(IssueStatus.Submitted, IssueStatus.Published)]
-    [InlineData(IssueStatus.UnderReview, IssueStatus.Published)]
-    [InlineData(IssueStatus.Rejected, IssueStatus.Published)]
-    [InlineData(IssueStatus.ChangesRequested, IssueStatus.Published)]
-    public void Nothing_reaches_Published_except_an_approved_issue(
-        IssueStatus from, IssueStatus to)
+    [InlineData(IssueStatus.Submitted)]
+    [InlineData(IssueStatus.UnderReview)]
+    [InlineData(IssueStatus.Rejected)]
+    [InlineData(IssueStatus.ChangesRequested)]
+    public void Nothing_reaches_DecisionPending_except_a_reviewed_issue(IssueStatus from)
     {
-        // "Member submissions are published only after valid approval" - the
-        // subtitle on the member's screen, and the invariant this aggregate
-        // exists to hold.
-        At(from).CanMoveTo(to).Should().BeFalse();
+        // Only an issue a reviewer has looked at goes in front of the Panch.
+        // Rejected and sent-back ones never do.
+        var reachable = At(from).CanMoveTo(IssueStatus.DecisionPending);
+
+        reachable.Should().Be(from is IssueStatus.Submitted or IssueStatus.UnderReview);
+    }
+
+    [Fact]
+    public void Closing_a_pending_issue_is_not_a_plain_move()
+    {
+        // DecisionPending -> Closed needs the Panch's decision text, so it is
+        // not a row in the table: a plain status move that closed it would
+        // leave a decided issue with no decision.
+        var issue = At(IssueStatus.DecisionPending);
+
+        issue.CanMoveTo(IssueStatus.Closed).Should().BeFalse();
+        issue.MoveTo(IssueStatus.Draft, ReviewerId, null, Now).Should().BeFalse();
+        issue.Status.Should().Be(IssueStatus.DecisionPending);
     }
 
     [Theory]
-    [InlineData(IssueStatus.Published)]
     [InlineData(IssueStatus.Rejected)]
     [InlineData(IssueStatus.Closed)]
     public void A_decided_issue_cannot_go_back_to_the_queue(IssueStatus from)
@@ -158,7 +167,7 @@ public sealed class SocialIssueTests
     {
         var issue = At(IssueStatus.Submitted);
 
-        issue.MoveTo(IssueStatus.Published, ReviewerId, null, Now).Should().BeFalse();
+        issue.MoveTo(IssueStatus.Draft, ReviewerId, null, Now).Should().BeFalse();
 
         issue.Status.Should().Be(IssueStatus.Submitted);
         issue.History.Should().ContainSingle("a refused move leaves no trace");
@@ -180,17 +189,17 @@ public sealed class SocialIssueTests
     [InlineData(IssueStatus.Draft)]
     [InlineData(IssueStatus.Submitted)]
     [InlineData(IssueStatus.ChangesRequested)]
-    public void A_member_may_withdraw_their_own_issue_before_it_is_published(IssueStatus from)
+    public void A_member_may_withdraw_their_own_issue_before_the_Panch_has_it(IssueStatus from)
     {
         SocialIssue.IsAuthorMove(from, IssueStatus.Closed).Should().BeTrue();
     }
 
     [Fact]
-    public void But_closing_a_published_issue_is_the_Samaaj_s_decision()
+    public void Once_the_Panch_has_it_the_author_cannot_take_it_back()
     {
-        // Once the Samaaj has been told, taking it back is not one member's
-        // call.
-        SocialIssue.IsAuthorMove(IssueStatus.Published, IssueStatus.Closed).Should().BeFalse();
+        // The Samaaj has been told and the Panch is discussing it; withdrawing
+        // is not one member's call any more.
+        At(IssueStatus.DecisionPending).CanMoveTo(IssueStatus.Closed).Should().BeFalse();
     }
 
     // ---- History and events ----------------------------------------------
@@ -243,35 +252,154 @@ public sealed class SocialIssueTests
             .Should().NotContain("Reason");
     }
 
+    // ---- The Panch's decision --------------------------------------------
+
     [Fact]
-    public void Publishing_raises_its_own_event_as_well_as_the_status_change()
+    public void The_Panch_decides_a_pending_issue_and_closes_it()
     {
-        // So a consumer that only cares about publication does not have to
-        // filter every move in an eight-state workflow.
-        var issue = At(IssueStatus.Approved);
+        var issue = At(IssueStatus.DecisionPending);
+        var group = Guid.NewGuid();
 
-        issue.MoveTo(IssueStatus.Published, ReviewerId, null, Now);
+        issue.RecordDecision("  Repaint the crossing and post a marshal.  ", group, PanchMemberId, Now)
+            .Should().BeTrue();
 
-        issue.DomainEvents.OfType<IssuePublishedDomainEvent>().Should().ContainSingle();
+        issue.Status.Should().Be(IssueStatus.Closed);
+        issue.Decision.Should().Be("Repaint the crossing and post a marshal.");
+        issue.MonitoringGroupId.Should().Be(group);
+        issue.DecidedAt.Should().Be(Now);
+        issue.DecidedBy.Should().Be(PanchMemberId);
+    }
+
+    [Fact]
+    public void Handing_over_the_monitoring_is_optional()
+    {
+        var issue = At(IssueStatus.DecisionPending);
+
+        issue.RecordDecision("Nothing further is needed.", null, PanchMemberId, Now).Should().BeTrue();
+
+        issue.MonitoringGroupId.Should().BeNull();
+    }
+
+    [Theory]
+    [InlineData(IssueStatus.Submitted)]
+    [InlineData(IssueStatus.UnderReview)]
+    [InlineData(IssueStatus.Rejected)]
+    [InlineData(IssueStatus.Closed)]
+    public void Only_a_pending_issue_can_be_decided(IssueStatus status)
+    {
+        var issue = At(status);
+        var before = issue.History.Count;
+
+        issue.RecordDecision("Anything.", null, PanchMemberId, Now).Should().BeFalse();
+
+        issue.Status.Should().Be(status);
+        issue.History.Should().HaveCount(before, "a refused decision leaves no trace");
+    }
+
+    [Fact]
+    public void A_decision_needs_words()
+    {
+        var issue = At(IssueStatus.DecisionPending);
+
+        var attempt = () => issue.RecordDecision("   ", null, PanchMemberId, Now);
+
+        attempt.Should().Throw<ArgumentException>();
+    }
+
+    [Fact]
+    public void Deciding_is_recorded_in_the_history_against_the_Panch_member()
+    {
+        var issue = At(IssueStatus.DecisionPending);
+
+        issue.RecordDecision("Done.", null, PanchMemberId, Now);
+
+        var last = issue.History.OrderBy(h => h.CreatedAt).Last();
+
+        last.FromStatus.Should().Be(IssueStatus.DecisionPending);
+        last.ToStatus.Should().Be(IssueStatus.Closed);
+        last.ActorUserId.Should().Be(PanchMemberId);
+    }
+
+    [Fact]
+    public void Deciding_raises_its_own_event_as_well_as_the_status_change()
+    {
+        var issue = At(IssueStatus.DecisionPending);
+        var group = Guid.NewGuid();
+
+        issue.RecordDecision("Done.", group, PanchMemberId, Now);
+
         issue.DomainEvents.OfType<IssueStatusChangedDomainEvent>().Should().ContainSingle();
-        issue.PublishedAt.Should().Be(Now);
+
+        var decided = issue.DomainEvents.OfType<IssueDecidedDomainEvent>().Should().ContainSingle().Subject;
+
+        decided.Topic.Should().Be("social-issues.issue.decided.v1");
+        decided.DecidedByMemberId.Should().Be(PanchMemberId);
+        decided.MonitoringGroupId.Should().Be(group);
+        decided.SubmittedByMemberId.Should().Be(AuthorId);
+    }
+
+    [Fact]
+    public void The_decided_event_carries_ids_and_never_the_decision_text()
+    {
+        // The decision is a paragraph about a member's concern, and
+        // audit-notification-service records payloads verbatim.
+        var issue = At(IssueStatus.DecisionPending);
+
+        issue.RecordDecision("A private remark.", null, PanchMemberId, Now);
+
+        issue.DomainEvents.OfType<IssueDecidedDomainEvent>().Single()
+            .GetType().GetProperties().Select(p => p.Name)
+            .Should().NotContain(["Decision", "Title", "Description", "Locality"]);
     }
 
     // ---- Visibility and revision -----------------------------------------
 
+    [Fact]
+    public void An_issue_in_front_of_the_Panch_is_public()
+    {
+        At(IssueStatus.DecisionPending).IsPublic.Should().BeTrue();
+    }
+
+    [Fact]
+    public void A_decided_issue_stays_public()
+    {
+        At(IssueStatus.Closed).IsPublic.Should().BeTrue();
+    }
+
     [Theory]
-    [InlineData(IssueStatus.Draft, false)]
-    [InlineData(IssueStatus.Submitted, false)]
-    [InlineData(IssueStatus.UnderReview, false)]
-    [InlineData(IssueStatus.Approved, false)]
-    [InlineData(IssueStatus.Rejected, false)]
-    [InlineData(IssueStatus.Published, true)]
-    [InlineData(IssueStatus.Closed, true)]
-    public void Only_published_and_closed_issues_are_public(IssueStatus status, bool expected)
+    [InlineData(IssueStatus.Draft)]
+    [InlineData(IssueStatus.Submitted)]
+    [InlineData(IssueStatus.UnderReview)]
+    [InlineData(IssueStatus.Rejected)]
+    [InlineData(IssueStatus.ChangesRequested)]
+    public void Before_the_Panch_has_it_an_issue_is_private(IssueStatus status)
     {
         var issue = status == IssueStatus.Draft ? Issue(submitNow: false) : At(status);
 
-        issue.IsPublic.Should().Be(expected);
+        issue.IsPublic.Should().BeFalse();
+    }
+
+    [Fact]
+    public void A_withdrawn_issue_has_no_decision_and_stays_private()
+    {
+        // It used to be public simply for being Closed. Withdrawing something
+        // does not make it the Samaaj's business.
+        var issue = Issue();
+
+        issue.MoveTo(IssueStatus.Closed, AuthorId, null, Now);
+
+        issue.Status.Should().Be(IssueStatus.Closed);
+        issue.IsPublic.Should().BeFalse();
+    }
+
+    [Fact]
+    public void A_rejected_issue_that_is_then_closed_stays_private()
+    {
+        var issue = At(IssueStatus.Rejected);
+
+        issue.MoveTo(IssueStatus.Closed, ReviewerId, null, Now);
+
+        issue.IsPublic.Should().BeFalse();
     }
 
     [Theory]
@@ -285,13 +413,13 @@ public sealed class SocialIssueTests
     }
 
     [Theory]
-    [InlineData(IssueStatus.Approved)]
-    [InlineData(IssueStatus.Published)]
+    [InlineData(IssueStatus.DecisionPending)]
+    [InlineData(IssueStatus.Closed)]
     [InlineData(IssueStatus.Rejected)]
-    public void A_decided_issue_cannot_be_edited(IssueStatus status)
+    public void An_issue_the_Panch_has_or_has_decided_cannot_be_edited(IssueStatus status)
     {
-        // A reviewer who approved one thing and finds another published has
-        // been made to endorse something they never read.
+        // A reviewer who approved one thing and finds another being discussed
+        // has been made to endorse something they never read.
         At(status).Revise("Something else entirely", "Rewritten.", "Community", null, Now)
             .Should().BeFalse();
     }

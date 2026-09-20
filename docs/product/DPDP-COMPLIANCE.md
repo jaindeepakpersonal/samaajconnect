@@ -382,7 +382,7 @@ GUIDs touches that. Both now consume `identity.user.erased.v1`.
 | Service | What it does on that event |
 |---|---|
 | timeline-service | Empties and hides the posts that member wrote, and empties their comments on anyone's post. Other members' comments and reactions survive |
-| social-issues-service | Empties the issues they submitted and drops the locality, and drops any reason they wrote in a history entry. Reviewers' decisions and reasons survive, and the status is not moved |
+| social-issues-service | Empties the issues they submitted and drops the locality, drops any reason they wrote in a history entry, and drops a decision they recorded as a Panch member. Other reviewers' reasons survive, and the status is not moved |
 
 The rule both follow is **the words go and the shape stays**. A post and an
 issue are containers — other people's comments, and a reviewer's decisions,

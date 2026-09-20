@@ -77,7 +77,7 @@ public sealed class SocialIssuesApiFactory : WebApplicationFactory<Program>, IAs
         var dbContext = scope.ServiceProvider.GetRequiredService<SocialIssuesDbContext>();
 
         await dbContext.Database.ExecuteSqlRawAsync(
-            "TRUNCATE TABLE issue_status_history, social_issues, outbox_messages "
+            "TRUNCATE TABLE issue_status_history, social_issues, panel_members, outbox_messages "
             + "RESTART IDENTITY CASCADE;");
     }
 

@@ -4,39 +4,44 @@ import { FormsModule } from '@angular/forms';
 import { describeError } from '@samaajconnect/shared';
 import { AdminApi } from '../../core/admin-api';
 import { AdminScope } from '../../core/admin-scope';
-import { IssueStatus, SocialIssue } from '../../core/admin.models';
+import { IssueReviewAccess, IssueStatus, SocialIssue } from '../../core/admin.models';
 import { isNotFound } from '../../core/http-status';
 
 /**
- * Social issues — what a reviewer has to decide about.
+ * Social issues — what the Samaaj Panch has to decide about.
  *
  * Wireframe `#issues`.
  *
- * **The mildest gap of the set, and worth saying so.** Unlike the others, a
- * reviewer was not stuck: the member portal's issue detail already renders
- * `availableTransitions`, so somebody who had an issue's id could decide it.
- * What was missing was the list — a reviewer had no way to find out that
- * anything was waiting, which makes the queue a thing somebody has to be told
- * about out of band.
+ * **Reviewing moved to the Panch, and this screen followed it.** An issue used
+ * to be an administrator's to approve, reject, or send back — this queue and
+ * `SocialIssues.Approve`. Once a Samaaj elects a Panch (panch-service), only
+ * its members review; an administrator keeps the queue so somebody can tell
+ * whether it is being worked, but loses every button. **Before** a Panch is
+ * seated, an administrator still reviews — the fallback that keeps every
+ * Samaaj's queue moving until it elects one.
  *
  * **The buttons come from the server, and nothing here derives them.**
  * `availableTransitions` is the domain's transition table filtered by this
- * caller's permission. social-issues-service is the one service on the platform
- * whose workflow is a real table with branches rather than a short line, so a
- * second copy of it in the panel would be the copy that drifts. This is the
- * same rule the moderation queue follows.
+ * caller's permission — empty for an administrator once a Panch exists, which
+ * is what actually turns this screen read-only rather than a client-side
+ * guess at whose turn it is.
  *
  * **A reason is asked for on the refusing moves.** The service requires one
  * where a member will ask why — rejecting, or sending it back for changes — and
  * ignores it elsewhere, so the screen asks exactly there and always sends the
  * field.
+ *
+ * **Recording the Panch's decision is not here.** `RecordDecisionCommand`
+ * needs a decision text and belongs to whoever sits on the Panch — an ordinary
+ * member, not necessarily an administrator — so that form lives in
+ * member-portal. This screen shows the decision once it exists, read-only.
  */
 @Component({
   selector: 'app-issue-queue',
   imports: [FormsModule, DatePipe],
   template: `
     <h1 class="title">Social issues</h1>
-    <p class="sub">The approval queue: what a reviewer has to decide about, oldest first.</p>
+    <p class="sub">What the Samaaj Panch has to decide about, oldest first.</p>
 
     @if (error(); as message) {
       <p class="notice error" role="alert">{{ message }}</p>
@@ -53,56 +58,74 @@ import { isNotFound } from '../../core/http-status';
       </p>
     } @else if (loading()) {
       <p class="empty" role="status">Loading…</p>
-    } @else if (issues().length === 0) {
-      <p class="empty">
-        Nothing waiting. Issues appear here when a member submits one.
-      </p>
     } @else {
-      @for (issue of issues(); track issue.id) {
-        <div class="card spaced">
-          <h2>{{ issue.title }}</h2>
-          <p class="sub">
-            {{ issue.category }}
-            @if (issue.locality) { · {{ issue.locality }} }
-            · {{ issue.status }}
-            · raised {{ issue.createdAt | date: 'd MMM y' }}
+      @if (access(); as granted) {
+        @if (granted.panelSeated && !granted.canReview) {
+          <p class="notice">
+            {{ scope.label() }} has elected a Samaaj Panch. Only its members can act on issues
+            now — this queue is read-only here.
           </p>
+        }
+      }
 
-          <p>{{ issue.description }}</p>
+      @if (issues().length === 0) {
+        <p class="empty">
+          Nothing waiting. Issues appear here when a member submits one.
+        </p>
+      } @else {
+        @for (issue of issues(); track issue.id) {
+          <div class="card spaced">
+            <h2>{{ issue.title }}</h2>
+            <p class="sub">
+              {{ issue.category }}
+              @if (issue.locality) { · {{ issue.locality }} }
+              · {{ issue.status }}
+              · raised {{ issue.createdAt | date: 'd MMM y' }}
+            </p>
 
-          @if (issue.availableTransitions.length === 0) {
-            <p class="empty">Nothing for you to decide on this one.</p>
-          } @else {
-            @if (needsReason(issue)) {
-              <label [attr.for]="'reason-' + issue.id">Reason</label>
-              <input
-                class="input"
-                [id]="'reason-' + issue.id"
-                [name]="'reason-' + issue.id"
-                [(ngModel)]="reason[issue.id]"
-                maxlength="1000"
-                placeholder="Why is it going back, or being turned down?"
-              />
-              <p class="small">
-                Required for the moves a member will ask about. They are shown it.
-              </p>
-            }
+            <p>{{ issue.description }}</p>
 
-            <div class="row-actions">
-              @for (next of issue.availableTransitions; track next) {
-                <button
-                  class="btn small"
-                  type="button"
-                  [class.alt]="refusing(next)"
-                  [disabled]="busy() || (refusing(next) && !(reason[issue.id] ?? '').trim())"
-                  (click)="move(issue, next)"
-                >
-                  {{ label(next) }}
-                </button>
+            @if (issue.decision; as decision) {
+              <div class="notice ok">
+                <b>The Panch's decision:</b> {{ decision }}
+                @if (issue.decidedAt) {
+                  <span class="small"> — {{ issue.decidedAt | date: 'd MMM y' }}</span>
+                }
+              </div>
+            } @else if (issue.availableTransitions.length === 0) {
+              <p class="empty">Nothing for you to decide on this one.</p>
+            } @else {
+              @if (needsReason(issue)) {
+                <label [attr.for]="'reason-' + issue.id">Reason</label>
+                <input
+                  class="input"
+                  [id]="'reason-' + issue.id"
+                  [name]="'reason-' + issue.id"
+                  [(ngModel)]="reason[issue.id]"
+                  maxlength="1000"
+                  placeholder="Why is it going back, or being turned down?"
+                />
+                <p class="small">
+                  Required for the moves a member will ask about. They are shown it.
+                </p>
               }
-            </div>
-          }
-        </div>
+
+              <div class="row-actions">
+                @for (next of issue.availableTransitions; track next) {
+                  <button
+                    class="btn small"
+                    type="button"
+                    [class.alt]="refusing(next)"
+                    [disabled]="busy() || (refusing(next) && !(reason[issue.id] ?? '').trim())"
+                    (click)="move(issue, next)"
+                  >
+                    {{ label(next) }}
+                  </button>
+                }
+              </div>
+            }
+          </div>
+        }
       }
     }
   `,
@@ -125,6 +148,7 @@ export class IssueQueueComponent implements OnInit {
   readonly scope = inject(AdminScope);
 
   readonly issues = signal<readonly SocialIssue[]>([]);
+  readonly access = signal<IssueReviewAccess | null>(null);
   readonly loading = signal(true);
   readonly busy = signal(false);
   readonly moduleOff = signal(false);
@@ -165,10 +189,8 @@ export class IssueQueueComponent implements OnInit {
     switch (status) {
       case 'UnderReview':
         return 'Pick it up';
-      case 'Approved':
-        return 'Approve';
-      case 'Published':
-        return 'Publish';
+      case 'DecisionPending':
+        return 'Put in front of the Panch';
       case 'Rejected':
         return 'Reject';
       case 'ChangesRequested':
@@ -183,6 +205,11 @@ export class IssueQueueComponent implements OnInit {
   private load(): void {
     this.loading.set(true);
     this.error.set(null);
+
+    this.api.issueReviewAccess().subscribe({
+      next: (found) => this.access.set(found),
+      error: () => this.access.set(null),
+    });
 
     this.api.issueApprovalQueue().subscribe({
       next: (found) => {

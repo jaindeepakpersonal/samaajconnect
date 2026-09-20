@@ -9,8 +9,9 @@ using Sangam.SocialIssues.Domain.Issues;
 namespace Sangam.SocialIssues.Application.Issues.Commands.MoveIssue;
 
 /// <summary>
-/// Moves an issue through the workflow: submit, pick up, approve, reject,
-/// request changes, publish, close.
+/// Moves an issue through the workflow: submit, pick up, put in front of the
+/// Panch, reject, request changes, withdraw, close. Recording the Panch decision
+/// is RecordDecisionCommand, not a move: it needs a decision.
 /// </summary>
 /// <remarks>
 /// One command for every transition rather than seven, because the transition
@@ -25,8 +26,9 @@ namespace Sangam.SocialIssues.Application.Issues.Commands.MoveIssue;
 /// their own issue, and only a reviewer may approve one.
 ///
 /// <see cref="PermissionKeys.MembersRead"/> rather than the reviewer permission,
-/// because some of these moves belong to the author. The handler refuses a
-/// reviewer move from somebody without SocialIssues.Approve.
+/// because some of these moves belong to the author and the reviewers are now
+/// Panch members, who hold no reviewer permission. The handler refuses a
+/// reviewer move from somebody who cannot act - see ReviewAccessResolver.
 /// </remarks>
 [RequiresPermission(PermissionKeys.MembersRead)]
 public sealed record MoveIssueCommand(Guid IssueId, string Status, string? Reason)
@@ -72,6 +74,7 @@ public sealed class MoveIssueCommandHandler(
     IUnitOfWork unitOfWork,
     ICurrentUser currentUser,
     ITenantContext tenantContext,
+    ReviewAccessResolver reviewAccess,
     IDateTimeProvider clock,
     ILogger<MoveIssueCommandHandler> logger)
     : IRequestHandler<MoveIssueCommand, Result<IssueDetailResponse>>
@@ -86,7 +89,7 @@ public sealed class MoveIssueCommandHandler(
                 Error.Unauthorized("Auth.Required", "Authentication is required for this request."));
         }
 
-        var canReview = currentUser.HasPermission(PermissionKeys.SocialIssuesApprove);
+        var access = await reviewAccess.ResolveAsync(cancellationToken);
 
         var issue = await issues.GetByIdAsync(command.IssueId, cancellationToken);
 
@@ -99,7 +102,7 @@ public sealed class MoveIssueCommandHandler(
 
         // A draft belongs to its author until they submit it, so somebody else
         // reaching one has guessed its id.
-        if (!issue.IsPublic && !issue.IsAuthor(actorId) && !canReview)
+        if (!issue.IsPublic && !issue.IsAuthor(actorId) && !access.CanSeeQueue)
         {
             return Result.Failure<IssueDetailResponse>(
                 Error.NotFound("Issue.NotFound", "No such issue in this Samaaj."));
@@ -118,13 +121,13 @@ public sealed class MoveIssueCommandHandler(
         // reviewer decides. The workflow says which kind this is.
         var isAuthorMove = SocialIssue.IsAuthorMove(issue.Status, target);
 
-        if (isAuthorMove ? !issue.IsAuthor(actorId) : !canReview)
+        if (isAuthorMove ? !issue.IsAuthor(actorId) : !access.CanAct)
         {
             return Result.Failure<IssueDetailResponse>(Error.Forbidden(
                 "Issue.NotYours",
                 isAuthorMove
                     ? "Only the member who raised this issue can do that."
-                    : "Only a reviewer can decide about this issue."));
+                    : "Only a member of the Samaaj Panch can review this issue."));
         }
 
         issue.MoveTo(target, actorId, command.Reason, clock.UtcNow);
@@ -134,6 +137,6 @@ public sealed class MoveIssueCommandHandler(
         logger.LogInformation(
             "Issue {IssueId} moved to {Status} by {ActorId}", issue.Id, target, actorId);
 
-        return Result.Success(issue.ToDetail(actorId, canReview));
+        return Result.Success(issue.ToDetail(actorId, access));
     }
 }

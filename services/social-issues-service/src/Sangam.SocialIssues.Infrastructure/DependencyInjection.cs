@@ -32,6 +32,7 @@ public static class DependencyInjection
 
         services.AddScoped<IUnitOfWork, UnitOfWork>();
         services.AddScoped<IIssueRepository, IssueRepository>();
+        services.AddScoped<IPanelRepository, PanelRepository>();
         services.AddSingleton<IDateTimeProvider, SystemDateTimeProvider>();
 
         services.AddOptions<JwtOptions>()

@@ -2382,15 +2382,32 @@ else
   fail=$((fail + 1))
 fi
 
+# No Samaaj Panch is seated (the panch module is a separate switch this
+# script does not turn on here), so an administrator is still the reviewer -
+# review-access says so, and is what a portal would ask before showing a
+# queue at all.
+ACCESS=$(curl -s -H "Authorization: Bearer $ADMIN_TOKEN" -H "$ADMIN_TENANT_HEADER" \
+  "$GATEWAY/v1/social-issues/review-access")
+
+if printf '%s' "$ACCESS" | grep -q '"canReview":true' \
+   && printf '%s' "$ACCESS" | grep -q '"panelSeated":false'; then
+  echo "  ok    with no Panch seated, review-access falls back to the administrator"
+  pass=$((pass + 1))
+else
+  echo "  FAIL  review-access did not report the fallback (got '$ACCESS')"
+  fail=$((fail + 1))
+fi
+
 check "a member cannot decide about their own issue" 403 \
   "$(status -X POST "$GATEWAY/v1/social-issues/$ISSUE_ID/status" -H 'Content-Type: application/json' \
-     -H "Authorization: Bearer $MEMBER_TOKEN" -d '{"status":"Approved","reason":null}')"
+     -H "Authorization: Bearer $MEMBER_TOKEN" -d '{"status":"DecisionPending","reason":null}')"
 
-# The one promise this service makes.
-check "publishing without approval is refused" 409 \
+# The one promise this service makes: closing needs a decision, so a plain
+# status move cannot do it.
+check "closing a pending issue by status alone is refused" 409 \
   "$(status -X POST "$GATEWAY/v1/social-issues/$ISSUE_ID/status" -H 'Content-Type: application/json' \
      -H "Authorization: Bearer $ADMIN_TOKEN" -H "$ADMIN_TENANT_HEADER" \
-     -d '{"status":"Published","reason":null}')"
+     -d '{"status":"Closed","reason":null}')"
 
 check "rejecting without saying why is refused" 400 \
   "$(status -X POST "$GATEWAY/v1/social-issues/$ISSUE_ID/status" -H 'Content-Type: application/json' \
@@ -2411,18 +2428,28 @@ check "and resubmits it" 200 \
   "$(status -X POST "$GATEWAY/v1/social-issues/$ISSUE_ID/status" -H 'Content-Type: application/json' \
      -H "Authorization: Bearer $MEMBER_TOKEN" -d '{"status":"Submitted","reason":null}')"
 
-check "the reviewer approves it" 200 \
+check "the reviewer puts it in front of the Panch" 200 \
   "$(status -X POST "$GATEWAY/v1/social-issues/$ISSUE_ID/status" -H 'Content-Type: application/json' \
      -H "Authorization: Bearer $ADMIN_TOKEN" -H "$ADMIN_TENANT_HEADER" \
-     -d '{"status":"Approved","reason":null}')"
+     -d '{"status":"DecisionPending","reason":null}')"
+
+if curl -s -H "Authorization: Bearer $CHILD_TOKEN" "$GATEWAY/v1/social-issues" \
+   | grep -q "$ISSUE_TITLE"; then
+  echo "  ok    an issue in front of the Panch is visible to the whole Samaaj"
+  pass=$((pass + 1))
+else
+  echo "  FAIL  an issue in front of the Panch did not reach the Samaaj"
+  fail=$((fail + 1))
+fi
 
 # social-issues.issue.status-changed.v1 had no KnownEvents descriptor until
-# this cycle, despite its own event carrying a distinct ActorUserId built for
-# exactly this reason - "the author who is waiting on the answer and the
-# reviewer who gave it" is one question this row is supposed to answer, and
-# the derived default answered it with a blank. The same poll-with-retry
-# shape the member-removal check above uses, for the same reason: the row
-# arrives over Kafka through the outbox rather than inside this request.
+# an earlier cycle, despite its own event carrying a distinct ActorUserId
+# built for exactly this reason - "the author who is waiting on the answer
+# and the reviewer who gave it" is one question this row is supposed to
+# answer, and the derived default answered it with a blank. The same
+# poll-with-retry shape the member-removal check above uses, for the same
+# reason: the row arrives over Kafka through the outbox rather than inside
+# this request.
 REVIEWER_ID=$(curl -s -H "Authorization: Bearer $ADMIN_TOKEN" -H "$ADMIN_TENANT_HEADER" \
   "$GATEWAY/v1/identity/me" | json_field userId)
 require_id reviewer_id "$REVIEWER_ID"
@@ -2439,24 +2466,48 @@ for attempt in $(seq 1 20); do
 done
 
 if [ "$issue_decision_audited" -eq 1 ]; then
-  echo "  ok    the decision names the reviewer who made it, not just the issue"
+  echo "  ok    the move names the reviewer who made it, not just the issue"
   pass=$((pass + 1))
 else
-  echo "  FAIL  the decision reaches the audit trail with its actor and entity id"
+  echo "  FAIL  the move reaches the audit trail with its actor and entity id"
   fail=$((fail + 1))
 fi
 
-check "and publishes it" 200 \
-  "$(status -X POST "$GATEWAY/v1/social-issues/$ISSUE_ID/status" -H 'Content-Type: application/json' \
+check "the Panch's decision needs words" 400 \
+  "$(status -X POST "$GATEWAY/v1/social-issues/$ISSUE_ID/decision" -H 'Content-Type: application/json' \
      -H "Authorization: Bearer $ADMIN_TOKEN" -H "$ADMIN_TENANT_HEADER" \
-     -d '{"status":"Published","reason":null}')"
+     -d '{"decision":"   ","monitoringGroupId":null}')"
 
-if curl -s -H "Authorization: Bearer $CHILD_TOKEN" "$GATEWAY/v1/social-issues" \
-   | grep -q "$ISSUE_TITLE"; then
-  echo "  ok    the published issue reaches the whole Samaaj"
+check "the administrator, standing in for the Panch, records the decision" 200 \
+  "$(status -X POST "$GATEWAY/v1/social-issues/$ISSUE_ID/decision" -H 'Content-Type: application/json' \
+     -H "Authorization: Bearer $ADMIN_TOKEN" -H "$ADMIN_TENANT_HEADER" \
+     -d '{"decision":"Repaint the crossing and post a marshal at closing time.","monitoringGroupId":null}')"
+
+decision_audited=0
+for attempt in $(seq 1 20); do
+  if curl -s -H "Authorization: Bearer $ADMIN_TOKEN" -H "$ADMIN_TENANT_HEADER" \
+     "$GATEWAY/v1/audit/logs?action=IssueDecided&limit=200" \
+     | grep -q "\"entityId\":\"$ISSUE_ID\",\"actorUserId\":\"$REVIEWER_ID\""; then
+    decision_audited=1
+    break
+  fi
+  sleep 2
+done
+
+if [ "$decision_audited" -eq 1 ]; then
+  echo "  ok    the decision names who recorded it, and the decision text stays out of the log"
   pass=$((pass + 1))
 else
-  echo "  FAIL  the published issue did not reach the Samaaj"
+  echo "  FAIL  the decision did not reach the audit trail with its actor and entity id"
+  fail=$((fail + 1))
+fi
+
+if curl -s -H "Authorization: Bearer $CHILD_TOKEN" "$GATEWAY/v1/social-issues/$ISSUE_ID" \
+   | grep -q "Repaint the crossing"; then
+  echo "  ok    the decided issue's decision reaches the whole Samaaj"
+  pass=$((pass + 1))
+else
+  echo "  FAIL  the decided issue's decision did not reach the Samaaj"
   fail=$((fail + 1))
 fi
 
@@ -2470,11 +2521,17 @@ else
   fail=$((fail + 1))
 fi
 
-check "a published issue can no longer be edited" 409 \
+check "a decided issue can no longer be edited" 409 \
   "$(status -X PUT "$GATEWAY/v1/social-issues/$ISSUE_ID" -H 'Content-Type: application/json' \
      -H "Authorization: Bearer $MEMBER_TOKEN" \
      -d '{"title":"Something else entirely","description":"Rewritten after approval.","category":"Community","locality":null}')"
 
+check "an issue that is not pending cannot be decided again" 409 \
+  "$(status -X POST "$GATEWAY/v1/social-issues/$ISSUE_ID/decision" -H 'Content-Type: application/json' \
+     -H "Authorization: Bearer $ADMIN_TOKEN" -H "$ADMIN_TENANT_HEADER" \
+     -d '{"decision":"A different answer.","monitoringGroupId":null}')"
+
+# Two module keys, gated independently.
 # Two module keys, gated independently.
 check "switching the social-issues module off alone" 200 \
   "$(status -X PUT "$GATEWAY/v1/identity/tenants/$TENANT_ID/modules" \

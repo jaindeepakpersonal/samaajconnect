@@ -6,32 +6,48 @@ using Sangam.SocialIssues.Application.Security;
 namespace Sangam.SocialIssues.Application.Issues.Queries.GetApprovalQueue;
 
 /// <summary>
-/// What a reviewer has to decide about: submitted, under review, or
-/// approved and still waiting to be published. The admin wireframe's
-/// approval queue - one queue for every stage a reviewer's own next move
-/// applies to, not only the first decision.
+/// What the Panch has to look at: submitted, under review, or in front of it
+/// awaiting a decision. One queue for every stage a reviewer's own next move
+/// applies to.
 /// </summary>
 /// <remarks>
 /// Oldest first. A member waiting on an answer about their own community has
 /// been waiting longest, and a queue ordered any other way needs explaining to
 /// the people it passes over.
+///
+/// <b>The outer permission is <c>Members.Read</c>, not
+/// <c>SocialIssues.Approve</c>.</b> A Panch member is an ordinary member and
+/// holds no reviewer permission; gating on it would lock out the people this
+/// queue is now for. Who may read it is decided in the handler, against the
+/// roster - a seated Panch member, or a holder of the reviewer permission
+/// (which lets an administrator see the queue, though not act on it, once a
+/// Panch exists).
 /// </remarks>
-[RequiresPermission(PermissionKeys.SocialIssuesApprove)]
+[RequiresPermission(PermissionKeys.MembersRead)]
 public sealed record GetApprovalQueueQuery : IQuery<IReadOnlyList<IssueResponse>>;
 
 public sealed class GetApprovalQueueQueryHandler(
-    IIssueRepository issues, ICurrentUser currentUser)
+    IIssueRepository issues, ICurrentUser currentUser, ReviewAccessResolver reviewAccess)
     : IRequestHandler<GetApprovalQueueQuery, Result<IReadOnlyList<IssueResponse>>>
 {
     public async Task<Result<IReadOnlyList<IssueResponse>>> Handle(
         GetApprovalQueueQuery query,
         CancellationToken cancellationToken)
     {
+        var access = await reviewAccess.ResolveAsync(cancellationToken);
+
+        if (!access.CanSeeQueue)
+        {
+            return Result.Failure<IReadOnlyList<IssueResponse>>(Error.Forbidden(
+                "Issue.NotAReviewer",
+                "Only the Samaaj Panch reviews issues."));
+        }
+
         var waiting = await issues.ListAwaitingDecisionAsync(cancellationToken);
         var viewerId = currentUser.UserId ?? Guid.Empty;
 
         IReadOnlyList<IssueResponse> results =
-            [.. waiting.Select(i => i.ToResponse(viewerId, canReview: true))];
+            [.. waiting.Select(i => i.ToResponse(viewerId, access))];
 
         return Result.Success(results);
     }

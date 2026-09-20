@@ -1,6 +1,7 @@
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;
 using Sangam.SocialIssues.Domain.Issues;
+using Sangam.SocialIssues.Domain.Panel;
 
 namespace Sangam.SocialIssues.Infrastructure.Persistence.Configurations;
 
@@ -21,8 +22,9 @@ public sealed class IssueConfiguration : IEntityTypeConfiguration<SocialIssue>
         builder.Property(i => i.Category).IsRequired().HasMaxLength(50);
         builder.Property(i => i.Locality).HasMaxLength(150);
         builder.Property(i => i.Status).HasConversion<string>().HasMaxLength(20);
+        builder.Property(i => i.Decision).HasMaxLength(2000);
 
-        // The published list, and the reviewer's queue: both are "this Samaaj's
+        // The list the Samaaj sees, and the reviewer's queue: both are "this Samaaj's
         // issues in these statuses, in date order".
         builder.HasIndex(i => new { i.TenantId, i.Status, i.CreatedAt });
 
@@ -54,5 +56,19 @@ public sealed class IssueStatusHistoryConfiguration : IEntityTypeConfiguration<I
 
         // Read in order, always.
         builder.HasIndex(h => new { h.IssueId, h.CreatedAt });
+    }
+}
+
+public sealed class PanelMemberConfiguration : IEntityTypeConfiguration<PanelMember>
+{
+    public void Configure(EntityTypeBuilder<PanelMember> builder)
+    {
+        builder.ToTable("panel_members");
+        builder.HasKey(m => m.Id);
+        builder.Property(m => m.Id).ValueGeneratedNever();
+
+        // A member holds at most one seat in a Samaaj's Panch. Also the lookup
+        // every review makes: "is this member on this Samaaj's Panch?".
+        builder.HasIndex(m => new { m.TenantId, m.MemberId }).IsUnique();
     }
 }

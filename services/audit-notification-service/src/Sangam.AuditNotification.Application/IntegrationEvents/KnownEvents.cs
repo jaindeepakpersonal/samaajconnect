@@ -404,10 +404,22 @@ public static class KnownEvents
             ActorIdProperty: "actorUserId",
             BeforeProperties: ["previousStatus"]),
 
+        // Retired: nothing raises this any more. Issues are put in front of the
+        // Samaaj Panch and decided rather than published. The descriptor stays
+        // because rows already in the audit trail were written under it.
         ["social-issues.issue.published.v1"] = new(
             Action: "IssuePublished",
             EntityName: "Issue",
             EntityIdProperty: "issueId"),
+
+        // The Panch decided an issue. It names who decided: "who closed my issue,
+        // and what did they decide to do about it" is what this trail exists to
+        // answer, and the status change beside it names the same person.
+        ["social-issues.issue.decided.v1"] = new(
+            Action: "IssueDecided",
+            EntityName: "Issue",
+            EntityIdProperty: "issueId",
+            ActorIdProperty: "decidedByMemberId"),
 
         // timeline-service's third topic in this same shape: PostModeratedDomainEvent
         // carries a distinct ActorUserId separate from AuthorMemberId, for the

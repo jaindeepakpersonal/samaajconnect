@@ -28,8 +28,24 @@ public sealed record IssueResponse(
     /// know which moves are live rather than guessing from the status.
     /// </summary>
     IReadOnlyList<string> AvailableTransitions,
+
+    /// <summary>
+    /// True when this caller may record the Panch's decision on this issue now:
+    /// it is <c>DecisionPending</c> and they sit on the Panch (or, while no Panch
+    /// is seated, hold the reviewer permission).
+    /// </summary>
+    bool CanDecide,
     DateTimeOffset CreatedAt,
-    DateTimeOffset? PublishedAt);
+
+    /// <summary>What the Panch decided. Null until it has.</summary>
+    string? Decision,
+
+    /// <summary>
+    /// The volunteer group the Panch handed monitoring to, if it did. An id -
+    /// names live in volunteer-groups-service and the portal resolves them.
+    /// </summary>
+    Guid? MonitoringGroupId,
+    DateTimeOffset? DecidedAt);
 
 /// <summary>One step in the issue's life, for the history view.</summary>
 public sealed record IssueHistoryResponse(

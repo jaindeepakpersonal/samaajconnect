@@ -16,7 +16,8 @@ namespace Sangam.SocialIssues.Application.Issues.Queries.GetIssue;
 [RequiresPermission(PermissionKeys.MembersRead)]
 public sealed record GetIssueQuery(Guid IssueId) : IQuery<IssueDetailResponse>;
 
-public sealed class GetIssueQueryHandler(IIssueRepository issues, ICurrentUser currentUser)
+public sealed class GetIssueQueryHandler(
+    IIssueRepository issues, ICurrentUser currentUser, ReviewAccessResolver reviewAccess)
     : IRequestHandler<GetIssueQuery, Result<IssueDetailResponse>>
 {
     public async Task<Result<IssueDetailResponse>> Handle(
@@ -29,7 +30,7 @@ public sealed class GetIssueQueryHandler(IIssueRepository issues, ICurrentUser c
                 Error.Unauthorized("Auth.Required", "Authentication is required for this request."));
         }
 
-        var canReview = currentUser.HasPermission(PermissionKeys.SocialIssuesApprove);
+        var access = await reviewAccess.ResolveAsync(cancellationToken);
         var issue = await issues.GetByIdAsync(query.IssueId, cancellationToken);
 
         if (issue is null)
@@ -38,13 +39,13 @@ public sealed class GetIssueQueryHandler(IIssueRepository issues, ICurrentUser c
                 Error.NotFound("Issue.NotFound", "No such issue in this Samaaj."));
         }
 
-        // Before publication an issue belongs to its author and its reviewers.
-        // Anyone else is told it does not exist rather than that they may not
-        // see it — the difference confirms one with that id is there.
-        var maySee = issue.IsPublic || issue.IsAuthor(memberId) || canReview;
+        // Before the Panch has it, an issue belongs to its author and its
+        // reviewers. Anyone else is told it does not exist rather than that they
+        // may not see it — the difference confirms one with that id is there.
+        var maySee = issue.IsPublic || issue.IsAuthor(memberId) || access.CanSeeQueue;
 
         return maySee
-            ? Result.Success(issue.ToDetail(memberId, canReview))
+            ? Result.Success(issue.ToDetail(memberId, access))
             : Result.Failure<IssueDetailResponse>(
                 Error.NotFound("Issue.NotFound", "No such issue in this Samaaj."));
     }

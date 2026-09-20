@@ -7,22 +7,29 @@ namespace Sangam.SocialIssues.Domain.Issues;
 /// the school, support for elderly members, lighting in the community park.
 /// </summary>
 /// <remarks>
-/// This is the platform's longest-lived workflow — eight states — and the
-/// member-portal wireframe shows it as a progress strip: Submitted → Under
-/// Review → Approved → Published. The transitions are declared as a table in
+/// This is the platform's longest-lived workflow — seven states — and the
+/// member-portal shows it as a progress strip: Submitted → Under Review →
+/// Decision pending → Closed. The transitions are declared as a table in
 /// <see cref="Transitions"/> rather than scattered through methods, because
-/// eight states have fifty-odd plausible transitions and the only way to see
+/// seven states have dozens of plausible transitions and the only way to see
 /// which are allowed is to have them written down in one place.
+///
+/// <b>The Samaaj Panch judges it.</b> A reviewer's approval puts an issue in
+/// <see cref="IssueStatus.DecisionPending"/>: it is now discussed by the Panch,
+/// which records a <see cref="Decision"/> - optionally handing the monitoring
+/// to a volunteer group - and closes it. That last move is not in the table:
+/// it needs a decision text and a monitoring group, so it has its own method,
+/// <see cref="RecordDecision"/>, and its own command.
 ///
 /// <b>Every transition is recorded.</b> <see cref="IssueStatusHistory"/> is
 /// append-only within the aggregate: nothing changes or removes a row. A member
 /// whose issue was rejected will ask why, and a Samaaj that cannot answer has
 /// failed them twice.
 ///
-/// The subtitle on the member's screen — "member submissions are published only
-/// after valid approval" — is the invariant this aggregate exists to hold.
-/// Publishing is reachable only from <see cref="IssueStatus.Approved"/>, and
-/// approval is reachable only from a review.
+/// The subtitle on the member's screen — "member submissions are shown only
+/// after valid approval" — is the invariant this aggregate exists to hold. An
+/// issue is visible to the Samaaj only once a reviewer has put it in front of
+/// the Panch, or the Panch has decided it.
 /// </remarks>
 public sealed class SocialIssue : AggregateRoot, ITenantScopedEntity
 {
@@ -53,7 +60,7 @@ public sealed class SocialIssue : AggregateRoot, ITenantScopedEntity
 
         // The reviewer's moves.
         (IssueStatus.Submitted, IssueStatus.UnderReview, false),
-        (IssueStatus.UnderReview, IssueStatus.Approved, false),
+        (IssueStatus.UnderReview, IssueStatus.DecisionPending, false),
         (IssueStatus.UnderReview, IssueStatus.Rejected, false),
         (IssueStatus.UnderReview, IssueStatus.ChangesRequested, false),
 
@@ -61,19 +68,17 @@ public sealed class SocialIssue : AggregateRoot, ITenantScopedEntity
         // wireframe's queue offers Approve, Reject and Request Changes on a
         // submitted issue, so requiring a separate "start review" click would
         // be a step the design does not have.
-        (IssueStatus.Submitted, IssueStatus.Approved, false),
+        (IssueStatus.Submitted, IssueStatus.DecisionPending, false),
         (IssueStatus.Submitted, IssueStatus.Rejected, false),
         (IssueStatus.Submitted, IssueStatus.ChangesRequested, false),
 
-        // Publishing is reachable only from Approved. This single row is the
-        // "published only after valid approval" promise.
-        (IssueStatus.Approved, IssueStatus.Published, false),
-
-        // A published issue is closed when it has been dealt with; a rejected
-        // one is already over.
-        (IssueStatus.Published, IssueStatus.Closed, false),
+        // A rejected issue is already over.
         (IssueStatus.Rejected, IssueStatus.Closed, false),
-        (IssueStatus.Approved, IssueStatus.Closed, false),
+
+        // DecisionPending -> Closed is deliberately NOT a row. It needs the
+        // Panch's decision text, so the only way there is RecordDecision; a
+        // plain status move that closed it would leave a "decided" issue with
+        // no decision.
     ];
 
     private readonly List<IssueStatusHistory> _history = [];
@@ -90,7 +95,21 @@ public sealed class SocialIssue : AggregateRoot, ITenantScopedEntity
     public Guid SubmittedByMemberId { get; private set; }
     public IssueStatus Status { get; private set; }
     public DateTimeOffset CreatedAt { get; private set; }
-    public DateTimeOffset? PublishedAt { get; private set; }
+
+    /// <summary>What the Panch decided. Null until it has.</summary>
+    public string? Decision { get; private set; }
+
+    /// <summary>
+    /// The volunteer group the Panch handed the monitoring to, when it did. A
+    /// loose id: volunteer-groups-service owns groups, and a synchronous call
+    /// to check one would couple the two.
+    /// </summary>
+    public Guid? MonitoringGroupId { get; private set; }
+
+    public DateTimeOffset? DecidedAt { get; private set; }
+
+    /// <summary>The Panch member who recorded the decision.</summary>
+    public Guid? DecidedBy { get; private set; }
 
     public IReadOnlyCollection<IssueStatusHistory> History => _history.AsReadOnly();
 
@@ -140,8 +159,14 @@ public sealed class SocialIssue : AggregateRoot, ITenantScopedEntity
         return issue;
     }
 
-    /// <summary>Whether the Samaaj at large can see this.</summary>
-    public bool IsPublic => Status is IssueStatus.Published or IssueStatus.Closed;
+    /// <summary>
+    /// Whether the Samaaj at large can see this: it is in front of the Panch,
+    /// or the Panch has decided it. A closed issue that was withdrawn or
+    /// rejected has no decision and stays private.
+    /// </summary>
+    public bool IsPublic =>
+        Status == IssueStatus.DecisionPending
+        || (Status == IssueStatus.Closed && DecidedAt is not null);
 
     /// <summary>Whether a reviewer still has something to decide.</summary>
     public bool AwaitsDecision => Status is IssueStatus.Submitted or IssueStatus.UnderReview;
@@ -175,11 +200,6 @@ public sealed class SocialIssue : AggregateRoot, ITenantScopedEntity
         var from = Status;
         Status = target;
 
-        if (target == IssueStatus.Published)
-        {
-            PublishedAt = now;
-        }
-
         _history.Add(new IssueStatusHistory(
             Id, from, target, actorUserId, Normalize(reason), now));
 
@@ -187,10 +207,50 @@ public sealed class SocialIssue : AggregateRoot, ITenantScopedEntity
             Id, TenantId, SubmittedByMemberId, actorUserId,
             from.ToString(), target.ToString(), now));
 
-        if (target == IssueStatus.Published)
+        return true;
+    }
+
+    /// <summary>
+    /// The Panch decides an issue that was put in front of it, and closes it.
+    /// Returns false when the issue is not <see cref="IssueStatus.DecisionPending"/>.
+    /// </summary>
+    /// <remarks>
+    /// Not a row in the transition table because it carries a payload: a
+    /// decision is required, and the monitoring group is optional. The caller
+    /// has checked that the actor sits on the Panch.
+    ///
+    /// The event carries ids only. The decision is a paragraph a Panch member
+    /// wrote about a named person's concern, and audit-notification-service
+    /// records payloads verbatim into an append-only table - the reason the
+    /// submitted and status-changed events carry no text either.
+    /// </remarks>
+    public bool RecordDecision(
+        string decision, Guid? monitoringGroupId, Guid actorUserId, DateTimeOffset now)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(decision);
+
+        if (Status != IssueStatus.DecisionPending)
         {
-            Raise(new IssuePublishedDomainEvent(Id, TenantId, Category, Locality, now));
+            return false;
         }
+
+        var from = Status;
+
+        Status = IssueStatus.Closed;
+        Decision = decision.Trim();
+        MonitoringGroupId = monitoringGroupId;
+        DecidedAt = now;
+        DecidedBy = actorUserId;
+
+        _history.Add(new IssueStatusHistory(
+            Id, from, IssueStatus.Closed, actorUserId, null, now));
+
+        Raise(new IssueStatusChangedDomainEvent(
+            Id, TenantId, SubmittedByMemberId, actorUserId,
+            from.ToString(), IssueStatus.Closed.ToString(), now));
+
+        Raise(new IssueDecidedDomainEvent(
+            Id, TenantId, SubmittedByMemberId, actorUserId, monitoringGroupId, now));
 
         return true;
     }
@@ -200,9 +260,9 @@ public sealed class SocialIssue : AggregateRoot, ITenantScopedEntity
     /// sent back to them. Returns false when it is too late to edit.
     /// </summary>
     /// <remarks>
-    /// Editing stops once a reviewer has approved or published it: a reviewer
-    /// who approved one thing and finds another published has been made to
-    /// endorse something they never read. An issue under review can still be
+    /// Editing stops once a reviewer has put it in front of the Panch: a
+    /// reviewer who approved one thing and finds another being discussed has
+    /// been made to endorse something they never read. An issue under review can still be
     /// corrected, because the wireframe's "Request Changes" only makes sense if
     /// changes are possible.
     /// </remarks>
@@ -276,6 +336,16 @@ public sealed class SocialIssue : AggregateRoot, ITenantScopedEntity
             changed |= entry.EraseReason();
         }
 
+        // A Panch member's decision is their own words about the issue, like a
+        // reviewer's reason. It goes; that the issue was decided, and when, does
+        // not.
+        if (DecidedBy == memberId && Decision is not null && Decision != ErasedPlaceholder)
+        {
+            Decision = ErasedPlaceholder;
+
+            changed = true;
+        }
+
         return changed;
     }
 
@@ -300,8 +370,11 @@ public enum IssueStatus
     /// <summary>A reviewer has picked it up.</summary>
     UnderReview = 3,
 
-    /// <summary>Accepted, and awaiting publication.</summary>
-    Approved = 4,
+    /// <summary>
+    /// A reviewer has put it in front of the Samaaj Panch, which is discussing
+    /// it. Visible to the Samaaj.
+    /// </summary>
+    DecisionPending = 4,
 
     /// <summary>Declined, with a reason the author is told.</summary>
     Rejected = 5,
@@ -309,9 +382,9 @@ public enum IssueStatus
     /// <summary>Sent back to the author to revise and resubmit.</summary>
     ChangesRequested = 6,
 
-    /// <summary>Visible to the Samaaj.</summary>
-    Published = 7,
-
-    /// <summary>Dealt with, withdrawn, or finished.</summary>
+    /// <summary>
+    /// Decided by the Panch, rejected and finished with, or withdrawn by its
+    /// author.
+    /// </summary>
     Closed = 8,
 }

@@ -6,15 +6,19 @@
  * learned the hard way (see `apps/member-portal/CLAUDE.md`).
  */
 
-/** `IssueStatus` in the domain: eight states, in workflow order. */
+/**
+ * `IssueStatus` in the domain: seven states, in workflow order.
+ *
+ * `Approved` and `Published` are retired: a reviewer's approval now puts an
+ * issue in `DecisionPending`, and the Samaaj Panch decides it and closes it.
+ */
 export type IssueStatus =
   | 'Draft'
   | 'Submitted'
   | 'UnderReview'
-  | 'Approved'
+  | 'DecisionPending'
   | 'Rejected'
   | 'ChangesRequested'
-  | 'Published'
   | 'Closed';
 
 export interface Issue {
@@ -40,12 +44,21 @@ export interface Issue {
    * **The screen renders its buttons from this and never from `status`.** The
    * service computes it from the same transition table the aggregate enforces,
    * so a button that appears is a move the server will accept. Deriving the
-   * buttons from the status here would be a second copy of an eight-state
-   * table, and the two would drift.
+   * buttons from the status here would be a second copy of the workflow table,
+   * and the two would drift.
    */
   readonly availableTransitions: readonly IssueStatus[];
+
+  /** True when this caller may record the Panch's decision on this issue now. */
+  readonly canDecide: boolean;
   readonly createdAt: string;
-  readonly publishedAt: string | null;
+
+  /** What the Panch decided. Null until it has. */
+  readonly decision: string | null;
+
+  /** The volunteer group the Panch handed monitoring to, if it did. */
+  readonly monitoringGroupId: string | null;
+  readonly decidedAt: string | null;
 }
 
 /** One step in the issue's life. */
@@ -66,6 +79,19 @@ export interface IssueHistoryEntry {
 export interface IssueDetail {
   readonly issue: Issue;
   readonly history: readonly IssueHistoryEntry[];
+}
+
+/**
+ * Whether the caller reviews issues, and whether this Samaaj has a Panch.
+ *
+ * Mirrors `ReviewAccessResponse`. `canReview` is the fallback-aware answer: a
+ * seated Panch member, or - only while no Panch is seated - an administrator.
+ */
+export interface ReviewAccess {
+  readonly canReview: boolean;
+  readonly canSeeQueue: boolean;
+  readonly panelSeated: boolean;
+  readonly isPanelMember: boolean;
 }
 
 /**
@@ -98,10 +124,9 @@ export const TransitionLabels: Readonly<Record<IssueStatus, string>> = {
   Draft: 'Move back to draft',
   Submitted: 'Submit for approval',
   UnderReview: 'Start reviewing',
-  Approved: 'Approve',
+  DecisionPending: 'Put in front of the Panch',
   Rejected: 'Reject',
   ChangesRequested: 'Ask for changes',
-  Published: 'Publish',
   Closed: 'Close',
 };
 
@@ -110,24 +135,24 @@ export const StatusLabels: Readonly<Record<IssueStatus, string>> = {
   Draft: 'Draft',
   Submitted: 'Submitted',
   UnderReview: 'Under review',
-  Approved: 'Approved',
+  DecisionPending: 'Decision pending',
   Rejected: 'Not accepted',
   ChangesRequested: 'Changes requested',
-  Published: 'Published',
   Closed: 'Closed',
 };
 
 /**
- * The strip the wireframe draws on "My Submissions": Submitted → Under Review →
- * Approved → Published.
+ * The strip on "My Submissions": Submitted → Under Review → Decision pending →
+ * Closed.
  *
- * Only the happy path. Rejected, ChangesRequested and Closed are not steps
- * along it - they are where an issue leaves it - so the screen says so in
- * words instead of drawing a step that was never reached.
+ * Only the happy path. Rejected and ChangesRequested are not steps along it -
+ * they are where an issue leaves it - so the screen says so in words instead
+ * of drawing a step that was never reached. A Closed issue with no decision
+ * (withdrawn) is also off the path, for the same reason.
  */
 export const ProgressSteps: readonly IssueStatus[] = [
   'Submitted',
   'UnderReview',
-  'Approved',
-  'Published',
+  'DecisionPending',
+  'Closed',
 ];

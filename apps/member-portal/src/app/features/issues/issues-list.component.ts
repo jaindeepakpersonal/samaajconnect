@@ -8,10 +8,11 @@ import {
   IssueCategories,
   IssueStatus,
   ProgressSteps,
+  ReviewAccess,
   StatusLabels,
 } from './issues.models';
 
-type IssuesTab = 'published' | 'raise' | 'mine';
+type IssuesTab = 'community' | 'raise' | 'mine' | 'panch';
 
 /**
  * Social Issues, from the member-portal wireframe's `#issues` screen.
@@ -19,17 +20,21 @@ type IssuesTab = 'published' | 'raise' | 'mine';
  * The wireframe's three panels - a submission form, the published list, and
  * "My Submissions" with a progress strip - are now `role="tablist"` tabs
  * rather than stacked cards, the same horizontal-tab pattern My Profile and
- * Matrimony's Proposals screen already use. All three were already fetching
- * from one `IssuesApi.list()` call; switching tabs is a signal flip, not a
- * new request.
+ * Matrimony's Proposals screen already use.
+ *
+ * **A fourth tab, "For the Panch", appears only for somebody who may see the
+ * queue.** Reviewing used to be an administrator's job and lived in the admin
+ * panel alone. Now it is the Samaaj Panch - an elected panel of ordinary
+ * members - and a Panch member has no other screen to review from.
+ * `reviewAccess()` decides whether the tab exists at all, so a member who
+ * cannot see the queue is never shown a tab that answers 403.
  *
  * The strip is the interesting one. The wireframe draws four fixed steps -
- * Submitted, Under Review, Approved, Published - with the reached ones marked.
- * That is the happy path of an eight-state workflow, and three of the eight
- * are not on it: Rejected, ChangesRequested and Closed are where an issue
- * *leaves* the path. Drawing a strip for those would say an issue is partway
- * to publication when it is not going there at all, so those say so in words
- * instead.
+ * Submitted, Under Review, Decision pending, Closed - with the reached ones
+ * marked. Rejected and ChangesRequested are not on it: those are where an
+ * issue *leaves* the path, and drawing a strip for those would say it is
+ * partway to a decision when it is not going there at all, so those say so in
+ * words instead.
  *
  * **Attach Evidence** is present and disabled. There is no upload endpoint and
  * no file storage on the platform (`DEVELOPMENT_PLAN.md` Phase 5), and the
@@ -45,7 +50,7 @@ type IssuesTab = 'published' | 'raise' | 'mine';
       <header class="page-head">
         <div>
           <h1 class="page-title">Social Issues</h1>
-          <p class="subtitle">Member submissions are published only after approval.</p>
+          <p class="subtitle">Judged by the Samaaj Panch once it has decided.</p>
         </div>
       </header>
 
@@ -53,11 +58,11 @@ type IssuesTab = 'published' | 'raise' | 'mine';
         <button
           type="button"
           role="tab"
-          [class.on]="activeTab() === 'published'"
-          [attr.aria-selected]="activeTab() === 'published'"
-          (click)="activeTab.set('published')"
+          [class.on]="activeTab() === 'community'"
+          [attr.aria-selected]="activeTab() === 'community'"
+          (click)="activeTab.set('community')"
         >
-          Published issues
+          Samaaj issues
         </button>
         <button
           type="button"
@@ -77,9 +82,22 @@ type IssuesTab = 'published' | 'raise' | 'mine';
         >
           My submissions
         </button>
+        @if (access(); as granted) {
+          @if (granted.canSeeQueue) {
+            <button
+              type="button"
+              role="tab"
+              [class.on]="activeTab() === 'panch'"
+              [attr.aria-selected]="activeTab() === 'panch'"
+              (click)="openPanchTab()"
+            >
+              For the Panch
+            </button>
+          }
+        }
       </div>
 
-      @if (activeTab() === 'published') {
+      @if (activeTab() === 'community') {
         <div class="card">
           <label for="filter-category">Filter by category</label>
           <select
@@ -97,14 +115,14 @@ type IssuesTab = 'published' | 'raise' | 'mine';
 
           @if (loading()) {
             <p role="status">Loading…</p>
-          } @else if (published().length === 0) {
-            <p class="small">Nothing has been published yet.</p>
+          } @else if (visible().length === 0) {
+            <p class="small">Nothing is in front of the Panch, or decided, yet.</p>
           } @else {
-            @for (issue of published(); track issue.id) {
+            @for (issue of visible(); track issue.id) {
               <div class="issue-row">
                 <a [routerLink]="['/issues', issue.id]">{{ issue.title }}</a>
                 <div class="badges">
-                  <span class="pill">{{ label(issue.status) }}</span>
+                  <span class="pill" [class]="pillClass(issue.status)">{{ label(issue.status) }}</span>
                   <span class="pill">{{ issue.category }}</span>
                 </div>
               </div>
@@ -172,7 +190,7 @@ type IssuesTab = 'published' | 'raise' | 'mine';
                 {{
                   submittedAsDraft()
                     ? 'Saved as a draft. Only you can see it until you submit it.'
-                    : 'Sent for approval. You will see it below with its progress.'
+                    : 'Sent for review. You will see it below with its progress.'
                 }}
               </p>
             }
@@ -194,7 +212,7 @@ type IssuesTab = 'published' | 'raise' | 'mine';
                 Save draft
               </button>
               <button class="btn" type="submit" [disabled]="!canSubmit() || busy()">
-                {{ busy() ? 'Sending…' : 'Submit for approval' }}
+                {{ busy() ? 'Sending…' : 'Submit for review' }}
               </button>
             </div>
           </div>
@@ -231,7 +249,7 @@ type IssuesTab = 'published' | 'raise' | 'mine';
                   </div>
                 } @else {
                   <!-- Off the path. A strip here would say the issue is partway
-                       to publication when it is not going there. -->
+                       to a decision when it is not going there. -->
                   <div class="badges">
                     <span class="pill" [class]="pillClass(issue.status)">
                       {{ label(issue.status) }}
@@ -245,13 +263,45 @@ type IssuesTab = 'published' | 'raise' | 'mine';
           }
         </div>
       }
+
+      @if (activeTab() === 'panch') {
+        <div class="card">
+          <p class="small">
+            Waiting on the Panch, oldest first. Open one to record its decision.
+          </p>
+
+          @if (queueLoading()) {
+            <p role="status">Loading…</p>
+          } @else if (queueError(); as message) {
+            <div class="notice error" role="alert">
+              {{ message }}
+              <button class="btn link" type="button" (click)="loadQueue()">Try again</button>
+            </div>
+          } @else if (queue().length === 0) {
+            <p class="small">Nothing is waiting.</p>
+          } @else {
+            @for (issue of queue(); track issue.id) {
+              <div class="issue-row">
+                <a [routerLink]="['/issues', issue.id]">{{ issue.title }}</a>
+                <div class="badges">
+                  <span class="pill" [class]="pillClass(issue.status)">{{ label(issue.status) }}</span>
+                  <span class="pill">{{ issue.category }}</span>
+                  @if (issue.canDecide) {
+                    <span class="pill ok">Ready for a decision</span>
+                  }
+                </div>
+              </div>
+            }
+          }
+        </div>
+      }
     </div>
   `,
 })
 export class IssuesListComponent implements OnInit {
   private readonly api = inject(IssuesApi);
 
-  readonly activeTab = signal<IssuesTab>('published');
+  readonly activeTab = signal<IssuesTab>('community');
 
   readonly categories = IssueCategories;
   readonly steps = ProgressSteps;
@@ -259,6 +309,13 @@ export class IssuesListComponent implements OnInit {
   readonly issues = signal<readonly Issue[]>([]);
   readonly loading = signal(true);
   readonly error = signal<string | null>(null);
+
+  readonly access = signal<ReviewAccess | null>(null);
+
+  readonly queue = signal<readonly Issue[]>([]);
+  readonly queueLoading = signal(false);
+  readonly queueError = signal<string | null>(null);
+  private queueLoaded = false;
 
   readonly busy = signal(false);
   readonly formError = signal<string | null>(null);
@@ -272,18 +329,20 @@ export class IssuesListComponent implements OnInit {
   filter = '';
 
   /**
-   * What the panel says it shows: published issues.
+   * What the panel says it shows: issues the Samaaj can see.
    *
    * Filtered on the status, not on `!isMine`. Doing it by author looked
-   * equivalent - the service returns published issues plus the caller's own -
-   * but it is not: a member's *own* published issue is excluded by it, so a
-   * member whose issue had just gone live read "Nothing has been published
-   * yet" underneath their own published issue. It appears in both panels now,
-   * which is right, because the two answer different questions: what the
-   * Samaaj can see, and what I raised.
+   * equivalent - the service returns visible issues plus the caller's own -
+   * but it is not: a member's *own* decided issue is excluded by it, so a
+   * member whose issue had just been decided read "Nothing... yet" underneath
+   * their own decided issue. It appears in both panels now, which is right,
+   * because the two answer different questions: what the Samaaj can see, and
+   * what I raised.
    */
-  readonly published = computed(() =>
-    this.issues().filter((issue) => issue.status === 'Published'),
+  readonly visible = computed(() =>
+    this.issues().filter(
+      (issue) => issue.status === 'DecisionPending' || (issue.status === 'Closed' && issue.decidedAt !== null),
+    ),
   );
 
   readonly mine = computed(() =>
@@ -295,6 +354,7 @@ export class IssuesListComponent implements OnInit {
 
   ngOnInit(): void {
     this.load();
+    this.loadAccess();
   }
 
   load(): void {
@@ -309,6 +369,39 @@ export class IssuesListComponent implements OnInit {
       error: (failure: unknown) => {
         this.loading.set(false);
         this.error.set(describeError(failure));
+      },
+    });
+  }
+
+  /** Whether the "For the Panch" tab belongs on screen at all. */
+  private loadAccess(): void {
+    this.api.reviewAccess().subscribe({
+      next: (found) => this.access.set(found),
+      error: () => this.access.set(null),
+    });
+  }
+
+  openPanchTab(): void {
+    this.activeTab.set('panch');
+
+    if (!this.queueLoaded) {
+      this.loadQueue();
+    }
+  }
+
+  loadQueue(): void {
+    this.queueLoading.set(true);
+    this.queueError.set(null);
+
+    this.api.queue().subscribe({
+      next: (found) => {
+        this.queue.set(found);
+        this.queueLoading.set(false);
+        this.queueLoaded = true;
+      },
+      error: (failure: unknown) => {
+        this.queueLoading.set(false);
+        this.queueError.set(describeError(failure));
       },
     });
   }
@@ -364,9 +457,10 @@ export class IssuesListComponent implements OnInit {
     return StatusLabels[status];
   }
 
-  /** Whether the wireframe's four-step strip describes where this issue is. */
+  /** Whether the strip describes where this issue is. */
   isOnHappyPath(issue: Issue): boolean {
-    return ProgressSteps.includes(issue.status);
+    return ProgressSteps.includes(issue.status)
+      && (issue.status !== 'Closed' || issue.decidedAt !== null);
   }
 
   /** A step is reached when the issue is at it or past it. */
@@ -377,6 +471,10 @@ export class IssuesListComponent implements OnInit {
   pillClass(status: IssueStatus): string {
     if (status === 'Rejected') {
       return 'danger';
+    }
+
+    if (status === 'Closed') {
+      return 'ok';
     }
 
     return status === 'ChangesRequested' ? 'warn' : '';
@@ -391,16 +489,14 @@ export class IssuesListComponent implements OnInit {
         return 'Waiting for a reviewer to pick it up.';
       case 'UnderReview':
         return 'A reviewer is looking at it.';
-      case 'Approved':
-        return 'Accepted, and awaiting publication.';
-      case 'Published':
-        return 'Visible to your Samaaj.';
+      case 'DecisionPending':
+        return 'In front of the Samaaj Panch, awaiting its decision.';
       case 'ChangesRequested':
         return 'Sent back to you. Open it to see what was asked for.';
       case 'Rejected':
         return 'Not accepted. Open it to see why.';
       case 'Closed':
-        return 'Closed.';
+        return issue.decidedAt !== null ? 'Decided by the Panch. Open it to see the decision.' : 'Withdrawn.';
     }
   }
 }

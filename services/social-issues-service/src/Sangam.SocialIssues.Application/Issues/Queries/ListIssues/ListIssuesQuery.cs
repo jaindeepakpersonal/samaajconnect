@@ -6,8 +6,9 @@ using Sangam.SocialIssues.Application.Security;
 namespace Sangam.SocialIssues.Application.Issues.Queries.ListIssues;
 
 /// <summary>
-/// The published issues, plus the asking member's own whatever their status —
-/// the wireframe's "Published Issues" and "My Submissions" cards in one call.
+/// The issues the Samaaj can see - in front of the Panch, or decided by it - plus
+/// the asking member's own whatever their status: the wireframe's "Published
+/// Issues" and "My Submissions" cards in one call.
 /// </summary>
 /// <remarks>
 /// Their own drafts and rejections are visible to them and to nobody else. A
@@ -17,7 +18,8 @@ namespace Sangam.SocialIssues.Application.Issues.Queries.ListIssues;
 [RequiresPermission(PermissionKeys.MembersRead)]
 public sealed record ListIssuesQuery(string? Category) : IQuery<IReadOnlyList<IssueResponse>>;
 
-public sealed class ListIssuesQueryHandler(IIssueRepository issues, ICurrentUser currentUser)
+public sealed class ListIssuesQueryHandler(
+    IIssueRepository issues, ICurrentUser currentUser, ReviewAccessResolver reviewAccess)
     : IRequestHandler<ListIssuesQuery, Result<IReadOnlyList<IssueResponse>>>
 {
     public async Task<Result<IReadOnlyList<IssueResponse>>> Handle(
@@ -30,7 +32,7 @@ public sealed class ListIssuesQueryHandler(IIssueRepository issues, ICurrentUser
                 Error.Unauthorized("Auth.Required", "Authentication is required for this request."));
         }
 
-        var canReview = currentUser.HasPermission(PermissionKeys.SocialIssuesApprove);
+        var access = await reviewAccess.ResolveAsync(cancellationToken);
 
         var published = await issues.ListPublicAsync(query.Category, cancellationToken);
         var mine = await issues.ListForAuthorAsync(memberId, cancellationToken);
@@ -43,7 +45,7 @@ public sealed class ListIssuesQueryHandler(IIssueRepository issues, ICurrentUser
                 .Concat(mine)
                 .DistinctBy(i => i.Id)
                 .OrderByDescending(i => i.CreatedAt)
-                .Select(i => i.ToResponse(memberId, canReview))
+                .Select(i => i.ToResponse(memberId, access))
         ];
 
         return Result.Success(results);

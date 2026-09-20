@@ -4,6 +4,7 @@ using Microsoft.EntityFrameworkCore;
 using Sangam.SocialIssues.Application.Abstractions;
 using Sangam.SocialIssues.Domain.Common;
 using Sangam.SocialIssues.Domain.Issues;
+using Sangam.SocialIssues.Domain.Panel;
 
 namespace Sangam.SocialIssues.Infrastructure.Persistence;
 
@@ -17,6 +18,8 @@ public sealed class SocialIssuesDbContext(
     public DbSet<SocialIssue> Issues => Set<SocialIssue>();
 
     public DbSet<IssueStatusHistory> IssueHistory => Set<IssueStatusHistory>();
+
+    public DbSet<PanelMember> PanelMembers => Set<PanelMember>();
 
     public DbSet<OutboxMessage> OutboxMessages => Set<OutboxMessage>();
 

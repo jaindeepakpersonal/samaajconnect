@@ -8,25 +8,14 @@ namespace Sangam.SocialIssues.Infrastructure.Repositories;
 public sealed class IssueRepository(SocialIssuesDbContext dbContext) : IIssueRepository
 {
     /// <summary>
-    /// Statuses the Samaaj at large can see. Kept here rather than expressed as
-    /// <c>IsPublic</c> in the query, because a computed property cannot be
-    /// translated to SQL and the failure mode is a silent client-side
-    /// evaluation that loads every issue in the Samaaj.
-    /// </summary>
-    private static readonly IssueStatus[] PublicStatuses =
-        [IssueStatus.Published, IssueStatus.Closed];
-
-    /// <summary>
-    /// `Approved` belongs here too, alongside `Submitted`/`UnderReview` - an
-    /// approved issue is still waiting on its reviewer, just for the next
-    /// move (publishing) rather than the first one. Without it, the moment
-    /// a reviewer approved an issue it fell out of the only screen that can
-    /// act on issues at all: `availableTransitions` already offered
-    /// `Published` correctly, but nothing ever queried for it, so there was
-    /// no way to reach the button that renders it.
+    /// What the Panch has to look at. `DecisionPending` belongs here alongside
+    /// `Submitted`/`UnderReview`: an issue in front of the Panch is still
+    /// waiting on it, just for its decision rather than its first look. Without
+    /// it, the moment a reviewer put an issue in front of the Panch it would fall
+    /// out of the only screen that can record the decision.
     /// </summary>
     private static readonly IssueStatus[] AwaitingDecision =
-        [IssueStatus.Submitted, IssueStatus.UnderReview, IssueStatus.Approved];
+        [IssueStatus.Submitted, IssueStatus.UnderReview, IssueStatus.DecisionPending];
 
     public Task<SocialIssue?> GetByIdAsync(Guid id, CancellationToken cancellationToken = default) =>
         dbContext.Issues
@@ -36,9 +25,16 @@ public sealed class IssueRepository(SocialIssuesDbContext dbContext) : IIssueRep
     public async Task<IReadOnlyList<SocialIssue>> ListPublicAsync(
         string? category, CancellationToken cancellationToken = default)
     {
+        // What the Samaaj can see: in front of the Panch, or decided by it.
+        // Spelled out here rather than as `IsPublic`: a computed property
+        // cannot be translated to SQL, and the failure mode is a silent
+        // client-side evaluation that loads every issue in the Samaaj. Keep it
+        // in step with `SocialIssue.IsPublic` - a closed issue with no decision
+        // (withdrawn, rejected) stays private.
         var query = dbContext.Issues
             .AsNoTracking()
-            .Where(i => PublicStatuses.Contains(i.Status));
+            .Where(i => i.Status == IssueStatus.DecisionPending
+                || (i.Status == IssueStatus.Closed && i.DecidedAt != null));
 
         if (!string.IsNullOrWhiteSpace(category))
         {

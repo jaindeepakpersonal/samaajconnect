@@ -3,9 +3,10 @@ import { HttpTestingController, provideHttpClientTesting } from '@angular/common
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { ActivatedRoute, provideRouter } from '@angular/router';
 import { API_CONFIG, CurrentUser } from '@samaajconnect/shared';
+import { VolunteerGroup } from '../groups/groups.models';
 import { IssueDetailComponent } from './issue-detail.component';
 import { IssuesListComponent } from './issues-list.component';
-import { Issue, IssueDetail, IssueHistoryEntry, IssueStatus } from './issues.models';
+import { Issue, IssueDetail, IssueHistoryEntry, IssueStatus, ReviewAccess } from './issues.models';
 
 const ME = 'u1';
 const REVIEWER = 'r1';
@@ -34,8 +35,11 @@ function issue(overrides: Partial<Issue> = {}): Issue {
     status: 'Submitted',
     isMine: true,
     availableTransitions: [],
+    canDecide: false,
     createdAt: new Date().toISOString(),
-    publishedAt: null,
+    decision: null,
+    monitoringGroupId: null,
+    decidedAt: null,
     ...overrides,
   };
 }
@@ -47,6 +51,29 @@ function history(overrides: Partial<IssueHistoryEntry> = {}): IssueHistoryEntry 
     actorUserId: ME,
     reason: null,
     createdAt: new Date().toISOString(),
+    ...overrides,
+  };
+}
+
+function access(overrides: Partial<ReviewAccess> = {}): ReviewAccess {
+  return { canReview: false, canSeeQueue: false, panelSeated: false, isPanelMember: false, ...overrides };
+}
+
+function group(overrides: Partial<VolunteerGroup> = {}): VolunteerGroup {
+  return {
+    id: 'g1',
+    name: 'Road Safety Watch',
+    description: null,
+    focusArea: null,
+    presidentMemberId: null,
+    status: 'Active',
+    memberCount: 5,
+    pendingApplicationCount: 0,
+    myApplicationStatus: null,
+    iAmAMember: false,
+    iAmThePresident: false,
+    iCanLead: false,
+    createdAt: '2026-01-01T00:00:00Z',
     ...overrides,
   };
 }
@@ -75,9 +102,10 @@ describe('IssuesListComponent', () => {
 
   afterEach(() => http.verify());
 
-  function load(issues: Issue[]): void {
+  function load(issues: Issue[], grant: ReviewAccess = access()): void {
     fixture.detectChanges();
     http.expectOne((r) => r.url === '/v1/social-issues').flush(issues);
+    http.expectOne('/v1/social-issues/review-access').flush(grant);
     fixture.detectChanges();
   }
 
@@ -85,41 +113,51 @@ describe('IssuesListComponent', () => {
     return (fixture.nativeElement as HTMLElement).textContent ?? '';
   }
 
-  // ---- The three wireframe panels ---------------------------------------
+  // ---- The tabs -----------------------------------------------------------
 
-  it('separates what the member raised from what the Samaaj published', () => {
+  it('separates what the member raised from what the Samaaj can see', () => {
     load([
       issue({ id: 'mine', isMine: true, status: 'Submitted' }),
-      issue({ id: 'theirs', isMine: false, status: 'Published', submittedByMemberId: 'x' }),
+      issue({
+        id: 'theirs',
+        isMine: false,
+        status: 'Closed',
+        decidedAt: '2026-09-01T00:00:00Z',
+        submittedByMemberId: 'x',
+      }),
     ]);
 
     expect(component.mine().map((i) => i.id)).toEqual(['mine']);
-    expect(component.published().map((i) => i.id)).toEqual(['theirs']);
+    expect(component.visible().map((i) => i.id)).toEqual(['theirs']);
   });
 
-  it('lists a member own published issue among the published ones', () => {
+  it('lists a member own decided issue among the visible ones', () => {
     // Filtering that panel by author rather than by status looked equivalent
-    // and was not: a member whose issue had just gone live read "Nothing has
-    // been published yet" directly underneath their own published issue.
-    load([issue({ id: 'mine', isMine: true, status: 'Published' })]);
+    // and was not: a member whose issue had just been decided read "Nothing
+    // is... yet" directly underneath their own decided issue.
+    load([issue({ id: 'mine', isMine: true, status: 'Closed', decidedAt: '2026-09-01T00:00:00Z' })]);
 
-    expect(component.published().map((i) => i.id)).toEqual(['mine']);
+    expect(component.visible().map((i) => i.id)).toEqual(['mine']);
     expect(component.mine().map((i) => i.id)).toEqual(['mine']);
-    expect(text()).not.toContain('Nothing has been published yet');
+    expect(text()).not.toContain('Nothing is in front of the Panch');
   });
 
-  it('does not count an unpublished issue as published', () => {
+  it('does not count an undecided issue as visible to the Samaaj', () => {
     load([issue({ id: 'mine', isMine: true, status: 'Submitted' })]);
 
-    expect(component.published()).toHaveLength(0);
-    expect(text()).toContain('Nothing has been published yet');
+    expect(component.visible()).toHaveLength(0);
+    expect(text()).toContain('Nothing is in front of the Panch');
+  });
+
+  it('does not count a withdrawn issue (Closed with no decision) as visible', () => {
+    load([issue({ id: 'mine', isMine: true, status: 'Closed', decidedAt: null })]);
+
+    expect(component.visible()).toHaveLength(0);
   });
 
   it('offers every category the service accepts, not the wireframe three', () => {
     load([]);
 
-    // The prototype dropdown had Community, Education, Environment. The
-    // validator has six.
     for (const category of ['Community', 'Education', 'Environment', 'Health', 'Safety',
       'Infrastructure']) {
       expect(text()).toContain(category);
@@ -151,7 +189,7 @@ describe('IssuesListComponent', () => {
     fixture.detectChanges();
 
     expect(component.mine().map((i) => i.id)).toEqual(['new']);
-    expect(text()).toContain('Sent for approval');
+    expect(text()).toContain('Sent for review');
   });
 
   it('sends no locality rather than an empty one', () => {
@@ -201,7 +239,7 @@ describe('IssuesListComponent', () => {
     expect(component.formError()).not.toBeNull();
   });
 
-  it('filters the published list by category through the service', () => {
+  it('filters the visible list by category through the service', () => {
     load([]);
 
     component.filter = 'Health';
@@ -216,21 +254,21 @@ describe('IssuesListComponent', () => {
 
   // ---- The progress strip -------------------------------------------------
 
-  it('draws the wireframe strip for an issue on the happy path', () => {
-    load([issue({ status: 'Approved' })]);
+  it('draws the strip for an issue on the happy path', () => {
+    load([issue({ status: 'DecisionPending' })]);
 
     const stages = component.mine()[0]!;
 
     expect(component.isOnHappyPath(stages)).toBe(true);
     expect(component.isReached(stages, 'Submitted')).toBe(true);
-    expect(component.isReached(stages, 'Approved')).toBe(true);
-    expect(component.isReached(stages, 'Published')).toBe(false);
+    expect(component.isReached(stages, 'DecisionPending')).toBe(true);
+    expect(component.isReached(stages, 'Closed')).toBe(false);
   });
 
   it('draws no strip for an issue that left the path', () => {
-    // Rejected, ChangesRequested and Closed are not steps towards publication.
-    // A strip would say the issue is partway there when it is not going.
-    for (const status of ['Rejected', 'ChangesRequested', 'Closed'] as IssueStatus[]) {
+    // Rejected and ChangesRequested are not steps towards a decision. A strip
+    // would say the issue is partway there when it is not going.
+    for (const status of ['Rejected', 'ChangesRequested'] as IssueStatus[]) {
       expect(component.isOnHappyPath(issue({ status }))).toBe(false);
     }
 
@@ -242,10 +280,18 @@ describe('IssuesListComponent', () => {
     expect(text()).toContain('Not accepted');
   });
 
-  it('says what is actually happening to each of the eight states', () => {
+  it('draws no strip for a withdrawn issue either', () => {
+    // Closed with no decision is off the path the same as Rejected is.
+    expect(component.isOnHappyPath(issue({ status: 'Closed', decidedAt: null }))).toBe(false);
+    expect(
+      component.isOnHappyPath(issue({ status: 'Closed', decidedAt: '2026-09-01T00:00:00Z' })),
+    ).toBe(true);
+  });
+
+  it('says what is actually happening to each of the seven states', () => {
     const statuses: IssueStatus[] = [
-      'Draft', 'Submitted', 'UnderReview', 'Approved',
-      'Rejected', 'ChangesRequested', 'Published', 'Closed',
+      'Draft', 'Submitted', 'UnderReview', 'DecisionPending',
+      'Rejected', 'ChangesRequested', 'Closed',
     ];
 
     load([]);
@@ -270,26 +316,56 @@ describe('IssuesListComponent', () => {
 
   // ---- Tabs -----------------------------------------------------------------
 
-  it('shows Published issues first', () => {
+  it('shows Samaaj issues first', () => {
     load([]);
 
-    expect(component.activeTab()).toBe('published');
-    expect(text()).toContain('Nothing has been published yet');
+    expect(component.activeTab()).toBe('community');
+    expect(text()).toContain('Nothing is in front of the Panch');
   });
 
-  it('switches to Raise an issue and back without losing the published list', () => {
+  it('switches to Raise an issue and back without losing the community list', () => {
     load([]);
 
     component.activeTab.set('raise');
     fixture.detectChanges();
 
-    expect(text()).toContain('Submit for approval');
-    expect(text()).not.toContain('Nothing has been published yet');
+    expect(text()).toContain('Submit for review');
+    expect(text()).not.toContain('Nothing is in front of the Panch');
 
-    component.activeTab.set('published');
+    component.activeTab.set('community');
     fixture.detectChanges();
 
-    expect(text()).toContain('Nothing has been published yet');
+    expect(text()).toContain('Nothing is in front of the Panch');
+  });
+
+  // ---- The Panch's tab ------------------------------------------------------
+
+  it('offers no "For the Panch" tab to somebody who cannot see the queue', () => {
+    load([], access({ canSeeQueue: false }));
+
+    expect(text()).not.toContain('For the Panch');
+  });
+
+  it('offers the tab, and loads the queue only once it is opened', () => {
+    load([], access({ canSeeQueue: true, canReview: true, isPanelMember: true, panelSeated: true }));
+
+    expect(text()).toContain('For the Panch');
+    http.expectNone('/v1/social-issues/approval-queue');
+
+    component.openPanchTab();
+
+    const request = http.expectOne('/v1/social-issues/approval-queue');
+
+    request.flush([issue({ id: 'waiting', status: 'DecisionPending', canDecide: true })]);
+    fixture.detectChanges();
+
+    expect(text()).toContain('Ready for a decision');
+
+    // Reopening does not ask again.
+    component.activeTab.set('community');
+    fixture.detectChanges();
+    component.openPanchTab();
+    http.expectNone('/v1/social-issues/approval-queue');
   });
 });
 
@@ -318,6 +394,11 @@ describe('IssueDetailComponent', () => {
     fixture.detectChanges();
     http.expectOne('/v1/identity/me').flush(member);
     http.expectOne('/v1/social-issues/i1').flush(detail);
+
+    if (detail.issue.canDecide || detail.issue.monitoringGroupId !== null) {
+      http.expectOne('/v1/volunteer-groups/groups').flush([group()]);
+    }
+
     fixture.detectChanges();
   }
 
@@ -335,23 +416,22 @@ describe('IssueDetailComponent', () => {
 
   it('renders exactly the transitions the service said are legal', () => {
     load({
-      issue: issue({ status: 'UnderReview', availableTransitions: ['Approved', 'Rejected'] }),
+      issue: issue({ status: 'UnderReview', availableTransitions: ['DecisionPending', 'Rejected'] }),
       history: [history()],
     });
 
-    expect(buttonSaying('Approve')).toBeDefined();
+    expect(buttonSaying('Put in front of the Panch')).toBeDefined();
     expect(buttonSaying('Reject')).toBeDefined();
-
-    // Not offered, because the service did not list it - even though the
-    // status might suggest it.
-    expect(buttonSaying('Publish')).toBeUndefined();
   });
 
-  it('offers nothing when the service lists nothing', () => {
-    load({ issue: issue({ status: 'Published', availableTransitions: [] }), history: [history()] });
+  it('offers nothing when the service lists nothing and there is no decision to make', () => {
+    load({
+      issue: issue({ status: 'Closed', availableTransitions: [], decidedAt: '2026-09-01T00:00:00Z' }),
+      history: [history()],
+    });
 
     expect(text()).toContain('nothing for you to do');
-    expect(buttonSaying('Approve')).toBeUndefined();
+    expect(buttonSaying('Reject')).toBeUndefined();
   });
 
   it('serves a reviewer and an author from the same list without knowing which', () => {
@@ -425,14 +505,14 @@ describe('IssueDetailComponent', () => {
 
   it('sends a move that needs no reason straight away', () => {
     load({
-      issue: issue({ status: 'Approved', availableTransitions: ['Published'] }),
+      issue: issue({ status: 'UnderReview', availableTransitions: ['DecisionPending'] }),
       history: [history()],
     });
 
-    component.move('Published');
+    component.move('DecisionPending');
 
     expect(http.expectOne('/v1/social-issues/i1/status').request.body).toEqual({
-      status: 'Published',
+      status: 'DecisionPending',
       reason: null,
     });
   });
@@ -520,7 +600,7 @@ describe('IssueDetailComponent', () => {
 
   it('offers no edit on somebody else issue', () => {
     load({
-      issue: issue({ isMine: false, submittedByMemberId: 'x', status: 'Published' }),
+      issue: issue({ isMine: false, submittedByMemberId: 'x', status: 'DecisionPending' }),
       history: [history()],
     });
 
@@ -553,5 +633,106 @@ describe('IssueDetailComponent', () => {
     fixture.detectChanges();
 
     expect(text()).toContain('Try again');
+  });
+
+  // ---- The Panch's decision -------------------------------------------------
+
+  it('offers no decision form to somebody who may not decide', () => {
+    load({
+      issue: issue({ status: 'DecisionPending', canDecide: false, availableTransitions: [] }),
+      history: [history()],
+    });
+
+    expect(text()).not.toContain("Record the Panch's decision");
+  });
+
+  it('offers the decision form to a Panch member, with the volunteer groups to choose from', () => {
+    load({
+      issue: issue({ status: 'DecisionPending', canDecide: true, availableTransitions: [] }),
+      history: [history()],
+    });
+
+    expect(text()).toContain("Record the Panch's decision");
+    expect(text()).toContain('Road Safety Watch');
+  });
+
+  it('will not record an empty decision', () => {
+    load({
+      issue: issue({ status: 'DecisionPending', canDecide: true, availableTransitions: [] }),
+      history: [history()],
+    });
+
+    component.decisionText = '   ';
+    component.decide();
+
+    http.expectNone('/v1/social-issues/i1/decision');
+  });
+
+  it('records a decision and hands monitoring to the chosen group', () => {
+    load({
+      issue: issue({ status: 'DecisionPending', canDecide: true, availableTransitions: [] }),
+      history: [history()],
+    });
+
+    component.decisionText = '  Repaint the crossing.  ';
+    component.monitoringGroupId = 'g1';
+    component.decide();
+
+    const request = http.expectOne('/v1/social-issues/i1/decision');
+
+    expect(request.request.body).toEqual({
+      decision: 'Repaint the crossing.',
+      monitoringGroupId: 'g1',
+    });
+
+    request.flush({ issue: issue({ status: 'Closed' }), history: [history()] });
+
+    http.expectOne('/v1/social-issues/i1').flush({
+      issue: issue({
+        status: 'Closed',
+        canDecide: false,
+        decision: 'Repaint the crossing.',
+        monitoringGroupId: 'g1',
+        decidedAt: '2026-09-01T00:00:00Z',
+      }),
+      history: [history()],
+    });
+    http.expectOne('/v1/volunteer-groups/groups').flush([group()]);
+    fixture.detectChanges();
+
+    expect(text()).toContain("The Panch's decision");
+    expect(text()).toContain('Road Safety Watch');
+    expect(component.decisionText).toBe('');
+  });
+
+  it('sends no monitoring group when none was chosen', () => {
+    load({
+      issue: issue({ status: 'DecisionPending', canDecide: true, availableTransitions: [] }),
+      history: [history()],
+    });
+
+    component.decisionText = 'Nothing further is needed.';
+    component.decide();
+
+    expect(http.expectOne('/v1/social-issues/i1/decision').request.body).toMatchObject({
+      monitoringGroupId: null,
+    });
+  });
+
+  it('shows a recorded decision read-only, resolving the group name', () => {
+    load({
+      issue: issue({
+        status: 'Closed',
+        availableTransitions: [],
+        decision: 'Repaint the crossing.',
+        monitoringGroupId: 'g1',
+        decidedAt: '2026-09-01T00:00:00Z',
+      }),
+      history: [history()],
+    });
+
+    expect(text()).toContain('Repaint the crossing.');
+    expect(text()).toContain('Road Safety Watch');
+    expect(text()).not.toContain("Record the Panch's decision");
   });
 });

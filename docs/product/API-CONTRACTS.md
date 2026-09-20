@@ -175,21 +175,27 @@ who never passed the check that produced it.
 > Module-gated on `social-issues` — its own key, not `community`. Switching it
 > off leaves the timeline and volunteer groups untouched.
 
+Reviewed by the Samaaj Panch (panch-service) once a Samaaj has elected one;
+until then `SocialIssues.Approve` holders review as a fallback. See "Who
+reviews" in `services/social-issues-service/CLAUDE.md`.
+
 | Method | Path | Roles | Purpose |
 |---|---|---|---|
-| GET | `/` | `Members.Read` | Published issues, plus this member's own whatever their status. `?category=` filters |
+| GET | `/` | `Members.Read` | Issues the Samaaj can see (in front of the Panch, or decided), plus this member's own whatever their status. `?category=` filters |
 | POST | `/` | `Members.Read` | Raise one. `submitNow=false` saves a draft only the author sees |
-| GET | `/approval-queue` | `SocialIssues.Approve` | Submitted and under review, oldest first |
+| GET | `/approval-queue` | `Members.Read`, then Panch member (or `SocialIssues.Approve`, read-only once a Panch exists) | Submitted, under review, or in front of the Panch, oldest first |
+| GET | `/review-access` | `Members.Read` | `{canReview, canSeeQueue, panelSeated, isPanelMember}` — so a portal never asks for a queue it may not have |
 | GET | `/{id}` | `Members.Read` | One issue with its full status history |
-| PUT | `/{id}` | `Members.Read` + author | Correct one that has not been decided |
+| PUT | `/{id}` | `Members.Read` + author | Correct one the Panch does not have yet |
 | POST | `/{id}/status` | `Members.Read`, then per transition | `{status, reason}` — one endpoint for every move. Reject and ChangesRequested need a reason; the legal moves for this caller are on the issue as `availableTransitions` |
+| POST | `/{id}/decision` | `Members.Read`, then Panch member | `{decision, monitoringGroupId}` — records the Panch's decision and closes the issue; `monitoringGroupId` is optional |
 
 > The draft named `SubmitIssueCommand`, `DecideIssueCommand`,
 > `PublishIssueCommand` and `CloseIssueCommand` as four separate operations.
-> They ship as one `POST /{id}/status`, because the transition table decides
-> legality and four handlers would be four copies of the same tenant, author and
-> permission checks — see "The workflow" in
-> `services/social-issues-service/CLAUDE.md`.
+> They ship as `POST /{id}/status` plus `POST /{id}/decision`, because the
+> transition table decides legality and separate handlers for every move would
+> be copies of the same tenant, author and permission checks — see "The
+> workflow" in `services/social-issues-service/CLAUDE.md`.
 
 ## celebrity-voting-service — `/v1/celebrity-voting`
 

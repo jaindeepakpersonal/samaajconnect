@@ -5,8 +5,8 @@ public sealed class ConsumerOptions
     public const string SectionName = "Consumer";
 
     /// <summary>
-    /// The one topic this service acts on, named explicitly rather than matched
-    /// by pattern.
+    /// The topics this service acts on, named explicitly rather than matched by
+    /// pattern: a member erasing their account, and the Samaaj Panch changing.
     /// </summary>
     /// <remarks>
     /// SERVICES.md names <c>members.child-conversion.approved.v1</c>. That event
@@ -19,7 +19,7 @@ public sealed class ConsumerOptions
     /// Subscribing by pattern would mean quietly committing offsets for every
     /// event this service has no handler for.
     /// </remarks>
-    public string[] Topics { get; set; } = ["identity.user.erased.v1"];
+    public string[] Topics { get; set; } = ["identity.user.erased.v1", "panch.panel.changed.v1"];
 
     /// <summary>
     /// This service's Kafka consumer group. Defined here and deliberately

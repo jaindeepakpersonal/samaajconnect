@@ -81,6 +81,19 @@ namespace Sangam.SocialIssues.Infrastructure.Migrations
                         .HasColumnType("timestamp with time zone")
                         .HasColumnName("created_at");
 
+                    b.Property<DateTimeOffset?>("DecidedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("decided_at");
+
+                    b.Property<Guid?>("DecidedBy")
+                        .HasColumnType("uuid")
+                        .HasColumnName("decided_by");
+
+                    b.Property<string>("Decision")
+                        .HasMaxLength(2000)
+                        .HasColumnType("character varying(2000)")
+                        .HasColumnName("decision");
+
                     b.Property<string>("Description")
                         .IsRequired()
                         .HasMaxLength(5000)
@@ -92,9 +105,9 @@ namespace Sangam.SocialIssues.Infrastructure.Migrations
                         .HasColumnType("character varying(150)")
                         .HasColumnName("locality");
 
-                    b.Property<DateTimeOffset?>("PublishedAt")
-                        .HasColumnType("timestamp with time zone")
-                        .HasColumnName("published_at");
+                    b.Property<Guid?>("MonitoringGroupId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("monitoring_group_id");
 
                     b.Property<string>("Status")
                         .IsRequired()
@@ -126,6 +139,30 @@ namespace Sangam.SocialIssues.Infrastructure.Migrations
                         .HasDatabaseName("ix_social_issues_tenant_id_status_created_at");
 
                     b.ToTable("social_issues", (string)null);
+                });
+
+            modelBuilder.Entity("Sangam.SocialIssues.Domain.Panel.PanelMember", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<Guid>("MemberId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("member_id");
+
+                    b.Property<Guid>("TenantId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("tenant_id");
+
+                    b.HasKey("Id")
+                        .HasName("pk_panel_members");
+
+                    b.HasIndex("TenantId", "MemberId")
+                        .IsUnique()
+                        .HasDatabaseName("ix_panel_members_tenant_id_member_id");
+
+                    b.ToTable("panel_members", (string)null);
                 });
 
             modelBuilder.Entity("Sangam.SocialIssues.Infrastructure.Persistence.OutboxMessage", b =>
