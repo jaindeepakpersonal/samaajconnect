@@ -903,6 +903,27 @@ public static class KnownEvents
             EntityName: "TrustMember",
             EntityIdProperty: "trustMemberId",
             ActorIdProperty: "removedBy"),
+
+        // trust-service, phase 2 (elections for trustee positions). Moving an
+        // election is the administrator's own act and names no separate
+        // actor, the identical shape panch.election.status-changed.v1 and
+        // volunteer-groups.election.status-changed.v1 already take.
+        ["trust.election.status-changed.v1"] = new(
+            Action: "ElectionStatusChanged",
+            EntityName: "TrustElection",
+            EntityIdProperty: "electionId",
+            BeforeProperties: ["previousStatus"]),
+
+        // WinnerMemberId is who the event is about, not who published it -
+        // the event carries no publisher id at all, the same shape
+        // volunteer-groups.election.results-published.v1 already has.
+        // Publishing also installs the winner on their own TrustMember row,
+        // which raises its own trust.member.updated.v1 with UpdatedBy - "who
+        // did this" is answered there, not here.
+        ["trust.election.results-published.v1"] = new(
+            Action: "ElectionResultsPublished",
+            EntityName: "TrustElection",
+            EntityIdProperty: "electionId"),
     };
 
     public static EventDescriptor Describe(string topic) =>

@@ -4362,7 +4362,7 @@ panch_checks() {
 panch_checks || echo "  ..    the rest of the Panch checks were skipped"
 
 echo
-echo "Trust (locality-wise Trust management, phase 1: rosters only)"
+echo "Trust (locality-wise Trust management, phase 2: rosters and elections)"
 
 # Wrapped in a function for the same reason competition_checks is.
 trust_checks() {
@@ -4450,6 +4450,140 @@ trust_checks() {
     pass=$((pass + 1))
   else
     echo "  FAIL  changing the position title (got '$UPDATED')"
+    fail=$((fail + 1))
+  fi
+
+  # An election for a named Trust position - nominate, approve, vote, close,
+  # publish - and what publishing actually does to the winner's own roster
+  # row. TRUST_MEMBER_ID (MEMBER_ID) is still active on the roster here,
+  # holding "Treasurer" from the position-change check above, which is what
+  # lets this section also prove publishing clears a same-titled predecessor
+  # rather than only installing a fresh winner.
+  ELECTION_CANDIDATE="eeeeeeee-0000-4000-8000-00000000e202"
+
+  check "an administrator adds the election candidate to the roster" 200 \
+    "$(status -X POST "$GATEWAY/v1/trust/trusts/$TRUST_ID/members" -H 'Content-Type: application/json' \
+       -H "Authorization: Bearer $ADMIN_TOKEN" -H "$ADMIN_TENANT_HEADER" \
+       -d "{\"memberId\":\"$ELECTION_CANDIDATE\",\"positionTitle\":null}")"
+
+  # Nominations and voting are never open at once, so this section has a real
+  # window to wait out, the same as the Panch election above.
+  NOMINATIONS_OPENED=$(date -u -d '-1 minute' +%Y-%m-%dT%H:%M:%SZ)
+  NOMINATIONS_CLOSE=$(date -u -d '+45 seconds' +%Y-%m-%dT%H:%M:%SZ)
+  VOTING_CLOSES=$(date -u -d '+7 days' +%Y-%m-%dT%H:%M:%SZ)
+
+  check "a member cannot open a Trust election" 403 \
+    "$(status -X POST "$GATEWAY/v1/trust/trusts/$TRUST_ID/elections" -H 'Content-Type: application/json' \
+       -H "Authorization: Bearer $MEMBER_TOKEN" \
+       -d "{\"positionTitle\":\"Treasurer\",\"nominationStartAt\":\"$NOMINATIONS_OPENED\",\"nominationEndAt\":\"$NOMINATIONS_CLOSE\",\"votingStartAt\":\"$NOMINATIONS_CLOSE\",\"votingEndAt\":\"$VOTING_CLOSES\"}")"
+
+  TRUST_ELECTION=$(curl -s -X POST "$GATEWAY/v1/trust/trusts/$TRUST_ID/elections" \
+    -H 'Content-Type: application/json' -H "Authorization: Bearer $ADMIN_TOKEN" -H "$ADMIN_TENANT_HEADER" \
+    -d "{\"positionTitle\":\"Treasurer\",\"nominationStartAt\":\"$NOMINATIONS_OPENED\",\"nominationEndAt\":\"$NOMINATIONS_CLOSE\",\"votingStartAt\":\"$NOMINATIONS_CLOSE\",\"votingEndAt\":\"$VOTING_CLOSES\"}")
+
+  TRUST_ELECTION_ID=$(printf '%s' "$TRUST_ELECTION" | json_field id)
+
+  if [ -n "$TRUST_ELECTION_ID" ]; then
+    echo "  ok    an administrator sets a Trust election up"
+    pass=$((pass + 1))
+  else
+    echo "  FAIL  setting a Trust election up (got '$TRUST_ELECTION')"
+    fail=$((fail + 1))
+    return 1
+  fi
+
+  check "opening nominations is accepted" 200 \
+    "$(status -X POST "$GATEWAY/v1/trust/elections/$TRUST_ELECTION_ID/status" \
+       -H 'Content-Type: application/json' -H "Authorization: Bearer $ADMIN_TOKEN" -H "$ADMIN_TENANT_HEADER" \
+       -d '{"status":"NominationsOpen"}')"
+
+  NOMINATION=$(curl -s -X POST "$GATEWAY/v1/trust/elections/$TRUST_ELECTION_ID/candidates" \
+    -H 'Content-Type: application/json' -H "Authorization: Bearer $MEMBER_TOKEN" \
+    -d "{\"memberId\":\"$ELECTION_CANDIDATE\"}")
+
+  TRUST_CANDIDATE_ID=$(printf '%s' "$NOMINATION" | json_field candidateId)
+
+  if [ -n "$TRUST_CANDIDATE_ID" ]; then
+    echo "  ok    an active Trust member nominates another"
+    pass=$((pass + 1))
+  else
+    echo "  FAIL  nominating a Trust member (got '$NOMINATION')"
+    fail=$((fail + 1))
+    return 1
+  fi
+
+  check "an administrator approves the nomination" 200 \
+    "$(status -X POST "$GATEWAY/v1/trust/elections/$TRUST_ELECTION_ID/candidates/$TRUST_CANDIDATE_ID/decide" \
+       -H 'Content-Type: application/json' -H "Authorization: Bearer $ADMIN_TOKEN" -H "$ADMIN_TENANT_HEADER" \
+       -d '{"approve":true}')"
+
+  echo "  ..    waiting for nominations to close"
+  while [ "$(date -u +%s)" -lt "$(date -u -d "$NOMINATIONS_CLOSE" +%s)" ]; do
+    sleep 2
+  done
+
+  check "opening voting is accepted" 200 \
+    "$(status -X POST "$GATEWAY/v1/trust/elections/$TRUST_ELECTION_ID/status" \
+       -H 'Content-Type: application/json' -H "Authorization: Bearer $ADMIN_TOKEN" -H "$ADMIN_TENANT_HEADER" \
+       -d '{"status":"VotingOpen"}')"
+
+  FIRST_TRUST_VOTE=$(curl -s -X POST "$GATEWAY/v1/trust/elections/$TRUST_ELECTION_ID/votes" \
+    -H 'Content-Type: application/json' -H "Authorization: Bearer $MEMBER_TOKEN" \
+    -d "{\"candidateId\":\"$TRUST_CANDIDATE_ID\"}")
+
+  if printf '%s' "$FIRST_TRUST_VOTE" | grep -q '"accepted":true'; then
+    echo "  ok    a Trust member's vote is accepted"
+    pass=$((pass + 1))
+  else
+    echo "  FAIL  the vote was not accepted (got '$FIRST_TRUST_VOTE')"
+    fail=$((fail + 1))
+  fi
+
+  SECOND_TRUST_VOTE=$(curl -s -X POST "$GATEWAY/v1/trust/elections/$TRUST_ELECTION_ID/votes" \
+    -H 'Content-Type: application/json' -H "Authorization: Bearer $MEMBER_TOKEN" \
+    -d "{\"candidateId\":\"$TRUST_CANDIDATE_ID\"}")
+
+  if printf '%s' "$SECOND_TRUST_VOTE" | grep -q '"accepted":false'; then
+    echo "  ok    a second vote from the same member is reported, not applied"
+    pass=$((pass + 1))
+  else
+    echo "  FAIL  a second vote was not refused (got '$SECOND_TRUST_VOTE')"
+    fail=$((fail + 1))
+  fi
+
+  check "the administrator closes the election" 200 \
+    "$(status -X POST "$GATEWAY/v1/trust/elections/$TRUST_ELECTION_ID/status" \
+       -H 'Content-Type: application/json' -H "Authorization: Bearer $ADMIN_TOKEN" -H "$ADMIN_TENANT_HEADER" \
+       -d '{"status":"Closed"}')"
+
+  PUBLISHED_TRUST_ELECTION=$(curl -s -X POST "$GATEWAY/v1/trust/elections/$TRUST_ELECTION_ID/publish" \
+    -H "Authorization: Bearer $ADMIN_TOKEN" -H "$ADMIN_TENANT_HEADER")
+
+  if printf '%s' "$PUBLISHED_TRUST_ELECTION" | grep -q "\"winnerMemberId\":\"$ELECTION_CANDIDATE\""; then
+    echo "  ok    the nominee with the most votes wins"
+    pass=$((pass + 1))
+  else
+    echo "  FAIL  publishing the Trust election (got '$PUBLISHED_TRUST_ELECTION')"
+    fail=$((fail + 1))
+  fi
+
+  ROSTER_AFTER_ELECTION=$(curl -s -H "Authorization: Bearer $MEMBER_TOKEN" "$GATEWAY/v1/trust/trusts/$TRUST_ID/members")
+
+  if printf '%s' "$ROSTER_AFTER_ELECTION" \
+      | grep -q "\"memberId\":\"$ELECTION_CANDIDATE\",\"positionTitle\":\"Treasurer\""; then
+    echo "  ok    publishing installs the winner's position on their own roster row"
+    pass=$((pass + 1))
+  else
+    echo "  FAIL  the winner's position was not installed (got '$ROSTER_AFTER_ELECTION')"
+    fail=$((fail + 1))
+  fi
+
+  if printf '%s' "$ROSTER_AFTER_ELECTION" \
+      | grep -q "\"memberId\":\"$MEMBER_ID\",\"positionTitle\":null"; then
+    echo "  ok    publishing clears the same title from the member who held it before"
+    pass=$((pass + 1))
+  else
+    echo "  FAIL  the previous holder's title was not cleared (got '$ROSTER_AFTER_ELECTION')"
     fail=$((fail + 1))
   fi
 

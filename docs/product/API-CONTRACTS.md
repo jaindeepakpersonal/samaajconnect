@@ -505,11 +505,14 @@ so a malformed id is a 400 rather than an unhandled binding failure.
 ## trust-service — `/v1/trust`
 
 Module-gated on `trust`, off by default. New permission `Trust.Manage`,
-granted to `SamaajAdmin`, for every write; `Members.Read` for every read.
+granted to `SamaajAdmin`, for every write except nominating and voting;
+`Members.Read` for every read, and for nominating/voting further gated by
+being an active member of the Trust the election belongs to.
 
-Phase 1 only: Trust + roster CRUD. Elections for trustee positions,
-donations, expenses and a payment-collection ledger against both donations
-and Boli results are later phases and are not in this API yet.
+Phase 2: Trust + roster CRUD (phase 1), plus elections for trustee positions
+(this phase). Donations, expenses and a payment-collection ledger against
+both donations and Boli results are later phases and are not in this API
+yet.
 
 | Method | Path | Roles | Purpose |
 |---|---|---|---|
@@ -521,6 +524,14 @@ and Boli results are later phases and are not in this API yet.
 | POST | `/trusts/{id}/members` | `Trust.Manage` | Add a member. Adding one already active is a no-op reported as success; adding one previously removed reactivates their old row |
 | PUT | `/trusts/{id}/members/{trustMemberId}/position` | `Trust.Manage` | Change an active trustee's position title (free text - grants nothing). 409 on a removed member |
 | DELETE | `/trusts/{id}/members/{trustMemberId}` | `Trust.Manage` | Take a member off the roster. Removing one already removed is success and changes nothing |
+| GET | `/trusts/{trustId}/elections` | `Members.Read` | This Trust's elections, newest first, with the caller's own vote on each |
+| POST | `/trusts/{trustId}/elections` | `Trust.Manage` | Set an election up for a position. Starts `Draft` |
+| GET | `/elections/{id}` | `Members.Read` | One election with its ballot and tally - never hidden |
+| POST | `/elections/{id}/status` | `Trust.Manage` | `NominationsOpen`, `VotingOpen` or `Closed`. Strictly forward; 409 moving to `VotingOpen` on an empty ballot |
+| POST | `/elections/{id}/candidates` | `Members.Read` + active Trust member | Nominate a fellow active member. A repeat nomination is a no-op reported as success |
+| POST | `/elections/{id}/candidates/{candidateId}/decide` | `Trust.Manage` | Approve onto the ballot, or remove before voting opens |
+| POST | `/elections/{id}/votes` | `Members.Read` + active Trust member | Cast this member's one vote. Self-votes and a second vote are both refused/reported without accepting - see the service's own CLAUDE.md |
+| POST | `/elections/{id}/publish` | `Trust.Manage` | Only from `Closed`. Installs the winner's position on their `TrustMember` row, clearing it from any prior holder. Publishing twice changes nothing |
 
 `LocalityId` and member ids on the wire are strings, validated and parsed in
 the command, so a malformed id is a 400 rather than an unhandled binding

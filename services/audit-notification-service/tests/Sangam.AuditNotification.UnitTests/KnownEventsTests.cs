@@ -441,6 +441,23 @@ public sealed class KnownEventsTests
     }
 
     [Fact]
+    public void A_trust_election_moving_names_no_separate_actor_but_publishing_names_the_winner()
+    {
+        var statusChanged = KnownEvents.Describe("trust.election.status-changed.v1");
+        statusChanged.Action.Should().Be("ElectionStatusChanged");
+        statusChanged.EntityName.Should().Be("TrustElection");
+        statusChanged.EntityIdProperty.Should().Be("electionId");
+        statusChanged.BeforeProperties.Should().Equal("previousStatus");
+        statusChanged.ActorIdProperty.Should().BeNull();
+
+        var published = KnownEvents.Describe("trust.election.results-published.v1");
+        published.Action.Should().Be("ElectionResultsPublished");
+        published.EntityName.Should().Be("TrustElection");
+        published.EntityIdProperty.Should().Be("electionId");
+        published.ActorIdProperty.Should().BeNull("WinnerMemberId is who the event is about, not who published it");
+    }
+
+    [Fact]
     public void A_withdrawn_consent_names_the_parent_and_the_child_it_was_about()
     {
         var descriptor = KnownEvents.Describe("members.child.consent-withdrawn.v1");

@@ -22,6 +22,161 @@ namespace Sangam.Trust.Infrastructure.Persistence.Migrations
 
             NpgsqlModelBuilderExtensions.UseIdentityByDefaultColumns(modelBuilder);
 
+            modelBuilder.Entity("Sangam.Trust.Domain.Elections.TrustElection", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<DateTimeOffset?>("ClosedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("closed_at");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at");
+
+                    b.Property<DateTimeOffset>("NominationEndAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("nomination_end_at");
+
+                    b.Property<DateTimeOffset>("NominationStartAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("nomination_start_at");
+
+                    b.Property<string>("PositionTitle")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)")
+                        .HasColumnName("position_title");
+
+                    b.Property<DateTimeOffset?>("PublishedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("published_at");
+
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)")
+                        .HasColumnName("status");
+
+                    b.Property<Guid>("TenantId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("tenant_id");
+
+                    b.Property<Guid>("TrustId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("trust_id");
+
+                    b.Property<DateTimeOffset>("VotingEndAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("voting_end_at");
+
+                    b.Property<DateTimeOffset>("VotingStartAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("voting_start_at");
+
+                    b.Property<Guid?>("WinnerMemberId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("winner_member_id");
+
+                    b.HasKey("Id")
+                        .HasName("pk_trust_elections");
+
+                    b.HasIndex("TrustId", "Status")
+                        .HasDatabaseName("ix_trust_elections_trust_id_status");
+
+                    b.ToTable("trust_elections", (string)null);
+                });
+
+            modelBuilder.Entity("Sangam.Trust.Domain.Elections.TrustElectionCandidate", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<DateTimeOffset?>("ApprovedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("approved_at");
+
+                    b.Property<Guid?>("ApprovedBy")
+                        .HasColumnType("uuid")
+                        .HasColumnName("approved_by");
+
+                    b.Property<Guid>("ElectionId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("election_id");
+
+                    b.Property<Guid>("MemberId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("member_id");
+
+                    b.Property<DateTimeOffset>("NominatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("nominated_at");
+
+                    b.Property<Guid>("NominatedBy")
+                        .HasColumnType("uuid")
+                        .HasColumnName("nominated_by");
+
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)")
+                        .HasColumnName("status");
+
+                    b.Property<Guid?>("TrustElectionId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("trust_election_id");
+
+                    b.HasKey("Id")
+                        .HasName("pk_trust_election_candidates");
+
+                    b.HasIndex("TrustElectionId")
+                        .HasDatabaseName("ix_trust_election_candidates_trust_election_id");
+
+                    b.HasIndex("ElectionId", "MemberId")
+                        .IsUnique()
+                        .HasDatabaseName("ix_trust_election_candidates_election_id_member_id");
+
+                    b.ToTable("trust_election_candidates", (string)null);
+                });
+
+            modelBuilder.Entity("Sangam.Trust.Domain.Elections.Vote", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<Guid>("CandidateId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("candidate_id");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at");
+
+                    b.Property<Guid>("ElectionId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("election_id");
+
+                    b.Property<Guid>("VoterMemberId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("voter_member_id");
+
+                    b.HasKey("Id")
+                        .HasName("pk_trust_election_votes");
+
+                    b.HasIndex("ElectionId", "CandidateId")
+                        .HasDatabaseName("ix_trust_election_votes_election_id_candidate_id");
+
+                    b.HasIndex("ElectionId", "VoterMemberId")
+                        .IsUnique()
+                        .HasDatabaseName("ix_trust_election_votes_election_id_voter_member_id");
+
+                    b.ToTable("trust_election_votes", (string)null);
+                });
+
             modelBuilder.Entity("Sangam.Trust.Domain.Members.TrustMember", b =>
                 {
                     b.Property<Guid>("Id")
@@ -170,6 +325,28 @@ namespace Sangam.Trust.Infrastructure.Persistence.Migrations
                         .HasFilter("processed_at IS NULL");
 
                     b.ToTable("outbox_messages", (string)null);
+                });
+
+            modelBuilder.Entity("Sangam.Trust.Domain.Elections.TrustElectionCandidate", b =>
+                {
+                    b.HasOne("Sangam.Trust.Domain.Elections.TrustElection", null)
+                        .WithMany("Candidates")
+                        .HasForeignKey("ElectionId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired()
+                        .HasConstraintName("fk_trust_election_candidates_trust_elections_election_id");
+
+                    b.HasOne("Sangam.Trust.Domain.Elections.TrustElection", null)
+                        .WithMany("Ballot")
+                        .HasForeignKey("TrustElectionId")
+                        .HasConstraintName("fk_trust_election_candidates_trust_elections_trust_election_id");
+                });
+
+            modelBuilder.Entity("Sangam.Trust.Domain.Elections.TrustElection", b =>
+                {
+                    b.Navigation("Ballot");
+
+                    b.Navigation("Candidates");
                 });
 #pragma warning restore 612, 618
         }

@@ -370,26 +370,36 @@ and expose its endpoints behind the gateway at the route prefix shown.
 
 ## 16. trust-service
 
-- **First / primary aggregate:** `Trust` (with `TrustMember` as a second,
-  peer-to-peer aggregate — its own, not owned, so a roster change raises its
-  own event)
-- **Owns:** Trust, TrustMember
+- **First / primary aggregate:** `Trust` (with `TrustMember` and
+  `TrustElection` as peer, not owned, aggregates — a roster change and an
+  election status change each raise their own event)
+- **Owns:** Trust, TrustMember, TrustElection (with `TrustElectionCandidate`
+  as an owned entity), Vote
 - **Key commands:** `CreateTrustCommand`, `ChangeTrustStatusCommand`,
   `AddTrustMemberCommand`, `UpdateTrustMemberCommand`,
-  `RemoveTrustMemberCommand`
-- **Key queries:** `ListTrustsQuery`, `GetTrustQuery`, `ListTrustMembersQuery`
+  `RemoveTrustMemberCommand`, `OpenTrustElectionCommand`,
+  `MoveTrustElectionCommand`, `NominateTrustCandidateCommand`,
+  `DecideTrustCandidateCommand`, `CastTrustVoteCommand`,
+  `PublishTrustElectionResultsCommand`
+- **Key queries:** `ListTrustsQuery`, `GetTrustQuery`, `ListTrustMembersQuery`,
+  `ListTrustElectionsQuery`, `GetTrustElectionQuery`
 - **Events published:** `TrustCreated`, `TrustStatusChanged`,
-  `TrustMemberAdded`, `TrustMemberUpdated`, `TrustMemberRemoved`
+  `TrustMemberAdded`, `TrustMemberUpdated`, `TrustMemberRemoved`,
+  `TrustElectionStatusChanged`, `TrustElectionResultsPublished`
 - **Events consumed:** none — a leaf service, like volunteer-groups-service
 - **Gateway route prefix:** `/v1/trust/**`, module-gated on `trust` (off by
   default, the same stance as `boli`/`matrimony`/`panch`)
 - **Tenant role(s):** new permission `Trust.Manage`, granted to `SamaajAdmin`,
-  for every write; `Members.Read` for every read
-- **Notes:** Phase 1 of a larger plan — locality-wise Trust management, one
-  Trust per `(TenantId, LocalityId)`, roster CRUD only. Elections for trustee
-  positions, donation and expense management, and a payment-collection
-  ledger against both donations and a future locality-wise Boli are later
-  phases, not built yet. See the service's own `CLAUDE.md`.
+  for every write except nominating/voting; `Members.Read` for every read
+  and, for nominating/voting, gated further by being an active member of the
+  Trust the election belongs to
+- **Notes:** Phase 2 of a larger plan — locality-wise Trust management, one
+  Trust per `(TenantId, LocalityId)`. Phase 1 shipped roster CRUD; phase 2
+  adds elections for trustee positions, copying volunteer-groups-service's
+  `GroupElection` shape rather than sharing code with it. Donation and
+  expense management, and a payment-collection ledger against both donations
+  and a future locality-wise Boli, are later phases, not built yet. See the
+  service's own `CLAUDE.md`.
 
 ## Inter-service data access rule
 

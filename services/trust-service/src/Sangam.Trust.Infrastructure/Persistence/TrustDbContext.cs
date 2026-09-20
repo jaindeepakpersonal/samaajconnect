@@ -3,6 +3,7 @@ using System.Text.Json;
 using Microsoft.EntityFrameworkCore;
 using Sangam.Trust.Application.Abstractions;
 using Sangam.Trust.Domain.Common;
+using Sangam.Trust.Domain.Elections;
 using Sangam.Trust.Domain.Members;
 
 namespace Sangam.Trust.Infrastructure.Persistence;
@@ -20,6 +21,12 @@ public sealed class TrustDbContext(
     public DbSet<Domain.Trusts.Trust> Trusts => Set<Domain.Trusts.Trust>();
 
     public DbSet<TrustMember> TrustMembers => Set<TrustMember>();
+
+    public DbSet<TrustElection> Elections => Set<TrustElection>();
+
+    public DbSet<TrustElectionCandidate> ElectionCandidates => Set<TrustElectionCandidate>();
+
+    public DbSet<Vote> Votes => Set<Vote>();
 
     public DbSet<OutboxMessage> OutboxMessages => Set<OutboxMessage>();
 

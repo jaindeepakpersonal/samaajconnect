@@ -441,11 +441,12 @@ social-issues-service keeps its own copy of the roster, fed by
 `panch.panel.changed.v1` (see SERVICES.md §15); it never queries this
 service.
 
-## 17. Trust (locality-wise Trust management, phase 1)
+## 17. Trust (locality-wise Trust management, phase 2)
 
-Phase 1 only — elections for trustee positions, donations, expenses and a
-payment-collection ledger against both donations and Boli results are later
-phases and add their own entities when they land.
+Phase 1 shipped Trust + roster CRUD; phase 2 (this one) adds elections for
+trustee positions. Donations, expenses and a payment-collection ledger
+against both donations and Boli results are later phases and add their own
+entities when they land.
 
 **Trust** — `Id, TenantId, LocalityId, Name, Status (Active/Inactive),
 CreatedAt` — unique on `(TenantId, LocalityId)`: exactly one Trust per
@@ -461,4 +462,20 @@ by `Trust`, so a roster change raises its own event, the same reasoning
 panch-service's `PanelMember` gives for standing apart from its election.
 Unique on `(TrustId, MemberId)`: at most one row per pair ever — re-adding a
 previously removed member reactivates that same row rather than inserting a
-second one.
+second one. `PositionTitle` is set by hand (phase 1) or installed by a
+published `TrustElection` (phase 2) — both paths go through the same
+`UpdatePosition` method, so there is one way a position is ever held.
+
+**TrustElection** — `Id, TenantId, TrustId, PositionTitle, NominationStartAt,
+NominationEndAt, VotingStartAt, VotingEndAt, Status
+(Draft/NominationsOpen/VotingOpen/Closed/Published), CreatedAt, ClosedAt
+(nullable), WinnerMemberId (nullable), PublishedAt (nullable)` — copies
+volunteer-groups-service's `GroupElection` shape. Owns `TrustElectionCandidate`
+(`Id, ElectionId, MemberId, NominatedBy, NominatedAt, Status
+(Nominated/Approved), ApprovedBy (nullable), ApprovedAt (nullable)`; unique
+on `(ElectionId, MemberId)`) and does not own `Vote` (`Id, ElectionId,
+CandidateId, VoterMemberId, CreatedAt`; unique on `(ElectionId,
+VoterMemberId)` — the double-voting guarantee, written directly rather than
+through the aggregate, the same shape every election on this platform uses).
+The electorate for nominating and voting is the Trust's own active
+`TrustMember` roster, not the whole Samaaj.
