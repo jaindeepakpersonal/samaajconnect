@@ -11,6 +11,7 @@ import {
   GroupDetail,
   VolunteerGroup,
   electionStageLabel,
+  votingNote,
 } from './groups.models';
 
 /**
@@ -524,6 +525,10 @@ import {
                   }
 
                   <h3 class="section-heading">{{ election.status === 'Published' ? 'Result' : 'Ballot' }}</h3>
+
+                  @if (voteNote(election, found.group, approvedCandidates(detail).length); as note) {
+                    <p class="notice info" role="status">{{ note }}</p>
+                  }
 
                   @if (approvedCandidates(detail).length === 0) {
                     <p class="small">Nobody is on the ballot yet.</p>
@@ -1069,6 +1074,15 @@ export class GroupDetailComponent implements OnInit {
 
   approvedCandidates(detail: ElectionDetail) {
     return detail.candidates.filter((c) => c.status === 'Approved');
+  }
+
+  /** Why the vote button is not there, if it is not - see `votingNote`. */
+  voteNote(election: Election, group: VolunteerGroup, onBallot: number): string | null {
+    return votingNote(
+      election,
+      { inGroup: this.isInGroup(group), canLead: group.iCanLead },
+      onBallot,
+    );
   }
 
   electionStage(election: Election): string {

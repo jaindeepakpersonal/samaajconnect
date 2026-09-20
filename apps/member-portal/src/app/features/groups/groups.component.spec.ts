@@ -768,6 +768,84 @@ describe('GroupDetailComponent', () => {
     expect(document.body.querySelector('select[id^="nominee-"]')).toBeNull();
   });
 
+  // ---- Why there is no vote button ---------------------------------------------
+
+  const PAST = new Date(Date.now() - 2 * 86400000).toISOString();
+
+  function openBallot(
+    groupOverrides: Partial<VolunteerGroup>,
+    electionOverrides: Partial<Election>,
+    candidates: ElectionCandidate[],
+  ): void {
+    load(
+      detail({ iAmAMember: true, ...groupOverrides }, [
+        { memberId: PRESIDENT, rolePosition: 'President', joinedAt: new Date().toISOString() },
+        { memberId: 'm9', rolePosition: null, joinedAt: new Date().toISOString() },
+      ]),
+      groupOverrides.iCanLead ? [] : null,
+      [election(electionOverrides)],
+    );
+
+    component.toggleElection('e1');
+    http.expectOne('/v1/volunteer-groups/elections/e1').flush(electionDetail(electionOverrides, candidates));
+    fixture.detectChanges();
+  }
+
+  it('shows a vote button when voting is open and somebody is on the ballot', () => {
+    openBallot({}, { status: 'VotingOpen', acceptsVotes: true, acceptsNominations: false, votingStartAt: PAST },
+      [candidate({ status: 'Approved' })]);
+
+    expect(text()).toContain('Vote');
+    expect(text()).not.toContain('Voting has');
+  });
+
+  it('says the voting window has not started when the status is on but the clock is not', () => {
+    // Status VotingOpen with a start date still ahead: acceptsVotes is false, the
+    // button is absent, and this used to give no reason at all.
+    openBallot({}, { status: 'VotingOpen', acceptsVotes: false, acceptsNominations: false },
+      [candidate({ status: 'Approved' })]);
+
+    expect(text()).toContain('switched on, but its window does not start until');
+    expect(text()).toContain('Voting opens soon');
+  });
+
+  it('says voting has not been opened, and tells the organiser what to press', () => {
+    openBallot({ iCanLead: true }, { status: 'NominationsOpen', acceptsVotes: false },
+      [candidate({ status: 'Approved' })]);
+
+    expect(text()).toContain('Voting has not been opened yet');
+    expect(text()).toContain('use "Open voting" above');
+  });
+
+  it('tells a member the organiser opens voting', () => {
+    openBallot({}, { status: 'NominationsOpen', acceptsVotes: false }, [candidate({ status: 'Approved' })]);
+
+    expect(text()).toContain('The organiser opens it once nominations are done');
+  });
+
+  it('says nobody is on the ballot when voting is open but no nomination was approved', () => {
+    openBallot({}, { status: 'VotingOpen', acceptsVotes: true, acceptsNominations: false, votingStartAt: PAST },
+      [candidate({ status: 'Nominated' })]);
+
+    expect(text()).toContain('nobody is on the ballot yet');
+  });
+
+  it('says only members can vote to somebody outside the group', () => {
+    openBallot({ iAmAMember: false, iAmThePresident: false },
+      { status: 'VotingOpen', acceptsVotes: true, acceptsNominations: false, votingStartAt: PAST },
+      [candidate({ status: 'Approved' })]);
+
+    expect(text()).toContain('Only members of this group can vote');
+  });
+
+  it('says nothing once the reader has voted', () => {
+    openBallot({}, { status: 'VotingOpen', acceptsVotes: true, votingStartAt: PAST, myVoteCandidateId: 'c1' },
+      [candidate({ status: 'Approved' })]);
+
+    expect(text()).toContain('Your vote');
+    expect(text()).not.toContain('Voting has');
+  });
+
   it('expands a ballot, nominates a group member, and the president approves it', () => {
     load(
       detail({ iAmThePresident: true, iAmAMember: true }, [

@@ -158,8 +158,13 @@ export interface NominateResult {
  * Celebrities of Samaaj's own `stageLabel` already uses and for the same
  * reason: an election left at NominationsOpen past its closing date is not
  * taking nominations.
+ *
+ * The fallback also looks at the clock. A status of VotingOpen whose voting
+ * window has not started yet is not "Voting closed" - it is about to open, and
+ * saying closed sent people looking for a fault when the only thing wrong was
+ * the date the organiser picked.
  */
-export function electionStageLabel(election: Election): string {
+export function electionStageLabel(election: Election, now: number = Date.now()): string {
   if (election.acceptsNominations) {
     return 'Nominations open';
   }
@@ -172,11 +177,67 @@ export function electionStageLabel(election: Election): string {
     case 'Draft':
       return 'Not started';
     case 'NominationsOpen':
-      return 'Nominations closed';
+      return now < Date.parse(election.nominationStartAt) ? 'Nominations open soon' : 'Nominations closed';
     case 'VotingOpen':
+      return now < Date.parse(election.votingStartAt) ? 'Voting opens soon' : 'Voting closed';
     case 'Closed':
       return 'Voting closed';
     case 'Published':
       return 'Result published';
   }
+}
+
+/**
+ * Why a member cannot vote right now, in a sentence - or null when nothing needs
+ * saying (they can, they already have, or the election is over).
+ *
+ * The vote button is drawn only when every one of several things is true: the
+ * reader belongs to the group, the status is VotingOpen, the clock is inside the
+ * voting window, somebody is on the ballot, and they have not voted. When any one
+ * fails the button is simply absent, and a missing button with no reason reads
+ * as a bug. This names the one that is missing, in the order a person would fix
+ * them.
+ */
+export function votingNote(
+  election: Election,
+  reader: { readonly inGroup: boolean; readonly canLead: boolean },
+  onBallot: number,
+  now: number = Date.now(),
+): string | null {
+  if (election.status === 'Published' || election.myVoteCandidateId !== null) {
+    return null;
+  }
+
+  if (!reader.inGroup) {
+    return 'Only members of this group can vote. Ask to join it to take part.';
+  }
+
+  const opens = new Date(election.votingStartAt).toLocaleString(undefined, {
+    day: '2-digit',
+    month: 'short',
+    hour: '2-digit',
+    minute: '2-digit',
+  });
+
+  if (election.status === 'Draft' || election.status === 'NominationsOpen') {
+    return (
+      'Voting has not been opened yet. ' +
+      (reader.canLead
+        ? 'Once the ballot is set, use "Open voting" above.'
+        : 'The organiser opens it once nominations are done.') +
+      ` Its window starts ${opens}.`
+    );
+  }
+
+  if (election.status === 'Closed' || now > Date.parse(election.votingEndAt)) {
+    return 'Voting is closed.';
+  }
+
+  if (!election.acceptsVotes) {
+    return `Voting has been switched on, but its window does not start until ${opens}. The vote button appears then.`;
+  }
+
+  return onBallot === 0
+    ? 'Voting is open, but nobody is on the ballot yet. Nominations have to be approved first.'
+    : null;
 }
