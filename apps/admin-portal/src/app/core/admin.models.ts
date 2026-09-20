@@ -773,6 +773,15 @@ export interface GroupElectionDetail {
   readonly candidates: readonly GroupElectionCandidate[];
 }
 
+/** A request to join a group. Mirrors `ApplicationResponse`. */
+export interface GroupApplication {
+  readonly id: string;
+  readonly memberId: string;
+  readonly note: string | null;
+  readonly status: 'Pending' | 'Accepted' | 'Rejected';
+  readonly createdAt: string;
+}
+
 /** What opening an election sends. */
 export interface GroupElectionInput {
   readonly positionTitle: string;

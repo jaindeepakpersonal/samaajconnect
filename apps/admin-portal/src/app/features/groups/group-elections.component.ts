@@ -6,6 +6,7 @@ import { describeError } from '@samaajconnect/shared';
 import { AdminApi } from '../../core/admin-api';
 import { AdminScope } from '../../core/admin-scope';
 import {
+  GroupApplication,
   GroupDetail,
   GroupElection,
   GroupElectionDetail,
@@ -85,7 +86,57 @@ import { isNotFound } from '../../core/http-status';
         </p>
       }
 
-      <div class="card">
+      @if (found.group.iCanLead) {
+        <div class="card">
+          <h2>Join requests</h2>
+          <p class="small">
+            Only members of a group can nominate, be nominated, or vote in its elections. A group
+            created with no president has no members until somebody accepts its first joiners
+            here.
+          </p>
+
+          @if (pending().length === 0) {
+            <p class="empty">
+              Nobody is waiting.
+              @if (found.members.length === 0) {
+                Members ask to join from the member portal.
+              }
+            </p>
+          } @else {
+            <div class="table-wrap">
+              <table>
+                <caption class="sr-only">Members waiting to join {{ found.group.name }}</caption>
+                <thead>
+                  <tr><th>Member</th><th>Note</th><th>Asked</th><th></th></tr>
+                </thead>
+                <tbody>
+                  @for (request of pending(); track request.id) {
+                    <tr>
+                      <td><b>{{ memberName(request.memberId) }}</b></td>
+                      <td>{{ request.note ?? '—' }}</td>
+                      <td>{{ request.createdAt | date: 'd MMM y' }}</td>
+                      <td>
+                        <div class="row-actions">
+                          <button class="btn small" type="button" [disabled]="busy()"
+                            (click)="decideApplication(request, true)">
+                            Accept<span class="sr-only"> {{ memberName(request.memberId) }}</span>
+                          </button>
+                          <button class="btn small alt" type="button" [disabled]="busy()"
+                            (click)="decideApplication(request, false)">
+                            Turn down<span class="sr-only"> {{ memberName(request.memberId) }}</span>
+                          </button>
+                        </div>
+                      </td>
+                    </tr>
+                  }
+                </tbody>
+              </table>
+            </div>
+          }
+        </div>
+      }
+
+      <div class="card spaced">
         <div class="section-head">
           <h2>Elections</h2>
 
@@ -338,6 +389,9 @@ export class GroupElectionsComponent implements OnInit {
   readonly error = signal<string | null>(null);
   readonly done = signal<string | null>(null);
 
+  readonly applications = signal<readonly GroupApplication[]>([]);
+  readonly pending = computed(() => this.applications().filter((a) => a.status === 'Pending'));
+
   readonly showOpen = signal(false);
   readonly expandedId = signal<string | null>(null);
   readonly ballot = signal<GroupElectionDetail | null>(null);
@@ -426,6 +480,23 @@ export class GroupElectionsComponent implements OnInit {
       default:
         return 'Close voting';
     }
+  }
+
+  // ---- Admitting members ----------------------------------------------------
+
+  decideApplication(request: GroupApplication, accept: boolean): void {
+    const found = this.detail();
+
+    if (found === null) {
+      return;
+    }
+
+    const who = this.memberName(request.memberId);
+
+    this.act(
+      this.api.decideGroupApplication(found.group.id, request.id, accept),
+      accept ? `${who} is now a member of ${found.group.name}.` : `${who}'s request was turned down.`,
+    );
   }
 
   // ---- Opening one ---------------------------------------------------------
@@ -577,6 +648,7 @@ export class GroupElectionsComponent implements OnInit {
       next: (found) => {
         this.detail.set(found);
         this.loadElections();
+        this.loadApplications(found);
         this.loadNames();
       },
       error: (failure: unknown) => {
@@ -608,6 +680,22 @@ export class GroupElectionsComponent implements OnInit {
         this.error.set(describeError(failure));
         this.loading.set(false);
       },
+    });
+  }
+
+  /**
+   * The queue is asked for only when the service said this caller may decide it:
+   * anybody else gets a 404, and a speculative call would put one on every visit.
+   */
+  private loadApplications(found: GroupDetail): void {
+    if (!found.group.iCanLead) {
+      this.applications.set([]);
+      return;
+    }
+
+    this.api.groupApplications(found.group.id).subscribe({
+      next: (list) => this.applications.set(list),
+      error: () => this.applications.set([]),
     });
   }
 

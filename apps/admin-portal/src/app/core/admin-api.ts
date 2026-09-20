@@ -44,6 +44,7 @@ import {
   InviteAdminResult,
   City,
   Gautra,
+  GroupApplication,
   GroupDetail,
   GroupElection,
   GroupElectionDetail,
@@ -526,6 +527,26 @@ export class AdminApi {
   /** One group with its roster, and whether this caller may run its elections now. */
   groupDetail(id: string): Observable<GroupDetail> {
     return this.http.get<GroupDetail>(`/v1/volunteer-groups/groups/${id}`);
+  }
+
+  /**
+   * A group's join requests. The service answers 404 to anybody who may not
+   * decide them, and an administrator may only while the group has no president.
+   */
+  groupApplications(groupId: string): Observable<GroupApplication[]> {
+    return this.http.get<GroupApplication[]>(`/v1/volunteer-groups/groups/${groupId}/applications`);
+  }
+
+  /** Accepts or turns down a request. Carries no position: positions come from elections. */
+  decideGroupApplication(
+    groupId: string,
+    applicationId: string,
+    accept: boolean,
+  ): Observable<GroupApplication> {
+    return this.http.post<GroupApplication>(
+      `/v1/volunteer-groups/groups/${groupId}/applications/${applicationId}/decide`,
+      { accept },
+    );
   }
 
   /** A group's elections, newest first. */

@@ -827,3 +827,11 @@ for anybody who is not the president (mirroring `GroupAuthority.CanRunElection`)
 so a group that already has a president shows the elections read-only rather than
 buttons that answer 403. Nominating and voting are deliberately not here - both
 need a seat in the group.
+
+**The page also carries the join-requests queue, because an election with nobody to
+nominate is a dead end.** The electorate is the group's own members, and a group
+created with no president has none - so its nominee picker is empty (and was, in
+the member portal, with no explanation) until somebody accepts its first joiners.
+The service lets an administrator do that only while there is no president, the
+same window as the President election, and this screen asks for the queue only
+when `iCanLead` says it may (anybody else gets a 404).

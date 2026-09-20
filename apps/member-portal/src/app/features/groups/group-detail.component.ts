@@ -459,7 +459,25 @@ import {
                 </div>
 
                 @if (expandedElectionId() === election.id && expandedDetail(); as detail) {
-                  @if (election.acceptsNominations) {
+                  @if (election.acceptsNominations && !isInGroup(found.group)) {
+                    <!-- The electorate is the group's own members: the service refuses a
+                         nomination from anybody outside it, and only a member can be
+                         nominated. A picker here would be blank for exactly the person
+                         who cannot use it. -->
+                    <h3 class="section-heading">Nominate somebody</h3>
+                    <p class="notice info" role="status">
+                      Only members of this group can nominate, be nominated, or vote.
+                      @if (found.members.length === 0) {
+                        Nobody has joined yet: members ask to join, and
+                        {{ found.group.iCanLead ? 'you accept them in Applications above' : 'a Samaaj admin accepts them' }}
+                        - then they can be nominated here.
+                      } @else {
+                        Ask to join this group to take part.
+                      }
+                    </p>
+                  }
+
+                  @if (election.acceptsNominations && isInGroup(found.group)) {
                     <h3 class="section-heading">Nominate somebody</h3>
 
                     <div class="actions">
@@ -978,6 +996,11 @@ export class GroupDetailComponent implements OnInit {
         this.electionBusy.set(false);
       },
     });
+  }
+
+  /** Whether the reader belongs to this group - the electorate for its elections. */
+  isInGroup(group: VolunteerGroup): boolean {
+    return group.iAmAMember || group.iAmThePresident;
   }
 
   setNomineeDraft(electionId: string, memberId: string): void {

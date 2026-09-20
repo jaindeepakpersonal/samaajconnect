@@ -4,6 +4,7 @@ import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { ActivatedRoute, provideRouter } from '@angular/router';
 import { API_CONFIG } from '@samaajconnect/shared';
 import {
+  GroupApplication,
   GroupDetail,
   GroupElection,
   GroupElectionCandidate,
@@ -63,6 +64,17 @@ function candidate(overrides: Partial<GroupElectionCandidate> = {}): GroupElecti
   return { id: 'c1', memberId: 'm1', status: 'Nominated', nominatedBy: 'm2', votes: 0, ...overrides };
 }
 
+function application(overrides: Partial<GroupApplication> = {}): GroupApplication {
+  return {
+    id: 'a1',
+    memberId: 'm1',
+    note: 'I would like to help.',
+    status: 'Pending',
+    createdAt: '2026-07-02T00:00:00Z',
+    ...overrides,
+  };
+}
+
 const MEMBERS = [
   { id: 'm1', fullName: 'Diya Jain' },
   { id: 'm2', fullName: 'Aarav Jain' },
@@ -101,18 +113,33 @@ describe('GroupElectionsComponent', () => {
 
   const GROUP_URL = `/v1/volunteer-groups/groups/${GROUP_ID}`;
 
-  function load(found: GroupDetail = detail(), elections: GroupElection[] = []) {
+  function load(
+    found: GroupDetail = detail(),
+    elections: GroupElection[] = [],
+    applications: GroupApplication[] = [],
+  ) {
     fixture.detectChanges();
     http.expectOne(GROUP_URL).flush(found);
     http.expectOne(`${GROUP_URL}/elections`).flush(elections);
+    answerApplications(found, applications);
     http.expectOne('/v1/members?take=100').flush({ items: MEMBERS, hasMore: false });
     fixture.detectChanges();
+  }
+
+  /** The queue is asked for only when the service said the caller may decide it. */
+  function answerApplications(found: GroupDetail, applications: GroupApplication[] = []) {
+    if (found.group.iCanLead) {
+      http.expectOne(`${GROUP_URL}/applications`).flush(applications);
+    } else {
+      http.expectNone(`${GROUP_URL}/applications`);
+    }
   }
 
   /** What a successful action does next: re-read the group and its elections. */
   function reload(found: GroupDetail = detail(), elections: GroupElection[] = []) {
     http.expectOne(GROUP_URL).flush(found);
     http.expectOne(`${GROUP_URL}/elections`).flush(elections);
+    answerApplications(found);
     fixture.detectChanges();
   }
 
@@ -302,6 +329,51 @@ describe('GroupElectionsComponent', () => {
     expect(component.stage(election({ status: 'NominationsOpen', acceptsNominations: true }))).toBe(
       'Nominations open',
     );
+  });
+
+  it('shows who is waiting to join, so an administrator can admit the first members', () => {
+    load(detail({ iCanLead: true }), [], [application(), application({ id: 'a2', status: 'Accepted' })]);
+
+    expect(text()).toContain('Join requests');
+    expect(text()).toContain('Diya Jain');
+    expect(text()).toContain('I would like to help.');
+    expect(component.pending().length).toBe(1);
+  });
+
+  it('explains that a group with no members has nobody to nominate until joiners are accepted', () => {
+    load({ ...detail(), members: [] });
+
+    expect(text()).toContain('no members until somebody accepts its first joiners');
+    expect(text()).toContain('Nobody is waiting');
+  });
+
+  it('accepts a joiner and re-reads the group', () => {
+    load(detail(), [], [application()]);
+
+    component.decideApplication(application(), true);
+
+    const request = http.expectOne(`${GROUP_URL}/applications/a1/decide`);
+
+    expect(request.request.body).toEqual({ accept: true });
+    request.flush(application({ status: 'Accepted' }));
+    reload();
+
+    expect(text()).toContain('Diya Jain is now a member of Seva Sangh');
+  });
+
+  it('turns a joiner down', () => {
+    load(detail(), [], [application()]);
+
+    component.decideApplication(application(), false);
+
+    expect(http.expectOne(`${GROUP_URL}/applications/a1/decide`).request.body).toEqual({ accept: false });
+  });
+
+  it('does not ask for the queue of a group whose president runs it', () => {
+    // load() asserts no request was made when iCanLead is false.
+    load(detail({ presidentMemberId: 'm1', iCanLead: false }));
+
+    expect(text()).not.toContain('Join requests');
   });
 
   it('says "A member" rather than printing an id it cannot resolve', () => {

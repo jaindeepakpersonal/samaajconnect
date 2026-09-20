@@ -735,6 +735,39 @@ describe('GroupDetailComponent', () => {
     expect(text()).toContain('Secretary');
   });
 
+  it('explains, rather than showing a blank picker, when nobody has joined the group yet', () => {
+    // A group created with no president has no members, and only a member can
+    // nominate or be nominated - so the picker would be empty for the one person
+    // who reached this screen to run the election.
+    load(detail({ iAmThePresident: false, iAmAMember: false, iCanLead: true }, []), [], [election()]);
+
+    component.toggleElection('e1');
+    http.expectOne('/v1/volunteer-groups/elections/e1').flush(electionDetail());
+    fixture.detectChanges();
+
+    expect(text()).toContain('Only members of this group can nominate');
+    expect(text()).toContain('Nobody has joined yet');
+    expect(text()).toContain('you accept them in Applications above');
+    expect(document.body.querySelector('select[id^="nominee-"]')).toBeNull();
+  });
+
+  it('tells a member of the Samaaj who is not in the group to ask to join, with no picker', () => {
+    load(
+      detail({ iAmThePresident: false, iAmAMember: false, iCanLead: false }, [
+        { memberId: PRESIDENT, rolePosition: 'President', joinedAt: new Date().toISOString() },
+      ]),
+      null,
+      [election()],
+    );
+
+    component.toggleElection('e1');
+    http.expectOne('/v1/volunteer-groups/elections/e1').flush(electionDetail());
+    fixture.detectChanges();
+
+    expect(text()).toContain('Ask to join this group to take part');
+    expect(document.body.querySelector('select[id^="nominee-"]')).toBeNull();
+  });
+
   it('expands a ballot, nominates a group member, and the president approves it', () => {
     load(
       detail({ iAmThePresident: true, iAmAMember: true }, [
