@@ -44,6 +44,11 @@ import {
   InviteAdminResult,
   City,
   Gautra,
+  GroupDetail,
+  GroupElection,
+  GroupElectionDetail,
+  GroupElectionInput,
+  GroupElectionStatus,
   IssueReviewAccess,
   IssueStatus,
   Locality,
@@ -514,6 +519,57 @@ export class AdminApi {
       `/v1/volunteer-groups/groups/${id}/president`,
       { newPresidentMemberId },
     );
+  }
+
+  // ---- Volunteer group elections -----------------------------------------
+
+  /** One group with its roster, and whether this caller may run its elections now. */
+  groupDetail(id: string): Observable<GroupDetail> {
+    return this.http.get<GroupDetail>(`/v1/volunteer-groups/groups/${id}`);
+  }
+
+  /** A group's elections, newest first. */
+  listGroupElections(groupId: string): Observable<GroupElection[]> {
+    return this.http.get<GroupElection[]>(`/v1/volunteer-groups/groups/${groupId}/elections`);
+  }
+
+  /**
+   * Sets an election up. It starts as a draft.
+   *
+   * A Samaaj admin may do this only for the "President" position and only while
+   * the group has none; the service refuses anything else with a 403.
+   */
+  openGroupElection(groupId: string, election: GroupElectionInput): Observable<GroupElection> {
+    return this.http.post<GroupElection>(
+      `/v1/volunteer-groups/groups/${groupId}/elections`,
+      election,
+    );
+  }
+
+  groupElection(id: string): Observable<GroupElectionDetail> {
+    return this.http.get<GroupElectionDetail>(`/v1/volunteer-groups/elections/${id}`);
+  }
+
+  /** Opens nominations, opens voting, or closes. Strictly forward. */
+  moveGroupElection(id: string, status: GroupElectionStatus): Observable<GroupElection> {
+    return this.http.post<GroupElection>(`/v1/volunteer-groups/elections/${id}/status`, { status });
+  }
+
+  /** Puts a nomination on the ballot, or takes it off before voting opens. */
+  decideGroupCandidate(
+    electionId: string,
+    candidateId: string,
+    approve: boolean,
+  ): Observable<GroupElectionDetail> {
+    return this.http.post<GroupElectionDetail>(
+      `/v1/volunteer-groups/elections/${electionId}/candidates/${candidateId}/decide`,
+      { approve },
+    );
+  }
+
+  /** Freezes the winner and installs them in the position - the group's president, for that election. */
+  publishGroupElection(id: string): Observable<GroupElection> {
+    return this.http.post<GroupElection>(`/v1/volunteer-groups/elections/${id}/publish`, {});
   }
 
   // ---- Social issues -----------------------------------------------------

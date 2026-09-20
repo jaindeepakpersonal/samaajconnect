@@ -158,6 +158,14 @@ export const routes: Routes = [
           ),
       },
       {
+        path: 'groups/:id',
+        title: 'Volunteer group - samaajconnect admin',
+        loadComponent: () =>
+          import('./features/groups/group-elections.component').then(
+            (m) => m.GroupElectionsComponent,
+          ),
+      },
+      {
         path: 'panch',
         title: 'Samaaj Panch - samaajconnect admin',
         loadComponent: () =>

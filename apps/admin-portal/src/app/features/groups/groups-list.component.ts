@@ -1,5 +1,6 @@
 import { Component, OnInit, computed, inject, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
+import { RouterLink } from '@angular/router';
 import { describeError } from '@samaajconnect/shared';
 import { AdminApi } from '../../core/admin-api';
 import { AdminScope } from '../../core/admin-scope';
@@ -31,7 +32,7 @@ import { isNotFound } from '../../core/http-status';
  */
 @Component({
   selector: 'app-groups-list',
-  imports: [FormsModule],
+  imports: [FormsModule, RouterLink],
   template: `
     <h1 class="title">Volunteer groups</h1>
     <p class="sub">Set a group up, optionally name its president, and stand one down.</p>
@@ -71,7 +72,7 @@ import { isNotFound } from '../../core/http-status';
                 @for (group of groups(); track group.id) {
                   <tr>
                     <td>
-                      <b>{{ group.name }}</b>
+                      <a [routerLink]="['/groups', group.id]"><b>{{ group.name }}</b></a>
                       @if (group.description) {
                         <div class="muted">{{ group.description }}</div>
                       }

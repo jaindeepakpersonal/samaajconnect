@@ -709,6 +709,79 @@ export interface VolunteerGroup {
   readonly memberCount: number;
 }
 
+// ---- Volunteer group elections -------------------------------------------
+
+/**
+ * A group as its own detail endpoint returns it: the list shape plus the two
+ * flags the service computes for the asker.
+ *
+ * `iCanLead` is the one this screen branches on. It is the service's answer to
+ * "may this caller run this group's elections right now" - the president, or a
+ * Samaaj admin **only while the group has no president** - so the panel never
+ * re-derives it from a role and a president id.
+ */
+export interface LedGroup extends VolunteerGroup {
+  readonly iAmThePresident: boolean;
+  readonly iCanLead: boolean;
+}
+
+export interface GroupRosterMember {
+  readonly memberId: string;
+  readonly rolePosition: string | null;
+  readonly joinedAt: string;
+}
+
+/** Mirrors `GroupDetailResponse`. */
+export interface GroupDetail {
+  readonly group: LedGroup;
+  readonly members: readonly GroupRosterMember[];
+}
+
+export type GroupElectionStatus = 'Draft' | 'NominationsOpen' | 'VotingOpen' | 'Closed' | 'Published';
+
+/** Mirrors `ElectionResponse` in volunteer-groups-service. */
+export interface GroupElection {
+  readonly id: string;
+  readonly groupId: string;
+  readonly positionTitle: string;
+  readonly nominationStartAt: string;
+  readonly nominationEndAt: string;
+  readonly votingStartAt: string;
+  readonly votingEndAt: string;
+  readonly status: GroupElectionStatus;
+
+  /** Right now: the status says so *and* the clock agrees. */
+  readonly acceptsNominations: boolean;
+  readonly acceptsVotes: boolean;
+  readonly candidateCount: number;
+  readonly winnerMemberId: string | null;
+  readonly publishedAt: string | null;
+  readonly createdAt: string;
+}
+
+/** A group election's vote counts are never hidden - it has no results-visibility setting. */
+export interface GroupElectionCandidate {
+  readonly id: string;
+  readonly memberId: string;
+  readonly status: 'Nominated' | 'Approved';
+  readonly nominatedBy: string;
+  readonly votes: number;
+}
+
+export interface GroupElectionDetail {
+  readonly election: GroupElection;
+  readonly candidates: readonly GroupElectionCandidate[];
+}
+
+/** What opening an election sends. */
+export interface GroupElectionInput {
+  readonly positionTitle: string;
+  readonly nominationStartAt: string;
+  readonly nominationEndAt: string;
+  readonly votingStartAt: string;
+  readonly votingEndAt: string;
+}
+
 // ---- Social issues -------------------------------------------------------
 
 /**

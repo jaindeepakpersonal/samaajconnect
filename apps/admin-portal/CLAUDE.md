@@ -34,6 +34,7 @@ screen. The spec is `docs/product/wireframes/admin-panel-wireframes.html`.
 | Samaaj Panch | `/panch` | — | built; no wireframe covers it. The seated Panch with Remove, and the elections list with a create modal |
 | Panch election | `/panch/:id` | — | built. Stage, approving nominations, the tally, publishing (which replaces the Panch) |
 | Volunteer Groups | `/groups` | `#groups` (member-facing) | built. Create (president optional), set a president later, and stand one down |
+| Group elections | `/groups/:id` | — | built; no wireframe covers running one. Open an election, approve nominations, move its stages, publish - an administrator for the President election of a group with no president, the president for any |
 | Social Issues | `/issues` | `#issues` | built. The reviewer's approval queue |
 | Members | `/members` | `#members` | built. Search the Samaaj directory and open somebody |
 | Member detail | `/members/:id` | — | built; the wireframe's "View" had no screen behind it. The correction form |
@@ -277,8 +278,10 @@ is happening, because "deactivate" alone reads like deletion.
 starts on "No president yet" and the list says "Not set" for such a group, with
 a "Set president" control that is the same panel as "Change". A group with none
 is not a dead end any more: a Samaaj admin accepts its joiners and can run a
-"President" election in the member portal until one exists, and that election's
-winner becomes the real president (see volunteer-groups-service's own notes).
+"President" election until one exists - members nominate and vote in the member
+portal, the administrator opens it, approves the ballot and publishes it from the
+group's own screen here - and that election's winner becomes the real president
+(see volunteer-groups-service's own notes).
 Standing one down
 keeps its members and history and is reversible, so the screen offers "Bring
 back" rather than leaving it looking deleted.
@@ -809,3 +812,18 @@ out loud: **publishing replaces the whole Panch**, so the confirmation
 names that. Removing a member asks first and leaves the seat empty; nobody
 is promoted. Names come from the member directory (`/v1/members`, first
 hundred) and fall back to 'A member' rather than a GUID.
+
+**Volunteer group elections had no screen in this panel, only in the member
+portal, and the one election an administrator is meant to run was the case that
+needed it most.** A group can be created with no president, and the service lets
+a Samaaj admin run its *President* election - and only that - while none exists.
+The member portal's group screen has the whole flow, but a Super Admin is not a
+member and an administrator should not have to change apps to start the election
+that is theirs. `/groups/:id` covers opening one, approving who reaches the
+ballot, the stage button, the tally, and a confirmed publish. What it offers is
+the service's own answer: `group.iCanLead` says whether the caller may run
+elections now, and per election the screen also requires the President position
+for anybody who is not the president (mirroring `GroupAuthority.CanRunElection`),
+so a group that already has a president shows the elections read-only rather than
+buttons that answer 403. Nominating and voting are deliberately not here - both
+need a seat in the group.
