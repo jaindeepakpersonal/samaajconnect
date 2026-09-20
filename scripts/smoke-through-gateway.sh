@@ -2402,13 +2402,6 @@ check "a member cannot decide about their own issue" 403 \
   "$(status -X POST "$GATEWAY/v1/social-issues/$ISSUE_ID/status" -H 'Content-Type: application/json' \
      -H "Authorization: Bearer $MEMBER_TOKEN" -d '{"status":"DecisionPending","reason":null}')"
 
-# The one promise this service makes: closing needs a decision, so a plain
-# status move cannot do it.
-check "closing a pending issue by status alone is refused" 409 \
-  "$(status -X POST "$GATEWAY/v1/social-issues/$ISSUE_ID/status" -H 'Content-Type: application/json' \
-     -H "Authorization: Bearer $ADMIN_TOKEN" -H "$ADMIN_TENANT_HEADER" \
-     -d '{"status":"Closed","reason":null}')"
-
 check "rejecting without saying why is refused" 400 \
   "$(status -X POST "$GATEWAY/v1/social-issues/$ISSUE_ID/status" -H 'Content-Type: application/json' \
      -H "Authorization: Bearer $ADMIN_TOKEN" -H "$ADMIN_TENANT_HEADER" \
@@ -2432,6 +2425,14 @@ check "the reviewer puts it in front of the Panch" 200 \
   "$(status -X POST "$GATEWAY/v1/social-issues/$ISSUE_ID/status" -H 'Content-Type: application/json' \
      -H "Authorization: Bearer $ADMIN_TOKEN" -H "$ADMIN_TENANT_HEADER" \
      -d '{"status":"DecisionPending","reason":null}')"
+
+# The one promise this service makes: closing needs a decision, so a plain
+# status move cannot do it. Not a row in the table at all, so this is refused
+# before any permission check - true for the author as much as a reviewer.
+check "closing a pending issue by status alone is refused" 409 \
+  "$(status -X POST "$GATEWAY/v1/social-issues/$ISSUE_ID/status" -H 'Content-Type: application/json' \
+     -H "Authorization: Bearer $ADMIN_TOKEN" -H "$ADMIN_TENANT_HEADER" \
+     -d '{"status":"Closed","reason":null}')"
 
 if curl -s -H "Authorization: Bearer $CHILD_TOKEN" "$GATEWAY/v1/social-issues" \
    | grep -q "$ISSUE_TITLE"; then
