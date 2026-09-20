@@ -18,6 +18,12 @@ import {
   CampaignInput,
   CampaignResult,
   CampaignStatus,
+  Election,
+  ElectionDetail,
+  ElectionInput,
+  ElectionResult,
+  ElectionStatus,
+  Panel,
   ClassExam,
   Competition,
   CompetitionDetail,
@@ -606,6 +612,57 @@ export class AdminApi {
   /** The frozen ranking. 404 until it has been published. */
   campaignResults(id: string): Observable<CampaignResult> {
     return this.http.get<CampaignResult>(`/v1/celebrity-voting/campaigns/${id}/results`);
+  }
+
+  // ---- Samaaj Panch ------------------------------------------------------
+
+  /** The seated Panch. A 404 means the panch module is switched off for this Samaaj. */
+  panel(): Observable<Panel> {
+    return this.http.get<Panel>('/v1/panch/panel');
+  }
+
+  /** Unseats one member. The seat stays empty until the next election. */
+  removePanelMember(memberId: string): Observable<Panel> {
+    return this.http.delete<Panel>(`/v1/panch/panel/${memberId}`);
+  }
+
+  listElections(): Observable<Election[]> {
+    return this.http.get<Election[]>('/v1/panch/elections');
+  }
+
+  election(id: string): Observable<ElectionDetail> {
+    return this.http.get<ElectionDetail>(`/v1/panch/elections/${id}`);
+  }
+
+  /** Sets an election up. It starts as a draft. */
+  createElection(election: ElectionInput): Observable<Election> {
+    return this.http.post<Election>('/v1/panch/elections', election);
+  }
+
+  /** Moves an election on one stage. Never backwards. */
+  moveElection(id: string, status: ElectionStatus): Observable<Election> {
+    return this.http.post<Election>(`/v1/panch/elections/${id}/status`, { status });
+  }
+
+  /** Puts a nomination on the ballot, or takes it off before voting opens. */
+  decideElectionCandidate(
+    electionId: string,
+    candidateId: string,
+    approve: boolean,
+  ): Observable<ElectionDetail> {
+    return this.http.post<ElectionDetail>(
+      `/v1/panch/elections/${electionId}/candidates/${candidateId}/decide`,
+      { approve },
+    );
+  }
+
+  /** Freezes the ranking and seats the winners, replacing the current Panch. */
+  publishElection(id: string): Observable<ElectionResult> {
+    return this.http.post<ElectionResult>(`/v1/panch/elections/${id}/results`, {});
+  }
+
+  electionResults(id: string): Observable<ElectionResult> {
+    return this.http.get<ElectionResult>(`/v1/panch/elections/${id}/results`);
   }
 
   // ---- Events ------------------------------------------------------------

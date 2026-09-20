@@ -36,6 +36,8 @@ before translating another screen.
 | Orders | `/businesses/orders` | — | built. Placed/Received tabs |
 | Competitions | `/competitions` | — | built; no wireframe covers this new module. Browse, register, withdraw |
 | Competition detail | `/competitions/:id` | — | built. Rounds and entries, a judging section visible only to an assigned judge, and the published result |
+| Samaaj Panch | `/panch` | — | built; no wireframe covers it. Who sits on the Panch, and the elections |
+| Panch election | `/panch/:id` | — | built. Nominate somebody by name, cast one final ballot of up to ten, read the result |
 | Pathshala events | — | `#pathevents` | not built — no endpoint exists |
 | Set your password | `/activate` | — | built; no wireframe covers redeeming an activation code, and three admin screens told people to do it here |
 | Forgot password | `/forgot`, `/reset` | `#forgot`, `#otp` | built — redeems into a new password, not a session |
@@ -867,3 +869,16 @@ which is what a second `@if`/`@else` pair reads as correct at a glance.
 Not yet done: a pass with a real screen reader, and keyboard-only walkthroughs
 of the longer workflows (the Boli bid form, the issue transitions). Those need a
 person, not a script.
+
+**Samaaj Panch is a new module, with no wireframe to translate.** Behind its
+own key (`ModuleKeys.Panch`, off by default), under Community. Three things
+the screens keep straight. **A ballot is up to ten names and is final:**
+ticking stops at the seat count rather than letting somebody build an
+eleventh choice and find out on submit, there is no tick box against your
+own name (the service refuses a self-vote), and casting twice is reported
+by the service as `accepted: false` rather than an error. **A null vote
+count is not zero** - `tallyVisible` says whether this caller is shown
+counts at all. **Open means the flags, not the status:** the screens read
+`acceptsNominations`/`acceptsVotes`, because only the server knows the time
+it is deciding against. Names are resolved once per seated member or
+candidate through the directory (`members.get`) and fall back to "A member".

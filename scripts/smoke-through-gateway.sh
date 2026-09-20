@@ -4138,6 +4138,172 @@ competition_checks() {
 competition_checks || echo "  ..    the rest of the Competitions checks were skipped"
 
 echo
+echo "Samaaj Panch"
+
+# Wrapped in a function for the same reason competition_checks is.
+panch_checks() {
+
+  check "switching the panch module on" 200 \
+    "$(status -X PUT "$GATEWAY/v1/identity/tenants/$TENANT_ID/modules" \
+       -H 'Content-Type: application/json' -H "Authorization: Bearer $ADMIN_TOKEN" -H "$ADMIN_TENANT_HEADER" \
+       -d '{"enabledModules":["community","panch"]}')"
+
+  sleep 62
+
+  refresh_tokens
+
+  MEMBER_ID=$(curl -s -H "Authorization: Bearer $MEMBER_TOKEN" "$GATEWAY/v1/identity/me" | json_field userId)
+  CHILD_MEMBER_ID=$(curl -s -H "Authorization: Bearer $CHILD_TOKEN" "$GATEWAY/v1/identity/me" | json_field userId)
+  OTHER_CANDIDATE="dddddddd-0000-4000-8000-00000000d002"
+
+  # Nominations and voting are never open at once, so this section has a real
+  # window to wait out, the same as the celebrity-voting one.
+  NOMINATIONS_OPENED=$(date -u -d '-1 minute' +%Y-%m-%dT%H:%M:%SZ)
+  NOMINATIONS_CLOSE=$(date -u -d '+45 seconds' +%Y-%m-%dT%H:%M:%SZ)
+  VOTING_CLOSES=$(date -u -d '+7 days' +%Y-%m-%dT%H:%M:%SZ)
+
+  ELECTION=$(curl -s -X POST "$GATEWAY/v1/panch/elections" \
+    -H 'Content-Type: application/json' -H "Authorization: Bearer $ADMIN_TOKEN" -H "$ADMIN_TENANT_HEADER" \
+    -d "{\"title\":\"Smoke Panch $(date +%s)\",\"description\":null,\"nominationStartAt\":\"$NOMINATIONS_OPENED\",\"nominationEndAt\":\"$NOMINATIONS_CLOSE\",\"votingStartAt\":\"$NOMINATIONS_CLOSE\",\"votingEndAt\":\"$VOTING_CLOSES\",\"resultsVisibility\":\"Live\"}")
+
+  ELECTION_ID=$(printf '%s' "$ELECTION" | json_field id)
+
+  if [ -n "$ELECTION_ID" ]; then
+    echo "  ok    an administrator sets a Panch election up"
+    pass=$((pass + 1))
+  else
+    echo "  FAIL  setting a Panch election up (got '$ELECTION')"
+    fail=$((fail + 1))
+    return 1
+  fi
+
+  check "a member cannot set one up" 403 \
+    "$(status -X POST "$GATEWAY/v1/panch/elections" -H 'Content-Type: application/json' \
+       -H "Authorization: Bearer $MEMBER_TOKEN" \
+       -d "{\"title\":\"Mine\",\"description\":null,\"nominationStartAt\":\"$NOMINATIONS_OPENED\",\"nominationEndAt\":\"$NOMINATIONS_CLOSE\",\"votingStartAt\":\"$NOMINATIONS_CLOSE\",\"votingEndAt\":\"$VOTING_CLOSES\",\"resultsVisibility\":\"Live\"}")"
+
+  check "opening nominations is accepted" 200 \
+    "$(status -X POST "$GATEWAY/v1/panch/elections/$ELECTION_ID/status" \
+       -H 'Content-Type: application/json' -H "Authorization: Bearer $ADMIN_TOKEN" -H "$ADMIN_TENANT_HEADER" \
+       -d '{"status":"NominationsOpen"}')"
+
+  for NOMINEE in "$CHILD_MEMBER_ID" "$MEMBER_ID" "$OTHER_CANDIDATE"; do
+    NOMINATION=$(curl -s -X POST "$GATEWAY/v1/panch/elections/$ELECTION_ID/candidates" \
+      -H 'Content-Type: application/json' -H "Authorization: Bearer $MEMBER_TOKEN" \
+      -d "{\"memberId\":\"$NOMINEE\"}")
+    CANDIDATE_ID=$(printf '%s' "$NOMINATION" | json_field candidateId)
+
+    if [ -z "$CANDIDATE_ID" ]; then
+      echo "  FAIL  nominating a member (got '$NOMINATION')"
+      fail=$((fail + 1))
+      return 1
+    fi
+
+    check "an administrator approves a nomination" 200 \
+      "$(status -X POST "$GATEWAY/v1/panch/elections/$ELECTION_ID/candidates/$CANDIDATE_ID/decide" \
+         -H 'Content-Type: application/json' -H "Authorization: Bearer $ADMIN_TOKEN" -H "$ADMIN_TENANT_HEADER" \
+         -d '{"approve":true}')"
+
+    if [ "$NOMINEE" = "$CHILD_MEMBER_ID" ]; then CHILD_CANDIDATE_ID=$CANDIDATE_ID; fi
+    if [ "$NOMINEE" = "$MEMBER_ID" ]; then MEMBER_CANDIDATE_ID=$CANDIDATE_ID; fi
+  done
+
+  check "a member cannot open voting" 403 \
+    "$(status -X POST "$GATEWAY/v1/panch/elections/$ELECTION_ID/status" \
+       -H 'Content-Type: application/json' -H "Authorization: Bearer $MEMBER_TOKEN" \
+       -d '{"status":"VotingOpen"}')"
+
+  echo "  ..    waiting for nominations to close"
+  while [ "$(date -u +%s)" -lt "$(date -u -d "$NOMINATIONS_CLOSE" +%s)" ]; do
+    sleep 2
+  done
+
+  check "opening voting is accepted" 200 \
+    "$(status -X POST "$GATEWAY/v1/panch/elections/$ELECTION_ID/status" \
+       -H 'Content-Type: application/json' -H "Authorization: Bearer $ADMIN_TOKEN" -H "$ADMIN_TENANT_HEADER" \
+       -d '{"status":"VotingOpen"}')"
+
+  check "a member cannot back themselves" 409 \
+    "$(status -X POST "$GATEWAY/v1/panch/elections/$ELECTION_ID/ballots" \
+       -H 'Content-Type: application/json' -H "Authorization: Bearer $MEMBER_TOKEN" \
+       -d "{\"candidateIds\":[\"$MEMBER_CANDIDATE_ID\"]}")"
+
+  FIRST_BALLOT=$(curl -s -X POST "$GATEWAY/v1/panch/elections/$ELECTION_ID/ballots" \
+    -H 'Content-Type: application/json' -H "Authorization: Bearer $MEMBER_TOKEN" \
+    -d "{\"candidateIds\":[\"$CHILD_CANDIDATE_ID\"]}")
+
+  if printf '%s' "$FIRST_BALLOT" | grep -q '"accepted":true'; then
+    echo "  ok    a member ballot is accepted"
+    pass=$((pass + 1))
+  else
+    echo "  FAIL  a member ballot was not accepted (got '$FIRST_BALLOT')"
+    fail=$((fail + 1))
+  fi
+
+  SECOND_BALLOT=$(curl -s -X POST "$GATEWAY/v1/panch/elections/$ELECTION_ID/ballots" \
+    -H 'Content-Type: application/json' -H "Authorization: Bearer $MEMBER_TOKEN" \
+    -d "{\"candidateIds\":[\"$CHILD_CANDIDATE_ID\"]}")
+
+  if printf '%s' "$SECOND_BALLOT" | grep -q '"accepted":false'; then
+    echo "  ok    a second ballot from the same member is reported, not applied"
+    pass=$((pass + 1))
+  else
+    echo "  FAIL  a second ballot was not refused (got '$SECOND_BALLOT')"
+    fail=$((fail + 1))
+  fi
+
+  check "publishing before the election closes is refused" 409 \
+    "$(status -X POST "$GATEWAY/v1/panch/elections/$ELECTION_ID/results" \
+       -H "Authorization: Bearer $ADMIN_TOKEN" -H "$ADMIN_TENANT_HEADER")"
+
+  check "the administrator closes the election" 200 \
+    "$(status -X POST "$GATEWAY/v1/panch/elections/$ELECTION_ID/status" \
+       -H 'Content-Type: application/json' -H "Authorization: Bearer $ADMIN_TOKEN" -H "$ADMIN_TENANT_HEADER" \
+       -d '{"status":"Closed"}')"
+
+  check "a member cannot publish the result" 403 \
+    "$(status -X POST "$GATEWAY/v1/panch/elections/$ELECTION_ID/results" \
+       -H "Authorization: Bearer $MEMBER_TOKEN")"
+
+  check "the administrator publishes the result" 200 \
+    "$(status -X POST "$GATEWAY/v1/panch/elections/$ELECTION_ID/results" \
+       -H "Authorization: Bearer $ADMIN_TOKEN" -H "$ADMIN_TENANT_HEADER")"
+
+  PANEL=$(curl -s -H "Authorization: Bearer $CHILD_TOKEN" "$GATEWAY/v1/panch/panel")
+
+  if printf '%s' "$PANEL" | grep -q "$CHILD_MEMBER_ID" && printf '%s' "$PANEL" | grep -q '"viewerIsMember":true'; then
+    echo "  ok    the winner is seated on the Panch and knows it"
+    pass=$((pass + 1))
+  else
+    echo "  FAIL  the winner is not on the panel (got '$PANEL')"
+    fail=$((fail + 1))
+  fi
+
+  check "a member cannot remove a panel member" 403 \
+    "$(status -X DELETE "$GATEWAY/v1/panch/panel/$CHILD_MEMBER_ID" -H "Authorization: Bearer $MEMBER_TOKEN")"
+
+  check "the administrator removes a panel member" 200 \
+    "$(status -X DELETE "$GATEWAY/v1/panch/panel/$CHILD_MEMBER_ID" \
+       -H "Authorization: Bearer $ADMIN_TOKEN" -H "$ADMIN_TENANT_HEADER")"
+
+  check "switching the panch module off" 200 \
+    "$(status -X PUT "$GATEWAY/v1/identity/tenants/$TENANT_ID/modules" \
+       -H 'Content-Type: application/json' -H "Authorization: Bearer $ADMIN_TOKEN" -H "$ADMIN_TENANT_HEADER" \
+       -d '{"enabledModules":["community"]}')"
+
+  sleep 62
+
+  # Refreshed for the reason competition_checks refreshes: this function's
+  # sleeps and its voting wait add real elapsed time.
+  refresh_tokens
+
+  check "the panch route then answers 404" 404 \
+    "$(status -H "Authorization: Bearer $MEMBER_TOKEN" "$GATEWAY/v1/panch/panel")"
+}
+
+panch_checks || echo "  ..    the rest of the Panch checks were skipped"
+
+echo
 echo "Master data"
 
 master_data_checks() {

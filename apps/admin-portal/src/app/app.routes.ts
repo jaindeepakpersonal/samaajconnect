@@ -158,6 +158,20 @@ export const routes: Routes = [
           ),
       },
       {
+        path: 'panch',
+        title: 'Samaaj Panch - samaajconnect admin',
+        loadComponent: () =>
+          import('./features/panch/panch.component').then((m) => m.PanchComponent),
+      },
+      {
+        path: 'panch/:id',
+        title: 'Panch election - samaajconnect admin',
+        loadComponent: () =>
+          import('./features/panch/election-detail.component').then(
+            (m) => m.ElectionDetailComponent,
+          ),
+      },
+      {
         path: 'competitions',
         title: 'Competitions - samaajconnect admin',
         loadComponent: () =>

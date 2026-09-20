@@ -71,6 +71,14 @@ public static class AuthorizationCatalog
         /// not a new platform role.
         /// </summary>
         public static readonly Guid CompetitionManage = new("b0000000-0000-0000-0000-000000000019");
+
+        /// <summary>
+        /// Run a Samaaj Panch election - set it up, open and close its stages,
+        /// approve candidates, publish the result - and remove a seated member.
+        /// Samaaj-admin-only: the admin convenes the election, the members
+        /// choose the Panch.
+        /// </summary>
+        public static readonly Guid PanchManage = new("b0000000-0000-0000-0000-000000000020");
     }
 
     public static IReadOnlyList<Role> Roles { get; } =
@@ -113,6 +121,7 @@ public static class AuthorizationCatalog
         new(PermissionIds.MasterDataManage, "MasterData.Manage"),
         new(PermissionIds.GautraManage, "Gautra.Manage"),
         new(PermissionIds.CompetitionManage, "Competition.Manage"),
+        new(PermissionIds.PanchManage, "Panch.Manage"),
     ];
 
     /// <summary>
@@ -137,6 +146,7 @@ public static class AuthorizationCatalog
         new(RoleIds.SamaajAdmin, PermissionIds.SocialIssuesApprove),
         new(RoleIds.SamaajAdmin, PermissionIds.CelebrityVotingConfigure),
         new(RoleIds.SamaajAdmin, PermissionIds.CompetitionManage),
+        new(RoleIds.SamaajAdmin, PermissionIds.PanchManage),
 
         // Running a Pathshala - sessions, classes, teacher assignments, placing
         // students - is the Samaaj's job. Only *creating* the master record is

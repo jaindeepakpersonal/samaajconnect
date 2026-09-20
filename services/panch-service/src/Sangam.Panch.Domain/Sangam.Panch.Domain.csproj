@@ -1,0 +1,6 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!-- Domain has no framework dependencies by design (ARCHITECTURE.md §2).
+       If a PackageReference ever appears here, question it. -->
+
+</Project>

@@ -39,6 +39,9 @@ export const ModuleKeys = {
 
   /** Off by default; not every Samaaj wants to run a competition. */
   Competitions: 'competitions',
+
+  /** Off by default; a Samaaj switches it on once it is ready to elect a Panch. */
+  Panch: 'panch',
 } as const;
 
 export type ModuleKey = (typeof ModuleKeys)[keyof typeof ModuleKeys];

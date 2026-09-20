@@ -155,6 +155,18 @@ export const routes: Routes = [
           ),
       },
       {
+        path: 'panch',
+        title: 'Samaaj Panch - samaajconnect',
+        loadComponent: () =>
+          import('./features/panch/panch.component').then((m) => m.PanchComponent),
+      },
+      {
+        path: 'panch/:id',
+        title: 'Panch election - samaajconnect',
+        loadComponent: () =>
+          import('./features/panch/election.component').then((m) => m.ElectionComponent),
+      },
+      {
         path: 'pathshala',
         title: 'Jain Pathshala - samaajconnect',
         loadComponent: () =>

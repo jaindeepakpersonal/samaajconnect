@@ -55,6 +55,9 @@ public static class ModuleCatalog
     /// <summary>Samaaj competitions: registration, judged rounds and published results. Off by default - see Boli's own note.</summary>
     public const string Competitions = "competitions";
 
+    /// <summary>The Samaaj Panch: the elected ten-member jury that judges social issues. Off by default - a Samaaj switches it on once it is ready to elect one.</summary>
+    public const string Panch = "panch";
+
     public static IReadOnlyList<ModuleDescriptor> All { get; } =
     [
         new(Community, "Timeline & Volunteer Groups", DefaultOn: true),
@@ -77,6 +80,10 @@ public static class ModuleCatalog
         // Same reasoning again: running a competition is optional, not every
         // Samaaj wants one.
         new(Competitions, "Competitions", DefaultOn: false),
+
+        // Electing a Panch is a decision a Samaaj makes; until it does, social
+        // issues are reviewed by its administrators as before.
+        new(Panch, "Samaaj Panch", DefaultOn: false),
     ];
 
     public static IReadOnlyList<string> DefaultKeys { get; } =

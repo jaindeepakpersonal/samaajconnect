@@ -399,3 +399,36 @@ before or after publication — only the published ranking's rank and
 average are. A leaf service: it consumes nothing and holds no copy of
 another service's data, so account erasure touches nothing here beyond
 what the platform's own tenant isolation already scopes away.
+
+## 16. Samaaj Panch
+
+**PanchElection** — `Id, TenantId, Title, Description (nullable),
+NominationStartAt, NominationEndAt, VotingStartAt, VotingEndAt,
+ResultsVisibility (Live/HiddenUntilClose), Status (Draft/NominationsOpen/
+VotingOpen/Closed/Published — strictly forward), CreatedAt` — owns its
+`Candidate` rows. Seats are fixed at ten.
+
+**Candidate** — `Id, ElectionId, MemberId, NominatedByMemberId, Status
+(Nominated/Approved/Removed), NominatedAt` — unique on `(ElectionId,
+MemberId)`: one candidacy per member, or their votes would split.
+
+**Ballot** — `Id, TenantId, ElectionId, VoterMemberId, CastAt` — unique on
+`(ElectionId, VoterMemberId)`. This index is the one-ballot-per-member
+guarantee.
+
+**Vote** — `Id, TenantId, ElectionId, CandidateId, VoterMemberId` — one
+row per choice on a ballot (at most ten), unique on `(ElectionId,
+VoterMemberId, CandidateId)`. Inserted with its ballot in one transaction.
+
+**ElectionResult** — `Id, TenantId, ElectionId (unique), RankedCandidateIds
+(jsonb), SeatedMemberIds (jsonb), PublishedBy, PublishedAt` — the frozen
+ranking; computed once.
+
+**PanelMember** — `Id, TenantId, MemberId, ElectionId (nullable),
+SeatedAt` — the seated roster, unique on `(TenantId, MemberId)`. Replaced
+wholesale when an election is published; one row is removed when an
+administrator unseats a member.
+
+social-issues-service keeps its own copy of the roster, fed by
+`panch.panel.changed.v1` (see SERVICES.md §15); it never queries this
+service.

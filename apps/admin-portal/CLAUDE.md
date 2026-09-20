@@ -31,6 +31,8 @@ screen. The spec is `docs/product/wireframes/admin-panel-wireframes.html`.
 | Campaign detail | `/voting/:id` | — | built; no wireframe covers running one. Stage, ballot, nominations, tally, result |
 | Competitions | `/competitions` | — | built; no wireframe covers this new module. Competitions and setting one up |
 | Competition detail | `/competitions/:id` | — | built; no wireframe covers running one. Stage, judges, rounds, entries, publish results |
+| Samaaj Panch | `/panch` | — | built; no wireframe covers it. The seated Panch with Remove, and the elections list with a create modal |
+| Panch election | `/panch/:id` | — | built. Stage, approving nominations, the tally, publishing (which replaces the Panch) |
 | Volunteer Groups | `/groups` | `#groups` (member-facing) | built. Create (president optional), set a president later, and stand one down |
 | Social Issues | `/issues` | `#issues` | built. The reviewer's approval queue |
 | Members | `/members` | `#members` | built. Search the Samaaj directory and open somebody |
@@ -794,3 +796,16 @@ stacked it, never collapsed it.
 
 Not yet done: a pass with a real screen reader, and a keyboard-only walkthrough
 of the role matrix, which is the widest table in either app.
+
+**Samaaj Panch is a new module, with no wireframe to translate.** It sits
+under Community, and is off by default (`panch` module key; a 404 from
+`/v1/panch/panel` reads as 'this Samaaj does not run it', not as an error).
+An administrator convenes an election and runs its stages, but never
+chooses who wins: this screen has "Set up an election" and "Remove" and
+deliberately no "Appoint". The election detail is the campaign detail's
+shape again - one button for the one next stage, approve or turn down a
+nomination, a confirmed publish - with one difference the screen has to say
+out loud: **publishing replaces the whole Panch**, so the confirmation
+names that. Removing a member asks first and leaves the seat empty; nobody
+is promoted. Names come from the member directory (`/v1/members`, first
+hundred) and fall back to 'A member' rather than a GUID.

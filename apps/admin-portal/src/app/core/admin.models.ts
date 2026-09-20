@@ -610,6 +610,87 @@ export interface CampaignResult {
   readonly publishedAt: string;
 }
 
+// ---- Samaaj Panch --------------------------------------------------------
+
+/** Forward only, like a campaign; publishing is its own call, then `Published`. */
+export type ElectionStatus = 'Draft' | 'NominationsOpen' | 'VotingOpen' | 'Closed' | 'Published';
+
+/** What creating an election sends. */
+export interface ElectionInput {
+  readonly title: string;
+  readonly description: string | null;
+  readonly nominationStartAt: string;
+  readonly nominationEndAt: string;
+  readonly votingStartAt: string;
+  readonly votingEndAt: string;
+  readonly resultsVisibility: ResultsVisibility;
+}
+
+/** Mirrors panch-service's `ElectionResponse`. */
+export interface Election {
+  readonly id: string;
+  readonly title: string;
+  readonly description: string | null;
+  readonly nominationStartAt: string;
+  readonly nominationEndAt: string;
+  readonly votingStartAt: string;
+  readonly votingEndAt: string;
+
+  /** The Panch is this many members, and a voter may back up to this many. */
+  readonly seats: number;
+  readonly resultsVisibility: ResultsVisibility;
+  readonly status: ElectionStatus;
+  readonly acceptsNominations: boolean;
+  readonly acceptsVotes: boolean;
+  readonly myChoices: readonly string[] | null;
+  readonly candidateCount: number;
+  readonly createdAt: string;
+}
+
+/** Nominated is put forward; Approved is on the ballot. */
+export interface ElectionCandidate {
+  readonly id: string;
+  readonly memberId: string;
+  readonly status: CandidateStatus;
+  readonly nominatedBy: string;
+  readonly votes: number | null;
+}
+
+export interface ElectionDetail {
+  readonly election: Election;
+  readonly candidates: readonly ElectionCandidate[];
+  readonly tallyVisible: boolean;
+}
+
+export interface ElectionResultEntry {
+  readonly rank: number;
+  readonly candidateId: string;
+  readonly memberId: string;
+  readonly votes: number;
+}
+
+/** The ranking as announced, and who took the seats. Stored, never recomputed. */
+export interface ElectionResult {
+  readonly electionId: string;
+  readonly ranking: readonly ElectionResultEntry[];
+  readonly seatedMemberIds: readonly string[];
+  readonly publishedBy: string;
+  readonly publishedAt: string;
+}
+
+export interface PanelMember {
+  readonly memberId: string;
+  readonly electionId: string;
+  readonly seatedAt: string;
+}
+
+/** The seated Panch. Names are ids on the wire and resolved from the directory. */
+export interface Panel {
+  readonly members: readonly PanelMember[];
+  readonly seats: number;
+  readonly viewerIsMember: boolean;
+}
+
 // ---- Volunteer groups ----------------------------------------------------
 
 /** Inactive keeps its members and its history; it takes no new applications. */

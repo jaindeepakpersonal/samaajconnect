@@ -130,6 +130,19 @@ personal data of any *other* party, unlike a Proposal) and de-identifies
 (strips the note from) every order they placed as a buyer, keeping the
 row so the business owner's own order history is not silently broken.
 
+### Samaaj Panch — bare ids again, and one thing that is deliberately not secret
+
+panch-service holds candidacies, ballots and the seated roster as plain
+member ids: no name, no contact detail, and its events carry ids only.
+A ballot ties a voter to the candidates they backed, so it is the most
+sensitive row here; it is never returned to anyone but the voter, and the
+tally shown to members is an aggregate. Like celebrity-voting-service's
+`Vote`, it does not subscribe to `identity.user.erased.v1` and raises the
+same open question as the other bare-id services below: whether a bare
+`MemberId` left in a service holding no name is still personal data once
+every service that could resolve it has cleared.
+Who sits on the Panch is public within the Samaaj by design: members must
+know who is judging their issues.
 ### Competitions — the same open question as the other bare-id services
 
 competition-service holds a member's registration, entries and a judge's

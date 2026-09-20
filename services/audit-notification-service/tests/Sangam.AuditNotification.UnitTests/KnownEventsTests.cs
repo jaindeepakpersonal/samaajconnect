@@ -353,6 +353,26 @@ public sealed class KnownEventsTests
     }
 
     [Fact]
+    public void A_change_to_the_panch_names_the_administrator_who_made_it()
+    {
+        var descriptor = KnownEvents.Describe("panch.panel.changed.v1");
+
+        descriptor.Action.Should().Be("PanelChanged");
+        descriptor.EntityName.Should().Be("PanchPanel");
+        descriptor.EntityIdProperty.Should().Be("tenantId");
+        descriptor.ActorIdProperty.Should().Be("changedBy");
+    }
+
+    [Fact]
+    public void A_panch_election_moving_on_keeps_the_stage_it_left()
+    {
+        var descriptor = KnownEvents.Describe("panch.election.status-changed.v1");
+
+        descriptor.EntityIdProperty.Should().Be("electionId");
+        descriptor.BeforeProperties.Should().Equal("previousStatus");
+    }
+
+    [Fact]
     public void A_changed_family_head_is_recorded_against_the_family_admin_who_chose_it()
     {
         var descriptor = KnownEvents.Describe("members.family.head-changed.v1");

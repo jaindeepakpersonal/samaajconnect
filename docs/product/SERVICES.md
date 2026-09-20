@@ -339,6 +339,35 @@ and expose its endpoints behind the gateway at the route prefix shown.
 
 ---
 
+## 15. panch-service
+
+- **First / primary aggregate:** `PanchElection` (owns its candidates),
+  with `Ballot`, `Vote`, `ElectionResult` and `PanelMember` as separate,
+  non-owned aggregates
+- **Owns:** PanchElection (with `Candidate`), Ballot, Vote,
+  ElectionResult, PanelMember
+- **Key commands:** `CreateElectionCommand`, `MoveElectionCommand`,
+  `NominateCandidateCommand`, `DecideCandidateCommand`,
+  `CastBallotCommand`, `PublishElectionResultsCommand`,
+  `RemovePanelMemberCommand`
+- **Key queries:** `ListElectionsQuery`, `GetElectionQuery`,
+  `GetResultsQuery`, `GetPanelQuery`
+- **Events published:** `panch.election.status-changed.v1`,
+  `panch.panel.changed.v1`
+- **Events consumed:** none
+- **Gateway route prefix:** `/v1/panch/**`, module-gated on `panch` (off by
+  default)
+- **Tenant role(s):** new permission `Panch.Manage`, granted to
+  `SamaajAdmin`, for every organiser command; `Members.Read` for
+  nominating, voting and every read
+- **Notes:** the Samaaj Panch is a ten-member jury elected from the
+  Samaaj's own members. Each member casts one final ballot of up to ten
+  candidates (no self-vote); the ten most-backed win, each with at least
+  one vote. Publishing replaces the seated roster; there is no term.
+  `panch.panel.changed.v1` carries the whole roster as member ids so that
+  social-issues-service, which decides who may review an issue from it,
+  can replace its own copy idempotently.
+
 ## Inter-service data access rule
 
 Services do not query each other's databases directly. A service that

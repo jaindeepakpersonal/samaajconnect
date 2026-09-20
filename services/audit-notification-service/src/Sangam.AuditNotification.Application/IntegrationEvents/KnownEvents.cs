@@ -836,6 +836,24 @@ public static class KnownEvents
             Action: "RoundResultsPublished",
             EntityName: "Round",
             EntityIdProperty: "roundId"),
+        // panch-service. An election moving on is the administrator's own act
+        // and names no separate actor, the shape competition.* and
+        // celebrity-voting.campaign.* take. A change to the panel does name one:
+        // the administrator who removed a member, or who published the election
+        // that seated it - "who decided who sits on the Panch" is the question
+        // this trail exists to answer. The panel has no id of its own; it is
+        // the Samaaj's, so the tenant is what it is recorded against.
+        ["panch.election.status-changed.v1"] = new(
+            Action: "ElectionStatusChanged",
+            EntityName: "PanchElection",
+            EntityIdProperty: "electionId",
+            BeforeProperties: ["previousStatus"]),
+
+        ["panch.panel.changed.v1"] = new(
+            Action: "PanelChanged",
+            EntityName: "PanchPanel",
+            EntityIdProperty: "tenantId",
+            ActorIdProperty: "changedBy"),
     };
 
     public static EventDescriptor Describe(string topic) =>

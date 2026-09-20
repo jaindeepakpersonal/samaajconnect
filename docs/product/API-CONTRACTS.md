@@ -472,3 +472,26 @@ No photo endpoint, the same reason businesses-service has none. Individual
 judge marks are never returned to a caller who is neither the organiser
 nor an assigned judge, before or after publication; only the published
 ranking's rank and average are.
+
+## panch-service — `/v1/panch`
+
+Module-gated on `panch`, off by default. New permission `Panch.Manage`,
+granted to `SamaajAdmin`, for every organiser call; `Members.Read` for
+nominating, voting and every read.
+
+| Method | Path | Roles | Purpose |
+|---|---|---|---|
+| GET | `/panel` | `Members.Read` | The seated Panch (member ids, seated-at) and `viewerIsMember` |
+| DELETE | `/panel/{memberId}` | `Panch.Manage` | Unseat one member. The seat stays empty until the next election. Removing someone not seated is success |
+| GET | `/elections` | `Members.Read` | This Samaaj's elections, newest first, each with the caller's own ballot choices |
+| POST | `/elections` | `Panch.Manage` | Set an election up. Starts `Draft`; nominations must close before voting opens |
+| GET | `/elections/{id}` | `Members.Read` | Ballot always; tally only when this caller may see it |
+| POST | `/elections/{id}/status` | `Panch.Manage` | Strictly forward: `NominationsOpen`, `VotingOpen`, `Closed`. Publishing is its own call |
+| POST | `/elections/{id}/candidates` | `Members.Read` | Put a member forward while nominations are open. A repeat is success |
+| POST | `/elections/{id}/candidates/{candidateId}/decide` | `Panch.Manage` | Approve onto the ballot, or remove before voting opens |
+| POST | `/elections/{id}/ballots` | `Members.Read` | Cast the caller's one ballot: up to ten distinct approved candidates, never themselves. Final; a second ballot returns `accepted: false` with the first's choices |
+| POST | `/elections/{id}/results` | `Panch.Manage` | Only from `Closed`. Freezes the ranking and replaces the seated Panch with the ten most-backed candidates (each with at least one vote) |
+| GET | `/elections/{id}/results` | `Members.Read` | The published ranking and who was seated. 404 until published |
+
+Member ids on the wire are strings, validated and parsed in the command,
+so a malformed id is a 400 rather than an unhandled binding failure.

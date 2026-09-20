@@ -57,6 +57,8 @@ jobs:
             solution: services/businesses-service/Sangam.Businesses.sln
           - name: competition-service
             solution: services/competition-service/Sangam.Competition.sln
+          - name: panch-service
+            solution: services/panch-service/Sangam.Panch.sln
           - name: gateway
             solution: gateway/Sangam.Gateway.sln
 
@@ -346,6 +348,12 @@ jobs:
           dotnet dotnet-ef migrations has-pending-model-changes \
             --project services/competition-service/src/Sangam.Competition.Infrastructure \
             --startup-project services/competition-service/src/Sangam.Competition.Api
+
+      - name: Check panch-service
+        run: |
+          dotnet dotnet-ef migrations has-pending-model-changes \
+            --project services/panch-service/src/Sangam.Panch.Infrastructure \
+            --startup-project services/panch-service/src/Sangam.Panch.Api
 
   smoke:
     name: Through the gateway

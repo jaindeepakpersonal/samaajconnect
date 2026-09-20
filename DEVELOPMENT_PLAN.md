@@ -8,7 +8,13 @@ version of the plan; the reasoning behind the ordering lives in
 ## Current Status
 
 - **Stage:** every module has a service and member screens; Phase 5 hardening under way
-- **Last updated:** 2026-09-13 - **a new module, competition-service:
+- **Last updated:** 2026-09-20 - **a new module, panch-service: the Samaaj
+  Panch (ten members) elected from the Samaaj's own members.** Each member
+  casts one final ballot of up to ten candidates; publishing seats the ten
+  most-backed and replaces the roster. Off by default (`panch` module key,
+  `Panch.Manage` for SamaajAdmin). Judging social issues by the Panch is
+  the next step in this cycle; the previous update follows.
+- **Previously:** 2026-09-13 - **a new module, competition-service:
   Samaaj competitions end to end, module-gated off by default.**
 
   An organiser sets a competition up, members register while its window is

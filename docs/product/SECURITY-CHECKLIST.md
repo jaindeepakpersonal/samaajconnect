@@ -201,6 +201,7 @@ existing platform (`Pathshala.Attendance.Write`, `Issue.Approve`):
 | `Notifications.Broadcast` | Announce to every member of a Samaaj, and read what has been announced. Its own key rather than folded into an administrative one: managing members and putting a message in front of every one of them are different powers |
 | `MasterData.Manage` | Manage the platform-wide lookups: Country, City, Locality, ProfessionType, Gender, MaritalStatus. SuperAdmin only — reference data every Samaaj shares, not one Samaaj's own list |
 | `Gautra.Manage` | Manage one Samaaj's own Gautra list. Granted to `SamaajAdmin`, scoped to their own tenant the same way every other tenant-scoped write is |
+| `Panch.Manage` | Convene a Samaaj Panch election: set it up, move its stages, approve candidates, publish the result, remove a seated member. Granted to `SamaajAdmin`. It never chooses who wins: the members vote |
 
 `AuthorizationCatalog` in identity-tenant-service is the executable copy of
 this table, with stable hand-assigned ids so a grant means the same thing in
