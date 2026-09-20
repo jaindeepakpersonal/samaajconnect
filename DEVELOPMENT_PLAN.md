@@ -8,13 +8,23 @@ version of the plan; the reasoning behind the ordering lives in
 ## Current Status
 
 - **Stage:** every module has a service and member screens; Phase 5 hardening under way
-- **Last updated:** 2026-09-20 - **a new module, panch-service: the Samaaj
+- **Last updated:** 2026-09-20 - **social-issues-service: the Samaaj Panch
+  now judges issues, once a Samaaj has elected one.** A reviewer's approval
+  moves an issue to `DecisionPending` (visible to the Samaaj); any seated
+  Panch member records a decision - optionally handing the monitoring to a
+  volunteer group - which closes it. `Approved`/`Published` retired, with a
+  data migration. Reviewing is the Panch's; while none is seated,
+  `SocialIssues.Approve` holders still review, as the fallback that keeps
+  every Samaaj's queue moving before it elects one. The roster is a local
+  copy fed by panch-service's `panch.panel.changed.v1`. member-portal gained
+  a "For the Panch" tab and a decision form; admin-portal's queue goes
+  read-only once a Panch exists.
+- **Previously:** 2026-09-20 - **a new module, panch-service: the Samaaj
   Panch (ten members) elected from the Samaaj's own members.** Each member
   casts one final ballot of up to ten candidates; publishing seats the ten
   most-backed and replaces the roster. Off by default (`panch` module key,
-  `Panch.Manage` for SamaajAdmin). Judging social issues by the Panch is
-  the next step in this cycle; the previous update follows.
-- **Previously:** 2026-09-13 - **a new module, competition-service:
+  `Panch.Manage` for SamaajAdmin).
+- **Before that:** 2026-09-13 - **a new module, competition-service:
   Samaaj competitions end to end, module-gated off by default.**
 
   An organiser sets a competition up, members register while its window is
