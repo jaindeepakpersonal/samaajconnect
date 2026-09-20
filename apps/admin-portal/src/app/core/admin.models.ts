@@ -791,6 +791,81 @@ export interface GroupElectionInput {
   readonly votingEndAt: string;
 }
 
+// ---- Trust -----------------------------------------------------------------
+
+export type TrustStatus = 'Active' | 'Inactive';
+
+/** Mirrors trust-service's `TrustResponse`. */
+export interface Trust {
+  readonly id: string;
+  readonly localityId: string;
+  readonly name: string;
+  readonly status: TrustStatus;
+  readonly createdAt: string;
+}
+
+export type TrustMemberStatus = 'Active' | 'Removed';
+
+/** One row on a Trust's roster. Mirrors `TrustMemberResponse`. */
+export interface TrustMember {
+  readonly id: string;
+  readonly trustId: string;
+  readonly memberId: string;
+  readonly positionTitle: string | null;
+  readonly status: TrustMemberStatus;
+  readonly addedBy: string;
+  readonly addedAt: string;
+  readonly removedBy: string | null;
+  readonly removedAt: string | null;
+}
+
+export type TrustElectionStatus = 'Draft' | 'NominationsOpen' | 'VotingOpen' | 'Closed' | 'Published';
+
+/** Mirrors `TrustElectionResponse`. Trust has no single leader, so unlike
+ * `GroupElection` there is no `iCanLead`/president split - every admin-side
+ * election command stays behind the same `Trust.Manage` that governs the
+ * roster. */
+export interface TrustElection {
+  readonly id: string;
+  readonly trustId: string;
+  readonly positionTitle: string;
+  readonly nominationStartAt: string;
+  readonly nominationEndAt: string;
+  readonly votingStartAt: string;
+  readonly votingEndAt: string;
+  readonly status: TrustElectionStatus;
+  readonly acceptsNominations: boolean;
+  readonly acceptsVotes: boolean;
+  readonly myVoteCandidateId: string | null;
+  readonly candidateCount: number;
+  readonly winnerMemberId: string | null;
+  readonly publishedAt: string | null;
+  readonly createdAt: string;
+}
+
+/** A Trust election's vote counts are never hidden - it has no results-visibility setting. */
+export interface TrustElectionCandidate {
+  readonly id: string;
+  readonly memberId: string;
+  readonly status: 'Nominated' | 'Approved';
+  readonly nominatedBy: string;
+  readonly votes: number;
+}
+
+export interface TrustElectionDetail {
+  readonly election: TrustElection;
+  readonly candidates: readonly TrustElectionCandidate[];
+}
+
+/** What opening an election sends. */
+export interface TrustElectionInput {
+  readonly positionTitle: string;
+  readonly nominationStartAt: string;
+  readonly nominationEndAt: string;
+  readonly votingStartAt: string;
+  readonly votingEndAt: string;
+}
+
 // ---- Social issues -------------------------------------------------------
 
 /**

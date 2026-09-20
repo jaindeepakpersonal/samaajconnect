@@ -75,6 +75,13 @@ import {
   State,
   Tenant,
   TenantStatus,
+  Trust,
+  TrustElection,
+  TrustElectionDetail,
+  TrustElectionInput,
+  TrustElectionStatus,
+  TrustMember,
+  TrustStatus,
   UserStatusResult,
   VolunteerGroup,
 } from './admin.models';
@@ -591,6 +598,104 @@ export class AdminApi {
   /** Freezes the winner and installs them in the position - the group's president, for that election. */
   publishGroupElection(id: string): Observable<GroupElection> {
     return this.http.post<GroupElection>(`/v1/volunteer-groups/elections/${id}/publish`, {});
+  }
+
+  // ---- Trust ---------------------------------------------------------------
+
+  /** This Samaaj's Trusts, optionally narrowed to one locality. */
+  listTrusts(localityId?: string | null): Observable<Trust[]> {
+    let params = new HttpParams();
+
+    if (localityId) {
+      params = params.set('localityId', localityId);
+    }
+
+    return this.http.get<Trust[]>('/v1/trust/trusts', { params });
+  }
+
+  /** Sets a Trust up for a locality. Exactly one per (Samaaj, Locality) - a second attempt is a 409. */
+  createTrust(localityId: string, name: string): Observable<Trust> {
+    return this.http.post<Trust>('/v1/trust/trusts', { localityId, name });
+  }
+
+  getTrust(id: string): Observable<Trust> {
+    return this.http.get<Trust>(`/v1/trust/trusts/${id}`);
+  }
+
+  changeTrustStatus(id: string, status: TrustStatus): Observable<Trust> {
+    return this.http.post<Trust>(`/v1/trust/trusts/${id}/status`, { status });
+  }
+
+  /** A Trust's roster, active members first. */
+  listTrustMembers(trustId: string): Observable<TrustMember[]> {
+    return this.http.get<TrustMember[]>(`/v1/trust/trusts/${trustId}/members`);
+  }
+
+  /** Adds a member, or reactivates one previously removed - a repeat add of an active member is a no-op. */
+  addTrustMember(
+    trustId: string,
+    memberId: string,
+    positionTitle: string | null,
+  ): Observable<TrustMember> {
+    return this.http.post<TrustMember>(`/v1/trust/trusts/${trustId}/members`, {
+      memberId,
+      positionTitle,
+    });
+  }
+
+  /** Changes an active trustee's position title by hand. 409 on a removed member. */
+  updateTrustMemberPosition(
+    trustId: string,
+    trustMemberId: string,
+    positionTitle: string | null,
+  ): Observable<TrustMember> {
+    return this.http.put<TrustMember>(
+      `/v1/trust/trusts/${trustId}/members/${trustMemberId}/position`,
+      { positionTitle },
+    );
+  }
+
+  /** Takes a member off the roster. Soft: a repeat removal is a no-op. */
+  removeTrustMember(trustId: string, trustMemberId: string): Observable<TrustMember> {
+    return this.http.delete<TrustMember>(`/v1/trust/trusts/${trustId}/members/${trustMemberId}`);
+  }
+
+  // ---- Trust elections -------------------------------------------------------
+
+  /** This Trust's elections, newest first. */
+  listTrustElections(trustId: string): Observable<TrustElection[]> {
+    return this.http.get<TrustElection[]>(`/v1/trust/trusts/${trustId}/elections`);
+  }
+
+  /** Sets an election up for a named position on this Trust's roster. Starts as a draft. */
+  openTrustElection(trustId: string, election: TrustElectionInput): Observable<TrustElection> {
+    return this.http.post<TrustElection>(`/v1/trust/trusts/${trustId}/elections`, election);
+  }
+
+  getTrustElection(id: string): Observable<TrustElectionDetail> {
+    return this.http.get<TrustElectionDetail>(`/v1/trust/elections/${id}`);
+  }
+
+  /** Opens nominations, opens voting, or closes. Strictly forward. */
+  moveTrustElection(id: string, status: TrustElectionStatus): Observable<TrustElection> {
+    return this.http.post<TrustElection>(`/v1/trust/elections/${id}/status`, { status });
+  }
+
+  /** Puts a nomination on the ballot, or takes it off before voting opens. */
+  decideTrustCandidate(
+    electionId: string,
+    candidateId: string,
+    approve: boolean,
+  ): Observable<TrustElectionDetail> {
+    return this.http.post<TrustElectionDetail>(
+      `/v1/trust/elections/${electionId}/candidates/${candidateId}/decide`,
+      { approve },
+    );
+  }
+
+  /** Freezes the winner and installs them in the position, clearing any prior holder. */
+  publishTrustElection(id: string): Observable<TrustElection> {
+    return this.http.post<TrustElection>(`/v1/trust/elections/${id}/publish`, {});
   }
 
   // ---- Social issues -----------------------------------------------------

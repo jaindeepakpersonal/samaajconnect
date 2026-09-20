@@ -280,6 +280,7 @@ const NAV: readonly NavGroup[] = [
       { label: 'Social Issues', route: '/issues' },
       { label: 'Celebrities / Voting', route: '/voting' },
       { label: 'Samaaj Panch', route: '/panch' },
+      { label: 'Trusts', route: '/trust' },
     ],
   },
   {

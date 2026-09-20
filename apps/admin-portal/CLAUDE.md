@@ -35,6 +35,8 @@ screen. The spec is `docs/product/wireframes/admin-panel-wireframes.html`.
 | Panch election | `/panch/:id` | — | built. Stage, approving nominations, the tally, publishing (which replaces the Panch) |
 | Volunteer Groups | `/groups` | `#groups` (member-facing) | built. Create (president optional), set a president later, and stand one down |
 | Group elections | `/groups/:id` | — | built; no wireframe covers running one. Open an election, approve nominations, move its stages, publish - an administrator for the President election of a group with no president, the president for any |
+| Trusts | `/trust` | — | built; no wireframe covers this new module. This Samaaj's locality Trusts, and setting one up |
+| Trust detail | `/trust/:id` | — | built; no wireframe covers running one. Roster (add/change position/remove), and its elections - open, approve nominations, move stages, publish |
 | Social Issues | `/issues` | `#issues` | built. The reviewer's approval queue |
 | Members | `/members` | `#members` | built. Search the Samaaj directory and open somebody |
 | Member detail | `/members/:id` | — | built; the wireframe's "View" had no screen behind it. The correction form |
@@ -835,3 +837,25 @@ the member portal, with no explanation) until somebody accepts its first joiners
 The service lets an administrator do that only while there is no president, the
 same window as the President election, and this screen asks for the queue only
 when `iCanLead` says it may (anybody else gets a 404).
+
+**Trusts shipped with no admin screen at all until now**, the same shape of gap
+as every other case in this file: `trust-service` (roster CRUD, then
+elections) landed across two backend-only cycles, reachable only by curl.
+`/trust` and `/trust/:id` are shaped after Volunteer Groups' own two screens
+rather than Panch's, because a Trust's roster is admin-added directly - there
+is no join-request queue to review, only "Add a trustee" (a directory search,
+the same one Invite Admin's "existing member" mode uses, since a Samaaj's
+whole membership is not already on screen the way a small group's roster is)
+and "Remove", with no confirmation on either - reversible, since re-adding a
+removed member reactivates their old row rather than refusing them.
+
+**There is no `iCanLead`/president-equivalent split here, and that is a real
+difference from Volunteer Groups, not an oversight.** A Trust's positions are
+plural - President, Secretary, Treasurer - so there is no single instance-level
+leader to gate the roster or the election commands on; every admin-side action
+stays behind the one `Trust.Manage` permission, and this screen renders every
+control unconditionally rather than computing anything like `iCanLead` itself.
+The election flow is otherwise volunteer-groups' `group-elections` screen
+copied almost line for line - one button per forward stage, a confirmed
+publish - deliberately not shared code, per this repo's own "copy the
+template, don't couple the services" rule.

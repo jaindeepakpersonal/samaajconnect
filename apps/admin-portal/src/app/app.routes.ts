@@ -180,6 +180,18 @@ export const routes: Routes = [
           ),
       },
       {
+        path: 'trust',
+        title: 'Trusts - samaajconnect admin',
+        loadComponent: () =>
+          import('./features/trust/trusts-list.component').then((m) => m.TrustsListComponent),
+      },
+      {
+        path: 'trust/:id',
+        title: 'Trust - samaajconnect admin',
+        loadComponent: () =>
+          import('./features/trust/trust-detail.component').then((m) => m.TrustDetailComponent),
+      },
+      {
         path: 'competitions',
         title: 'Competitions - samaajconnect admin',
         loadComponent: () =>
