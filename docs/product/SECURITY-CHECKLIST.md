@@ -202,6 +202,7 @@ existing platform (`Pathshala.Attendance.Write`, `Issue.Approve`):
 | `MasterData.Manage` | Manage the platform-wide lookups: Country, City, Locality, ProfessionType, Gender, MaritalStatus. SuperAdmin only — reference data every Samaaj shares, not one Samaaj's own list |
 | `Gautra.Manage` | Manage one Samaaj's own Gautra list. Granted to `SamaajAdmin`, scoped to their own tenant the same way every other tenant-scoped write is |
 | `Panch.Manage` | Convene a Samaaj Panch election: set it up, move its stages, approve candidates, publish the result, remove a seated member. Granted to `SamaajAdmin`. It never chooses who wins: the members vote |
+| `Trust.Manage` | Set up a locality's Trust, change its status, and add, update or remove members of its roster. Granted to `SamaajAdmin`. Phase 1 only — elections, donations, expenses and payment collection are later phases and gate on nothing yet |
 
 `AuthorizationCatalog` in identity-tenant-service is the executable copy of
 this table, with stable hand-assigned ids so a grant means the same thing in

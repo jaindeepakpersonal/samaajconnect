@@ -440,3 +440,25 @@ administrator unseats a member.
 social-issues-service keeps its own copy of the roster, fed by
 `panch.panel.changed.v1` (see SERVICES.md §15); it never queries this
 service.
+
+## 17. Trust (locality-wise Trust management, phase 1)
+
+Phase 1 only — elections for trustee positions, donations, expenses and a
+payment-collection ledger against both donations and Boli results are later
+phases and add their own entities when they land.
+
+**Trust** — `Id, TenantId, LocalityId, Name, Status (Active/Inactive),
+CreatedAt` — unique on `(TenantId, LocalityId)`: exactly one Trust per
+locality. `LocalityId` is a loose reference into master-data-service's
+`Locality`, with no referential integrity across the service boundary — the
+same convention `Business.LocalityId` and `BiodataProfile.LocalityId`
+already use.
+
+**TrustMember** — `Id, TenantId, TrustId, MemberId, PositionTitle (nullable
+free text — grants nothing), Status (Active/Removed), AddedBy, AddedAt,
+RemovedBy (nullable), RemovedAt (nullable)` — its own aggregate, not owned
+by `Trust`, so a roster change raises its own event, the same reasoning
+panch-service's `PanelMember` gives for standing apart from its election.
+Unique on `(TrustId, MemberId)`: at most one row per pair ever — re-adding a
+previously removed member reactivates that same row rather than inserting a
+second one.

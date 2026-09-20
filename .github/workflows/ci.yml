@@ -59,6 +59,8 @@ jobs:
             solution: services/competition-service/Sangam.Competition.sln
           - name: panch-service
             solution: services/panch-service/Sangam.Panch.sln
+          - name: trust-service
+            solution: services/trust-service/Sangam.Trust.sln
           - name: gateway
             solution: gateway/Sangam.Gateway.sln
 
@@ -354,6 +356,12 @@ jobs:
           dotnet dotnet-ef migrations has-pending-model-changes \
             --project services/panch-service/src/Sangam.Panch.Infrastructure \
             --startup-project services/panch-service/src/Sangam.Panch.Api
+
+      - name: Check trust-service
+        run: |
+          dotnet dotnet-ef migrations has-pending-model-changes \
+            --project services/trust-service/src/Sangam.Trust.Infrastructure \
+            --startup-project services/trust-service/src/Sangam.Trust.Api
 
   smoke:
     name: Through the gateway

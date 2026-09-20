@@ -58,6 +58,9 @@ public static class ModuleCatalog
     /// <summary>The Samaaj Panch: the elected ten-member jury that judges social issues. Off by default - a Samaaj switches it on once it is ready to elect one.</summary>
     public const string Panch = "panch";
 
+    /// <summary>Locality-wise Trust management: rosters, and later elections, donations, expenses and payment collection. Off by default - see Boli's own note.</summary>
+    public const string Trust = "trust";
+
     public static IReadOnlyList<ModuleDescriptor> All { get; } =
     [
         new(Community, "Timeline & Volunteer Groups", DefaultOn: true),
@@ -84,6 +87,10 @@ public static class ModuleCatalog
         // Electing a Panch is a decision a Samaaj makes; until it does, social
         // issues are reviewed by its administrators as before.
         new(Panch, "Samaaj Panch", DefaultOn: false),
+
+        // Same reasoning as Boli: not every Samaaj organises itself by
+        // locality Trusts, and opting in should be a visible admin decision.
+        new(Trust, "Trust Management", DefaultOn: false),
     ];
 
     public static IReadOnlyList<string> DefaultKeys { get; } =

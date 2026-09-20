@@ -368,6 +368,29 @@ and expose its endpoints behind the gateway at the route prefix shown.
   social-issues-service, which decides who may review an issue from it,
   can replace its own copy idempotently.
 
+## 16. trust-service
+
+- **First / primary aggregate:** `Trust` (with `TrustMember` as a second,
+  peer-to-peer aggregate — its own, not owned, so a roster change raises its
+  own event)
+- **Owns:** Trust, TrustMember
+- **Key commands:** `CreateTrustCommand`, `ChangeTrustStatusCommand`,
+  `AddTrustMemberCommand`, `UpdateTrustMemberCommand`,
+  `RemoveTrustMemberCommand`
+- **Key queries:** `ListTrustsQuery`, `GetTrustQuery`, `ListTrustMembersQuery`
+- **Events published:** `TrustCreated`, `TrustStatusChanged`,
+  `TrustMemberAdded`, `TrustMemberUpdated`, `TrustMemberRemoved`
+- **Events consumed:** none — a leaf service, like volunteer-groups-service
+- **Gateway route prefix:** `/v1/trust/**`, module-gated on `trust` (off by
+  default, the same stance as `boli`/`matrimony`/`panch`)
+- **Tenant role(s):** new permission `Trust.Manage`, granted to `SamaajAdmin`,
+  for every write; `Members.Read` for every read
+- **Notes:** Phase 1 of a larger plan — locality-wise Trust management, one
+  Trust per `(TenantId, LocalityId)`, roster CRUD only. Elections for trustee
+  positions, donation and expense management, and a payment-collection
+  ledger against both donations and a future locality-wise Boli are later
+  phases, not built yet. See the service's own `CLAUDE.md`.
+
 ## Inter-service data access rule
 
 Services do not query each other's databases directly. A service that

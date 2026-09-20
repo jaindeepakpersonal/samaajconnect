@@ -409,6 +409,38 @@ public sealed class KnownEventsTests
     }
 
     [Fact]
+    public void A_trust_created_or_moved_names_no_separate_actor()
+    {
+        var created = KnownEvents.Describe("trust.trust.created.v1");
+        created.Action.Should().Be("TrustCreated");
+        created.EntityName.Should().Be("Trust");
+        created.EntityIdProperty.Should().Be("trustId");
+        created.ActorIdProperty.Should().BeNull();
+
+        var statusChanged = KnownEvents.Describe("trust.trust.status-changed.v1");
+        statusChanged.EntityIdProperty.Should().Be("trustId");
+        statusChanged.BeforeProperties.Should().Equal("previousStatus");
+    }
+
+    [Fact]
+    public void A_trust_roster_change_names_who_did_it()
+    {
+        var added = KnownEvents.Describe("trust.member.added.v1");
+        added.Action.Should().Be("MemberAdded");
+        added.EntityName.Should().Be("TrustMember");
+        added.EntityIdProperty.Should().Be("trustMemberId");
+        added.ActorIdProperty.Should().Be("addedBy");
+
+        var updated = KnownEvents.Describe("trust.member.updated.v1");
+        updated.Action.Should().Be("MemberUpdated");
+        updated.ActorIdProperty.Should().Be("updatedBy");
+
+        var removed = KnownEvents.Describe("trust.member.removed.v1");
+        removed.Action.Should().Be("MemberRemoved");
+        removed.ActorIdProperty.Should().Be("removedBy");
+    }
+
+    [Fact]
     public void A_withdrawn_consent_names_the_parent_and_the_child_it_was_about()
     {
         var descriptor = KnownEvents.Describe("members.child.consent-withdrawn.v1");

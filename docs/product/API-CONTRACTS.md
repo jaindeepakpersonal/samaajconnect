@@ -501,3 +501,29 @@ nominating, voting and every read.
 
 Member ids on the wire are strings, validated and parsed in the command,
 so a malformed id is a 400 rather than an unhandled binding failure.
+
+## trust-service — `/v1/trust`
+
+Module-gated on `trust`, off by default. New permission `Trust.Manage`,
+granted to `SamaajAdmin`, for every write; `Members.Read` for every read.
+
+Phase 1 only: Trust + roster CRUD. Elections for trustee positions,
+donations, expenses and a payment-collection ledger against both donations
+and Boli results are later phases and are not in this API yet.
+
+| Method | Path | Roles | Purpose |
+|---|---|---|---|
+| GET | `/trusts` | `Members.Read` | This Samaaj's Trusts, newest first. `?localityId=` narrows to one locality |
+| POST | `/trusts` | `Trust.Manage` | Set a Trust up for a locality. Exactly one per (Samaaj, Locality); a second attempt is a 409 |
+| GET | `/trusts/{id}` | `Members.Read` | One Trust |
+| POST | `/trusts/{id}/status` | `Trust.Manage` | Active or Inactive. Setting the status it already has is success and changes nothing |
+| GET | `/trusts/{id}/members` | `Members.Read` | The Trust's roster, active members first |
+| POST | `/trusts/{id}/members` | `Trust.Manage` | Add a member. Adding one already active is a no-op reported as success; adding one previously removed reactivates their old row |
+| PUT | `/trusts/{id}/members/{trustMemberId}/position` | `Trust.Manage` | Change an active trustee's position title (free text - grants nothing). 409 on a removed member |
+| DELETE | `/trusts/{id}/members/{trustMemberId}` | `Trust.Manage` | Take a member off the roster. Removing one already removed is success and changes nothing |
+
+`LocalityId` and member ids on the wire are strings, validated and parsed in
+the command, so a malformed id is a 400 rather than an unhandled binding
+failure - the same convention panch-service's own member ids use.
+`LocalityId` is a loose reference into master-data-service's `Locality`, with
+no referential integrity across the service boundary.

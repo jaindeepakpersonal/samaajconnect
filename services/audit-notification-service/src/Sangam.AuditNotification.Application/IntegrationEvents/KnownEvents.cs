@@ -866,6 +866,43 @@ public static class KnownEvents
             EntityName: "PanchPanel",
             EntityIdProperty: "tenantId",
             ActorIdProperty: "changedBy"),
+
+        // trust-service, phase 1 (roster only - elections, donations, expenses
+        // and payment collection are later phases). Creating a Trust and
+        // changing its status are the administrator's own act and name no
+        // separate actor, the same shape panch.election.status-changed.v1
+        // takes. A roster change does name one - who put a member on a Trust,
+        // who changed their position, who took them off - the same "who did
+        // this" the volunteer-groups.member.* pair already answers for an
+        // identical shape of question.
+        ["trust.trust.created.v1"] = new(
+            Action: "TrustCreated",
+            EntityName: "Trust",
+            EntityIdProperty: "trustId"),
+
+        ["trust.trust.status-changed.v1"] = new(
+            Action: "TrustStatusChanged",
+            EntityName: "Trust",
+            EntityIdProperty: "trustId",
+            BeforeProperties: ["previousStatus"]),
+
+        ["trust.member.added.v1"] = new(
+            Action: "MemberAdded",
+            EntityName: "TrustMember",
+            EntityIdProperty: "trustMemberId",
+            ActorIdProperty: "addedBy"),
+
+        ["trust.member.updated.v1"] = new(
+            Action: "MemberUpdated",
+            EntityName: "TrustMember",
+            EntityIdProperty: "trustMemberId",
+            ActorIdProperty: "updatedBy"),
+
+        ["trust.member.removed.v1"] = new(
+            Action: "MemberRemoved",
+            EntityName: "TrustMember",
+            EntityIdProperty: "trustMemberId",
+            ActorIdProperty: "removedBy"),
     };
 
     public static EventDescriptor Describe(string topic) =>

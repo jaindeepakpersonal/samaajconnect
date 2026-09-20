@@ -4362,6 +4362,123 @@ panch_checks() {
 panch_checks || echo "  ..    the rest of the Panch checks were skipped"
 
 echo
+echo "Trust (locality-wise Trust management, phase 1: rosters only)"
+
+# Wrapped in a function for the same reason competition_checks is.
+trust_checks() {
+
+  check "switching the trust module on" 200 \
+    "$(status -X PUT "$GATEWAY/v1/identity/tenants/$TENANT_ID/modules" \
+       -H 'Content-Type: application/json' -H "Authorization: Bearer $ADMIN_TOKEN" -H "$ADMIN_TENANT_HEADER" \
+       -d '{"enabledModules":["community","trust"]}')"
+
+  sleep 62
+
+  refresh_tokens
+
+  # LocalityId is a loose FK into master-data-service with no referential
+  # integrity across the service boundary (root CLAUDE.md's own convention for
+  # every consumer of Locality), so an arbitrary id proves the walk without
+  # needing a real Locality row to exist first.
+  LOCALITY_ID="$(uuidgen 2>/dev/null || echo eeeeeeee-0000-4000-8000-00000000e101)"
+  MEMBER_ID=$(curl -s -H "Authorization: Bearer $MEMBER_TOKEN" "$GATEWAY/v1/identity/me" | json_field userId)
+
+  check "a member cannot create a Trust" 403 \
+    "$(status -X POST "$GATEWAY/v1/trust/trusts" -H 'Content-Type: application/json' \
+       -H "Authorization: Bearer $MEMBER_TOKEN" \
+       -d "{\"localityId\":\"$LOCALITY_ID\",\"name\":\"Mine\"}")"
+
+  TRUST=$(curl -s -X POST "$GATEWAY/v1/trust/trusts" \
+    -H 'Content-Type: application/json' -H "Authorization: Bearer $ADMIN_TOKEN" -H "$ADMIN_TENANT_HEADER" \
+    -d "{\"localityId\":\"$LOCALITY_ID\",\"name\":\"Smoke Trust $(date +%s)\"}")
+
+  TRUST_ID=$(printf '%s' "$TRUST" | json_field id)
+
+  if [ -n "$TRUST_ID" ]; then
+    echo "  ok    an administrator sets a Trust up for a locality"
+    pass=$((pass + 1))
+  else
+    echo "  FAIL  setting a Trust up (got '$TRUST')"
+    fail=$((fail + 1))
+    return 1
+  fi
+
+  check "a second Trust for the same locality is refused" 409 \
+    "$(status -X POST "$GATEWAY/v1/trust/trusts" -H 'Content-Type: application/json' \
+       -H "Authorization: Bearer $ADMIN_TOKEN" -H "$ADMIN_TENANT_HEADER" \
+       -d "{\"localityId\":\"$LOCALITY_ID\",\"name\":\"Second Trust\"}")"
+
+  check "a member can read the Trust" 200 \
+    "$(status -H "Authorization: Bearer $MEMBER_TOKEN" "$GATEWAY/v1/trust/trusts/$TRUST_ID")"
+
+  check "a member cannot add a Trust member" 403 \
+    "$(status -X POST "$GATEWAY/v1/trust/trusts/$TRUST_ID/members" -H 'Content-Type: application/json' \
+       -H "Authorization: Bearer $MEMBER_TOKEN" \
+       -d "{\"memberId\":\"$MEMBER_ID\",\"positionTitle\":\"Trustee\"}")"
+
+  TRUST_MEMBER=$(curl -s -X POST "$GATEWAY/v1/trust/trusts/$TRUST_ID/members" \
+    -H 'Content-Type: application/json' -H "Authorization: Bearer $ADMIN_TOKEN" -H "$ADMIN_TENANT_HEADER" \
+    -d "{\"memberId\":\"$MEMBER_ID\",\"positionTitle\":\"Trustee\"}")
+
+  TRUST_MEMBER_ID=$(printf '%s' "$TRUST_MEMBER" | json_field id)
+
+  if [ -n "$TRUST_MEMBER_ID" ]; then
+    echo "  ok    an administrator adds a member to the Trust's roster"
+    pass=$((pass + 1))
+  else
+    echo "  FAIL  adding a Trust member (got '$TRUST_MEMBER')"
+    fail=$((fail + 1))
+    return 1
+  fi
+
+  ROSTER=$(curl -s -H "Authorization: Bearer $MEMBER_TOKEN" "$GATEWAY/v1/trust/trusts/$TRUST_ID/members")
+
+  if printf '%s' "$ROSTER" | grep -q "$MEMBER_ID"; then
+    echo "  ok    the roster lists the new member"
+    pass=$((pass + 1))
+  else
+    echo "  FAIL  the roster does not list the new member (got '$ROSTER')"
+    fail=$((fail + 1))
+  fi
+
+  UPDATED=$(curl -s -X PUT "$GATEWAY/v1/trust/trusts/$TRUST_ID/members/$TRUST_MEMBER_ID/position" \
+    -H 'Content-Type: application/json' -H "Authorization: Bearer $ADMIN_TOKEN" -H "$ADMIN_TENANT_HEADER" \
+    -d '{"positionTitle":"Treasurer"}')
+
+  if printf '%s' "$UPDATED" | grep -q '"positionTitle":"Treasurer"'; then
+    echo "  ok    an administrator changes a trustee's position"
+    pass=$((pass + 1))
+  else
+    echo "  FAIL  changing the position title (got '$UPDATED')"
+    fail=$((fail + 1))
+  fi
+
+  check "an administrator removes a Trust member" 200 \
+    "$(status -X DELETE "$GATEWAY/v1/trust/trusts/$TRUST_ID/members/$TRUST_MEMBER_ID" \
+       -H "Authorization: Bearer $ADMIN_TOKEN" -H "$ADMIN_TENANT_HEADER")"
+
+  check "removing the same member again is still success" 200 \
+    "$(status -X DELETE "$GATEWAY/v1/trust/trusts/$TRUST_ID/members/$TRUST_MEMBER_ID" \
+       -H "Authorization: Bearer $ADMIN_TOKEN" -H "$ADMIN_TENANT_HEADER")"
+
+  check "switching the trust module off" 200 \
+    "$(status -X PUT "$GATEWAY/v1/identity/tenants/$TENANT_ID/modules" \
+       -H 'Content-Type: application/json' -H "Authorization: Bearer $ADMIN_TOKEN" -H "$ADMIN_TENANT_HEADER" \
+       -d '{"enabledModules":["community"]}')"
+
+  sleep 62
+
+  # Refreshed for the reason competition_checks refreshes: this function's
+  # sleeps add real elapsed time.
+  refresh_tokens
+
+  check "the trust route then answers 404" 404 \
+    "$(status -H "Authorization: Bearer $MEMBER_TOKEN" "$GATEWAY/v1/trust/trusts/$TRUST_ID")"
+}
+
+trust_checks || echo "  ..    the rest of the Trust checks were skipped"
+
+echo
 echo "Master data"
 
 master_data_checks() {

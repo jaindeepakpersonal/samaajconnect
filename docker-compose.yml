@@ -312,6 +312,20 @@ services:
     ports:
       - "5115:8080"
 
+  trust-service:
+    <<: *service-defaults
+    build:
+      context: .
+      dockerfile: services/trust-service/Dockerfile
+    container_name: samaajconnect-trust
+    environment:
+      <<: *service-environment
+      ConnectionStrings__Default: "Host=postgres;Port=5432;Database=samaajconnect_trust;Username=samaajconnect;Password=samaajconnect"
+      Jwt__SigningKey: "${JWT_SIGNING_KEY:-local-development-signing-key-do-not-use-in-production}"
+      Outbox__PollIntervalSeconds: "5"
+    ports:
+      - "5116:8080"
+
   gateway:
     build:
       context: .
@@ -350,6 +364,8 @@ services:
       competition-service:
         condition: service_started
       panch-service:
+        condition: service_started
+      trust-service:
         condition: service_started
     environment:
       ASPNETCORE_ENVIRONMENT: Development

@@ -8,7 +8,25 @@ version of the plan; the reasoning behind the ordering lives in
 ## Current Status
 
 - **Stage:** every module has a service and member screens; Phase 5 hardening under way
-- **Last updated:** 2026-09-20 - **social-issues-service: the Samaaj Panch
+- **Last updated:** 2026-09-20 - **a new module, trust-service: locality-wise
+  Trust management, phase 1 (roster only).** One Trust per `(Samaaj,
+  Locality)`, with `TrustMember` as its own aggregate so a roster change
+  raises its own event - the same reasoning panch-service's `PanelMember`
+  gives for standing apart from its election. Admin-curated: an admin
+  explicitly adds, updates and removes trustees (`Trust.Manage`) rather than
+  membership following wherever a Samaaj member happens to live. Off by
+  default (`trust` module key). `LocalityId` is a loose reference into
+  master-data-service's `Locality`, the same convention `Business`/
+  `BiodataProfile` already use.
+
+  Elections for trustee positions, donation and expense management, and a
+  payment-collection ledger against both donations and a future
+  locality-wise Boli are later phases and are deliberately not built yet -
+  see the service's own CLAUDE.md, "Decisions worth knowing", for what each
+  is expected to need. Whether `Boli.Manage`/`Boli.PublishResults` should
+  eventually be gated by a caller's Trust position, rather than staying
+  Samaaj-wide, was deliberately deferred past this phase.
+- **Previously:** 2026-09-20 - **social-issues-service: the Samaaj Panch
   now judges issues, once a Samaaj has elected one.** A reviewer's approval
   moves an issue to `DecisionPending` (visible to the Samaaj); any seated
   Panch member records a decision - optionally handing the monitoring to a
@@ -19,7 +37,7 @@ version of the plan; the reasoning behind the ordering lives in
   copy fed by panch-service's `panch.panel.changed.v1`. member-portal gained
   a "For the Panch" tab and a decision form; admin-portal's queue goes
   read-only once a Panch exists.
-- **Previously:** 2026-09-20 - **a new module, panch-service: the Samaaj
+- **Before that:** 2026-09-20 - **a new module, panch-service: the Samaaj
   Panch (ten members) elected from the Samaaj's own members.** Each member
   casts one final ballot of up to ten candidates; publishing seats the ten
   most-backed and replaces the roster. Off by default (`panch` module key,

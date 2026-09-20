@@ -42,6 +42,9 @@ export const ModuleKeys = {
 
   /** Off by default; a Samaaj switches it on once it is ready to elect a Panch. */
   Panch: 'panch',
+
+  /** Off by default; not every Samaaj organises itself by locality Trusts. */
+  Trust: 'trust',
 } as const;
 
 export type ModuleKey = (typeof ModuleKeys)[keyof typeof ModuleKeys];

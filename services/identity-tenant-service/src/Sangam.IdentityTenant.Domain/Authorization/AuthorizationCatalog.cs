@@ -79,6 +79,13 @@ public static class AuthorizationCatalog
         /// choose the Panch.
         /// </summary>
         public static readonly Guid PanchManage = new("b0000000-0000-0000-0000-000000000020");
+
+        /// <summary>
+        /// Create a Trust for a locality, change its status, and add, update or
+        /// remove members of its roster. Samaaj-admin-only, the same
+        /// organiser-permission shape as <c>Panch.Manage</c>.
+        /// </summary>
+        public static readonly Guid TrustManage = new("b0000000-0000-0000-0000-000000000021");
     }
 
     public static IReadOnlyList<Role> Roles { get; } =
@@ -122,6 +129,7 @@ public static class AuthorizationCatalog
         new(PermissionIds.GautraManage, "Gautra.Manage"),
         new(PermissionIds.CompetitionManage, "Competition.Manage"),
         new(PermissionIds.PanchManage, "Panch.Manage"),
+        new(PermissionIds.TrustManage, "Trust.Manage"),
     ];
 
     /// <summary>
@@ -147,6 +155,7 @@ public static class AuthorizationCatalog
         new(RoleIds.SamaajAdmin, PermissionIds.CelebrityVotingConfigure),
         new(RoleIds.SamaajAdmin, PermissionIds.CompetitionManage),
         new(RoleIds.SamaajAdmin, PermissionIds.PanchManage),
+        new(RoleIds.SamaajAdmin, PermissionIds.TrustManage),
 
         // Running a Pathshala - sessions, classes, teacher assignments, placing
         // students - is the Samaaj's job. Only *creating* the master record is
