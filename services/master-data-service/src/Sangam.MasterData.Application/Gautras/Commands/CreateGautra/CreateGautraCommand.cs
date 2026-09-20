@@ -37,6 +37,15 @@ public sealed class CreateGautraCommandHandler(
                 "Gautra.NoSamaaj", "Select a Samaaj before adding a Gautra to it."));
         }
 
+        // Checked here so a duplicate name is a clean 409 rather than an
+        // unhandled unique-index violation surfacing as a 500 - the same
+        // reason CreateLookupItemCommandHandler checks CodeExistsAsync first.
+        if (await gautras.NameExistsAsync(command.Name, cancellationToken))
+        {
+            return Result.Failure<GautraResponse>(Error.Conflict(
+                "Gautra.DuplicateName", $"This Samaaj already has a Gautra named '{command.Name}'."));
+        }
+
         var gautra = Gautra.Create(tenantId, command.Name, clock.UtcNow);
 
         gautras.Add(gautra);

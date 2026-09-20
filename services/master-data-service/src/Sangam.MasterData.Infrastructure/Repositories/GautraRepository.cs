@@ -14,6 +14,9 @@ public sealed class GautraRepository(MasterDataDbContext dbContext) : IGautraRep
     public Task<Gautra?> GetByIdAsync(Guid id, CancellationToken cancellationToken = default) =>
         dbContext.Gautras.FirstOrDefaultAsync(g => g.Id == id, cancellationToken);
 
+    public Task<bool> NameExistsAsync(string name, CancellationToken cancellationToken = default) =>
+        dbContext.Gautras.AnyAsync(g => g.Name == name, cancellationToken);
+
     public async Task<IReadOnlyList<Gautra>> ListAsync(
         bool includeInactive, CancellationToken cancellationToken = default)
     {

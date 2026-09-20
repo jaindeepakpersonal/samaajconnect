@@ -54,7 +54,8 @@ public static class GautraEndpoints
             .Produces<GautraResponse>(StatusCodes.Status201Created)
             .ProducesValidationProblem()
             .ProducesProblem(StatusCodes.Status401Unauthorized)
-            .ProducesProblem(StatusCodes.Status403Forbidden);
+            .ProducesProblem(StatusCodes.Status403Forbidden)
+            .ProducesProblem(StatusCodes.Status409Conflict);
 
         group.MapPut("/{id:guid}", async (
                 Guid id, UpdateGautraRequest request, ISender sender, CancellationToken cancellationToken) =>

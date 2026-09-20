@@ -50,6 +50,48 @@ public sealed class GautraTenantIsolationTests(MasterDataApiFactory factory)
             "the global query filter scopes every Gautra read to the caller's own tenant");
     }
 
+    /// <summary>
+    /// Without <c>NameExistsAsync</c>'s pre-check, a second insert of the same
+    /// name hits the unique index directly and the resulting
+    /// <c>DbUpdateException</c> surfaces as an unhandled 500 rather than a
+    /// business outcome the caller can act on - which is exactly how a smoke
+    /// suite that deliberately reuses one Samaaj across runs first found this.
+    /// </summary>
+    [Fact]
+    public async Task Adding_the_same_name_twice_is_a_clean_conflict_not_a_500()
+    {
+        var admin = factory.CreateClientAs(
+            Guid.NewGuid(), Guid.NewGuid(), ["SamaajAdmin"], [PermissionKeys.GautraManage]);
+
+        (await admin.PostAsJsonAsync("/v1/master-data/gautras", new { Name = "Kasliwal" }))
+            .EnsureSuccessStatusCode();
+
+        var second = await admin.PostAsJsonAsync("/v1/master-data/gautras", new { Name = "Kasliwal" });
+
+        second.StatusCode.Should().Be(System.Net.HttpStatusCode.Conflict);
+
+        var list = await admin.GetFromJsonAsync<List<GautraResponse>>(
+            "/v1/master-data/gautras?includeInactive=false");
+
+        list.Should().ContainSingle(g => g.Name == "Kasliwal", "the refused second insert left no row behind");
+    }
+
+    [Fact]
+    public async Task Two_different_Samaajs_may_each_have_their_own_Kasliwal()
+    {
+        // The uniqueness is per Samaaj, not platform-wide - a duplicate name
+        // check that ignored the tenant would refuse this.
+        var adminA = factory.CreateClientAs(
+            Guid.NewGuid(), Guid.NewGuid(), ["SamaajAdmin"], [PermissionKeys.GautraManage]);
+        var adminB = factory.CreateClientAs(
+            Guid.NewGuid(), Guid.NewGuid(), ["SamaajAdmin"], [PermissionKeys.GautraManage]);
+
+        (await adminA.PostAsJsonAsync("/v1/master-data/gautras", new { Name = "Kasliwal" }))
+            .StatusCode.Should().Be(System.Net.HttpStatusCode.Created);
+        (await adminB.PostAsJsonAsync("/v1/master-data/gautras", new { Name = "Kasliwal" }))
+            .StatusCode.Should().Be(System.Net.HttpStatusCode.Created);
+    }
+
     [Fact]
     public async Task A_samaaj_admin_cannot_update_a_gautra_that_belongs_to_another_samaaj()
     {
