@@ -21,7 +21,8 @@ public sealed record ReviseIssueCommand(
     string Title,
     string Description,
     string Category,
-    string? Locality) : ICommand<IssueDetailResponse>;
+    string? Locality,
+    string? LocalityId = null) : ICommand<IssueDetailResponse>;
 
 public sealed class ReviseIssueCommandValidator : AbstractValidator<ReviseIssueCommand>
 {
@@ -31,6 +32,9 @@ public sealed class ReviseIssueCommandValidator : AbstractValidator<ReviseIssueC
         RuleFor(x => x.Title).NotEmpty().MaximumLength(200);
         RuleFor(x => x.Description).NotEmpty().MaximumLength(5000);
         RuleFor(x => x.Locality).MaximumLength(150);
+        RuleFor(x => x.LocalityId)
+            .Must(value => string.IsNullOrWhiteSpace(value) || Guid.TryParse(value, out _))
+            .WithMessage("Locality is not valid.");
 
         // The same closed list submission uses. Two lists would drift, and the
         // way they drift is a revision that cannot be saved.
@@ -75,7 +79,12 @@ public sealed class ReviseIssueCommandHandler(
         }
 
         if (!issue.Revise(
-            command.Title, command.Description, command.Category, command.Locality, clock.UtcNow))
+            command.Title,
+            command.Description,
+            command.Category,
+            command.Locality,
+            clock.UtcNow,
+            string.IsNullOrWhiteSpace(command.LocalityId) ? null : Guid.Parse(command.LocalityId)))
         {
             return Result.Failure<IssueDetailResponse>(Error.Conflict(
                 "Issue.Decided",

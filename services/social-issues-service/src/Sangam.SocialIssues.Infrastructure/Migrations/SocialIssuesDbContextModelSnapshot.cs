@@ -105,6 +105,10 @@ namespace Sangam.SocialIssues.Infrastructure.Migrations
                         .HasColumnType("character varying(150)")
                         .HasColumnName("locality");
 
+                    b.Property<Guid?>("LocalityId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("locality_id");
+
                     b.Property<Guid?>("MonitoringGroupId")
                         .HasColumnType("uuid")
                         .HasColumnName("monitoring_group_id");

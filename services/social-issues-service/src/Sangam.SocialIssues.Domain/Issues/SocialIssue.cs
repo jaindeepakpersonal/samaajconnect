@@ -92,6 +92,14 @@ public sealed class SocialIssue : AggregateRoot, ITenantScopedEntity
     /// <summary>Where in the Samaaj's area this is. The wireframe shows it on the queue card.</summary>
     public string? Locality { get; private set; }
 
+    /// <summary>
+    /// The locality it concerns - a master-data-service id the member picks,
+    /// optional. It decides which Area Admin may review the issue (while no
+    /// Panch is seated) and restricts nobody from reading it. <see cref="Locality"/>
+    /// is the free text issues carried before this, kept for those.
+    /// </summary>
+    public Guid? LocalityId { get; private set; }
+
     public Guid SubmittedByMemberId { get; private set; }
     public IssueStatus Status { get; private set; }
     public DateTimeOffset CreatedAt { get; private set; }
@@ -128,7 +136,8 @@ public sealed class SocialIssue : AggregateRoot, ITenantScopedEntity
         string? locality,
         Guid submittedByMemberId,
         bool submitNow,
-        DateTimeOffset now)
+        DateTimeOffset now,
+        Guid? localityId = null)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(title);
         ArgumentException.ThrowIfNullOrWhiteSpace(description);
@@ -142,6 +151,7 @@ public sealed class SocialIssue : AggregateRoot, ITenantScopedEntity
             Description = description.Trim(),
             Category = category.Trim(),
             Locality = Normalize(locality),
+            LocalityId = localityId,
             SubmittedByMemberId = submittedByMemberId,
             Status = submitNow ? IssueStatus.Submitted : IssueStatus.Draft,
             CreatedAt = now,
@@ -267,7 +277,12 @@ public sealed class SocialIssue : AggregateRoot, ITenantScopedEntity
     /// changes are possible.
     /// </remarks>
     public bool Revise(
-        string title, string description, string category, string? locality, DateTimeOffset now)
+        string title,
+        string description,
+        string category,
+        string? locality,
+        DateTimeOffset now,
+        Guid? localityId = null)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(title);
         ArgumentException.ThrowIfNullOrWhiteSpace(description);
@@ -283,6 +298,7 @@ public sealed class SocialIssue : AggregateRoot, ITenantScopedEntity
         Description = description.Trim();
         Category = category.Trim();
         Locality = Normalize(locality);
+        LocalityId = localityId;
 
         return true;
     }

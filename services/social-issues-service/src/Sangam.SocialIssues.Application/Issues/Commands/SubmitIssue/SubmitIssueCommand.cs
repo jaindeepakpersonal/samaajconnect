@@ -28,7 +28,11 @@ public sealed record SubmitIssueCommand(
     string Description,
     string Category,
     string? Locality,
-    bool SubmitNow = true) : ICommand<IssueResponse>;
+    bool SubmitNow = true,
+
+    // The master-data-service locality the issue concerns, picked by the
+    // member. A string, validated here and parsed in the handler.
+    string? LocalityId = null) : ICommand<IssueResponse>;
 
 public sealed class SubmitIssueCommandValidator : AbstractValidator<SubmitIssueCommand>
 {
@@ -45,6 +49,9 @@ public sealed class SubmitIssueCommandValidator : AbstractValidator<SubmitIssueC
         RuleFor(x => x.Title).NotEmpty().MaximumLength(200);
         RuleFor(x => x.Description).NotEmpty().MaximumLength(5000);
         RuleFor(x => x.Locality).MaximumLength(150);
+        RuleFor(x => x.LocalityId)
+            .Must(value => string.IsNullOrWhiteSpace(value) || Guid.TryParse(value, out _))
+            .WithMessage("Locality is not valid.");
 
         RuleFor(x => x.Category)
             .NotEmpty()
@@ -86,7 +93,8 @@ public sealed class SubmitIssueCommandHandler(
             command.Locality,
             memberId,
             command.SubmitNow,
-            clock.UtcNow);
+            clock.UtcNow,
+            string.IsNullOrWhiteSpace(command.LocalityId) ? null : Guid.Parse(command.LocalityId));
 
         issues.Add(issue);
 

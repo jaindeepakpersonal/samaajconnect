@@ -192,8 +192,8 @@ reviews" in `services/social-issues-service/CLAUDE.md`.
 | Method | Path | Roles | Purpose |
 |---|---|---|---|
 | GET | `/` | `Members.Read` | Issues the Samaaj can see (in front of the Panch, or decided), plus this member's own whatever their status. `?category=` filters |
-| POST | `/` | `Members.Read` | Raise one. `submitNow=false` saves a draft only the author sees |
-| GET | `/approval-queue` | `Members.Read`, then Panch member (or `SocialIssues.Approve`, read-only once a Panch exists) | Submitted, under review, or in front of the Panch, oldest first |
+| POST | `/` | `Members.Read` | Raise one. `submitNow=false` saves a draft only the author sees. `localityId` optional, the master-data locality it concerns (also on `PUT /{id}`) |
+| GET | `/approval-queue` | `Members.Read`, then Panch member (or `SocialIssues.Approve`, read-only once a Panch exists) | Submitted, under review, or in front of the Panch, oldest first. An Area Admin's `SocialIssues.Approve` covers only their own locality's issues, here and on every move; a Panch seat covers all |
 | GET | `/review-access` | `Members.Read` | `{canReview, canSeeQueue, panelSeated, isPanelMember}` — so a portal never asks for a queue it may not have |
 | GET | `/{id}` | `Members.Read` | One issue with its full status history |
 | PUT | `/{id}` | `Members.Read` + author | Correct one the Panch does not have yet |

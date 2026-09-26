@@ -46,8 +46,10 @@ public sealed class GetApprovalQueueQueryHandler(
         var waiting = await issues.ListAwaitingDecisionAsync(cancellationToken);
         var viewerId = currentUser.UserId ?? Guid.Empty;
 
+        // A Panch member's queue is the whole Samaaj's; an Area Admin's, their
+        // own locality's.
         IReadOnlyList<IssueResponse> results =
-            [.. waiting.Select(i => i.ToResponse(viewerId, access))];
+            [.. waiting.Where(access.MaySee).Select(i => i.ToResponse(viewerId, access))];
 
         return Result.Success(results);
     }

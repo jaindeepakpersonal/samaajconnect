@@ -81,7 +81,8 @@ public static class IssueEndpoints
                     request.Description,
                     request.Category,
                     request.Locality,
-                    request.SubmitNow);
+                    request.SubmitNow,
+                    request.LocalityId);
 
                 var result = await sender.Send(command, cancellationToken);
 
@@ -119,7 +120,8 @@ public static class IssueEndpoints
                 CancellationToken cancellationToken) =>
             {
                 var command = new ReviseIssueCommand(
-                    id, request.Title, request.Description, request.Category, request.Locality);
+                    id, request.Title, request.Description, request.Category, request.Locality,
+                    request.LocalityId);
 
                 var result = await sender.Send(command, cancellationToken);
 
@@ -193,13 +195,15 @@ public static class IssueEndpoints
         string Description,
         string Category,
         string? Locality,
-        bool SubmitNow = true);
+        bool SubmitNow = true,
+        string? LocalityId = null);
 
     public sealed record ReviseIssueRequest(
         string Title,
         string Description,
         string Category,
-        string? Locality);
+        string? Locality,
+        string? LocalityId = null);
 
     /// <summary>
     /// <paramref name="Status"/> is required and has no default: a workflow

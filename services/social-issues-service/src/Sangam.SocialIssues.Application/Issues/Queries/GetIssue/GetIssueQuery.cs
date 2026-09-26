@@ -42,7 +42,7 @@ public sealed class GetIssueQueryHandler(
         // Before the Panch has it, an issue belongs to its author and its
         // reviewers. Anyone else is told it does not exist rather than that they
         // may not see it — the difference confirms one with that id is there.
-        var maySee = issue.IsPublic || issue.IsAuthor(memberId) || access.CanSeeQueue;
+        var maySee = issue.IsPublic || issue.IsAuthor(memberId) || access.MaySee(issue);
 
         return maySee
             ? Result.Success(issue.ToDetail(memberId, access))

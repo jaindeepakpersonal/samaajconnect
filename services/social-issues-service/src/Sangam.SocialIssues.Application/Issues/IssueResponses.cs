@@ -15,6 +15,9 @@ public sealed record IssueResponse(
     string Description,
     string Category,
     string? Locality,
+
+    /// <summary>The master-data-service locality it concerns, or null.</summary>
+    Guid? LocalityId,
     Guid SubmittedByMemberId,
     string Status,
 

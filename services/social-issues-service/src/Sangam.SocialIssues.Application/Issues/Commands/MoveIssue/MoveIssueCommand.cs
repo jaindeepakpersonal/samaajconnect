@@ -102,7 +102,7 @@ public sealed class MoveIssueCommandHandler(
 
         // A draft belongs to its author until they submit it, so somebody else
         // reaching one has guessed its id.
-        if (!issue.IsPublic && !issue.IsAuthor(actorId) && !access.CanSeeQueue)
+        if (!issue.IsPublic && !issue.IsAuthor(actorId) && !access.MaySee(issue))
         {
             return Result.Failure<IssueDetailResponse>(
                 Error.NotFound("Issue.NotFound", "No such issue in this Samaaj."));
@@ -121,7 +121,7 @@ public sealed class MoveIssueCommandHandler(
         // reviewer decides. The workflow says which kind this is.
         var isAuthorMove = SocialIssue.IsAuthorMove(issue.Status, target);
 
-        if (isAuthorMove ? !issue.IsAuthor(actorId) : !access.CanAct)
+        if (isAuthorMove ? !issue.IsAuthor(actorId) : !access.MayAct(issue))
         {
             return Result.Failure<IssueDetailResponse>(Error.Forbidden(
                 "Issue.NotYours",

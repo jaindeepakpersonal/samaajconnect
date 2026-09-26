@@ -80,13 +80,13 @@ public sealed class RecordDecisionCommandHandler(
         }
 
         // Somebody who could not have seen this issue is told it does not exist.
-        if (!issue.IsPublic && !issue.IsAuthor(actorId) && !access.CanSeeQueue)
+        if (!issue.IsPublic && !issue.IsAuthor(actorId) && !access.MaySee(issue))
         {
             return Result.Failure<IssueDetailResponse>(
                 Error.NotFound("Issue.NotFound", "No such issue in this Samaaj."));
         }
 
-        if (!access.CanAct)
+        if (!access.MayAct(issue))
         {
             return Result.Failure<IssueDetailResponse>(Error.Forbidden(
                 "Issue.NotOnPanch",

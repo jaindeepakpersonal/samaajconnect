@@ -32,7 +32,7 @@ internal static class IssueMappings
                 .Where(issue.CanMoveTo)
                 .Where(target => SocialIssue.IsAuthorMove(issue.Status, target)
                     ? isAuthor
-                    : access.CanAct)
+                    : access.MayAct(issue))
                 .Select(target => target.ToString())
         ];
     }
@@ -44,11 +44,12 @@ internal static class IssueMappings
         issue.Description,
         issue.Category,
         issue.Locality,
+        issue.LocalityId,
         issue.SubmittedByMemberId,
         issue.Status.ToString(),
         issue.IsAuthor(viewerId),
         issue.AvailableTransitions(viewerId, access),
-        access.CanAct && issue.Status == IssueStatus.DecisionPending,
+        access.MayAct(issue) && issue.Status == IssueStatus.DecisionPending,
         issue.CreatedAt,
         issue.Decision,
         issue.MonitoringGroupId,

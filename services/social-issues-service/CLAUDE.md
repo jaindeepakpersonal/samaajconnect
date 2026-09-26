@@ -134,6 +134,18 @@ judges" with an exception for administrators is a rule that does not hold. An
 administrator keeps sight of the queue so that somebody can tell whether it is
 being worked.
 
+**An Area Admin's `SocialIssues.Approve` reaches their own locality only; a
+Panch seat reaches the whole Samaaj.** `SocialIssue.LocalityId` is the
+master-data-service locality the member picks when raising an issue (the older
+free-text `Locality` stays, for issues raised before). `ReviewAccess` carries
+the Area Admin's locality (`IAreaScope`, the `locality_id` token claim) and
+answers per issue: `MaySee` and `MayAct` apply it to the `Approve` branch and
+never to the Panch branch, so an Area Admin who also sits on the Panch judges
+everything, as every Panch member does. Their queue holds their own locality's
+issues; an unpublished issue elsewhere is "not found" to them like to any other
+member. `CanSeeQueue`/`CanAct` stay as caller-level answers for the portal's
+review-access check, and nothing that concerns one issue reads them directly.
+
 **Any Panch member may record the decision.** No quorum, no chair, no term: the
 Panch discusses offline and one of its members writes down the outcome. Who did
 is on the issue (`DecidedBy`) and in the history.

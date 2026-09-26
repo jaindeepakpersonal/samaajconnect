@@ -1,5 +1,6 @@
 using Sangam.SocialIssues.Application.Abstractions;
 using Sangam.SocialIssues.Application.Security;
+using Sangam.SocialIssues.Domain.Issues;
 
 namespace Sangam.SocialIssues.Application.Issues;
 
@@ -18,11 +19,37 @@ namespace Sangam.SocialIssues.Application.Issues;
 /// </param>
 /// <param name="PanelSeated">Whether this Samaaj has elected a Panch.</param>
 /// <param name="IsPanelMember">Whether the caller sits on it.</param>
+/// <param name="ApproveLocalityId">
+/// Set when the caller's <c>SocialIssues.Approve</c> comes from being an Area
+/// Admin: it then reaches only issues in that locality. A Panch seat is never
+/// narrowed this way - the Panch judges for the whole Samaaj.
+/// </param>
+/// <remarks>
+/// <see cref="CanSeeQueue"/> and <see cref="CanAct"/> answer for the caller in
+/// general, which is what the portal needs to decide whether to offer a queue
+/// at all. Anything about a particular issue asks <see cref="MaySee"/> and
+/// <see cref="MayAct"/>, which also apply the locality.
+/// </remarks>
 public sealed record ReviewAccess(
-    bool CanSeeQueue, bool CanAct, bool PanelSeated, bool IsPanelMember)
+    bool CanSeeQueue,
+    bool CanAct,
+    bool PanelSeated,
+    bool IsPanelMember,
+    Guid? ApproveLocalityId = null)
 {
     /// <summary>Nobody, for a caller with no identity.</summary>
     public static ReviewAccess None { get; } = new(false, false, false, false);
+
+    /// <summary>May read this issue as a reviewer - in the queue, or by id.</summary>
+    public bool MaySee(SocialIssue issue) =>
+        IsPanelMember || (CanSeeQueue && CoversByApprove(issue));
+
+    /// <summary>May move this issue as a reviewer, or record its decision.</summary>
+    public bool MayAct(SocialIssue issue) =>
+        IsPanelMember || (CanAct && CoversByApprove(issue));
+
+    private bool CoversByApprove(SocialIssue issue) =>
+        ApproveLocalityId is null || issue.LocalityId == ApproveLocalityId;
 }
 
 /// <summary>
@@ -41,7 +68,8 @@ public sealed record ReviewAccess(
 /// "only the Panch judges" a rule with an exception for administrators, which is
 /// a rule that does not hold.
 /// </remarks>
-public sealed class ReviewAccessResolver(IPanelRepository panel, ICurrentUser currentUser)
+public sealed class ReviewAccessResolver(
+    IPanelRepository panel, ICurrentUser currentUser, IAreaScope areaScope)
 {
     public async Task<ReviewAccess> ResolveAsync(CancellationToken cancellationToken)
     {
@@ -58,6 +86,7 @@ public sealed class ReviewAccessResolver(IPanelRepository panel, ICurrentUser cu
             CanSeeQueue: isMember || holdsApprove,
             CanAct: isMember || (holdsApprove && !seated),
             PanelSeated: seated,
-            IsPanelMember: isMember);
+            IsPanelMember: isMember,
+            ApproveLocalityId: areaScope.AreaLocalityId);
     }
 }
