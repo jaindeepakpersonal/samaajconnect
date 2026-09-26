@@ -616,11 +616,34 @@ export class AdminApi {
     return this.http.get<GroupElection[]>(`/v1/volunteer-groups/groups/${groupId}/elections`);
   }
 
+  /** Defines a volunteer role with the seats an election for it fills. Answers with the whole group. */
+  defineGroupRole(groupId: string, title: string, seats: number): Observable<GroupDetail> {
+    return this.http.post<GroupDetail>(`/v1/volunteer-groups/groups/${groupId}/roles`, { title, seats });
+  }
+
+  /** Renames or resizes a role. Not Volunteer or President, and never below its holders. */
+  updateGroupRole(groupId: string, roleId: string, title: string, seats: number): Observable<GroupDetail> {
+    return this.http.patch<GroupDetail>(`/v1/volunteer-groups/groups/${groupId}/roles/${roleId}`, {
+      title,
+      seats,
+    });
+  }
+
+  /** Removes a role nobody holds and no election is deciding. */
+  removeGroupRole(groupId: string, roleId: string): Observable<GroupDetail> {
+    return this.http.delete<GroupDetail>(`/v1/volunteer-groups/groups/${groupId}/roles/${roleId}`);
+  }
+
+  /** Moves a member into a role - not President, which moves only with the presidency. */
+  assignGroupRole(groupId: string, memberId: string, roleId: string): Observable<GroupDetail> {
+    return this.http.put<GroupDetail>(`/v1/volunteer-groups/groups/${groupId}/members/${memberId}/role`, {
+      roleId,
+    });
+  }
+
   /**
-   * Sets an election up. It starts as a draft.
-   *
-   * A Samaaj admin may do this only for the "President" position and only while
-   * the group has none; the service refuses anything else with a 403.
+   * Sets an election up for one of the group's roles. It starts as a draft.
+   * The president or an administrator of the group, at any time.
    */
   openGroupElection(groupId: string, election: GroupElectionInput): Observable<GroupElection> {
     return this.http.post<GroupElection>(
@@ -634,7 +657,7 @@ export class AdminApi {
   }
 
   /**
-   * Corrects the position title or windows - how nominations that closed too
+   * Corrects the role or windows - how nominations that closed too
    * early are reopened, since nothing here moves the election's own status.
    * Allowed in Draft or NominationsOpen; the service refuses it (409) from
    * VotingOpen on.
@@ -660,7 +683,7 @@ export class AdminApi {
     );
   }
 
-  /** Freezes the winner and installs them in the position - the group's president, for that election. */
+  /** Freezes the winners and installs them in the role - the group's president, for a President election. */
   publishGroupElection(id: string): Observable<GroupElection> {
     return this.http.post<GroupElection>(`/v1/volunteer-groups/elections/${id}/publish`, {});
   }

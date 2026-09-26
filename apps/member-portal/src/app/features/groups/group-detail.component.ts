@@ -2,6 +2,7 @@ import { Component, OnInit, computed, inject, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { ActivatedRoute, RouterLink } from '@angular/router';
 import { AuthService, describeError } from '@samaajconnect/shared';
+import { Observable } from 'rxjs';
 import { MembersApi } from '../members/members.api';
 import { GroupsApi } from './groups.api';
 import {
@@ -9,6 +10,7 @@ import {
   ElectionDetail,
   GroupApplication,
   GroupDetail,
+  GroupRole,
   VolunteerGroup,
   electionStageLabel,
   votingNote,
@@ -30,9 +32,9 @@ import {
  * says the reader is its president: the endpoint answers 404 to anyone else,
  * and asking speculatively would mean a 404 on every ordinary member's visit.
  *
- * Assigning a position is here for the same reason - the wireframe's own
- * subtitle promises "Group President assigns roles/positions" and nothing else
- * in the portal does it.
+ * Assigning a role is here for the same reason - the wireframe's own subtitle
+ * promises "Group President assigns roles/positions" and nothing else in the
+ * portal does it.
  *
  * **Every member and applicant is named and linked to their profile.**
  * volunteer-groups-service's own response only ever carries a member id -
@@ -47,17 +49,16 @@ import {
  * reads as "You" for the viewer's own row, and falls back to "A member"
  * only while a name is still loading or if that one lookup fails.
  *
- * **Positions are filled by election now, added 2026-09-12.** Accepting a
- * join request used to carry an optional free-text position in the same
- * breath - a unilateral president decision with no request, no nomination,
- * no vote - and that input is gone from the review queue below. The
- * "Positions" section is new: the president opens an election for a named
- * position, any current group member nominates another, the president
- * approves nominations onto the ballot, voting opens, and publishing installs
- * the winner - which then shows up in the Members table above like any other
- * position. `AssignRolePositionCommand`'s own "Give a position"/"Change
- * position" control on each member row is untouched and still there as the
- * manual override it always was; nothing about elections removes it.
+ * **Every member holds one of the group's volunteer roles (2026-09-26).**
+ * Volunteer and President are built in; the group defines the rest, each with
+ * the seats an election for it fills, in the "Volunteer roles" section. The
+ * president - or an administrator of the group - defines them, moves a member
+ * into one from the Members table (never into or out of President, which moves
+ * only with the presidency), and opens an election for one. Any current member
+ * nominates another, the leader approves nominations onto the ballot, voting
+ * opens, and publishing installs the winners. A role with several seats takes a
+ * ballot of several picks - ticked, then cast once, because a ballot is final.
+ * `group.iCanRunElections` is the service's own answer to who may do all this.
  *
  * The nominee picker is a `<select>` built from this group's own roster
  * (`found.members`), not a name search: unlike Celebrities of Samaaj's
@@ -178,7 +179,7 @@ import {
               <caption class="sr-only">Group members</caption>
               <tr>
                 <th scope="col">Member</th>
-                <th scope="col">Position</th>
+                <th scope="col">Role</th>
                 <th scope="col">Joined</th>
                 @if (found.group.iAmThePresident) {
                   <th scope="col"><span class="sr-only">Actions</span></th>
@@ -193,56 +194,49 @@ import {
                       <a [routerLink]="['/members', person.memberId]">{{ nameFor(person.memberId, found) }}</a>
                     }
                   </td>
-                  <td>{{ person.rolePosition ?? '—' }}</td>
+                  <td>
+                    <!--
+                      The president's own row is never a picker: President moves
+                      only with the presidency, and the service refuses anything
+                      else for them.
+                    -->
+                    @if (found.group.iCanRunElections && person.memberId !== found.group.presidentMemberId) {
+                      <label class="sr-only" [for]="'role-' + person.memberId">
+                        Role for {{ nameFor(person.memberId, found) }}
+                      </label>
+                      <select
+                        class="input"
+                        [id]="'role-' + person.memberId"
+                        [ngModel]="person.roleId"
+                        (ngModelChange)="assignRole(person.memberId, $event)"
+                        [disabled]="busy()"
+                      >
+                        @for (role of assignableRoles(found); track role.id) {
+                          <option [value]="role.id">{{ role.title }}</option>
+                        }
+                      </select>
+                    } @else {
+                      {{ person.rolePosition ?? 'Volunteer' }}
+                    }
+                  </td>
                   <td>{{ date(person.joinedAt) }}</td>
 
                   @if (found.group.iAmThePresident) {
                     <td>
-                      @if (editingPosition() === person.memberId) {
-                        <form class="inline-form" (ngSubmit)="savePosition(person.memberId)">
-                          <label class="sr-only" [for]="'position-' + person.memberId">
-                            Position
-                          </label>
-                          <input
-                            class="input"
-                            [id]="'position-' + person.memberId"
-                            name="position"
-                            [(ngModel)]="positionDraft"
-                            maxlength="100"
-                            placeholder="Secretary"
-                          />
-                          <button class="btn small" type="submit" [disabled]="busy()">Save</button>
-                          <button
-                            class="btn small secondary"
-                            type="button"
-                            (click)="editingPosition.set(null)"
-                          >
-                            Cancel
-                          </button>
-                        </form>
-                      } @else {
+                      <!--
+                        Never offered for the president's own row: the
+                        service refuses that with a 409, and a button that
+                        always fails is worse than no button.
+                      -->
+                      @if (person.memberId !== found.group.presidentMemberId) {
                         <button
                           class="btn link"
                           type="button"
-                          (click)="editPosition(person.memberId, person.rolePosition)"
+                          [disabled]="busy()"
+                          (click)="removeMember(person.memberId)"
                         >
-                          {{ person.rolePosition ? 'Change position' : 'Give a position' }}
+                          Remove
                         </button>
-                        <!--
-                          Never offered for the president's own row: the
-                          service refuses that with a 409, and a button that
-                          always fails is worse than no button.
-                        -->
-                        @if (person.memberId !== found.group.presidentMemberId) {
-                          <button
-                            class="btn link"
-                            type="button"
-                            [disabled]="busy()"
-                            (click)="removeMember(person.memberId)"
-                          >
-                            Remove
-                          </button>
-                        }
                       }
                     </td>
                   }
@@ -312,18 +306,99 @@ import {
           </p>
         }
 
-        <!-- Positions, filled by election ---------------------------- -->
-        <h2 class="section-heading">Positions</h2>
+        <!-- Volunteer roles -------------------------------------------- -->
+        <h2 class="section-heading">Volunteer roles</h2>
         <p class="small">
-          A position comes from an election now, not from the president's own say-so.
+          Everybody in the group holds one role, starting as a Volunteer. Each other role is filled
+          by an election for as many seats as it has.
         </p>
 
-        @if (found.group.iCanLead) {
+        <div class="table-scroll">
+          <table>
+            <caption class="sr-only">Volunteer roles in this group</caption>
+            <tr>
+              <th scope="col">Role</th>
+              <th scope="col">Seats</th>
+              <th scope="col">Held by</th>
+              @if (found.group.iCanRunElections) {
+                <th scope="col"><span class="sr-only">Actions</span></th>
+              }
+            </tr>
+            @for (role of found.roles; track role.id) {
+              <tr>
+                @if (editingRoleId() === role.id) {
+                  <td>
+                    <label class="sr-only" [for]="'role-title-' + role.id">Title</label>
+                    <input class="input" [id]="'role-title-' + role.id" name="editRoleTitle"
+                      [(ngModel)]="editRoleTitle" maxlength="100" />
+                  </td>
+                  <td>
+                    <label class="sr-only" [for]="'role-seats-' + role.id">Seats</label>
+                    <input class="input" type="number" min="1" max="100" [id]="'role-seats-' + role.id"
+                      name="editRoleSeats" [(ngModel)]="editRoleSeats" />
+                  </td>
+                  <td>{{ role.holderCount }}</td>
+                  <td>
+                    <button class="btn small" type="button" (click)="saveRole(role.id)"
+                      [disabled]="busy() || !validRole(editRoleTitle, editRoleSeats)">
+                      Save
+                    </button>
+                    <button class="btn small secondary" type="button" (click)="editingRoleId.set(null)">
+                      Cancel
+                    </button>
+                  </td>
+                } @else {
+                  <td>{{ role.title }}</td>
+                  <td>{{ role.seats ?? 'No limit' }}</td>
+                  <td>{{ role.holderCount }}</td>
+                  @if (found.group.iCanRunElections) {
+                    <td>
+                      @if (role.isEditable) {
+                        <button class="btn link" type="button" [disabled]="busy()" (click)="startEditRole(role)">
+                          Edit<span class="sr-only"> {{ role.title }}</span>
+                        </button>
+                        <!-- A held role cannot be removed: the service answers 409. -->
+                        @if (role.holderCount === 0) {
+                          <button class="btn link" type="button" [disabled]="busy()" (click)="removeRole(role.id)">
+                            Remove<span class="sr-only"> {{ role.title }}</span>
+                          </button>
+                        }
+                      }
+                    </td>
+                  }
+                }
+              </tr>
+            }
+          </table>
+        </div>
+
+        @if (roleError(); as message) {
+          <p class="notice error" role="alert">{{ message }}</p>
+        }
+
+        @if (found.group.iCanRunElections) {
+          <form class="inline-form" (ngSubmit)="defineRole()">
+            <label for="new-role-title">New role</label>
+            <input class="input" id="new-role-title" name="newRoleTitle" [(ngModel)]="newRoleTitle"
+              maxlength="100" placeholder="Secretary" />
+            <label for="new-role-seats">Seats</label>
+            <input class="input" id="new-role-seats" type="number" min="1" max="100"
+              name="newRoleSeats" [(ngModel)]="newRoleSeats" />
+            <button class="btn small" type="submit" [disabled]="busy() || !validRole(newRoleTitle, newRoleSeats)">
+              Add role
+            </button>
+          </form>
+        }
+
+        <!-- Elections, one per role ------------------------------------ -->
+        <h2 class="section-heading">Elections</h2>
+
+        @if (found.group.iCanRunElections) {
           <div class="actions">
             <button
               class="btn secondary"
               type="button"
-              (click)="openElectionForm(found.group)"
+              (click)="openElectionForm(found)"
             >
               {{ showOpenElection() ? 'Cancel' : 'Open an election' }}
             </button>
@@ -333,16 +408,13 @@ import {
             <form class="card" (ngSubmit)="openElection(found.group.id)">
               <div class="form-grid">
                 <div class="field span-all">
-                  <label for="election-position">Position</label>
-                  <input
-                    class="input"
-                    id="election-position"
-                    name="positionTitle"
-                    [(ngModel)]="positionTitle"
-                    [readonly]="!found.group.iAmThePresident"
-                    maxlength="100"
-                    placeholder="Secretary"
-                  />
+                  <label for="election-role">Role</label>
+                  <select class="input" id="election-role" name="roleId" [(ngModel)]="roleId">
+                    <option value="">Choose a role…</option>
+                    @for (role of electedRoles(found); track role.id) {
+                      <option [value]="role.id">{{ role.title }} ({{ seatsLabel(role.seats ?? 1) }})</option>
+                    }
+                  </select>
                 </div>
 
                 <div class="field">
@@ -395,7 +467,7 @@ import {
               }
 
               <div class="actions">
-                <button class="btn" type="submit" [disabled]="electionBusy() || !positionTitle.trim()">
+                <button class="btn" type="submit" [disabled]="electionBusy() || !roleId">
                   Open
                 </button>
               </div>
@@ -416,12 +488,15 @@ import {
                   <span class="pill" [class]="electionPillClass(election)">
                     {{ electionStage(election) }}
                   </span>
+                  <span class="small"> {{ seatsLabel(election.seats) }}</span>
                 </p>
 
-                @if (election.winnerMemberId; as winnerId) {
+                @if (election.winnerMemberIds.length > 0) {
                   <p>
                     Elected:
-                    <a [routerLink]="['/members', winnerId]">{{ nameFor(winnerId, found) }}</a>
+                    @for (winnerId of election.winnerMemberIds; track winnerId; let last = $last) {
+                      <a [routerLink]="['/members', winnerId]">{{ nameFor(winnerId, found) }}</a>{{ last ? '' : ', ' }}
+                    }
                   </p>
                 }
 
@@ -434,7 +509,7 @@ import {
                     {{ expandedElectionId() === election.id ? 'Hide ballot' : 'View ballot' }}
                   </button>
 
-                  @if (found.group.iCanLead) {
+                  @if (found.group.iCanRunElections) {
                     @if (canEditElection(election)) {
                       <button class="btn link" type="button" [disabled]="electionBusy()"
                         (click)="toggleEditElection(election)">
@@ -473,14 +548,13 @@ import {
                   <form class="card" (ngSubmit)="saveElectionEdit(election.id)">
                     <div class="form-grid">
                       <div class="field span-all">
-                        <label [for]="'edit-position-' + election.id">Position</label>
-                        <input
-                          class="input"
-                          [id]="'edit-position-' + election.id"
-                          name="editPositionTitle"
-                          [(ngModel)]="editPositionTitle"
-                          maxlength="100"
-                        />
+                        <label [for]="'edit-role-' + election.id">Role</label>
+                        <select class="input" [id]="'edit-role-' + election.id" name="editRoleId"
+                          [(ngModel)]="editRoleId">
+                          @for (role of electedRoles(found); track role.id) {
+                            <option [value]="role.id">{{ role.title }} ({{ seatsLabel(role.seats ?? 1) }})</option>
+                          }
+                        </select>
                       </div>
 
                       <div class="field">
@@ -518,7 +592,7 @@ import {
 
                     <div class="actions">
                       <button class="btn small" type="submit"
-                        [disabled]="electionBusy() || !editPositionTitle.trim()">
+                        [disabled]="electionBusy() || !editRoleId">
                         Save
                       </button>
                       <button class="btn small secondary" type="button"
@@ -576,7 +650,7 @@ import {
                     </div>
                   }
 
-                  @if (found.group.iCanLead) {
+                  @if (found.group.iCanRunElections) {
                     @for (candidate of waitingCandidates(detail); track candidate.id) {
                       <div class="candidate-row">
                         <span>{{ nameFor(candidate.memberId, found) }}</span>
@@ -603,23 +677,50 @@ import {
                   @if (approvedCandidates(detail).length === 0) {
                     <p class="small">Nobody is on the ballot yet.</p>
                   } @else {
+                    @if (canBallot(election) && election.seats > 1) {
+                      <p class="small">
+                        Pick up to {{ election.seats }}, then cast your ballot once. It is final: you
+                        cannot come back to add another.
+                      </p>
+                    }
+
                     @for (candidate of approvedCandidates(detail); track candidate.id) {
                       <div class="candidate-row">
                         <span>{{ nameFor(candidate.memberId, found) }}</span>
                         <span class="small">{{ candidate.votes }} {{ candidate.votes === 1 ? 'vote' : 'votes' }}</span>
 
-                        @if (election.myVoteCandidateId === candidate.id) {
+                        @if (election.myVoteCandidateIds.includes(candidate.id)) {
                           <span class="pill ok">Your vote</span>
-                        } @else if (election.acceptsVotes && election.myVoteCandidateId === null) {
+                        } @else if (canBallot(election)) {
                           @if (candidate.memberId === me()) {
                             <span class="small">You cannot vote for yourself.</span>
-                          } @else {
+                          } @else if (election.seats === 1) {
                             <button class="btn small" type="button" [disabled]="electionBusy()"
-                              (click)="castVote(election.id, candidate.id)">
+                              (click)="castVote(election.id, [candidate.id])">
                               Vote
                             </button>
+                          } @else {
+                            <label>
+                              <input
+                                type="checkbox"
+                                [checked]="picked(election.id, candidate.id)"
+                                [disabled]="!picked(election.id, candidate.id) && picks(election.id).length >= election.seats"
+                                (change)="togglePick(election.id, candidate.id)"
+                              />
+                              Pick<span class="sr-only"> {{ nameFor(candidate.memberId, found) }}</span>
+                            </label>
                           }
                         }
+                      </div>
+                    }
+
+                    @if (canBallot(election) && election.seats > 1) {
+                      <div class="actions">
+                        <button class="btn" type="button"
+                          [disabled]="electionBusy() || picks(election.id).length === 0"
+                          (click)="castVote(election.id, picks(election.id))">
+                          Cast my ballot ({{ picks(election.id).length }} of {{ election.seats }})
+                        </button>
                       </div>
                     }
                   }
@@ -652,13 +753,20 @@ export class GroupDetailComponent implements OnInit {
   /** Per-application failures, so one refusal does not blank the queue. */
   readonly decisionError = signal<Record<string, string>>({});
 
-  readonly editingPosition = signal<string | null>(null);
-
   /** Resolved names, by member id - see this component's own doc comment on why. */
   readonly names = signal<Record<string, string>>({});
 
   note = '';
-  positionDraft = '';
+
+  // ---- Volunteer roles ----------------------------------------------------
+
+  readonly roleError = signal<string | null>(null);
+  readonly editingRoleId = signal<string | null>(null);
+
+  newRoleTitle = '';
+  newRoleSeats = 1;
+  editRoleTitle = '';
+  editRoleSeats = 1;
 
   // ---- Elections ----------------------------------------------------------
 
@@ -669,22 +777,22 @@ export class GroupDetailComponent implements OnInit {
   readonly openElectionError = signal<string | null>(null);
   readonly electionBusy = signal(false);
 
-  positionTitle = '';
+  roleId = '';
 
   /**
-   * Opens the election form. An admin running a group that has no president may
-   * run only the "President" election, so the field is filled in and locked for
-   * them; the president may name any position.
+   * Opens the election form. A group with no president most likely wants its
+   * President election first, so that role is picked to start with.
    */
-  openElectionForm(group: VolunteerGroup): void {
+  openElectionForm(found: GroupDetail): void {
     if (this.showOpenElection()) {
       this.showOpenElection.set(false);
       return;
     }
 
-    if (!group.iAmThePresident) {
-      this.positionTitle = 'President';
-    }
+    this.roleId =
+      found.group.presidentMemberId === null
+        ? (found.roles.find((role) => role.kind === 'President')?.id ?? '')
+        : '';
 
     this.showOpenElection.set(true);
   }
@@ -698,7 +806,7 @@ export class GroupDetailComponent implements OnInit {
   readonly editingElectionId = signal<string | null>(null);
   readonly editElectionError = signal<string | null>(null);
 
-  editPositionTitle = '';
+  editRoleId = '';
   editNominationStartAt = '';
   editNominationEndAt = '';
   editVotingStartAt = '';
@@ -710,6 +818,9 @@ export class GroupDetailComponent implements OnInit {
 
   /** Per-election nominee-picker draft, so opening one ballot does not clear another's. */
   readonly nomineeDrafts = signal<Record<string, string>>({});
+
+  /** Per-election ticked candidates, for a role with more than one seat. */
+  readonly ballotDrafts = signal<Record<string, readonly string[]>>({});
 
   /** Per-election action failures, so one refusal does not blank the list. */
   readonly electionActionError = signal<Record<string, string>>({});
@@ -906,41 +1017,110 @@ export class GroupDetailComponent implements OnInit {
     });
   }
 
-  editPosition(memberId: string, current: string | null): void {
-    this.positionDraft = current ?? '';
-    this.editingPosition.set(memberId);
+  // ---- Volunteer roles ---------------------------------------------------
+
+  /** The roles an election can be run for: every one but Volunteer. */
+  electedRoles(found: GroupDetail): readonly GroupRole[] {
+    return found.roles.filter((role) => role.isElected);
   }
 
-  savePosition(memberId: string): void {
-    const found = this.detail();
+  /** The roles a member can be moved into by hand: every one but President. */
+  assignableRoles(found: GroupDetail): readonly GroupRole[] {
+    return found.roles.filter((role) => role.kind !== 'President');
+  }
 
-    if (found === null) {
+  seatsLabel(seats: number): string {
+    return seats === 1 ? '1 seat' : `${seats} seats`;
+  }
+
+  validRole(title: string, seats: number | null): boolean {
+    return title.trim().length > 0 && Number.isInteger(seats) && seats! >= 1 && seats! <= 100;
+  }
+
+  defineRole(): void {
+    const found = this.detail();
+    const title = this.newRoleTitle.trim();
+
+    if (found === null || !this.validRole(title, this.newRoleSeats)) {
       return;
     }
 
+    this.roleAction(this.api.defineRole(found.group.id, title, this.newRoleSeats), () => {
+      this.newRoleTitle = '';
+      this.newRoleSeats = 1;
+    });
+  }
+
+  startEditRole(role: GroupRole): void {
+    this.editRoleTitle = role.title;
+    this.editRoleSeats = role.seats ?? 1;
+    this.editingRoleId.set(role.id);
+  }
+
+  saveRole(roleId: string): void {
+    const found = this.detail();
+    const title = this.editRoleTitle.trim();
+
+    if (found === null || !this.validRole(title, this.editRoleSeats)) {
+      return;
+    }
+
+    this.roleAction(this.api.updateRole(found.group.id, roleId, title, this.editRoleSeats), () =>
+      this.editingRoleId.set(null),
+    );
+  }
+
+  removeRole(roleId: string): void {
+    const found = this.detail();
+
+    if (found !== null) {
+      this.roleAction(this.api.removeRole(found.group.id, roleId));
+    }
+  }
+
+  /**
+   * Moves a member into a role. A refusal - a full role, say - re-reads the
+   * group, because the select has already shown the choice the service refused.
+   */
+  assignRole(memberId: string, roleId: string): void {
+    const found = this.detail();
+
+    if (found === null || found.members.find((m) => m.memberId === memberId)?.roleId === roleId) {
+      return;
+    }
+
+    this.roleAction(this.api.assignRole(found.group.id, memberId, roleId), undefined, true);
+  }
+
+  /** Every role call answers with the whole group, so the screen takes it as it stands. */
+  private roleAction(
+    work: Observable<GroupDetail>,
+    done?: () => void,
+    reloadOnFailure = false,
+  ): void {
     this.busy.set(true);
+    this.roleError.set(null);
 
-    const position = this.positionDraft.trim();
+    work.subscribe({
+      next: (updated) => {
+        this.detail.set(updated);
+        this.busy.set(false);
+        done?.();
+      },
+      error: (failure: unknown) => {
+        this.roleError.set(describeError(failure));
+        this.busy.set(false);
 
-    this.api
-      .setPosition(found.group.id, memberId, position.length > 0 ? position : null)
-      .subscribe({
-        next: (updated) => {
-          this.detail.set(updated);
-          this.editingPosition.set(null);
-          this.busy.set(false);
-        },
-        error: (failure: unknown) => {
-          this.error.set(describeError(failure));
-          this.editingPosition.set(null);
-          this.busy.set(false);
-        },
-      });
+        if (reloadOnFailure) {
+          this.load();
+        }
+      },
+    });
   }
 
   /**
    * Removes a member. No confirmation, matching the weight this screen already
-   * gives assigning a position or deciding an application - all three are a
+   * gives assigning a role or deciding an application - all three are a
    * president acting on somebody else's standing in their own group, and none
    * of the others ask "are you sure?" either. It is also reversible: a removed
    * member can apply again, the same as anyone rejected.
@@ -969,9 +1149,7 @@ export class GroupDetailComponent implements OnInit {
   // ---- Elections ----------------------------------------------------------
 
   openElection(groupId: string): void {
-    const title = this.positionTitle.trim();
-
-    if (title.length === 0) {
+    if (this.roleId.length === 0) {
       return;
     }
 
@@ -981,7 +1159,7 @@ export class GroupDetailComponent implements OnInit {
     this.api
       .openElection(
         groupId,
-        title,
+        this.roleId,
         new Date(this.nominationStartAt).toISOString(),
         new Date(this.nominationEndAt).toISOString(),
         new Date(this.votingStartAt).toISOString(),
@@ -991,7 +1169,7 @@ export class GroupDetailComponent implements OnInit {
         next: () => {
           this.electionBusy.set(false);
           this.showOpenElection.set(false);
-          this.positionTitle = '';
+          this.roleId = '';
           this.nominationStartAt = '';
           this.nominationEndAt = '';
           this.votingStartAt = '';
@@ -1016,7 +1194,7 @@ export class GroupDetailComponent implements OnInit {
       return;
     }
 
-    this.editPositionTitle = election.positionTitle;
+    this.editRoleId = election.roleId;
     this.editNominationStartAt = toLocalInputValue(election.nominationStartAt);
     this.editNominationEndAt = toLocalInputValue(election.nominationEndAt);
     this.editVotingStartAt = toLocalInputValue(election.votingStartAt);
@@ -1026,9 +1204,7 @@ export class GroupDetailComponent implements OnInit {
   }
 
   saveElectionEdit(electionId: string): void {
-    const title = this.editPositionTitle.trim();
-
-    if (title.length === 0) {
+    if (this.editRoleId.length === 0) {
       return;
     }
 
@@ -1038,7 +1214,7 @@ export class GroupDetailComponent implements OnInit {
     this.api
       .updateElection(
         electionId,
-        title,
+        this.editRoleId,
         new Date(this.editNominationStartAt).toISOString(),
         new Date(this.editNominationEndAt).toISOString(),
         new Date(this.editVotingStartAt).toISOString(),
@@ -1189,13 +1365,38 @@ export class GroupDetailComponent implements OnInit {
     });
   }
 
-  castVote(electionId: string, candidateId: string): void {
+  /** Whether this reader may still cast a ballot in it: voting is open and they have not voted. */
+  canBallot(election: Election): boolean {
+    return election.acceptsVotes && election.myVoteCandidateIds.length === 0;
+  }
+
+  picks(electionId: string): readonly string[] {
+    return this.ballotDrafts()[electionId] ?? [];
+  }
+
+  picked(electionId: string, candidateId: string): boolean {
+    return this.picks(electionId).includes(candidateId);
+  }
+
+  togglePick(electionId: string, candidateId: string): void {
+    const current = this.picks(electionId);
+
+    this.ballotDrafts.update((drafts) => ({
+      ...drafts,
+      [electionId]: current.includes(candidateId)
+        ? current.filter((id) => id !== candidateId)
+        : [...current, candidateId],
+    }));
+  }
+
+  castVote(electionId: string, candidateIds: readonly string[]): void {
     this.electionBusy.set(true);
     this.clearElectionActionError(electionId);
 
-    this.api.castVote(electionId, candidateId).subscribe({
+    this.api.castVote(electionId, candidateIds).subscribe({
       next: () => {
         this.electionBusy.set(false);
+        this.ballotDrafts.update((drafts) => ({ ...drafts, [electionId]: [] }));
         this.loadElections(this.detail()!.group.id);
         this.refreshExpanded(electionId);
       },
@@ -1218,7 +1419,7 @@ export class GroupDetailComponent implements OnInit {
   voteNote(election: Election, group: VolunteerGroup, onBallot: number): string | null {
     return votingNote(
       election,
-      { inGroup: this.isInGroup(group), canLead: group.iCanLead },
+      { inGroup: this.isInGroup(group), canLead: group.iCanRunElections },
       onBallot,
     );
   }

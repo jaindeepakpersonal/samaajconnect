@@ -68,16 +68,29 @@ export class GroupsApi {
     );
   }
 
-  /** Gives a member a position in the group, or clears it. */
-  setPosition(
-    id: string,
-    memberId: string,
-    rolePosition: string | null,
-  ): Observable<GroupDetail> {
-    return this.http.put<GroupDetail>(
-      `/v1/volunteer-groups/groups/${id}/members/${memberId}/position`,
-      { rolePosition },
-    );
+  /** Moves a member into one of the group's roles - not President, which moves with the presidency. */
+  assignRole(id: string, memberId: string, roleId: string): Observable<GroupDetail> {
+    return this.http.put<GroupDetail>(`/v1/volunteer-groups/groups/${id}/members/${memberId}/role`, {
+      roleId,
+    });
+  }
+
+  /** Defines a volunteer role with the seats an election for it fills. */
+  defineRole(id: string, title: string, seats: number): Observable<GroupDetail> {
+    return this.http.post<GroupDetail>(`/v1/volunteer-groups/groups/${id}/roles`, { title, seats });
+  }
+
+  /** Renames or resizes a role. Not Volunteer or President, and never below its holders. */
+  updateRole(id: string, roleId: string, title: string, seats: number): Observable<GroupDetail> {
+    return this.http.patch<GroupDetail>(`/v1/volunteer-groups/groups/${id}/roles/${roleId}`, {
+      title,
+      seats,
+    });
+  }
+
+  /** Removes a role nobody holds and no election is deciding. */
+  removeRole(id: string, roleId: string): Observable<GroupDetail> {
+    return this.http.delete<GroupDetail>(`/v1/volunteer-groups/groups/${id}/roles/${roleId}`);
   }
 
   /**
@@ -98,17 +111,17 @@ export class GroupsApi {
     return this.http.get<Election[]>(`/v1/volunteer-groups/groups/${groupId}/elections`);
   }
 
-  /** The president sets an election up for a position. It stays a draft until opened. */
+  /** Sets an election up for one of the group's roles. It stays a draft until opened. */
   openElection(
     groupId: string,
-    positionTitle: string,
+    roleId: string,
     nominationStartAt: string,
     nominationEndAt: string,
     votingStartAt: string,
     votingEndAt: string,
   ): Observable<Election> {
     return this.http.post<Election>(`/v1/volunteer-groups/groups/${groupId}/elections`, {
-      positionTitle,
+      roleId,
       nominationStartAt,
       nominationEndAt,
       votingStartAt,
@@ -121,21 +134,21 @@ export class GroupsApi {
   }
 
   /**
-   * Corrects the position title or windows - how nominations that closed too
+   * Corrects the role or windows - how nominations that closed too
    * early are reopened, since nothing here moves the election's own status.
    * Allowed in Draft or NominationsOpen; the service refuses it (409) from
    * VotingOpen on.
    */
   updateElection(
     id: string,
-    positionTitle: string,
+    roleId: string,
     nominationStartAt: string,
     nominationEndAt: string,
     votingStartAt: string,
     votingEndAt: string,
   ): Observable<Election> {
     return this.http.patch<Election>(`/v1/volunteer-groups/elections/${id}`, {
-      positionTitle,
+      roleId,
       nominationStartAt,
       nominationEndAt,
       votingStartAt,
@@ -164,16 +177,17 @@ export class GroupsApi {
   }
 
   /**
-   * Casts this member's one vote. Voting twice is reported as success with
-   * `accepted: false` - the unique index, not this call, is what enforces it.
+   * Casts this member's one ballot: up to as many candidates as the role has
+   * seats, all counted the same, and final. Voting twice is reported as success
+   * with `accepted: false` - the unique indexes, not this call, enforce it.
    */
-  castVote(id: string, candidateId: string): Observable<CastVoteResult> {
+  castVote(id: string, candidateIds: readonly string[]): Observable<CastVoteResult> {
     return this.http.post<CastVoteResult>(`/v1/volunteer-groups/elections/${id}/votes`, {
-      candidateId,
+      candidateIds,
     });
   }
 
-  /** The president picks the winner, freezes it, and installs them in the position. */
+  /** Picks the winners, freezes them, and installs them in the role. */
   publishElectionResults(id: string): Observable<Election> {
     return this.http.post<Election>(`/v1/volunteer-groups/elections/${id}/publish`, {});
   }

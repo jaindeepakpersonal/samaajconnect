@@ -9,11 +9,18 @@ import {
   GroupElection,
   GroupElectionCandidate,
   GroupElectionDetail,
+  GroupRole,
   LedGroup,
 } from '../../core/admin.models';
 import { GroupElectionsComponent } from './group-elections.component';
 
 const GROUP_ID = 'g1';
+
+const ROLES: GroupRole[] = [
+  { id: 'rp', title: 'President', kind: 'President', seats: 1, holderCount: 0, isEditable: false, isElected: true },
+  { id: 'rs', title: 'Secretary', kind: 'Elected', seats: 2, holderCount: 1, isEditable: true, isElected: true },
+  { id: 'rv', title: 'Volunteer', kind: 'Volunteer', seats: null, holderCount: 2, isEditable: false, isElected: false },
+];
 
 function group(overrides: Partial<LedGroup> = {}): LedGroup {
   return {
@@ -27,6 +34,7 @@ function group(overrides: Partial<LedGroup> = {}): LedGroup {
     memberCount: 3,
     iAmThePresident: false,
     iCanLead: true,
+    iCanRunElections: true,
     ...overrides,
   };
 }
@@ -35,9 +43,10 @@ function detail(overrides: Partial<LedGroup> = {}): GroupDetail {
   return {
     group: group(overrides),
     members: [
-      { memberId: 'm1', rolePosition: null, joinedAt: '2026-01-01T00:00:00Z' },
-      { memberId: 'm2', rolePosition: null, joinedAt: '2026-01-01T00:00:00Z' },
+      { memberId: 'm1', rolePosition: 'Volunteer', roleId: 'rv', joinedAt: '2026-01-01T00:00:00Z' },
+      { memberId: 'm2', rolePosition: 'Volunteer', roleId: 'rv', joinedAt: '2026-01-01T00:00:00Z' },
     ],
+    roles: ROLES,
   };
 }
 
@@ -54,9 +63,11 @@ function election(overrides: Partial<GroupElection> = {}): GroupElection {
     acceptsNominations: false,
     acceptsVotes: false,
     candidateCount: 0,
-    winnerMemberId: null,
+    winnerMemberIds: [],
     publishedAt: null,
     createdAt: '2026-07-01T00:00:00Z',
+    roleId: 'rp',
+    seats: 1,
     ...overrides,
   };
 }
@@ -165,40 +176,46 @@ describe('GroupElectionsComponent', () => {
     load(detail({ presidentMemberId: null, iCanLead: true }));
 
     expect(text()).toContain('This group has no president');
-    expect(buttonSaying('Open the President election')).toBeDefined();
+    expect(buttonSaying('Open an election')).toBeDefined();
   });
 
-  it('offers an administrator no way to open an election once the group has a president', () => {
-    // The service refuses it, so the screen does not draw a control that answers 403.
-    load(detail({ presidentMemberId: 'm1', iCanLead: false }));
+  it('lets an administrator run elections after the group has a president', () => {
+    // Changed 2026-09-26: an administrator runs any role's election at any
+    // time. Join requests are still the president's, so the queue is not asked for.
+    load(detail({ presidentMemberId: 'm1', iCanLead: false, iCanRunElections: true }));
+
+    expect(buttonSaying('Open an election')).toBeDefined();
+    expect(text()).not.toContain('Join requests');
+  });
+
+  it('offers no way to open an election to somebody who cannot run them', () => {
+    // The service refuses it, so the screen does not draw a control that answers 404.
+    load(detail({ presidentMemberId: 'm1', iCanLead: false, iCanRunElections: false }));
 
     expect(text()).toContain('Diya Jain is this group');
     expect(buttonSaying('Open')).toBeUndefined();
   });
 
-  it('lets the president open any position', () => {
-    load(detail({ presidentMemberId: 'm1', iAmThePresident: true, iCanLead: true }));
-
-    expect(buttonSaying('Open an election')).toBeDefined();
-  });
-
-  it('fills in and locks the position for an administrator', () => {
+  it('picks the President role to start with in a group with none, and offers no Volunteer election', async () => {
     load();
 
     component.toggleOpenForm(component.detail()!);
     fixture.detectChanges();
+    await fixture.whenStable();
 
-    const input = fixture.nativeElement.querySelector('#election-position') as HTMLInputElement;
+    const select = fixture.nativeElement.querySelector('#election-role') as HTMLSelectElement;
+    const options = [...select.options].map((o) => o.textContent!.trim());
 
-    expect(component.positionTitle).toBe('President');
-    expect(input.readOnly).toBe(true);
-    expect(text()).toContain('only the President election');
+    expect(component.roleId).toBe('rp');
+    expect(options).toContain('President (1 seat)');
+    expect(options).toContain('Secretary (2 seats)');
+    expect(options.some((o) => o.startsWith('Volunteer'))).toBe(false);
   });
 
   it('refuses a voting window that starts before nominations close', () => {
     load();
 
-    component.positionTitle = 'President';
+    component.roleId = 'rp';
     component.nominationStartAt = '2026-08-01T00:00';
     component.nominationEndAt = '2026-08-20T00:00';
     component.votingStartAt = '2026-08-15T00:00';
@@ -214,7 +231,7 @@ describe('GroupElectionsComponent', () => {
   it('opens the election as a draft and re-reads', () => {
     load();
 
-    component.positionTitle = 'President';
+    component.roleId = 'rp';
     component.nominationStartAt = '2026-08-01T00:00';
     component.nominationEndAt = '2026-08-20T00:00';
     component.votingStartAt = '2026-08-20T00:00';
@@ -224,11 +241,11 @@ describe('GroupElectionsComponent', () => {
 
     const request = http.expectOne((r) => r.method === 'POST' && r.url === `${GROUP_URL}/elections`);
 
-    expect(request.request.body.positionTitle).toBe('President');
+    expect(request.request.body.roleId).toBe('rp');
     request.flush(election());
     reload(detail(), [election()]);
 
-    expect(text()).toContain('set up as a draft');
+    expect(text()).toContain('The President election is set up as a draft');
     expect(text()).toContain('Not started');
   });
 
@@ -248,8 +265,10 @@ describe('GroupElectionsComponent', () => {
     expect(component.canEditElection(election({ status: 'Closed' }))).toBe(false);
   });
 
-  it('gives an administrator no Edit on an election that is not the President one', () => {
-    load(detail(), [election({ positionTitle: 'Secretary', status: 'Draft' })]);
+  it('gives somebody who cannot run elections no Edit', () => {
+    load(detail({ presidentMemberId: 'm1', iCanLead: false, iCanRunElections: false }), [
+      election({ positionTitle: 'Secretary', status: 'Draft' }),
+    ]);
 
     expect(buttonSaying('Edit')).toBeUndefined();
   });
@@ -263,7 +282,11 @@ describe('GroupElectionsComponent', () => {
       }),
     ]);
 
-    buttonSaying('Edit')!.click();
+    // The election's own Edit, not a role's - the roles table has its own.
+    const editButtons = [...fixture.nativeElement.querySelectorAll('.election button')].filter(
+      (b) => (b as HTMLElement).textContent?.trim() === 'Edit',
+    ) as HTMLButtonElement[];
+    editButtons[0]!.click();
     fixture.detectChanges();
 
     // NgModel's initial write to the control is deferred a microtask, the same
@@ -271,12 +294,12 @@ describe('GroupElectionsComponent', () => {
     await fixture.whenStable();
     fixture.detectChanges();
 
-    expect(component.editPositionTitle).toBe('President');
+    expect(component.editRoleId).toBe('rp');
     expect(component.editingId()).toBe('e1');
 
-    const input = fixture.nativeElement.querySelector('#edit-position-e1') as HTMLInputElement;
+    const select = fixture.nativeElement.querySelector('#edit-role-e1') as HTMLSelectElement;
 
-    expect(input.value).toBe('President');
+    expect(select.value).toBe('rp');
   });
 
   it('sends the correction and re-reads', () => {
@@ -291,13 +314,13 @@ describe('GroupElectionsComponent', () => {
       (r) => r.method === 'PATCH' && r.url === '/v1/volunteer-groups/elections/e1',
     );
 
-    expect(request.request.body.positionTitle).toBe('President');
+    expect(request.request.body.roleId).toBe('rp');
     expect(request.request.body.nominationEndAt).toBe(new Date('2026-09-01T00:00').toISOString());
 
     request.flush(election({ nominationEndAt: request.request.body.nominationEndAt }));
     reload();
 
-    expect(text()).toContain('election updated');
+    expect(text()).toContain('Election updated');
     expect(component.editingId()).toBeNull();
   });
 
@@ -345,8 +368,10 @@ describe('GroupElectionsComponent', () => {
     reload(detail(), [election({ status: 'NominationsOpen' })]);
   });
 
-  it('gives an administrator no controls on an election that is not the President one', () => {
-    load(detail(), [election({ positionTitle: 'Secretary', status: 'Draft' })]);
+  it('gives somebody who cannot run elections no controls on one', () => {
+    load(detail({ presidentMemberId: 'm1', iCanLead: false, iCanRunElections: false }), [
+      election({ positionTitle: 'Secretary', status: 'Draft' }),
+    ]);
 
     expect(buttonSaying('Open nominations')).toBeUndefined();
     expect(buttonSaying('View ballot')).toBeDefined();
@@ -410,15 +435,98 @@ describe('GroupElectionsComponent', () => {
 
     const request = http.expectOne('/v1/volunteer-groups/elections/e1/publish');
 
-    request.flush(election({ status: 'Published', winnerMemberId: 'm1' }));
+    request.flush(election({ status: 'Published', winnerMemberIds: ['m1'] }));
     reload(
       detail({ presidentMemberId: 'm1', iCanLead: false }),
-      [election({ status: 'Published', winnerMemberId: 'm1' })],
+      [election({ status: 'Published', winnerMemberIds: ['m1'] })],
     );
 
-    expect(text()).toContain('winner now holds the position');
+    expect(text()).toContain('winners now hold the role');
     expect(text()).toContain('Elected:');
     expect(text()).toContain('Diya Jain');
+  });
+
+  it('names every winner of a role with more than one seat', () => {
+    load(detail(), [
+      election({ positionTitle: 'Secretary', roleId: 'rs', seats: 2, status: 'Published', winnerMemberIds: ['m1', 'm2'] }),
+    ]);
+
+    expect(text()).toContain('Elected: Diya Jain, Aarav Jain');
+    expect(text()).toContain('2 seats');
+  });
+
+  // ---- Roles ---------------------------------------------------------------
+
+  it('lists the roles with their seats and holders', () => {
+    load();
+
+    expect(text()).toContain('Volunteer roles');
+    expect(text()).toContain('No limit');
+    expect(text()).toContain("everybody's until elected to another");
+  });
+
+  it('defines a role and re-reads', () => {
+    load();
+
+    component.newRoleTitle = '  Treasurer ';
+    component.newRoleSeats = 1;
+    component.defineRole(component.detail()!);
+
+    const request = http.expectOne((r) => r.method === 'POST' && r.url === `${GROUP_URL}/roles`);
+
+    expect(request.request.body).toEqual({ title: 'Treasurer', seats: 1 });
+    request.flush(detail());
+    reload();
+
+    expect(text()).toContain('Treasurer is a role in Seva Sangh now, with 1 seat');
+  });
+
+  it('refuses a role with no title or no seats before asking', () => {
+    load();
+
+    expect(component.validRole('', 1)).toBe(false);
+    expect(component.validRole('Treasurer', 0)).toBe(false);
+    expect(component.validRole('Treasurer', 1.5)).toBe(false);
+    expect(component.validRole('Treasurer', 3)).toBe(true);
+  });
+
+  it('offers no edit or removal of the built-in roles, and no removal of a held one', () => {
+    load();
+
+    // Only Secretary is editable; it has a holder, so Remove is drawn disabled.
+    const remove = buttonSaying('Remove') as HTMLButtonElement;
+
+    expect(remove).toBeDefined();
+    expect(remove.disabled).toBe(true);
+    expect(
+      [...fixture.nativeElement.querySelectorAll('button')].filter((b) =>
+        (b as HTMLElement).textContent?.trim().startsWith('Remove'),
+      ).length,
+    ).toBe(1);
+  });
+
+  it('moves a member into a role from the roster, but never offers President', async () => {
+    load(detail({ presidentMemberId: 'm1' }));
+    await fixture.whenStable();
+
+    // The president's own row is not a select at all.
+    expect(fixture.nativeElement.querySelector('#member-role-m1')).toBeNull();
+
+    const select = fixture.nativeElement.querySelector('#member-role-m2') as HTMLSelectElement;
+    const options = [...select.options].map((o) => o.textContent!.trim());
+
+    expect(options).toEqual(['Secretary', 'Volunteer']);
+
+    component.assignRole(component.detail()!, component.detail()!.members[1]!, 'rs');
+
+    const request = http.expectOne(`${GROUP_URL}/members/m2/role`);
+
+    expect(request.request.method).toBe('PUT');
+    expect(request.request.body).toEqual({ roleId: 'rs' });
+    request.flush(detail());
+    reload(detail({ presidentMemberId: 'm1' }));
+
+    expect(text()).toContain('Aarav Jain is now Secretary');
   });
 
   it('reads the flags, not the status, for whether nominations are open', () => {

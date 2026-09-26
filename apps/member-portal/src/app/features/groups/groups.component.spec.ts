@@ -12,12 +12,20 @@ import {
   GroupApplication,
   GroupDetail,
   GroupMember,
+  GroupRole,
   VolunteerGroup,
 } from './groups.models';
 import { Member } from '../members/members.models';
 
 const ME = 'u1';
 const PRESIDENT = 'p1';
+
+const ROLES: GroupRole[] = [
+  { id: 'rp', title: 'President', kind: 'President', seats: 1, holderCount: 1, isEditable: false, isElected: true },
+  { id: 'rs', title: 'Secretary', kind: 'Elected', seats: 1, holderCount: 0, isEditable: true, isElected: true },
+  { id: 'rc', title: 'Coordinator', kind: 'Elected', seats: 2, holderCount: 0, isEditable: true, isElected: true },
+  { id: 'rv', title: 'Volunteer', kind: 'Volunteer', seats: null, holderCount: 1, isEditable: false, isElected: false },
+];
 
 const member: CurrentUser = {
   userId: ME,
@@ -49,6 +57,7 @@ function group(overrides: Partial<VolunteerGroup> = {}): VolunteerGroup {
     ...overrides,
     // Whoever is president can lead; a test naming neither says nothing else.
     iCanLead: overrides.iCanLead ?? overrides.iAmThePresident ?? false,
+    iCanRunElections: overrides.iCanRunElections ?? overrides.iAmThePresident ?? false,
   };
 }
 
@@ -56,7 +65,7 @@ function detail(
   overrides: Partial<VolunteerGroup> = {},
   members: GroupMember[] = [],
 ): GroupDetail {
-  return { group: group(overrides), members };
+  return { group: group(overrides), members, roles: ROLES };
 }
 
 /** A minimal member-family-service response, for the name-resolution calls `group-detail.component.ts` now makes. */
@@ -104,10 +113,12 @@ function election(overrides: Partial<Election> = {}): Election {
     status: 'NominationsOpen',
     acceptsNominations: true,
     acceptsVotes: false,
-    myVoteCandidateId: null,
+    myVoteCandidateIds: [],
     candidateCount: 0,
-    winnerMemberId: null,
+    winnerMemberIds: [],
     publishedAt: null,
+    roleId: 'rs',
+    seats: 1,
     createdAt: new Date().toISOString(),
     ...overrides,
   };
@@ -312,6 +323,13 @@ describe('GroupDetailComponent', () => {
       | undefined;
   }
 
+  /** A button whose whole text is this - the roles table has "Edit Secretary" and "Remove Secretary" too. */
+  function buttonExactly(label: string): HTMLButtonElement | undefined {
+    return Array.from(
+      (fixture.nativeElement as HTMLElement).querySelectorAll('button'),
+    ).find((button) => button.textContent?.trim() === label) as HTMLButtonElement | undefined;
+  }
+
   // ---- Applying -----------------------------------------------------------
 
   it('offers the wireframe Apply button to somebody who may join', () => {
@@ -419,27 +437,36 @@ describe('GroupDetailComponent', () => {
     expect(text()).toContain('Applications');
   });
 
-  it('fills in and locks the position to President for an admin opening the election', async () => {
-    load(detail({ presidentMemberId: null, iAmThePresident: false, iCanLead: true }), []);
+  it('picks the President role to start with for a group that has none', async () => {
+    load(
+      detail({ presidentMemberId: null, iAmThePresident: false, iCanLead: true, iCanRunElections: true }),
+      [],
+    );
 
-    component.openElectionForm(component.detail()!.group);
+    component.openElectionForm(component.detail()!);
     fixture.detectChanges();
-    // ngModel writes the value to the input a microtask later.
+    // ngModel writes the value to the select a microtask later.
     await fixture.whenStable();
 
-    const field = fixture.nativeElement.querySelector('#election-position') as HTMLInputElement;
-    expect(field.value).toBe('President');
-    expect(field.readOnly).toBe(true);
+    const field = fixture.nativeElement.querySelector('#election-role') as HTMLSelectElement;
+    expect(field.value).toBe('rp');
   });
 
-  it('leaves the position free for the president', () => {
+  it('offers the president every role but Volunteer, and picks none for them', async () => {
     load(detail({ iAmThePresident: true, iAmAMember: true }), []);
 
-    component.openElectionForm(component.detail()!.group);
+    component.openElectionForm(component.detail()!);
     fixture.detectChanges();
+    await fixture.whenStable();
 
-    const field = fixture.nativeElement.querySelector('#election-position') as HTMLInputElement;
-    expect(field.readOnly).toBe(false);
+    const field = fixture.nativeElement.querySelector('#election-role') as HTMLSelectElement;
+    expect(field.value).toBe('');
+    expect([...field.options].map((o) => o.textContent!.trim())).toEqual([
+      'Choose a role…',
+      'President (1 seat)',
+      'Secretary (1 seat)',
+      'Coordinator (2 seats)',
+    ]);
   });
 
   it('asks for it when they do, and shows only what is still waiting', () => {
@@ -527,34 +554,90 @@ describe('GroupDetailComponent', () => {
     expect(text()).toContain('Seva Group');
   });
 
-  // ---- Positions -----------------------------------------------------------
+  // ---- Roles ---------------------------------------------------------------
 
-  it('lets a president set and clear a position', () => {
-    load(detail({ iAmThePresident: true, iAmAMember: true }), []);
+  it('lets a president move a member into a role, and back to Volunteer', () => {
+    const members: GroupMember[] = [
+      { memberId: 'm9', rolePosition: 'Volunteer', roleId: 'rv', joinedAt: new Date().toISOString() },
+    ];
+    load(detail({ iAmThePresident: true, iAmAMember: true }, members), []);
 
-    component.editPosition('m9', null);
-    component.positionDraft = 'Secretary';
-    component.savePosition('m9');
+    component.assignRole('m9', 'rs');
 
-    const request = http.expectOne('/v1/volunteer-groups/groups/g1/members/m9/position');
+    const request = http.expectOne('/v1/volunteer-groups/groups/g1/members/m9/role');
 
-    expect(request.request.body).toEqual({ rolePosition: 'Secretary' });
+    expect(request.request.method).toBe('PUT');
+    expect(request.request.body).toEqual({ roleId: 'rs' });
+    request.flush(detail({ iAmThePresident: true, iAmAMember: true }, members));
 
-    request.flush(detail({ iAmThePresident: true, iAmAMember: true }));
-
-    expect(component.editingPosition()).toBeNull();
+    // Choosing the role a member already holds sends nothing.
+    component.assignRole('m9', 'rv');
+    http.expectNone('/v1/volunteer-groups/groups/g1/members/m9/role');
   });
 
-  it('clears a position by sending null rather than an empty string', () => {
+  it('never offers the President role in the picker, nor a picker on the president', async () => {
+    load(
+      detail({ iAmThePresident: true, iAmAMember: true }, [
+        { memberId: PRESIDENT, rolePosition: 'President', roleId: 'rp', joinedAt: new Date().toISOString() },
+        { memberId: 'm9', rolePosition: 'Volunteer', roleId: 'rv', joinedAt: new Date().toISOString() },
+      ]),
+      [],
+    );
+    await fixture.whenStable();
+
+    expect(fixture.nativeElement.querySelector(`#role-${PRESIDENT}`)).toBeNull();
+
+    const select = fixture.nativeElement.querySelector('#role-m9') as HTMLSelectElement;
+
+    expect([...select.options].map((o) => o.textContent!.trim())).toEqual([
+      'Secretary',
+      'Coordinator',
+      'Volunteer',
+    ]);
+  });
+
+  it('shows an ordinary member the roles but no way to change them', () => {
+    load(detail({ iAmAMember: true }, [
+      { memberId: 'm9', rolePosition: 'Secretary', roleId: 'rs', joinedAt: new Date().toISOString() },
+    ]));
+
+    expect(text()).toContain('Volunteer roles');
+    expect(text()).toContain('No limit');
+    expect(fixture.nativeElement.querySelector('#role-m9')).toBeNull();
+    expect(fixture.nativeElement.querySelector('#new-role-title')).toBeNull();
+  });
+
+  it('defines a role and takes the group the service answers with', () => {
     load(detail({ iAmThePresident: true, iAmAMember: true }), []);
 
-    component.editPosition('m9', 'Secretary');
-    component.positionDraft = '  ';
-    component.savePosition('m9');
+    component.newRoleTitle = '  Treasurer ';
+    component.newRoleSeats = 1;
+    component.defineRole();
 
-    expect(
-      http.expectOne('/v1/volunteer-groups/groups/g1/members/m9/position').request.body,
-    ).toEqual({ rolePosition: null });
+    const request = http.expectOne('/v1/volunteer-groups/groups/g1/roles');
+
+    expect(request.request.body).toEqual({ title: 'Treasurer', seats: 1 });
+    request.flush(detail({ iAmThePresident: true, iAmAMember: true }));
+
+    expect(component.newRoleTitle).toBe('');
+  });
+
+  it('shows a refused role change and re-reads, since the picker already moved', () => {
+    const members: GroupMember[] = [
+      { memberId: 'm9', rolePosition: 'Volunteer', roleId: 'rv', joinedAt: new Date().toISOString() },
+    ];
+    load(detail({ iAmThePresident: true, iAmAMember: true }, members), []);
+
+    component.assignRole('m9', 'rs');
+    http
+      .expectOne('/v1/volunteer-groups/groups/g1/members/m9/role')
+      .flush({ title: 'Role.Full', detail: 'Every seat in this role is taken.' }, { status: 409, statusText: 'Conflict' });
+
+    expect(component.roleError()).not.toBeNull();
+
+    http.expectOne('/v1/volunteer-groups/groups/g1').flush(detail({ iAmThePresident: true, iAmAMember: true }, members));
+    http.expectOne('/v1/volunteer-groups/groups/g1/elections').flush([]);
+    http.expectOne('/v1/volunteer-groups/groups/g1/applications').flush([]);
   });
 
   // ---- Removing a member ---------------------------------------------------
@@ -566,7 +649,7 @@ describe('GroupDetailComponent', () => {
   it('offers Remove to the president, for an ordinary member', () => {
     load(
       detail({ iAmThePresident: true, iAmAMember: true }, [
-        { memberId: 'm9', rolePosition: null, joinedAt: new Date().toISOString() },
+        { memberId: 'm9', rolePosition: 'Volunteer', roleId: 'rv', joinedAt: new Date().toISOString() },
       ]),
       [],
     );
@@ -577,20 +660,20 @@ describe('GroupDetailComponent', () => {
   it('never offers it against the president themselves', () => {
     load(
       detail({ iAmThePresident: true, iAmAMember: true }, [
-        { memberId: PRESIDENT, rolePosition: 'President', joinedAt: new Date().toISOString() },
+        { memberId: PRESIDENT, rolePosition: 'President', roleId: 'rp', joinedAt: new Date().toISOString() },
       ]),
       [],
     );
 
     // The service refuses this with a 409, and a button that always fails is
     // worse than no button.
-    expect(buttonSaying('Remove')).toBeUndefined();
+    expect(buttonExactly('Remove')).toBeUndefined();
   });
 
   it('does not offer it to anyone but the president', () => {
     load(
       detail({ iAmThePresident: false, iAmAMember: true }, [
-        { memberId: 'm9', rolePosition: null, joinedAt: new Date().toISOString() },
+        { memberId: 'm9', rolePosition: 'Volunteer', roleId: 'rv', joinedAt: new Date().toISOString() },
       ]),
     );
 
@@ -600,7 +683,7 @@ describe('GroupDetailComponent', () => {
   it('removes a member and re-reads the group', () => {
     load(
       detail({ iAmThePresident: true, iAmAMember: true }, [
-        { memberId: 'm9', rolePosition: null, joinedAt: new Date().toISOString() },
+        { memberId: 'm9', rolePosition: 'Volunteer', roleId: 'rv', joinedAt: new Date().toISOString() },
       ]),
       [],
     );
@@ -619,7 +702,7 @@ describe('GroupDetailComponent', () => {
   it('shows a refusal rather than pretending it worked', () => {
     load(
       detail({ iAmThePresident: true, iAmAMember: true }, [
-        { memberId: PRESIDENT, rolePosition: 'President', joinedAt: new Date().toISOString() },
+        { memberId: PRESIDENT, rolePosition: 'President', roleId: 'rp', joinedAt: new Date().toISOString() },
       ]),
       [],
     );
@@ -667,8 +750,8 @@ describe('GroupDetailComponent', () => {
   it('resolves a group member own name too, linked to their profile, but never the readers own', () => {
     load(
       detail({ iAmThePresident: true, iAmAMember: true }, [
-        { memberId: ME, rolePosition: null, joinedAt: new Date().toISOString() },
-        { memberId: 'm9', rolePosition: null, joinedAt: new Date().toISOString() },
+        { memberId: ME, rolePosition: 'Volunteer', roleId: 'rv', joinedAt: new Date().toISOString() },
+        { memberId: 'm9', rolePosition: 'Volunteer', roleId: 'rv', joinedAt: new Date().toISOString() },
       ]),
       [],
     );
@@ -702,10 +785,10 @@ describe('GroupDetailComponent', () => {
   it('shows the winner once an election is published', () => {
     load(
       detail({ iAmThePresident: true, iAmAMember: true }, [
-        { memberId: 'm9', rolePosition: 'Secretary', joinedAt: new Date().toISOString() },
+        { memberId: 'm9', rolePosition: 'Secretary', roleId: 'rs', joinedAt: new Date().toISOString() },
       ]),
       [],
-      [election({ status: 'Published', winnerMemberId: 'm9', publishedAt: new Date().toISOString() })],
+      [election({ status: 'Published', winnerMemberIds: ['m9'], publishedAt: new Date().toISOString() })],
     );
 
     expect(text()).toContain('Elected:');
@@ -716,7 +799,7 @@ describe('GroupDetailComponent', () => {
     load(detail({ iAmThePresident: true, iAmAMember: true }), [], []);
 
     component.showOpenElection.set(true);
-    component.positionTitle = 'Secretary';
+    component.roleId = 'rs';
     component.nominationStartAt = '2026-04-01T00:00';
     component.nominationEndAt = '2026-04-08T00:00';
     component.votingStartAt = '2026-04-08T00:00';
@@ -725,7 +808,7 @@ describe('GroupDetailComponent', () => {
 
     const request = http.expectOne('/v1/volunteer-groups/groups/g1/elections');
 
-    expect(request.request.body.positionTitle).toBe('Secretary');
+    expect(request.request.body.roleId).toBe('rs');
 
     request.flush(election());
     http.expectOne('/v1/volunteer-groups/groups/g1/elections').flush([election()]);
@@ -750,17 +833,17 @@ describe('GroupDetailComponent', () => {
   it('fills the edit form with the election as it stands', async () => {
     load(detail({ iAmThePresident: true, iAmAMember: true }), [], [election()]);
 
-    buttonSaying('Edit')!.click();
+    buttonExactly('Edit')!.click();
     fixture.detectChanges();
     await fixture.whenStable();
     fixture.detectChanges();
 
     expect(component.editingElectionId()).toBe('e1');
-    expect(component.editPositionTitle).toBe('Secretary');
+    expect(component.editRoleId).toBe('rs');
 
-    const input = fixture.nativeElement.querySelector('#edit-position-e1') as HTMLInputElement;
+    const select = fixture.nativeElement.querySelector('#edit-role-e1') as HTMLSelectElement;
 
-    expect(input.value).toBe('Secretary');
+    expect(select.value).toBe('rs');
   });
 
   it('sends the correction and reloads the elections', () => {
@@ -775,7 +858,7 @@ describe('GroupDetailComponent', () => {
       (r) => r.method === 'PATCH' && r.url === '/v1/volunteer-groups/elections/e1',
     );
 
-    expect(request.request.body.positionTitle).toBe('Secretary');
+    expect(request.request.body.roleId).toBe('rs');
     expect(request.request.body.nominationEndAt).toBe(new Date('2026-09-01T00:00').toISOString());
 
     request.flush(election({ nominationEndAt: request.request.body.nominationEndAt }));
@@ -821,7 +904,7 @@ describe('GroupDetailComponent', () => {
   it('tells a member of the Samaaj who is not in the group to ask to join, with no picker', () => {
     load(
       detail({ iAmThePresident: false, iAmAMember: false, iCanLead: false }, [
-        { memberId: PRESIDENT, rolePosition: 'President', joinedAt: new Date().toISOString() },
+        { memberId: PRESIDENT, rolePosition: 'President', roleId: 'rp', joinedAt: new Date().toISOString() },
       ]),
       null,
       [election()],
@@ -846,8 +929,8 @@ describe('GroupDetailComponent', () => {
   ): void {
     load(
       detail({ iAmAMember: true, ...groupOverrides }, [
-        { memberId: PRESIDENT, rolePosition: 'President', joinedAt: new Date().toISOString() },
-        { memberId: 'm9', rolePosition: null, joinedAt: new Date().toISOString() },
+        { memberId: PRESIDENT, rolePosition: 'President', roleId: 'rp', joinedAt: new Date().toISOString() },
+        { memberId: 'm9', rolePosition: 'Volunteer', roleId: 'rv', joinedAt: new Date().toISOString() },
       ]),
       groupOverrides.iCanLead ? [] : null,
       [election(electionOverrides)],
@@ -866,6 +949,46 @@ describe('GroupDetailComponent', () => {
     expect(text()).not.toContain('Voting has');
   });
 
+  it('takes a ballot of up to the seats for a role with several, and casts it once', () => {
+    const open = {
+      status: 'VotingOpen' as const,
+      acceptsVotes: true,
+      acceptsNominations: false,
+      votingStartAt: PAST,
+      seats: 2,
+    };
+    openBallot({}, open, [
+      candidate({ id: 'c1', memberId: 'x1', status: 'Approved' }),
+      candidate({ id: 'c2', memberId: 'x2', status: 'Approved' }),
+      candidate({ id: 'c3', memberId: 'x3', status: 'Approved' }),
+    ]);
+    http.match((r) => r.url.startsWith('/v1/members/')).forEach((r) => r.flush({}));
+
+    expect(text()).toContain('Pick up to 2');
+    expect(text()).toContain('It is final');
+    expect(buttonSaying('Vote')).toBeUndefined();
+
+    component.togglePick('e1', 'c1');
+    component.togglePick('e1', 'c3');
+    fixture.detectChanges();
+
+    // A third tick is refused by the checkboxes themselves once the seats are full.
+    const boxes = [...fixture.nativeElement.querySelectorAll('input[type="checkbox"]')] as HTMLInputElement[];
+
+    expect(boxes.filter((b) => b.disabled)).toHaveLength(1);
+
+    buttonSaying('Cast my ballot (2 of 2)')!.click();
+
+    const request = http.expectOne('/v1/volunteer-groups/elections/e1/votes');
+
+    expect(request.request.body).toEqual({ candidateIds: ['c1', 'c3'] });
+    request.flush({ electionId: 'e1', candidateIds: ['c1', 'c3'], accepted: true });
+    http.expectOne('/v1/volunteer-groups/groups/g1/elections').flush([election(open)]);
+    http.expectOne('/v1/volunteer-groups/elections/e1').flush(electionDetail(open, []));
+
+    expect(component.picks('e1')).toEqual([]);
+  });
+
   it('says the voting window has not started when the status is on but the clock is not', () => {
     // Status VotingOpen with a start date still ahead: acceptsVotes is false, the
     // button is absent, and this used to give no reason at all.
@@ -877,7 +1000,7 @@ describe('GroupDetailComponent', () => {
   });
 
   it('says voting has not been opened, and tells the organiser what to press', () => {
-    openBallot({ iCanLead: true }, { status: 'NominationsOpen', acceptsVotes: false },
+    openBallot({ iCanRunElections: true }, { status: 'NominationsOpen', acceptsVotes: false },
       [candidate({ status: 'Approved' })]);
 
     expect(text()).toContain('Voting has not been opened yet');
@@ -906,7 +1029,7 @@ describe('GroupDetailComponent', () => {
   });
 
   it('says nothing once the reader has voted', () => {
-    openBallot({}, { status: 'VotingOpen', acceptsVotes: true, votingStartAt: PAST, myVoteCandidateId: 'c1' },
+    openBallot({}, { status: 'VotingOpen', acceptsVotes: true, votingStartAt: PAST, myVoteCandidateIds: ['c1'] },
       [candidate({ status: 'Approved' })]);
 
     expect(text()).toContain('Your vote');
@@ -916,8 +1039,8 @@ describe('GroupDetailComponent', () => {
   it('expands a ballot, nominates a group member, and the president approves it', () => {
     load(
       detail({ iAmThePresident: true, iAmAMember: true }, [
-        { memberId: PRESIDENT, rolePosition: 'President', joinedAt: new Date().toISOString() },
-        { memberId: 'm9', rolePosition: null, joinedAt: new Date().toISOString() },
+        { memberId: PRESIDENT, rolePosition: 'President', roleId: 'rp', joinedAt: new Date().toISOString() },
+        { memberId: 'm9', rolePosition: 'Volunteer', roleId: 'rv', joinedAt: new Date().toISOString() },
       ]),
       [],
       [election()],
@@ -957,8 +1080,8 @@ describe('GroupDetailComponent', () => {
   it('casts a vote and reflects the tally', () => {
     load(
       detail({ iAmThePresident: true, iAmAMember: true }, [
-        { memberId: PRESIDENT, rolePosition: 'President', joinedAt: new Date().toISOString() },
-        { memberId: 'm9', rolePosition: null, joinedAt: new Date().toISOString() },
+        { memberId: PRESIDENT, rolePosition: 'President', roleId: 'rp', joinedAt: new Date().toISOString() },
+        { memberId: 'm9', rolePosition: 'Volunteer', roleId: 'rv', joinedAt: new Date().toISOString() },
       ]),
       [],
       [election({ status: 'VotingOpen', acceptsNominations: false, acceptsVotes: true })],
@@ -973,20 +1096,20 @@ describe('GroupDetailComponent', () => {
       ));
     fixture.detectChanges();
 
-    component.castVote('e1', 'c1');
+    component.castVote('e1', ['c1']);
 
     const voteRequest = http.expectOne('/v1/volunteer-groups/elections/e1/votes');
 
-    expect(voteRequest.request.body).toEqual({ candidateId: 'c1' });
+    expect(voteRequest.request.body).toEqual({ candidateIds: ['c1'] });
 
-    voteRequest.flush({ electionId: 'e1', candidateId: 'c1', accepted: true });
+    voteRequest.flush({ electionId: 'e1', candidateIds: ['c1'], accepted: true });
     http
       .expectOne('/v1/volunteer-groups/groups/g1/elections')
-      .flush([election({ status: 'VotingOpen', acceptsNominations: false, acceptsVotes: true, myVoteCandidateId: 'c1' })]);
+      .flush([election({ status: 'VotingOpen', acceptsNominations: false, acceptsVotes: true, myVoteCandidateIds: ['c1'] })]);
     http
       .expectOne('/v1/volunteer-groups/elections/e1')
       .flush(electionDetail(
-        { status: 'VotingOpen', acceptsNominations: false, acceptsVotes: true, myVoteCandidateId: 'c1' },
+        { status: 'VotingOpen', acceptsNominations: false, acceptsVotes: true, myVoteCandidateIds: ['c1'] },
         [candidate({ status: 'Approved', votes: 1 })],
       ));
     fixture.detectChanges();

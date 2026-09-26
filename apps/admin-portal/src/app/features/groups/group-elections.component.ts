@@ -11,37 +11,40 @@ import {
   GroupElection,
   GroupElectionDetail,
   GroupElectionStatus,
+  GroupRole,
+  GroupRosterMember,
 } from '../../core/admin.models';
 import { isNotFound } from '../../core/http-status';
 
 /**
- * One volunteer group: who leads it, and the elections that fill its positions.
+ * One volunteer group: its roles, who holds them, and the elections that fill
+ * them.
  *
- * **A group's president is chosen here or by an election, and until now the
- * election half had no screen in this panel.** The service lets a Samaaj admin
- * run a group's *President* election while - and only while - the group has no
- * president, because otherwise a group created without one has nobody able to
- * accept a joiner, nominate, or vote. The member portal has the election
- * screens, but a Super Admin is not a member and an administrator should not
- * have to switch apps to start the one election that is theirs to run.
+ * **Every member holds one of the group's roles.** Volunteer and President are
+ * built in; the group defines the rest - Secretary, three Coordinators - each
+ * with the seats an election for it fills. An administrator of the group (or its
+ * president) defines them here, moves a member into one directly, and runs an
+ * election for any of them, at any time (changed 2026-09-26 - an administrator
+ * used to be able to run only the President election, and only while there was
+ * no president).
  *
  * **What this screen offers is decided by the service's own answer.**
- * `group.iCanLead` is "may this caller run this group's elections now" and
- * `group.iAmThePresident` is the other half; the screen never derives either
- * from a role and a president id. An administrator's power is narrower than the
- * president's - the President election only - so per election the screen also
- * checks the position, mirroring `GroupAuthority.CanRunElection`. That copy is
- * a UX convenience; the service re-checks and is the boundary.
+ * `group.iCanRunElections` is "may this caller manage roles and run elections",
+ * and `group.iCanLead` is "may they decide join requests" - which an
+ * administrator still may only while the group has no president. The screen
+ * never derives either from a role and a president id; the service re-checks
+ * and is the boundary.
  *
  * **Nominating and voting are members' acts and are not here.** They need a
  * seat in the group, which an administrator does not have by being one. This
  * screen opens the election, approves who reaches the ballot, moves it through
- * its stages, shows the tally, and publishes - which installs the winner as
- * the position's holder. Names are resolved from the member directory and fall
- * back to "A member" rather than a GUID.
+ * its stages, shows the tally, and publishes - which installs the winners in
+ * the role and sends anyone who held it and lost back to Volunteer. Names are
+ * resolved from the member directory and fall back to "A member" rather than a
+ * GUID.
  *
  * **The stage is one button, strictly forward**, as on every other election
- * screen in this panel, and **publishing is confirmed**: it installs the winner
+ * screen in this panel, and **publishing is confirmed**: it installs the winners
  * and a second ranking would leave "the result" with nothing to point at.
  */
 @Component({
@@ -75,14 +78,14 @@ import { isNotFound } from '../../core/http-status';
 
       @if (found.group.presidentMemberId === null) {
         <p class="notice" role="status">
-          This group has no president. Until it has one, a Samaaj admin can run its
-          <b>President</b> election: members nominate and vote in the member portal, you approve
-          who reaches the ballot and publish the result.
+          This group has no president. Until it has one you accept its joiners here. Run its
+          <b>President</b> election below: members nominate and vote in the member portal, you
+          approve who reaches the ballot and publish the result.
         </p>
-      } @else if (!found.group.iCanLead) {
+      } @else if (!found.group.iCanRunElections) {
         <p class="notice" role="status">
           {{ memberName(found.group.presidentMemberId) }} is this group's president and runs its
-          elections. You can follow them here.
+          roles and elections. You can follow them here.
         </p>
       }
 
@@ -136,38 +139,175 @@ import { isNotFound } from '../../core/http-status';
         </div>
       }
 
+      <!-- Volunteer roles ---------------------------------------------- -->
+      <div class="card spaced">
+        <h2>Volunteer roles</h2>
+        <p class="small">
+          Every member holds one role. Everybody starts as a Volunteer; each other role is filled by
+          an election for as many seats as it has.
+        </p>
+
+        <div class="table-wrap">
+          <table>
+            <caption class="sr-only">Volunteer roles in {{ found.group.name }}</caption>
+            <thead>
+              <tr><th>Role</th><th>Seats</th><th>Held by</th><th></th></tr>
+            </thead>
+            <tbody>
+              @for (role of found.roles; track role.id) {
+                <tr>
+                  @if (editingRoleId() === role.id) {
+                    <td>
+                      <label class="sr-only" [for]="'role-title-' + role.id">Title</label>
+                      <input [id]="'role-title-' + role.id" class="input" name="editRoleTitle"
+                        [(ngModel)]="editRoleTitle" maxlength="100" />
+                    </td>
+                    <td>
+                      <label class="sr-only" [for]="'role-seats-' + role.id">Seats</label>
+                      <input [id]="'role-seats-' + role.id" class="input seats" type="number" min="1"
+                        max="100" name="editRoleSeats" [(ngModel)]="editRoleSeats" />
+                    </td>
+                    <td>{{ role.holderCount }}</td>
+                    <td>
+                      <div class="row-actions">
+                        <button class="btn small" type="button" (click)="saveRole(found, role)"
+                          [disabled]="busy() || !validRole(editRoleTitle, editRoleSeats)">
+                          Save
+                        </button>
+                        <button class="btn small alt" type="button" (click)="editingRoleId.set(null)">
+                          Cancel
+                        </button>
+                      </div>
+                    </td>
+                  } @else {
+                    <td>
+                      <b>{{ role.title }}</b>
+                      @if (!role.isElected) {
+                        <span class="small"> · everybody's until elected to another</span>
+                      }
+                    </td>
+                    <td>{{ role.seats ?? 'No limit' }}</td>
+                    <td>{{ role.holderCount }}</td>
+                    <td>
+                      @if (found.group.iCanRunElections && role.isEditable) {
+                        <div class="row-actions">
+                          <button class="btn small alt" type="button" [disabled]="busy()"
+                            (click)="startEditRole(role)">
+                            Edit<span class="sr-only"> {{ role.title }}</span>
+                          </button>
+                          <button class="btn small alt" type="button" [disabled]="busy() || role.holderCount > 0"
+                            [title]="role.holderCount > 0 ? 'Move its holders to another role first' : ''"
+                            (click)="removeRole(found, role)">
+                            Remove<span class="sr-only"> {{ role.title }}</span>
+                          </button>
+                        </div>
+                      }
+                    </td>
+                  }
+                </tr>
+              }
+            </tbody>
+          </table>
+        </div>
+
+        @if (found.group.iCanRunElections) {
+          <form class="add-role" (ngSubmit)="defineRole(found)">
+            <div>
+              <label for="new-role-title">New role</label>
+              <input id="new-role-title" class="input" name="newRoleTitle" [(ngModel)]="newRoleTitle"
+                maxlength="100" placeholder="Secretary" />
+            </div>
+            <div>
+              <label for="new-role-seats">Seats</label>
+              <input id="new-role-seats" class="input seats" type="number" min="1" max="100"
+                name="newRoleSeats" [(ngModel)]="newRoleSeats" />
+            </div>
+            <button class="btn" type="submit" [disabled]="busy() || !validRole(newRoleTitle, newRoleSeats)">
+              Add role
+            </button>
+          </form>
+        }
+      </div>
+
+      <!-- Members and their roles ---------------------------------------- -->
+      <div class="card spaced">
+        <h2>Members</h2>
+
+        @if (found.members.length === 0) {
+          <p class="empty">Nobody is in this group yet.</p>
+        } @else {
+          <div class="table-wrap">
+            <table>
+              <caption class="sr-only">Members of {{ found.group.name }} and their roles</caption>
+              <thead>
+                <tr><th>Member</th><th>Role</th><th>Joined</th></tr>
+              </thead>
+              <tbody>
+                @for (member of found.members; track member.memberId) {
+                  <tr>
+                    <td><b>{{ memberName(member.memberId) }}</b></td>
+                    <td>
+                      @if (found.group.iCanRunElections && member.memberId !== found.group.presidentMemberId) {
+                        <label class="sr-only" [for]="'member-role-' + member.memberId">
+                          Role for {{ memberName(member.memberId) }}
+                        </label>
+                        <select [id]="'member-role-' + member.memberId" class="input inline"
+                          [ngModel]="member.roleId" (ngModelChange)="assignRole(found, member, $event)"
+                          [disabled]="busy()">
+                          @for (role of assignableRoles(found); track role.id) {
+                            <option [value]="role.id">{{ role.title }}</option>
+                          }
+                        </select>
+                      } @else {
+                        {{ member.rolePosition }}
+                      }
+                    </td>
+                    <td>{{ member.joinedAt | date: 'd MMM y' }}</td>
+                  </tr>
+                }
+              </tbody>
+            </table>
+          </div>
+          @if (found.group.iCanRunElections) {
+            <p class="small">
+              President moves only with the presidency - change the president, or run a President
+              election.
+            </p>
+          }
+        }
+      </div>
+
       <div class="card spaced">
         <div class="section-head">
           <h2>Elections</h2>
 
-          @if (found.group.iCanLead) {
+          @if (found.group.iCanRunElections) {
             <button
               class="btn"
               type="button"
               [attr.aria-expanded]="showOpen()"
               (click)="toggleOpenForm(found)"
             >
-              {{ showOpen() ? 'Cancel' : openLabel(found) }}
+              {{ showOpen() ? 'Cancel' : 'Open an election' }}
             </button>
           }
         </div>
 
-        @if (showOpen() && found.group.iCanLead) {
+        @if (showOpen() && found.group.iCanRunElections) {
           <form class="spaced" (ngSubmit)="open(found)">
             <div class="form-grid">
               <div class="field span-all">
-                <label for="election-position">Position</label>
-                <input
-                  id="election-position"
-                  class="input"
-                  name="positionTitle"
-                  [(ngModel)]="positionTitle"
-                  [readonly]="!found.group.iAmThePresident"
-                  maxlength="100"
-                />
-                @if (!found.group.iAmThePresident) {
-                  <p class="small">An administrator can run only the President election.</p>
-                }
+                <label for="election-role">Role</label>
+                <select id="election-role" class="input" name="roleId" [(ngModel)]="roleId">
+                  <option value="">Choose a role</option>
+                  @for (role of electedRoles(found); track role.id) {
+                    <option [value]="role.id">{{ role.title }} ({{ seatsLabel(role.seats ?? 1) }})</option>
+                  }
+                </select>
+                <p class="small">
+                  A role runs one election at a time. Add a role above to elect something other than
+                  a president.
+                </p>
               </div>
 
               <div class="field">
@@ -229,7 +369,8 @@ import { isNotFound } from '../../core/http-status';
                 <div>
                   <h3>{{ election.positionTitle }}</h3>
                   <p class="small">
-                    Nominations {{ election.nominationStartAt | date: 'd MMM' }} —
+                    {{ seatsLabel(election.seats) }} · Nominations
+                    {{ election.nominationStartAt | date: 'd MMM' }} —
                     {{ election.nominationEndAt | date: 'd MMM y' }} · Voting
                     {{ election.votingStartAt | date: 'd MMM' }} —
                     {{ election.votingEndAt | date: 'd MMM y' }}
@@ -240,9 +381,9 @@ import { isNotFound } from '../../core/http-status';
                 </span>
               </div>
 
-              @if (election.winnerMemberId; as winner) {
+              @if (election.winnerMemberIds.length > 0) {
                 <p class="notice ok">
-                  Elected: <b>{{ memberName(winner) }}</b>
+                  Elected: <b>{{ winnerNames(election) }}</b>
                 </p>
               }
 
@@ -253,7 +394,7 @@ import { isNotFound } from '../../core/http-status';
                   {{ expandedId() === election.id ? 'Hide ballot' : 'View ballot' }}
                 </button>
 
-                @if (canRun(found, election)) {
+                @if (canRun(found)) {
                   @if (canEditElection(election)) {
                     <button class="btn small alt" type="button" [disabled]="busy()"
                       [attr.aria-expanded]="editingId() === election.id"
@@ -286,14 +427,13 @@ import { isNotFound } from '../../core/http-status';
 
                   <div class="form-grid">
                     <div class="field span-all">
-                      <label [for]="'edit-position-' + election.id">Position</label>
-                      <input
-                        [id]="'edit-position-' + election.id"
-                        class="input"
-                        name="editPositionTitle"
-                        [(ngModel)]="editPositionTitle"
-                        maxlength="100"
-                      />
+                      <label [for]="'edit-role-' + election.id">Role</label>
+                      <select [id]="'edit-role-' + election.id" class="input" name="editRoleId"
+                        [(ngModel)]="editRoleId">
+                        @for (role of electedRoles(found); track role.id) {
+                          <option [value]="role.id">{{ role.title }} ({{ seatsLabel(role.seats ?? 1) }})</option>
+                        }
+                      </select>
                     </div>
 
                     <div class="field">
@@ -349,8 +489,9 @@ import { isNotFound } from '../../core/http-status';
               @if (confirmingPublish() === election.id) {
                 <div class="notice" role="status">
                   <p>
-                    This picks the winner from the votes cast and installs them as
-                    {{ election.positionTitle }}. It cannot be undone or recomputed.
+                    This picks the top {{ seatsLabel(election.seats) }} from the votes cast and
+                    installs them as {{ election.positionTitle }}. Anyone who holds it now and did
+                    not win goes back to Volunteer. It cannot be undone or recomputed.
                   </p>
                   <div class="row-actions">
                     <button class="btn" type="button" [disabled]="busy()" (click)="publish(election)">
@@ -389,7 +530,7 @@ import { isNotFound } from '../../core/http-status';
                               </td>
                               <td>{{ candidate.votes }}</td>
                               <td>
-                                @if (canRun(found, election) && canDecide(election)) {
+                                @if (canRun(found) && canDecide(election)) {
                                   <div class="row-actions">
                                     @if (candidate.status === 'Nominated') {
                                       <button class="btn small" type="button" [disabled]="busy()"
@@ -450,6 +591,18 @@ import { isNotFound } from '../../core/http-status';
       flex-wrap: wrap;
       margin-top: var(--space-2);
     }
+
+    .add-role {
+      display: flex;
+      gap: var(--space-3);
+      align-items: flex-end;
+      flex-wrap: wrap;
+      margin-top: var(--space-4);
+    }
+
+    .seats {
+      max-width: 6rem;
+    }
   `,
 })
 export class GroupElectionsComponent implements OnInit {
@@ -475,7 +628,7 @@ export class GroupElectionsComponent implements OnInit {
   readonly confirmingPublish = signal<string | null>(null);
 
   readonly editingId = signal<string | null>(null);
-  editPositionTitle = '';
+  editRoleId = '';
   editNominationStartAt = '';
   editNominationEndAt = '';
   editVotingStartAt = '';
@@ -485,11 +638,17 @@ export class GroupElectionsComponent implements OnInit {
 
   readonly groupId = computed(() => this.route.snapshot.paramMap.get('id') ?? '');
 
-  positionTitle = '';
+  roleId = '';
   nominationStartAt = '';
   nominationEndAt = '';
   votingStartAt = '';
   votingEndAt = '';
+
+  newRoleTitle = '';
+  newRoleSeats = 1;
+  readonly editingRoleId = signal<string | null>(null);
+  editRoleTitle = '';
+  editRoleSeats = 1;
 
   ngOnInit(): void {
     this.load();
@@ -497,6 +656,84 @@ export class GroupElectionsComponent implements OnInit {
 
   memberName(memberId: string): string {
     return this.names().get(memberId) ?? 'A member';
+  }
+
+  winnerNames(election: GroupElection): string {
+    return election.winnerMemberIds.map((id) => this.memberName(id)).join(', ');
+  }
+
+  seatsLabel(seats: number): string {
+    return seats === 1 ? '1 seat' : `${seats} seats`;
+  }
+
+  /** The roles an election can be run for: every one but Volunteer. */
+  electedRoles(found: GroupDetail): readonly GroupRole[] {
+    return found.roles.filter((r) => r.isElected);
+  }
+
+  /** The roles a member can be moved into by hand: every one but President. */
+  assignableRoles(found: GroupDetail): readonly GroupRole[] {
+    return found.roles.filter((r) => r.kind !== 'President');
+  }
+
+  // ---- Roles ---------------------------------------------------------------
+
+  validRole(title: string, seats: number | null): boolean {
+    return title.trim().length > 0 && Number.isInteger(seats) && seats! >= 1 && seats! <= 100;
+  }
+
+  defineRole(found: GroupDetail): void {
+    const title = this.newRoleTitle.trim();
+
+    if (!this.validRole(title, this.newRoleSeats)) {
+      return;
+    }
+
+    this.act(
+      this.api.defineGroupRole(found.group.id, title, this.newRoleSeats),
+      `${title} is a role in ${found.group.name} now, with ${this.seatsLabel(this.newRoleSeats)}.`,
+      () => {
+        this.newRoleTitle = '';
+        this.newRoleSeats = 1;
+      },
+    );
+  }
+
+  startEditRole(role: GroupRole): void {
+    this.editRoleTitle = role.title;
+    this.editRoleSeats = role.seats ?? 1;
+    this.editingRoleId.set(role.id);
+  }
+
+  saveRole(found: GroupDetail, role: GroupRole): void {
+    const title = this.editRoleTitle.trim();
+
+    if (!this.validRole(title, this.editRoleSeats)) {
+      return;
+    }
+
+    this.act(
+      this.api.updateGroupRole(found.group.id, role.id, title, this.editRoleSeats),
+      `${title} saved.`,
+      () => this.editingRoleId.set(null),
+    );
+  }
+
+  removeRole(found: GroupDetail, role: GroupRole): void {
+    this.act(this.api.removeGroupRole(found.group.id, role.id), `${role.title} is no longer a role.`);
+  }
+
+  assignRole(found: GroupDetail, member: GroupRosterMember, roleId: string): void {
+    if (roleId === member.roleId) {
+      return;
+    }
+
+    const title = found.roles.find((r) => r.id === roleId)?.title ?? 'that role';
+
+    this.act(
+      this.api.assignGroupRole(found.group.id, member.memberId, roleId),
+      `${this.memberName(member.memberId)} is now ${title}.`,
+    );
   }
 
   stage(election: GroupElection): string {
@@ -521,20 +758,12 @@ export class GroupElectionsComponent implements OnInit {
     }
   }
 
-  openLabel(found: GroupDetail): string {
-    return found.group.iAmThePresident ? 'Open an election' : 'Open the President election';
-  }
-
   /**
-   * Whether this caller may run this election. Mirrors the service's
-   * `CanRunElection`: the president any election, an administrator the
-   * President one - while the group has none, which `iCanLead` already says.
+   * Whether this caller may run this group's elections - the service's own
+   * answer, the same for every election in the group.
    */
-  canRun(found: GroupDetail, election: GroupElection): boolean {
-    return (
-      found.group.iAmThePresident ||
-      (found.group.iCanLead && election.positionTitle.trim().toLowerCase() === 'president')
-    );
+  canRun(found: GroupDetail): boolean {
+    return found.group.iCanRunElections;
   }
 
   /** Nominations can be approved or removed only until voting opens. */
@@ -600,9 +829,12 @@ export class GroupElectionsComponent implements OnInit {
       return;
     }
 
-    // An administrator can run only the President election, so the field is
-    // filled in and locked; the president may name any position.
-    this.positionTitle = found.group.iAmThePresident ? '' : 'President';
+    // A group with no president most likely wants its President election
+    // first, so that is picked to start with; otherwise nothing is.
+    this.roleId =
+      found.group.presidentMemberId === null
+        ? (found.roles.find((r) => r.kind === 'President')?.id ?? '')
+        : '';
     this.showOpen.set(true);
   }
 
@@ -624,7 +856,7 @@ export class GroupElectionsComponent implements OnInit {
 
   canOpen(): boolean {
     return (
-      this.positionTitle.trim().length > 0 &&
+      this.roleId.length > 0 &&
       this.nominationStartAt.length > 0 &&
       this.nominationEndAt.length > 0 &&
       this.votingStartAt.length > 0 &&
@@ -640,11 +872,11 @@ export class GroupElectionsComponent implements OnInit {
       return;
     }
 
-    const title = this.positionTitle.trim();
+    const title = found.roles.find((r) => r.id === this.roleId)?.title ?? 'new';
 
     this.act(
       this.api.openGroupElection(found.group.id, {
-        positionTitle: title,
+        roleId: this.roleId,
         nominationStartAt: new Date(this.nominationStartAt).toISOString(),
         nominationEndAt: new Date(this.nominationEndAt).toISOString(),
         votingStartAt: new Date(this.votingStartAt).toISOString(),
@@ -669,7 +901,7 @@ export class GroupElectionsComponent implements OnInit {
       return;
     }
 
-    this.editPositionTitle = election.positionTitle;
+    this.editRoleId = election.roleId;
     this.editNominationStartAt = toLocalInputValue(election.nominationStartAt);
     this.editNominationEndAt = toLocalInputValue(election.nominationEndAt);
     this.editVotingStartAt = toLocalInputValue(election.votingStartAt);
@@ -687,7 +919,7 @@ export class GroupElectionsComponent implements OnInit {
 
   canSaveEdit(): boolean {
     return (
-      this.editPositionTitle.trim().length > 0 &&
+      this.editRoleId.length > 0 &&
       this.editNominationStartAt.length > 0 &&
       this.editNominationEndAt.length > 0 &&
       this.editVotingStartAt.length > 0 &&
@@ -705,13 +937,13 @@ export class GroupElectionsComponent implements OnInit {
 
     this.act(
       this.api.updateGroupElection(election.id, {
-        positionTitle: this.editPositionTitle.trim(),
+        roleId: this.editRoleId,
         nominationStartAt: new Date(this.editNominationStartAt).toISOString(),
         nominationEndAt: new Date(this.editNominationEndAt).toISOString(),
         votingStartAt: new Date(this.editVotingStartAt).toISOString(),
         votingEndAt: new Date(this.editVotingEndAt).toISOString(),
       }),
-      `${this.editPositionTitle.trim()} election updated.`,
+      'Election updated.',
       () => this.editingId.set(null),
     );
   }
@@ -762,7 +994,7 @@ export class GroupElectionsComponent implements OnInit {
 
     this.act(
       this.api.publishGroupElection(election.id),
-      `The ${election.positionTitle} result is announced, and the winner now holds the position.`,
+      `The ${election.positionTitle} result is announced, and the winners now hold the role.`,
     );
   }
 

@@ -42,12 +42,36 @@ export interface VolunteerGroup {
    */
   readonly iCanLead: boolean;
   readonly createdAt: string;
+
+  /**
+   * May define the group's roles, assign them and run its elections: the
+   * president, or an administrator of the group at any time.
+   */
+  readonly iCanRunElections: boolean;
 }
 
 export interface GroupMember {
   readonly memberId: string;
+
+  /** The title of the role they hold. Every member holds one. */
   readonly rolePosition: string | null;
   readonly joinedAt: string;
+  readonly roleId: string;
+}
+
+/**
+ * One of the group's volunteer roles. Volunteer and President are built in and
+ * not `isEditable`; `isElected` is every role but Volunteer. `seats` is null for
+ * Volunteer: no limit.
+ */
+export interface GroupRole {
+  readonly id: string;
+  readonly title: string;
+  readonly kind: 'Volunteer' | 'President' | 'Elected';
+  readonly seats: number | null;
+  readonly holderCount: number;
+  readonly isEditable: boolean;
+  readonly isElected: boolean;
 }
 
 export interface GroupApplication {
@@ -70,6 +94,7 @@ export interface GroupApplication {
 export interface GroupDetail {
   readonly group: VolunteerGroup;
   readonly members: readonly GroupMember[];
+  readonly roles: readonly GroupRole[];
 }
 
 /**
@@ -101,14 +126,20 @@ export interface Election {
   readonly acceptsNominations: boolean;
   readonly acceptsVotes: boolean;
 
-  /** The candidate this member voted for, if they have voted. */
-  readonly myVoteCandidateId: string | null;
+  /** The candidates this member picked, if they have voted. Empty until then. */
+  readonly myVoteCandidateIds: readonly string[];
   readonly candidateCount: number;
 
-  /** Set once the election is Published. Null until then. */
-  readonly winnerMemberId: string | null;
+  /** Set once the election is Published, in ranked order. Empty until then. */
+  readonly winnerMemberIds: readonly string[];
   readonly publishedAt: string | null;
   readonly createdAt: string;
+
+  /** The group role it fills; `positionTitle` is that role's title when it was opened. */
+  readonly roleId: string;
+
+  /** How many winners it produces, and how many candidates each voter may pick. */
+  readonly seats: number;
 }
 
 /**
@@ -136,7 +167,7 @@ export interface ElectionDetail {
  */
 export interface CastVoteResult {
   readonly electionId: string;
-  readonly candidateId: string;
+  readonly candidateIds: readonly string[];
   readonly accepted: boolean;
 }
 
@@ -204,7 +235,7 @@ export function votingNote(
   onBallot: number,
   now: number = Date.now(),
 ): string | null {
-  if (election.status === 'Published' || election.myVoteCandidateId !== null) {
+  if (election.status === 'Published' || election.myVoteCandidateIds.length > 0) {
     return null;
   }
 

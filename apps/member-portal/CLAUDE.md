@@ -491,17 +491,26 @@ so a 403 cannot confirm a group has applications pending - so asking
 speculatively would mean a 404 on every ordinary member's visit, and a console
 full of them is how a real 404 stops being noticed.
 
-**A group position is filled by election now, added 2026-09-12.** Accepting
-a join request used to carry an optional free-text position in the same
-click - a unilateral president decision with no request, no nomination, no
-vote. That input is gone from the review queue; the group detail screen's
-new "Positions" section is where a position actually comes from: the
-president opens an election naming a position, any current group member
-nominates another, the president approves nominations onto the ballot,
-voting opens, and publishing installs the winner - who then shows up with
-that title in the Members table above, the same table `AssignRolePosition`'s
-own "Give a position" control still edits directly, for a manual correction
-outside an election.
+**Every group member holds one of the group's volunteer roles, as of
+2026-09-26 - positions stopped being free text.** Volunteer (everybody's until
+elected to another, no seat limit) and President (one seat) are built in; the
+group defines the rest in the "Volunteer roles" section, each with the seats an
+election for it fills. `group.iCanRunElections` - the president, or an
+administrator of the group - decides who sees the role controls, the role picker
+on each Members row, and the election controls; `iCanLead` still decides only
+the join-request queue. The picker never offers President, and the president's
+own row has no picker: that role moves only with the presidency.
+
+**A multi-seat ballot is ticked, then cast once.** Single-seat elections keep
+the one-click Vote button. For a role with more seats each candidate gets a
+checkbox, capped at the seats by disabling the rest rather than refusing on
+submit, and one "Cast my ballot" button sends them together - the service keeps
+a ballot final, so the screen says so above the list instead of letting a
+member cast two picks and discover they cannot add a third. `myVoteCandidateIds`
+marks every pick as "Your vote"; a result names every winner.
+
+**Positions came from elections since 2026-09-12.** Accepting a join request
+carries no role; an election - or the manual picker - is where one comes from.
 
 **Nominations that closed too early are reopened by editing, not a separate
 "reopen" button.** An election left `NominationsOpen` past its own end date

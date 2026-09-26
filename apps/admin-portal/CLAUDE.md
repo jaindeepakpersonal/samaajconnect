@@ -34,7 +34,7 @@ screen. The spec is `docs/product/wireframes/admin-panel-wireframes.html`.
 | Samaaj Panch | `/panch` | — | built; no wireframe covers it. The seated Panch with Remove, and the elections list with a create modal |
 | Panch election | `/panch/:id` | — | built. Stage, approving nominations, the tally, publishing (which replaces the Panch) |
 | Volunteer Groups | `/groups` | `#groups` (member-facing) | built. Create (president optional), set a president later, and stand one down |
-| Group elections | `/groups/:id` | — | built; no wireframe covers running one. Open an election, approve nominations, move its stages, publish - an administrator for the President election of a group with no president, the president for any |
+| Group roles & elections | `/groups/:id` | — | built; no wireframe covers running one. Define volunteer roles and their seats, assign them, open an election for any role, approve nominations, move its stages, publish - the president or an administrator of the group |
 | Trusts | `/trust` | — | built; no wireframe covers this new module. This Samaaj's locality Trusts, and setting one up |
 | Trust detail | `/trust/:id` | — | built; no wireframe covers running one. Roster (add/change position/remove), and its elections - open, approve nominations, move stages, publish |
 | Social Issues | `/issues` | `#issues` | built. The reviewer's approval queue |
@@ -834,18 +834,26 @@ a Samaaj admin run its *President* election - and only that - while none exists.
 The member portal's group screen has the whole flow, but a Super Admin is not a
 member and an administrator should not have to change apps to start the election
 that is theirs. `/groups/:id` covers opening one, approving who reaches the
-ballot, the stage button, the tally, and a confirmed publish. What it offers is
-the service's own answer: `group.iCanLead` says whether the caller may run
-elections now, and per election the screen also requires the President position
-for anybody who is not the president (mirroring `GroupAuthority.CanRunElection`),
-so a group that already has a president shows the elections read-only rather than
-buttons that answer 403. Nominating and voting are deliberately not here - both
-need a seat in the group.
+ballot, the stage button, the tally, and a confirmed publish. Nominating and
+voting are deliberately not here - both need a seat in the group.
+
+**Since 2026-09-26 an administrator runs a group's roles and every one of its
+elections, at any time - not only the President election of a group with
+none.** The same page now has a "Volunteer roles" card (define a role with its
+seats, rename or resize it, remove one nobody holds - Volunteer and President
+are built in and offered neither), a Members card with a role picker per row
+(never President, and no picker on the president's own row, since that role
+moves only with the presidency), and an election form that picks a role rather
+than typing a title. What it offers is the service's own answer:
+`group.iCanRunElections` for roles and elections, `group.iCanLead` for the
+join-request queue, which an administrator still reaches only while the group
+has no president. Publishing names every winner and says that whoever held the
+role and lost goes back to Volunteer.
 
 **An election that ran out of time is reopened by editing it, not by a separate
 control.** Nominations left NominationsOpen past their own close date have
 nothing to undo - the status never advanced - so `Edit` (Draft/NominationsOpen
-only, mirroring the campaign screen's own rule) corrects the position title and
+only, mirroring the campaign screen's own rule) corrects the role and
 all four windows, and pushing the nomination close date out is the whole fix.
 The button disappears once voting has opened, the same reasoning every other
 edit-until-a-point control in this panel already uses.

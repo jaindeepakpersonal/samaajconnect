@@ -721,29 +721,50 @@ export interface VolunteerGroup {
 // ---- Volunteer group elections -------------------------------------------
 
 /**
- * A group as its own detail endpoint returns it: the list shape plus the two
- * flags the service computes for the asker.
+ * A group as its own detail endpoint returns it: the list shape plus the flags
+ * the service computes for the asker, so the panel never re-derives them from a
+ * role and a president id.
  *
- * `iCanLead` is the one this screen branches on. It is the service's answer to
- * "may this caller run this group's elections right now" - the president, or a
- * Samaaj admin **only while the group has no president** - so the panel never
- * re-derives it from a role and a president id.
+ * `iCanLead` is who may decide join requests - the president, or an
+ * administrator **only while the group has none**. `iCanRunElections` is who
+ * may define its roles, assign them and run its elections - the president, or
+ * an administrator of the group at any time.
  */
 export interface LedGroup extends VolunteerGroup {
   readonly iAmThePresident: boolean;
   readonly iCanLead: boolean;
+  readonly iCanRunElections: boolean;
 }
 
 export interface GroupRosterMember {
   readonly memberId: string;
+
+  /** The title of the role they hold. Every member holds one. */
   readonly rolePosition: string | null;
   readonly joinedAt: string;
+  readonly roleId: string;
+}
+
+/**
+ * One of a group's volunteer roles. Volunteer and President are built in and
+ * not `isEditable`; `isElected` is every role but Volunteer. `seats` is null for
+ * Volunteer: no limit.
+ */
+export interface GroupRole {
+  readonly id: string;
+  readonly title: string;
+  readonly kind: 'Volunteer' | 'President' | 'Elected';
+  readonly seats: number | null;
+  readonly holderCount: number;
+  readonly isEditable: boolean;
+  readonly isElected: boolean;
 }
 
 /** Mirrors `GroupDetailResponse`. */
 export interface GroupDetail {
   readonly group: LedGroup;
   readonly members: readonly GroupRosterMember[];
+  readonly roles: readonly GroupRole[];
 }
 
 export type GroupElectionStatus = 'Draft' | 'NominationsOpen' | 'VotingOpen' | 'Closed' | 'Published';
@@ -763,9 +784,17 @@ export interface GroupElection {
   readonly acceptsNominations: boolean;
   readonly acceptsVotes: boolean;
   readonly candidateCount: number;
-  readonly winnerMemberId: string | null;
+
+  /** In ranked order, once published. Empty until then. */
+  readonly winnerMemberIds: readonly string[];
   readonly publishedAt: string | null;
   readonly createdAt: string;
+
+  /** The role it fills; `positionTitle` is that role's title when it was opened. */
+  readonly roleId: string;
+
+  /** How many winners it produces, and how many candidates each voter may pick. */
+  readonly seats: number;
 }
 
 /** A group election's vote counts are never hidden - it has no results-visibility setting. */
@@ -793,7 +822,7 @@ export interface GroupApplication {
 
 /** What opening an election sends. */
 export interface GroupElectionInput {
-  readonly positionTitle: string;
+  readonly roleId: string;
   readonly nominationStartAt: string;
   readonly nominationEndAt: string;
   readonly votingStartAt: string;
