@@ -249,6 +249,16 @@ so the fourth entry in that list is the whole change on this side. The
 service's own `ReactionType` enum and its validator's error message moved
 with it - see timeline-service's own `CLAUDE.md`.
 
+**Timeline gained author names and reaction icons on 2026-09-26, both
+additions rather than redesigns.** `icon` sits beside `label` on each entry
+in `Reactions` - decorative only, never sent; `type` is still the only part
+of a reaction on the wire. Author names use the same batched, memoized
+`resolveNames()` this app already established for a group's roster (see
+"Names the portal cannot resolve are not invented" above) rather than a new
+pattern: one `MembersApi.get()` per distinct `authorMemberId` on screen,
+called from `load()` for the feed and from `toggleComments()` for whichever
+thread is open, never for the whole Samaaj.
+
 **A module key is `ModuleKeys.X`, never a string literal.** Home filtered its
 Events and Volunteer tiles on `Events` and `VolunteerGroups`, neither of which
 is a key the platform has ever had - both features are behind `community`. The
@@ -496,13 +506,19 @@ loaded roster, not a name search.** Celebrities of Samaaj needed
 a volunteer group's roster is already on screen and typically small, so
 there is nothing here for that fix to solve.
 
-**Names the portal cannot resolve are not invented.** Timeline, Events and
-Groups all carry member ids and no names: names live in member-family-service
-and resolving them would be a call per row. Each screen says the thing it *can*
-know and that actually matters to the reader - "Your post", "You", "The
-president", "A member", "A volunteer group" - rather than printing an id or a
-placeholder. The wireframes' "President: Rajesh Jain" is prototype data, not a
-field the API has.
+**Names the portal cannot resolve are not invented.** Names live in
+member-family-service, off the wire everywhere else, so a screen either
+resolves a bounded, on-screen set of ids through it, or says the thing it *can*
+know instead of printing an id or a placeholder. Groups (a group's own roster
+and applications) and Timeline (the loaded page of the feed, and whichever
+comment thread is open) both resolve this way - one `MembersApi.get()` per
+distinct id actually on screen, memoized so it is never repeated, falling back
+to a generic label ("A member") only if that one lookup fails. What no screen
+does is resolve unboundedly - a call per row across a list with no fixed size
+- which is why Timeline still reads as "Your post"/"You" for the reader's own
+posts rather than a second lookup, and why Events' organizer is "A volunteer
+group"/"The Samaaj" rather than a member id at all. The wireframes' "President:
+Rajesh Jain" is prototype data, not a field the API has.
 
 **Money is integer paise on the wire and converted in exactly one place.**
 boli-service holds every amount as a `long` because a Boli is money the Samaaj

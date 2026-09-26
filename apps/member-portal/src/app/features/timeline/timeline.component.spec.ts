@@ -3,6 +3,7 @@ import { HttpTestingController, provideHttpClientTesting } from '@angular/common
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { provideRouter } from '@angular/router';
 import { API_CONFIG, CurrentUser } from '@samaajconnect/shared';
+import { Member } from '../members/members.models';
 import { TimelineComponent } from './timeline.component';
 import { Post } from './timeline.models';
 
@@ -39,6 +40,24 @@ function post(overrides: Partial<Post> = {}): Post {
   };
 }
 
+/** A minimal member-family-service response, for the name-resolution calls `timeline.component.ts` now makes. */
+function apiMember(id: string, fullName = 'Some Member'): Member {
+  return {
+    id,
+    fullName,
+    photoUrl: null,
+    gautraId: null,
+    dateOfBirth: null,
+    mobile: null,
+    email: null,
+    permanentAddress: { line: null, cityId: null, localityId: null },
+    temporaryAddress: null,
+    professionId: null,
+    qualificationId: null,
+    gender: 'Unspecified',
+  };
+}
+
 describe('TimelineComponent', () => {
   let fixture: ComponentFixture<TimelineComponent>;
   let component: TimelineComponent;
@@ -62,12 +81,25 @@ describe('TimelineComponent', () => {
 
   afterEach(() => http.verify());
 
-  /** Answers the two calls the screen makes on load. */
+  /**
+   * Flushes every pending name-resolution call the component makes for an
+   * author it does not already know - see `resolveNames` on the component and
+   * this file's own doc comment on why it now resolves these instead of
+   * always falling back to "A member".
+   */
+  function flushMemberLookups(): void {
+    for (const req of http.match((r) => r.method === 'GET' && r.url.startsWith('/v1/members/'))) {
+      req.flush(apiMember(req.request.url.split('/').pop()!));
+    }
+  }
+
+  /** Answers the calls the screen makes on load: /me, the feed, then any author names it needs. */
   function load(posts: Post[], user: CurrentUser = member): void {
     fixture.detectChanges();
 
     http.expectOne('/v1/identity/me').flush(user);
     http.expectOne('/v1/timeline/posts').flush(posts);
+    flushMemberLookups();
 
     fixture.detectChanges();
   }
@@ -79,7 +111,7 @@ describe('TimelineComponent', () => {
   function buttonSaying(label: string): HTMLButtonElement | undefined {
     return Array.from(
       (fixture.nativeElement as HTMLElement).querySelectorAll('button'),
-    ).find((button) => button.textContent?.trim().startsWith(label)) as HTMLButtonElement | undefined;
+    ).find((button) => button.textContent?.trim().includes(label)) as HTMLButtonElement | undefined;
   }
 
   // ---- The three states the wireframe shows -----------------------------
@@ -243,11 +275,14 @@ describe('TimelineComponent', () => {
         { id: 'c1', authorMemberId: 'someone-else', body: 'Count me in.', createdAt: new Date().toISOString() },
       ],
     });
+    flushMemberLookups();
 
     fixture.detectChanges();
 
     expect(text()).toContain('Count me in.');
-    expect(text()).toContain('A member');
+    // Already resolved for the post's own author during load() - the same id,
+    // so no second lookup, just the memoized name.
+    expect(text()).toContain('Some Member');
   });
 
   it('names the reader as the author of their own comment', () => {
@@ -259,6 +294,7 @@ describe('TimelineComponent', () => {
       post: post(),
       comments: [{ id: 'c1', authorMemberId: ME, body: 'Mine.', createdAt: new Date().toISOString() }],
     });
+    flushMemberLookups();
 
     fixture.detectChanges();
 
@@ -270,6 +306,7 @@ describe('TimelineComponent', () => {
 
     component.toggleComments(component.posts()[0]!);
     http.expectOne('/v1/timeline/posts/p1').flush({ post: post({ commentCount: 0 }), comments: [] });
+    flushMemberLookups();
     fixture.detectChanges();
 
     component.draftComment = 'Well said.';
@@ -301,6 +338,51 @@ describe('TimelineComponent', () => {
     // Reporting removes nothing by itself, so the post is still there.
     expect(component.posts()).toHaveLength(1);
     expect(buttonSaying('Reported')).toBeDefined();
+  });
+
+  // ---- Names & icons -------------------------------------------------------
+
+  it("resolves and shows a post's author name", () => {
+    load([post({ authorMemberId: 'someone-else' })]);
+
+    expect(text()).toContain('Some Member');
+  });
+
+  it('reuses an already-resolved name rather than asking for it twice', () => {
+    // The comment shares the post's own author id - load() already resolved
+    // it, so toggleComments() must not issue a second /v1/members/ call.
+    load([post({ authorMemberId: 'someone-else', commentCount: 1 })]);
+
+    component.toggleComments(component.posts()[0]!);
+
+    http.expectOne('/v1/timeline/posts/p1').flush({
+      post: post({ authorMemberId: 'someone-else', commentCount: 1 }),
+      comments: [
+        {
+          id: 'c1',
+          authorMemberId: 'someone-else',
+          body: 'Count me in.',
+          createdAt: new Date().toISOString(),
+        },
+      ],
+    });
+    // No flushMemberLookups() here - http.verify() in afterEach is the
+    // assertion that nothing was left pending, i.e. nothing was requested.
+
+    fixture.detectChanges();
+
+    expect(text()).toContain('Some Member');
+  });
+
+  it('shows an icon on every reaction, the comment count and Report', () => {
+    load([post({ reactions: [{ type: 'Appreciate', count: 1 }] })]);
+
+    expect(buttonSaying('Appreciate')?.textContent).toContain('👏');
+    expect(buttonSaying('Support')?.textContent).toContain('🤝');
+    expect(buttonSaying('Celebrate')?.textContent).toContain('🎉');
+    expect(buttonSaying('Dislike')?.textContent).toContain('👎');
+    expect(buttonSaying('comment')?.textContent).toContain('💬');
+    expect(buttonSaying('Report')?.textContent).toContain('🚩');
   });
 
   // ---- What is not built -------------------------------------------------
@@ -365,6 +447,7 @@ describe('TimelineComponent', () => {
 
     http.expectOne('/v1/identity/me').flush({}, { status: 500, statusText: 'Server Error' });
     http.expectOne('/v1/timeline/posts').flush([post()]);
+    flushMemberLookups();
     fixture.detectChanges();
 
     expect(text()).toContain('Community blood donation drive');

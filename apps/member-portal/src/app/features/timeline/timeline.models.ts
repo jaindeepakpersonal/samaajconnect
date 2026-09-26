@@ -35,10 +35,10 @@ export interface Post {
   readonly id: string;
 
   /**
-   * An id, not a name. Names live in member-family-service and the feed does
-   * not fetch them - see the remarks on `PostResponse` for why. The screen
-   * shows the author's relationship to the reader ("Your post") rather than a
-   * name it cannot resolve.
+   * An id, not a name - names live in member-family-service, and the feed
+   * itself does not carry one. The screen resolves it separately, one call per
+   * distinct author actually on screen, memoized rather than fetched again per
+   * post; see `TimelineComponent.resolveNames`.
    */
   readonly authorMemberId: string;
   readonly type: PostType;
@@ -81,14 +81,15 @@ export interface PostDetail {
  * rather than replacing any of them - a member disagreeing with something on
  * the timeline had no reaction that said so.
  *
- * The labels are separate from the types so the wording can change without
- * changing what goes on the wire.
+ * The labels and icons are separate from the types so the wording or artwork
+ * can change without changing what goes on the wire - `type` is the only part
+ * of this that is ever sent.
  */
 export const Reactions = [
-  { type: 'Appreciate', label: 'Appreciate' },
-  { type: 'Support', label: 'Support' },
-  { type: 'Celebrate', label: 'Celebrate' },
-  { type: 'Dislike', label: 'Dislike' },
+  { type: 'Appreciate', label: 'Appreciate', icon: '👏' },
+  { type: 'Support', label: 'Support', icon: '🤝' },
+  { type: 'Celebrate', label: 'Celebrate', icon: '🎉' },
+  { type: 'Dislike', label: 'Dislike', icon: '👎' },
 ] as const;
 
 export type ReactionType = (typeof Reactions)[number]['type'];

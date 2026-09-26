@@ -2,6 +2,7 @@ import { HttpErrorResponse } from '@angular/common/http';
 import { Component, OnInit, computed, inject, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { AuthService, describeError } from '@samaajconnect/shared';
+import { MembersApi } from '../members/members.api';
 import { TimelineApi } from './timeline.api';
 import { Comment, Post, ReactionType, Reactions } from './timeline.models';
 
@@ -34,10 +35,13 @@ import { Comment, Post, ReactionType, Reactions } from './timeline.models';
  * button is present and disabled with the reason beside it, rather than wired
  * to something that does not exist.
  *
- * **Author names.** A post carries `authorMemberId` and no name, deliberately -
- * resolving one would be a call per post for a feed. The screen shows the
- * reader's relationship to the post ("Your post", "Samaaj announcement",
- * "Member post") instead of inventing a name it cannot get.
+ * **Author names.** A post carries `authorMemberId` and no name - resolving
+ * one is a call per author, not per post, so `resolveNames()` batches it: one
+ * `MembersApi.get()` per distinct id actually on screen (the loaded page of
+ * the feed, or the open comment thread), memoized in `names()` and never
+ * repeated. The reader's relationship to the post ("Your post", "Samaaj
+ * announcement", "Member post") is still the meta pill; the name sits beside
+ * it as who, not what kind of post this is.
  *
  * Reactions and comments are additions, not wireframe elements: the endpoints
  * exist and a timeline with no way to respond is a noticeboard.
@@ -142,6 +146,7 @@ import { Comment, Post, ReactionType, Reactions } from './timeline.models';
             @for (post of posts(); track post.id) {
               <article class="post card">
                 <div class="meta">
+                  <span class="author">{{ authorLabel(post.authorMemberId) }}</span>
                   <span class="pill" [class.warn]="isAwaitingReview(post)">{{ label(post) }}</span>
                   <span>{{ when(post.createdAt) }}</span>
                 </div>
@@ -170,6 +175,7 @@ import { Comment, Post, ReactionType, Reactions } from './timeline.models';
                         [disabled]="busyId() === post.id"
                         (click)="react(post, reaction.type)"
                       >
+                        <span class="icon" aria-hidden="true">{{ reaction.icon }}</span>
                         {{ reaction.label }}
                         @if (countOf(post, reaction.type); as count) {
                           <span class="count">{{ count }}</span>
@@ -178,6 +184,7 @@ import { Comment, Post, ReactionType, Reactions } from './timeline.models';
                     }
 
                     <button class="btn link" type="button" (click)="toggleComments(post)">
+                      <span class="icon" aria-hidden="true">💬</span>
                       {{ post.commentCount === 1 ? '1 comment' : post.commentCount + ' comments' }}
                     </button>
 
@@ -188,6 +195,7 @@ import { Comment, Post, ReactionType, Reactions } from './timeline.models';
                         [disabled]="busyId() === post.id || reported().includes(post.id)"
                         (click)="report(post)"
                       >
+                        <span class="icon" aria-hidden="true">🚩</span>
                         {{ reported().includes(post.id) ? 'Reported' : 'Report' }}
                       </button>
                     }
@@ -243,8 +251,12 @@ import { Comment, Post, ReactionType, Reactions } from './timeline.models';
 export class TimelineComponent implements OnInit {
   private readonly api = inject(TimelineApi);
   private readonly auth = inject(AuthService);
+  private readonly members = inject(MembersApi);
 
   readonly reactions = Reactions;
+
+  /** Resolved author names, keyed by member id. See `resolveNames`. */
+  readonly names = signal<Record<string, string>>({});
 
   readonly posts = signal<readonly Post[]>([]);
   readonly loading = signal(true);
@@ -332,6 +344,7 @@ export class TimelineComponent implements OnInit {
       next: (found) => {
         this.posts.set(found);
         this.loading.set(false);
+        this.resolveNames(found.map((post) => post.authorMemberId));
       },
       error: (failure: unknown) => {
         this.loading.set(false);
@@ -407,6 +420,7 @@ export class TimelineComponent implements OnInit {
     this.api.post(post.id).subscribe({
       next: (detail) => {
         this.comments.set(detail.comments);
+        this.resolveNames(detail.comments.map((comment) => comment.authorMemberId));
 
         // The detail carries a fresher copy of the post than the feed does.
         this.replace(detail.post);
@@ -491,8 +505,17 @@ export class TimelineComponent implements OnInit {
     return post.type === 'Announcement' ? 'Samaaj announcement' : 'Member post';
   }
 
+  /**
+   * What to call an author. The reader is named "You"; everyone else's real
+   * name comes from `resolveNames()` once it has loaded, falling back to a
+   * generic label until then or if that lookup failed.
+   */
   authorLabel(authorMemberId: string): string {
-    return authorMemberId === this.me() ? 'You' : 'A member';
+    if (authorMemberId === this.me()) {
+      return 'You';
+    }
+
+    return this.names()[authorMemberId] ?? 'A member';
   }
 
   countOf(post: Post, type: string): number {
@@ -531,6 +554,29 @@ export class TimelineComponent implements OnInit {
     const days = Math.floor(hours / 24);
 
     return days < 7 ? `${days}d ago` : new Date(iso).toLocaleDateString();
+  }
+
+  /**
+   * Resolves authors' names, one call per not-yet-resolved id actually on
+   * screen - the loaded page of the feed, or the open comment thread - never
+   * the whole Samaaj directory. A failed lookup is left unresolved rather
+   * than raised as a page-level error; `authorLabel` already falls back for
+   * that.
+   */
+  private resolveNames(authorMemberIds: readonly string[]): void {
+    const known = this.names();
+    const me = this.me();
+
+    const toResolve = [...new Set(authorMemberIds)].filter((id) => id !== me && !(id in known));
+
+    for (const id of toResolve) {
+      this.members.get(id).subscribe({
+        next: (member) => this.names.update((current) => ({ ...current, [id]: member.fullName })),
+        error: () => {
+          // Left unresolved; authorLabel() falls back to a generic label.
+        },
+      });
+    }
   }
 
   private replace(updated: Post): void {
