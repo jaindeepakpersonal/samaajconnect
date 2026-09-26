@@ -78,16 +78,40 @@ public sealed class PresidentlessGroupTests(VolunteerGroupsApiFactory factory)
         return memberId;
     }
 
+    /// <summary>
+    /// The role with this title - President is built in; any other is defined
+    /// first, the way an administrator would.
+    /// </summary>
+    private async Task<Guid> RoleIdAsync(Guid groupId, string title)
+    {
+        var detail = await Admin().GetFromJsonAsync<JsonElement>($"/v1/volunteer-groups/groups/{groupId}");
+        var match = detail.GetProperty("roles").EnumerateArray()
+            .Where(r => string.Equals(r.GetProperty("title").GetString(), title, StringComparison.OrdinalIgnoreCase))
+            .ToList();
+
+        if (match.Count == 1)
+        {
+            return match[0].GetProperty("id").GetGuid();
+        }
+
+        var defined = await Admin().PostAsJsonAsync(
+            $"/v1/volunteer-groups/groups/{groupId}/roles", new { title, seats = 1 });
+
+        return (await defined.Content.ReadFromJsonAsync<JsonElement>()).GetProperty("roles").EnumerateArray()
+            .Single(r => r.GetProperty("title").GetString() == title).GetProperty("id").GetGuid();
+    }
+
     private async Task<Guid> OpenElectionAsync(Guid groupId, string positionTitle)
     {
         var now = DateTimeOffset.UtcNow;
         var nominationEnd = now.AddMilliseconds(1500);
+        var roleId = await RoleIdAsync(groupId, positionTitle);
 
         var response = await Admin().PostAsJsonAsync(
             $"/v1/volunteer-groups/groups/{groupId}/elections",
             new
             {
-                positionTitle,
+                roleId = roleId.ToString(),
                 nominationStartAt = now,
                 nominationEndAt = nominationEnd,
                 votingStartAt = nominationEnd,
@@ -168,16 +192,19 @@ public sealed class PresidentlessGroupTests(VolunteerGroupsApiFactory factory)
         (await Admin().GetAsync($"/v1/volunteer-groups/groups/{groupId}/applications"))
             .StatusCode.Should().Be(HttpStatusCode.NotFound);
 
-        // And an election, including for President, is now theirs to open.
-        (await OpenElectionAsync(groupId, "President")).Should().Be(Guid.Empty);
+        // Roles and elections are not: an administrator runs those with or
+        // without a president (changed 2026-09-26).
+        (await OpenElectionAsync(groupId, "Secretary")).Should().NotBe(Guid.Empty);
     }
 
     [Fact]
-    public async Task An_admin_may_run_only_the_president_election_while_there_is_no_president()
+    public async Task An_admin_runs_any_role_s_election_while_there_is_no_president()
     {
+        // Before, only the President election - which left every other role
+        // in a president-less group with no way to be filled.
         var groupId = await CreateGroupWithoutPresidentAsync();
 
-        (await OpenElectionAsync(groupId, "Secretary")).Should().Be(Guid.Empty);
+        (await OpenElectionAsync(groupId, "Secretary")).Should().NotBe(Guid.Empty);
         (await OpenElectionAsync(groupId, "president")).Should().NotBe(Guid.Empty);
     }
 
@@ -213,7 +240,7 @@ public sealed class PresidentlessGroupTests(VolunteerGroupsApiFactory factory)
             .StatusCode.Should().Be(HttpStatusCode.OK);
 
         (await Member(voter).PostAsJsonAsync(
-                $"/v1/volunteer-groups/elections/{electionId}/votes", new { candidateId }))
+                $"/v1/volunteer-groups/elections/{electionId}/votes", new { candidateIds = new[] { candidateId } }))
             .StatusCode.Should().Be(HttpStatusCode.OK);
 
         await Admin().PostAsJsonAsync(

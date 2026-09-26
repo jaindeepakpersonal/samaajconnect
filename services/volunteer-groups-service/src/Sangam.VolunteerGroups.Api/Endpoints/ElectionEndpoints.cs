@@ -45,7 +45,7 @@ public static class ElectionEndpoints
             {
                 var command = new OpenElectionCommand(
                     groupId,
-                    request.PositionTitle,
+                    request.RoleId,
                     request.NominationStartAt,
                     request.NominationEndAt,
                     request.VotingStartAt,
@@ -58,7 +58,7 @@ public static class ElectionEndpoints
             })
             .RequireAuthorization()
             .WithName("OpenElection")
-            .WithSummary("The president sets an election up for a position. It stays a draft until opened.")
+            .WithSummary("The president or an administrator sets an election up for one of the group's roles. It stays a draft until opened.")
             .Produces<ElectionResponse>(StatusCodes.Status201Created)
             .ProducesValidationProblem()
             .ProducesProblem(StatusCodes.Status401Unauthorized)
@@ -88,7 +88,7 @@ public static class ElectionEndpoints
             {
                 var command = new UpdateElectionCommand(
                     id,
-                    request.PositionTitle,
+                    request.RoleId,
                     request.NominationStartAt,
                     request.NominationEndAt,
                     request.VotingStartAt,
@@ -178,15 +178,16 @@ public static class ElectionEndpoints
                 CancellationToken cancellationToken) =>
             {
                 var result = await sender.Send(
-                    new CastVoteCommand(id, request.CandidateId), cancellationToken);
+                    new CastVoteCommand(id, request.CandidateIds), cancellationToken);
 
                 return result.ToApiResult();
             })
             .RequireAuthorization()
             .WithName("CastVote")
             .WithSummary(
-                "Cast this member's one vote. Voting twice is reported as success with "
-                + "accepted=false; the unique index, not this endpoint, is what enforces it.")
+                "Cast this member's one ballot: up to as many candidates as the role has seats. "
+                + "Voting twice is reported as success with accepted=false; the unique indexes, "
+                + "not this endpoint, are what enforce it.")
             .Produces<CastVoteResponse>()
             .ProducesValidationProblem()
             .ProducesProblem(StatusCodes.Status401Unauthorized)
@@ -204,7 +205,7 @@ public static class ElectionEndpoints
             })
             .RequireAuthorization()
             .WithName("PublishElectionResults")
-            .WithSummary("Pick the winner, freeze it, and install them in the position. Only from Closed.")
+            .WithSummary("Pick as many winners as the role has seats, freeze them, and install them in the role. Only from Closed.")
             .Produces<ElectionResponse>()
             .ProducesValidationProblem()
             .ProducesProblem(StatusCodes.Status401Unauthorized)
@@ -215,7 +216,7 @@ public static class ElectionEndpoints
     }
 
     public sealed record OpenElectionRequest(
-        string PositionTitle,
+        string RoleId,
         DateTimeOffset NominationStartAt,
         DateTimeOffset NominationEndAt,
         DateTimeOffset VotingStartAt,
@@ -233,5 +234,6 @@ public static class ElectionEndpoints
     /// </summary>
     public sealed record DecideRequest(bool Approve);
 
-    public sealed record VoteRequest(Guid CandidateId);
+    /// <summary>Up to as many candidates as the role has seats - one final ballot.</summary>
+    public sealed record VoteRequest(IReadOnlyList<Guid> CandidateIds);
 }

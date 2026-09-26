@@ -37,13 +37,19 @@ public sealed record GroupElectionClosedDomainEvent(
     public string Topic => "volunteer-groups.election.closed.v1";
 }
 
-/// <summary>Names the winner - what a published election actually announces.</summary>
+/// <summary>Names the winners - what a published election actually announces.</summary>
+/// <remarks>
+/// A role may have several seats, so <c>WinnerMemberIds</c> carries all of
+/// them. <c>WinnerMemberId</c> stays, as the first, so a v1 consumer reading
+/// it still gets what it always did.
+/// </remarks>
 public sealed record GroupElectionResultsPublishedDomainEvent(
     Guid ElectionId,
     Guid TenantId,
     Guid GroupId,
     Guid WinnerMemberId,
-    DateTimeOffset OccurredAt) : IDomainEvent
+    DateTimeOffset OccurredAt,
+    IReadOnlyList<Guid>? WinnerMemberIds = null) : IDomainEvent
 {
     public string Topic => "volunteer-groups.election.results-published.v1";
 }

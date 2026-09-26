@@ -69,7 +69,7 @@ public sealed class PublishElectionResultsCommandHandler(
 
         var group = await groups.GetByIdAsync(election.GroupId, cancellationToken);
 
-        if (group is null || !group.CanRunElection(actorId, currentUser.Administers(areaScope, group), election.PositionTitle))
+        if (group is null || !group.CanRunElections(actorId, currentUser.Administers(areaScope, group)))
         {
             return Result.Failure<ElectionResponse>(
                 Error.NotFound("Election.NotFound", "No such election in this Samaaj."));
@@ -81,7 +81,7 @@ public sealed class PublishElectionResultsCommandHandler(
         {
             // Already announced. The stored winner is the answer, not a
             // fresh computation - the whole point of freezing it.
-            return Result.Success(election.ToResponse(now, myVoteCandidateId: null));
+            return Result.Success(election.ToResponse(now, myVoteCandidateIds: []));
         }
 
         if (election.Status != ElectionStatus.Closed)
@@ -93,34 +93,39 @@ public sealed class PublishElectionResultsCommandHandler(
         }
 
         var tally = await votes.TallyAsync(election.Id, cancellationToken);
-        var winner = election.WinnerBy(tally);
+        var winners = election.WinnersBy(tally).Select(c => c.MemberId).ToList();
 
-        if (winner is null)
+        if (winners.Count == 0)
         {
             return Result.Failure<ElectionResponse>(Error.Conflict(
                 "Election.NoCandidates", "Nobody was on the ballot, so there is no winner to announce."));
         }
 
-        if (!election.Publish(winner.MemberId, now))
+        // Installed before the election is frozen, so a refusal changes
+        // neither. A winner who left the group since voting, or the president
+        // winning another role, is not something the ballot should have
+        // allowed - ElectRole does not trust that promise from the other side
+        // of the call, and refusing here is better than a result announced and
+        // not applied.
+        if (!group.ElectRole(election.RoleId, winners, now))
+        {
+            return Result.Failure<ElectionResponse>(Error.Conflict(
+                "Election.CannotInstall",
+                "A winner is no longer in this group, or the role is gone, so the result cannot be installed."));
+        }
+
+        if (!election.Publish(winners, now))
         {
             return Result.Failure<ElectionResponse>(Error.Conflict(
                 "Election.NotClosed", "Close the election before publishing its result."));
         }
 
-        // The election has already refused this if the winner somehow left
-        // the group between voting and publishing is not possible here since
-        // Nominate/CastVote both check membership - but ElectPosition does
-        // not trust that promise from the other side of the call, and
-        // returning false would mean a data inconsistency worth knowing
-        // about rather than silently swallowed.
-        group.ElectPosition(election.PositionTitle, winner.MemberId, now);
-
         await unitOfWork.SaveChangesAsync(cancellationToken);
 
         logger.LogInformation(
-            "Election {ElectionId} published for group {GroupId}: {WinnerMemberId} elected {PositionTitle}",
-            election.Id, election.GroupId, winner.MemberId, election.PositionTitle);
+            "Election {ElectionId} published for group {GroupId}: {WinnerCount} elected {PositionTitle}",
+            election.Id, election.GroupId, winners.Count, election.PositionTitle);
 
-        return Result.Success(election.ToResponse(now, myVoteCandidateId: null));
+        return Result.Success(election.ToResponse(now, myVoteCandidateIds: []));
     }
 }

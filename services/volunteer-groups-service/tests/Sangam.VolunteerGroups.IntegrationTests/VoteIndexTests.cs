@@ -16,9 +16,11 @@ namespace Sangam.VolunteerGroups.IntegrationTests;
 /// </summary>
 /// <remarks>
 /// These talk to the database directly, past the handler and past the
-/// repository, so that only the unique index on
-/// <c>(ElectionId, VoterMemberId)</c> being present and unique can make them
-/// pass. Delete that index and these fail; that is the point of them.
+/// repository, so that only the two unique indexes on <c>election_votes</c>
+/// being present and unique can make them pass. Delete either and these fail;
+/// that is the point of them. A ballot's picks are numbered from 1, so
+/// <c>(election, voter, choice)</c> is what refuses a second ballot, and
+/// <c>(election, voter, candidate)</c> is what refuses one candidate picked twice.
 /// </remarks>
 public sealed class VoteIndexTests(VolunteerGroupsApiFactory factory)
     : IClassFixture<VolunteerGroupsApiFactory>, IAsyncLifetime
@@ -27,8 +29,10 @@ public sealed class VoteIndexTests(VolunteerGroupsApiFactory factory)
 
     public Task DisposeAsync() => Task.CompletedTask;
 
-    [Fact]
-    public async Task The_votes_index_exists_and_is_unique()
+    [Theory]
+    [InlineData("ix_election_votes_election_id_voter_member_id_choice")]
+    [InlineData("ix_election_votes_election_id_voter_member_id_candidate_id")]
+    public async Task The_votes_indexes_exist_and_are_unique(string indexName)
     {
         var definition = await factory.WithDbContextAsync(async db =>
         {
@@ -39,13 +43,12 @@ public sealed class VoteIndexTests(VolunteerGroupsApiFactory factory)
             command.CommandText =
                 "SELECT indexdef FROM pg_indexes "
                 + "WHERE tablename = 'election_votes' "
-                + "AND indexname = 'ix_election_votes_election_id_voter_member_id';";
+                + $"AND indexname = '{indexName}';";
 
             return (string?)await command.ExecuteScalarAsync();
         });
 
-        definition.Should().NotBeNull(
-            "the index on (election_id, voter_member_id) is what prevents double voting");
+        definition.Should().NotBeNull($"{indexName} is what prevents double voting");
 
         definition.Should().StartWith("CREATE UNIQUE INDEX",
             "a non-unique index on those columns would make the votes query fast "
@@ -53,15 +56,48 @@ public sealed class VoteIndexTests(VolunteerGroupsApiFactory factory)
     }
 
     [Fact]
-    public async Task A_second_vote_from_one_member_is_refused_by_the_database()
+    public async Task One_ballot_may_pick_several_candidates()
     {
         var electionId = Guid.NewGuid();
         var voterId = Guid.NewGuid();
         var now = DateTimeOffset.UtcNow;
 
-        await InsertAsync(new Vote(electionId, Guid.NewGuid(), voterId, now));
+        await InsertAsync(
+            new Vote(electionId, Guid.NewGuid(), voterId, 1, now),
+            new Vote(electionId, Guid.NewGuid(), voterId, 2, now));
 
-        var second = async () => await InsertAsync(new Vote(electionId, Guid.NewGuid(), voterId, now));
+        (await factory.WithDbContextAsync(db => db.Votes.CountAsync(v => v.ElectionId == electionId)))
+            .Should().Be(2);
+    }
+
+    [Fact]
+    public async Task One_candidate_picked_twice_is_refused_by_the_database()
+    {
+        var electionId = Guid.NewGuid();
+        var voterId = Guid.NewGuid();
+        var candidateId = Guid.NewGuid();
+        var now = DateTimeOffset.UtcNow;
+
+        var twice = async () => await InsertAsync(
+            new Vote(electionId, candidateId, voterId, 1, now),
+            new Vote(electionId, candidateId, voterId, 2, now));
+
+        (await twice.Should().ThrowAsync<DbUpdateException>())
+            .Which.InnerException.Should().BeOfType<PostgresException>()
+            .Which.SqlState.Should().Be(PostgresErrorCodes.UniqueViolation);
+    }
+
+    [Fact]
+    public async Task A_second_ballot_from_one_member_is_refused_by_the_database()
+    {
+        var electionId = Guid.NewGuid();
+        var voterId = Guid.NewGuid();
+        var now = DateTimeOffset.UtcNow;
+
+        await InsertAsync(new Vote(electionId, Guid.NewGuid(), voterId, 1, now));
+
+        // A second ballot for somebody else still starts at choice 1.
+        var second = async () => await InsertAsync(new Vote(electionId, Guid.NewGuid(), voterId, 1, now));
 
         var thrown = await second.Should().ThrowAsync<DbUpdateException>(
             "the index, not the application, is what refuses it");
@@ -78,12 +114,12 @@ public sealed class VoteIndexTests(VolunteerGroupsApiFactory factory)
         votes.Should().Be(1);
     }
 
-    private async Task InsertAsync(Vote vote)
+    private async Task InsertAsync(params Vote[] ballot)
     {
         await using var scope = factory.Services.CreateAsyncScope();
         var db = scope.ServiceProvider.GetRequiredService<VolunteerGroupsDbContext>();
 
-        db.Votes.Add(vote);
+        db.Votes.AddRange(ballot);
 
         await db.SaveChangesAsync();
     }

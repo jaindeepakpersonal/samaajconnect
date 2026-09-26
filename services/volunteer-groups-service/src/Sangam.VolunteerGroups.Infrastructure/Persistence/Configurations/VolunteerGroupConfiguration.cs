@@ -37,10 +37,16 @@ public sealed class VolunteerGroupConfiguration : IEntityTypeConfiguration<Volun
             .HasForeignKey(m => m.GroupId)
             .OnDelete(DeleteBehavior.Cascade);
 
+        builder.HasMany(g => g.Roles)
+            .WithOne()
+            .HasForeignKey(r => r.GroupId)
+            .OnDelete(DeleteBehavior.Cascade);
+
         foreach (var navigation in new[]
                  {
                      nameof(VolunteerGroup.Applications),
                      nameof(VolunteerGroup.Members),
+                     nameof(VolunteerGroup.Roles),
                  })
         {
             builder.Metadata.FindNavigation(navigation)!
@@ -75,11 +81,36 @@ public sealed class GroupMemberConfiguration : IEntityTypeConfiguration<GroupMem
         builder.ToTable("group_members");
         builder.HasKey(m => m.Id);
         builder.Property(m => m.Id).ValueGeneratedNever();
-        builder.Property(m => m.RolePosition).HasMaxLength(100);
-
         builder.HasIndex(m => new { m.GroupId, m.MemberId }).IsUnique();
 
         // "Which groups am I in?" - the member-portal's own view of this.
         builder.HasIndex(m => m.MemberId);
+
+        // Every member holds one of their own group's roles. A role cannot be
+        // removed while anybody holds it - the aggregate refuses first; this
+        // is what holds if something forgets to ask.
+        builder.HasOne<GroupRole>()
+            .WithMany()
+            .HasForeignKey(m => m.RoleId)
+            .OnDelete(DeleteBehavior.Restrict);
+    }
+}
+
+public sealed class GroupRoleConfiguration : IEntityTypeConfiguration<GroupRole>
+{
+    public void Configure(EntityTypeBuilder<GroupRole> builder)
+    {
+        builder.ToTable("group_roles");
+        builder.HasKey(r => r.Id);
+        builder.Property(r => r.Id).ValueGeneratedNever();
+        builder.Property(r => r.Title).IsRequired().HasMaxLength(100);
+        builder.Property(r => r.Kind).HasConversion<string>().HasMaxLength(20);
+
+        // One role per title per group. The aggregate compares titles without
+        // regard to case; this is the exact-match floor under that.
+        builder.HasIndex(r => new { r.GroupId, r.Title }).IsUnique();
+
+        builder.Ignore(r => r.IsElected);
+        builder.Ignore(r => r.IsEditable);
     }
 }

@@ -24,6 +24,7 @@ public sealed class VolunteerGroup : AggregateRoot, ITenantScopedEntity
 {
     private readonly List<GroupApplication> _applications = [];
     private readonly List<GroupMember> _members = [];
+    private readonly List<GroupRole> _roles = [];
 
     public Guid Id { get; private set; }
     public Guid TenantId { get; private set; }
@@ -41,8 +42,11 @@ public sealed class VolunteerGroup : AggregateRoot, ITenantScopedEntity
     /// </summary>
     public Guid? LocalityId { get; private set; }
 
-    /// <summary>The title a president holds, and the position whose election installs one.</summary>
+    /// <summary>The title of the President role every group has.</summary>
     public const string PresidentPosition = "President";
+
+    /// <summary>The title of the Volunteer role every member holds until elected to another.</summary>
+    public const string VolunteerRoleTitle = "Volunteer";
 
     /// <summary>
     /// Null until one is set - by a Samaaj admin choosing an existing member,
@@ -57,6 +61,16 @@ public sealed class VolunteerGroup : AggregateRoot, ITenantScopedEntity
 
     public IReadOnlyCollection<GroupApplication> Applications => _applications.AsReadOnly();
     public IReadOnlyCollection<GroupMember> Members => _members.AsReadOnly();
+    public IReadOnlyCollection<GroupRole> Roles => _roles.AsReadOnly();
+
+    /// <summary>The role every member holds until elected to another.</summary>
+    public GroupRole VolunteerRole => _roles.Single(r => r.Kind == GroupRoleKind.Volunteer);
+
+    public GroupRole PresidentRole => _roles.Single(r => r.Kind == GroupRoleKind.President);
+
+    public GroupRole? FindRole(Guid roleId) => _roles.FirstOrDefault(r => r.Id == roleId);
+
+    public int HoldersOf(Guid roleId) => _members.Count(m => m.RoleId == roleId);
 
     private VolunteerGroup() { }   // EF Core
 
@@ -92,12 +106,16 @@ public sealed class VolunteerGroup : AggregateRoot, ITenantScopedEntity
             CreatedAt = createdAt,
         };
 
+        // The two roles every group has, and neither can be edited or removed.
+        group._roles.Add(new GroupRole(group.Id, VolunteerRoleTitle, GroupRoleKind.Volunteer, null, createdAt));
+        group._roles.Add(new GroupRole(group.Id, PresidentPosition, GroupRoleKind.President, 1, createdAt));
+
         // A president, when there is one, is a member of their own group from
         // the start and needs no application to be one. A group created without
         // one starts with no members at all.
         if (presidentMemberId is { } president)
         {
-            group._members.Add(new GroupMember(group.Id, president, PresidentPosition, createdAt));
+            group._members.Add(new GroupMember(group.Id, president, group.PresidentRole.Id, createdAt));
         }
 
         group.Raise(new GroupCreatedDomainEvent(
@@ -175,9 +193,9 @@ public sealed class VolunteerGroup : AggregateRoot, ITenantScopedEntity
 
     /// <summary>
     /// The president's decision. Accepting also makes the applicant a member,
-    /// with no position - positions are given afterwards, either directly via
-    /// <see cref="AssignRolePosition"/> or through an election's own
-    /// <see cref="ElectPosition"/>. Returns false when there was no pending
+    /// in the Volunteer role - another is given afterwards, either directly via
+    /// <see cref="AssignRole"/> or through an election's own
+    /// <see cref="ElectRole"/>. Returns false when there was no pending
     /// application by that id.
     /// </summary>
     public bool DecideApplication(
@@ -198,7 +216,7 @@ public sealed class VolunteerGroup : AggregateRoot, ITenantScopedEntity
 
         if (accepted && !HasMember(application.MemberId))
         {
-            _members.Add(new GroupMember(Id, application.MemberId, rolePosition: null, now));
+            _members.Add(new GroupMember(Id, application.MemberId, VolunteerRole.Id, now));
         }
 
         Raise(new GroupApplicationDecidedDomainEvent(
@@ -207,80 +225,214 @@ public sealed class VolunteerGroup : AggregateRoot, ITenantScopedEntity
         return true;
     }
 
+    // ---- Volunteer roles ---------------------------------------------------
+
     /// <summary>
-    /// Gives a member a position within the group - Secretary, Coordinator.
-    /// Returns false when they are not in it.
+    /// Defines a new role with the seats an election for it will fill.
+    /// Refused when another role in this group already has the title - two
+    /// "Secretary" roles would make every member's role ambiguous.
+    /// </summary>
+    public RoleRefusal DefineRole(
+        string title, int seats, Guid changedBy, DateTimeOffset now, out GroupRole? role)
+    {
+        role = null;
+
+        if (TitleTaken(title, exceptRoleId: null))
+        {
+            return RoleRefusal.DuplicateTitle;
+        }
+
+        role = new GroupRole(Id, title, GroupRoleKind.Elected, seats, now);
+        _roles.Add(role);
+
+        Raise(new GroupRoleDefinedDomainEvent(Id, TenantId, role.Id, changedBy, now));
+
+        return RoleRefusal.None;
+    }
+
+    /// <summary>
+    /// Renames a role or changes its seats. Neither built-in role can be, and
+    /// seats cannot drop below how many hold it now - that would leave the
+    /// group with more holders than the role allows and nobody chosen to go.
+    /// </summary>
+    public RoleRefusal UpdateRole(Guid roleId, string title, int seats, Guid changedBy, DateTimeOffset now)
+    {
+        var role = FindRole(roleId);
+
+        if (role is null)
+        {
+            return RoleRefusal.NotFound;
+        }
+
+        if (!role.IsEditable)
+        {
+            return RoleRefusal.NotEditable;
+        }
+
+        if (TitleTaken(title, exceptRoleId: roleId))
+        {
+            return RoleRefusal.DuplicateTitle;
+        }
+
+        if (seats < HoldersOf(roleId))
+        {
+            return RoleRefusal.SeatsBelowHolders;
+        }
+
+        role.Change(title, seats);
+
+        Raise(new GroupRoleUpdatedDomainEvent(Id, TenantId, roleId, changedBy, now));
+
+        return RoleRefusal.None;
+    }
+
+    /// <summary>
+    /// Removes a role nobody holds. Refused while anybody does: they would be
+    /// left holding nothing, and choosing where they go is a decision, not a
+    /// side effect.
+    /// </summary>
+    public RoleRefusal RemoveRole(Guid roleId, Guid changedBy, DateTimeOffset now)
+    {
+        var role = FindRole(roleId);
+
+        if (role is null)
+        {
+            return RoleRefusal.NotFound;
+        }
+
+        if (!role.IsEditable)
+        {
+            return RoleRefusal.NotEditable;
+        }
+
+        if (HoldersOf(roleId) > 0)
+        {
+            return RoleRefusal.HasHolders;
+        }
+
+        _roles.Remove(role);
+
+        Raise(new GroupRoleRemovedDomainEvent(Id, TenantId, roleId, changedBy, now));
+
+        return RoleRefusal.None;
+    }
+
+    /// <summary>
+    /// Moves a member into a role directly - the manual override beside an
+    /// election, and how somebody is put back to Volunteer.
     /// </summary>
     /// <remarks>
-    /// A free-text label, not a platform role. What someone is called inside a
-    /// Seva group grants nothing anywhere and should not need a deployment to
-    /// add; the platform roles in <c>AuthorizationCatalog</c> are what actually
-    /// gate, and they are deliberately a closed list.
+    /// The President role moves only with the presidency itself, by
+    /// <see cref="ChangePresident"/> or a President election, in both
+    /// directions: the president cannot be assigned another role, and nobody
+    /// can be assigned President. Otherwise the title and
+    /// <see cref="PresidentMemberId"/> would disagree about who runs the group.
     /// </remarks>
-    public bool AssignRolePosition(Guid memberId, string? rolePosition, DateTimeOffset now)
+    public RoleRefusal AssignRole(Guid memberId, Guid roleId, DateTimeOffset now)
     {
         var member = _members.FirstOrDefault(m => m.MemberId == memberId);
 
         if (member is null)
         {
-            return false;
+            return RoleRefusal.NotAMember;
         }
 
-        member.SetRolePosition(Normalize(rolePosition));
+        var role = FindRole(roleId);
 
-        Raise(new GroupRolePositionAssignedDomainEvent(
-            Id, TenantId, memberId, member.RolePosition, now));
+        if (role is null)
+        {
+            return RoleRefusal.NotFound;
+        }
 
-        return true;
+        if (IsPresident(memberId) || role.Kind == GroupRoleKind.President)
+        {
+            return RoleRefusal.PresidencyIsSeparate;
+        }
+
+        if (member.RoleId == roleId)
+        {
+            return RoleRefusal.None;
+        }
+
+        if (role.Seats is { } seats && HoldersOf(roleId) >= seats)
+        {
+            return RoleRefusal.RoleFull;
+        }
+
+        member.SetRole(roleId);
+
+        Raise(new GroupRolePositionAssignedDomainEvent(Id, TenantId, memberId, role.Title, now, roleId));
+
+        return RoleRefusal.None;
     }
 
     /// <summary>
-    /// Installs the winner of a published election in the position it was run
-    /// for, and clears that exact title from anyone else currently holding it.
-    /// Returns false when the winner is no longer a member of this group -
-    /// which the election itself should already have prevented, but this
-    /// method does not trust that promise from the other side of a
-    /// cross-aggregate call.
+    /// Installs the winners of a published election in the role it was run
+    /// for. Whoever held that role and did not win goes back to Volunteer.
+    /// Returns false when a winner is no longer a member of this group, or is
+    /// the president being elected to another role - which the election should
+    /// already have prevented, but this method does not trust that promise
+    /// from the other side of a cross-aggregate call, and changes nothing.
     /// </summary>
     /// <remarks>
     /// Called only from <c>PublishElectionResultsCommand</c>, after
-    /// <c>GroupElection</c> has already frozen its own winner. A published
-    /// election is what actually installs someone in a position - not merely
-    /// an announcement - so this is the one place besides
-    /// <see cref="AssignRolePosition"/> that ever changes a
-    /// <see cref="GroupMember.RolePosition"/>.
+    /// <c>GroupElection</c> has frozen its winners. A published election is
+    /// what actually installs people in a role - not merely an announcement.
     /// </remarks>
-    public bool ElectPosition(string positionTitle, Guid winnerMemberId, DateTimeOffset now)
+    public bool ElectRole(Guid roleId, IReadOnlyList<Guid> winnerMemberIds, DateTimeOffset now)
     {
-        var winner = _members.FirstOrDefault(m => m.MemberId == winnerMemberId);
+        var role = FindRole(roleId);
 
-        if (winner is null)
+        if (role is null || !role.IsElected || winnerMemberIds.Count == 0)
         {
             return false;
         }
 
-        // Electing the "President" installs a real president. Before, only the
-        // label moved: the winner would have read "President" while
-        // IsPresident stayed false for them, and the previous president kept
-        // every power.
-        if (string.Equals(positionTitle.Trim(), PresidentPosition, StringComparison.OrdinalIgnoreCase))
+        // Electing the President installs a real president. Only the label
+        // moving would leave the winner reading "President" while the previous
+        // president kept every power.
+        if (role.Kind == GroupRoleKind.President)
         {
-            return IsPresident(winnerMemberId) || ChangePresident(winnerMemberId, now);
+            var winner = winnerMemberIds[0];
+
+            return HasMember(winner) && (IsPresident(winner) || ChangePresident(winner, now));
         }
 
-        foreach (var previousHolder in _members.Where(m =>
-            m.MemberId != winnerMemberId
-            && string.Equals(m.RolePosition, positionTitle, StringComparison.Ordinal)))
+        var winners = new List<GroupMember>(winnerMemberIds.Count);
+
+        foreach (var winnerId in winnerMemberIds)
         {
-            previousHolder.SetRolePosition(null);
+            var member = _members.FirstOrDefault(m => m.MemberId == winnerId);
+
+            if (member is null || IsPresident(winnerId))
+            {
+                return false;
+            }
+
+            winners.Add(member);
         }
 
-        winner.SetRolePosition(positionTitle);
+        foreach (var outgoing in _members.Where(m => m.RoleId == roleId && !winnerMemberIds.Contains(m.MemberId)))
+        {
+            outgoing.SetRole(VolunteerRole.Id);
 
-        Raise(new GroupRolePositionAssignedDomainEvent(Id, TenantId, winnerMemberId, positionTitle, now));
+            Raise(new GroupRolePositionAssignedDomainEvent(
+                Id, TenantId, outgoing.MemberId, VolunteerRole.Title, now, VolunteerRole.Id));
+        }
+
+        foreach (var winner in winners.Where(w => w.RoleId != roleId))
+        {
+            winner.SetRole(roleId);
+
+            Raise(new GroupRolePositionAssignedDomainEvent(Id, TenantId, winner.MemberId, role.Title, now, roleId));
+        }
 
         return true;
     }
+
+    private bool TitleTaken(string title, Guid? exceptRoleId) =>
+        _roles.Any(r => r.Id != exceptRoleId
+            && string.Equals(r.Title, title.Trim(), StringComparison.OrdinalIgnoreCase));
 
     /// <summary>
     /// Removes a member. Returns false when they were not in the group, or when
@@ -328,19 +480,19 @@ public sealed class VolunteerGroup : AggregateRoot, ITenantScopedEntity
 
         if (member is null)
         {
-            _members.Add(new GroupMember(Id, newPresidentMemberId, PresidentPosition, now));
+            _members.Add(new GroupMember(Id, newPresidentMemberId, PresidentRole.Id, now));
         }
         else
         {
-            member.SetRolePosition(PresidentPosition);
+            member.SetRole(PresidentRole.Id);
         }
 
-        // The outgoing president stays in the group as an ordinary member.
-        // Removing them would lose the group its most experienced volunteer as
-        // a side effect of an administrative change.
+        // The outgoing president stays in the group, as a Volunteer. Removing
+        // them would lose the group its most experienced volunteer as a side
+        // effect of an administrative change.
         if (previous is { } outgoing)
         {
-            _members.FirstOrDefault(m => m.MemberId == outgoing)?.SetRolePosition(null);
+            _members.FirstOrDefault(m => m.MemberId == outgoing)?.SetRole(VolunteerRole.Id);
         }
 
         Raise(new GroupPresidentChangedDomainEvent(
@@ -371,6 +523,24 @@ public sealed class VolunteerGroup : AggregateRoot, ITenantScopedEntity
 
     private static string? Normalize(string? value) =>
         string.IsNullOrWhiteSpace(value) ? null : value.Trim();
+}
+
+/// <summary>Why a role change was refused. <see cref="None"/> is success.</summary>
+public enum RoleRefusal
+{
+    None = 0,
+    NotFound,
+    NotAMember,
+    DuplicateTitle,
+
+    /// <summary>A built-in role - Volunteer or President - which cannot be renamed, resized or removed.</summary>
+    NotEditable,
+    SeatsBelowHolders,
+    HasHolders,
+    RoleFull,
+
+    /// <summary>The President role moves only with the presidency itself.</summary>
+    PresidencyIsSeparate,
 }
 
 public enum GroupStatus

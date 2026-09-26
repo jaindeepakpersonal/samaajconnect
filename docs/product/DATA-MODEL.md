@@ -155,7 +155,21 @@ PresidentMemberId (nullable - set later by an admin or a "President" election), 
 **GroupApplication** — `Id, GroupId, MemberId, Status
 (Pending/Accepted/Rejected), DecidedBy, DecidedAt`
 
-**GroupMember** — `Id, GroupId, MemberId, RolePosition, JoinedAt`
+**GroupMember** — `Id, GroupId, MemberId, RoleId, JoinedAt`. Every member
+holds exactly one `GroupRole`; Volunteer until elected to another.
+
+**GroupRole** — `Id, GroupId, Title, Kind (Volunteer/President/Elected),
+Seats (null for Volunteer), CreatedAt`. Volunteer and President are built into
+every group; the group defines its Elected roles. Title unique per group.
+
+**GroupElection** — `Id, TenantId, GroupId, RoleId, PositionTitle (the role's
+title when opened), Seats (frozen from the role), NominationStartAt,
+NominationEndAt, VotingStartAt, VotingEndAt, Status, WinnerMemberIds (uuid[],
+ranked), PublishedAt, CreatedAt`. Owns `ElectionCandidate`.
+
+**Vote** — `Id, ElectionId, CandidateId, VoterMemberId, Choice, CreatedAt`. A
+ballot is up to `Seats` picks numbered from 1; unique on (election, voter,
+choice) and (election, voter, candidate).
 
 ## 6. Events
 

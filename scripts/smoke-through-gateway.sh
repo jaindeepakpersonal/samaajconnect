@@ -1967,10 +1967,20 @@ check "deciding the same application twice is refused" 404 \
      -H 'Content-Type: application/json' -H "Authorization: Bearer $MEMBER_TOKEN" \
      -d '{"accept":false}')"
 
-check "the president assigns a position" 200 \
-  "$(status -X PUT "$GATEWAY/v1/volunteer-groups/groups/$GROUP_ID/members/$CHILD_USER_ID/position" \
+# A group's volunteer roles are its own: Volunteer and President come built in,
+# and anything else is defined with the seats an election for it fills.
+ROLES=$(curl -s -X POST "$GATEWAY/v1/volunteer-groups/groups/$GROUP_ID/roles" \
+  -H 'Content-Type: application/json' -H "Authorization: Bearer $MEMBER_TOKEN" \
+  -d '{"title":"Secretary","seats":1}')
+
+SECRETARY_ROLE_ID=$(printf '%s' "$ROLES" | sed -n 's/.*"id":"\([^"]*\)","title":"Secretary".*/\1/p')
+
+require_id secretary_role_id "$SECRETARY_ROLE_ID"
+
+check "the president assigns a role" 200 \
+  "$(status -X PUT "$GATEWAY/v1/volunteer-groups/groups/$GROUP_ID/members/$CHILD_USER_ID/role" \
      -H 'Content-Type: application/json' -H "Authorization: Bearer $MEMBER_TOKEN" \
-     -d '{"rolePosition":"Secretary"}')"
+     -d "{\"roleId\":\"$SECRETARY_ROLE_ID\"}")"
 
 # ---- An election, end to end -----------------------------------------------
 #
@@ -1986,7 +1996,7 @@ VOTING_END_ISO=$(date -u -d '+10 minutes' +"%Y-%m-%dT%H:%M:%S.000Z" 2>/dev/null 
 
 ELECTION=$(curl -s -X POST "$GATEWAY/v1/volunteer-groups/groups/$GROUP_ID/elections" \
   -H 'Content-Type: application/json' -H "Authorization: Bearer $MEMBER_TOKEN" \
-  -d "{\"positionTitle\":\"Secretary\",\"nominationStartAt\":\"$NOW_ISO\",\"nominationEndAt\":\"$NOMINATION_END_ISO\",\"votingStartAt\":\"$NOMINATION_END_ISO\",\"votingEndAt\":\"$VOTING_END_ISO\"}")
+  -d "{\"roleId\":\"$SECRETARY_ROLE_ID\",\"nominationStartAt\":\"$NOW_ISO\",\"nominationEndAt\":\"$NOMINATION_END_ISO\",\"votingStartAt\":\"$NOMINATION_END_ISO\",\"votingEndAt\":\"$VOTING_END_ISO\"}")
 
 ELECTION_ID=$(printf '%s' "$ELECTION" | json_field id)
 
@@ -2034,7 +2044,7 @@ check "voting opens" 200 \
 check "the president (a group member) casts a vote" 200 \
   "$(status -X POST "$GATEWAY/v1/volunteer-groups/elections/$ELECTION_ID/votes" \
      -H 'Content-Type: application/json' -H "Authorization: Bearer $MEMBER_TOKEN" \
-     -d "{\"candidateId\":\"$CANDIDATE_ID\"}")"
+     -d "{\"candidateIds\":[\"$CANDIDATE_ID\"]}")"
 
 check "voting is closed" 200 \
   "$(status -X POST "$GATEWAY/v1/volunteer-groups/elections/$ELECTION_ID/status" \
@@ -2044,7 +2054,7 @@ check "voting is closed" 200 \
 PUBLISHED=$(curl -s -X POST "$GATEWAY/v1/volunteer-groups/elections/$ELECTION_ID/publish" \
   -H 'Content-Type: application/json' -H "Authorization: Bearer $MEMBER_TOKEN" -d '{}')
 
-if printf '%s' "$PUBLISHED" | grep -q "\"winnerMemberId\":\"$CHILD_USER_ID\""; then
+if printf '%s' "$PUBLISHED" | grep -qF "\"winnerMemberIds\":[\"$CHILD_USER_ID\"]"; then
   echo "  ok    publishing names the winner"
   pass=$((pass + 1))
 else

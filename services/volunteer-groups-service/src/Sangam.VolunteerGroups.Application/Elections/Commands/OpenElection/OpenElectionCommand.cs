@@ -10,19 +10,21 @@ using Sangam.VolunteerGroups.Domain.Elections;
 namespace Sangam.VolunteerGroups.Application.Elections.Commands.OpenElection;
 
 /// <summary>
-/// Sets an election up for one position in one group. It stays a Draft until
-/// the president opens nominations.
+/// Sets an election up for one of the group's roles. It stays a Draft until
+/// nominations are opened. It fills as many seats as the role has.
 /// </summary>
 /// <remarks>
 /// VolunteerGroups.Lead is the outer gate, held by every member; being this
-/// group's president is the inner one, checked against the data here - the
-/// same shape every other president-only command in this service already
-/// uses.
+/// group's president or one of its administrators is the inner one, checked
+/// against the data here - see <c>GroupAuthority.CanRunElections</c>.
 /// </remarks>
 [RequiresPermission(PermissionKeys.VolunteerGroupsLead)]
 public sealed record OpenElectionCommand(
     Guid GroupId,
-    string PositionTitle,
+
+    // A string, not a Guid - a Guid-typed wire field crashes model binding
+    // with an unhandled 400 before validation runs. Validated, then parsed.
+    string RoleId,
     DateTimeOffset NominationStartAt,
     DateTimeOffset NominationEndAt,
     DateTimeOffset VotingStartAt,
@@ -33,7 +35,9 @@ public sealed class OpenElectionCommandValidator : AbstractValidator<OpenElectio
     public OpenElectionCommandValidator()
     {
         RuleFor(x => x.GroupId).NotEmpty();
-        RuleFor(x => x.PositionTitle).NotEmpty().MaximumLength(100);
+        RuleFor(x => x.RoleId)
+            .Must(v => Guid.TryParse(v, out var id) && id != Guid.Empty)
+            .WithMessage("Choose which role this election is for.");
 
         RuleFor(x => x.NominationEndAt)
             .GreaterThan(x => x.NominationStartAt)
@@ -83,18 +87,29 @@ public sealed class OpenElectionCommandHandler(
         // "Not found", the same answer every other president-only command in
         // this service gives a non-president - it does not confirm the group
         // exists to somebody who may not run it.
-        if (!group.CanRunElection(actorId, currentUser.Administers(areaScope, group), command.PositionTitle))
+        if (!group.CanRunElections(actorId, currentUser.Administers(areaScope, group)))
         {
             return Result.Failure<ElectionResponse>(
                 Error.NotFound("Group.NotFound", "No such group in this Samaaj."));
         }
 
+        var resolved = await ElectionRoles.ResolveAsync(
+            group, command.RoleId, elections, exceptElectionId: null, cancellationToken);
+
+        if (resolved.IsFailure)
+        {
+            return Result.Failure<ElectionResponse>(resolved.Error);
+        }
+
+        var role = resolved.Value;
         var now = clock.UtcNow;
 
         var election = GroupElection.Open(
             group.TenantId,
             group.Id,
-            command.PositionTitle,
+            role.Id,
+            role.Title,
+            role.Seats ?? 1,
             command.NominationStartAt,
             command.NominationEndAt,
             command.VotingStartAt,
@@ -105,6 +120,6 @@ public sealed class OpenElectionCommandHandler(
 
         await unitOfWork.SaveChangesAsync(cancellationToken);
 
-        return Result.Success(election.ToResponse(now, myVoteCandidateId: null));
+        return Result.Success(election.ToResponse(now, myVoteCandidateIds: []));
     }
 }

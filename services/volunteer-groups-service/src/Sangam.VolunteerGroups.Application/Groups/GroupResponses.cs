@@ -38,12 +38,34 @@ public sealed record GroupResponse(
     /// than re-deriving it from <c>IAmThePresident</c> and a role.
     /// </summary>
     bool ICanLead,
-    DateTimeOffset CreatedAt);
+    DateTimeOffset CreatedAt,
 
+    /// <summary>
+    /// Whether the asking member may define roles, assign them, and run
+    /// elections: the president, or an administrator of this group at any time.
+    /// </summary>
+    bool ICanRunElections);
+
+/// <remarks><c>RolePosition</c> is the role's title, kept under its old name for the screens that read it.</remarks>
 public sealed record GroupMemberResponse(
     Guid MemberId,
     string? RolePosition,
-    DateTimeOffset JoinedAt);
+    DateTimeOffset JoinedAt,
+    Guid RoleId);
+
+/// <summary>
+/// One of the group's volunteer roles. <c>Kind</c> is Volunteer, President or
+/// Elected; only Elected roles are <c>IsEditable</c>, and every role but
+/// Volunteer can have an election. <c>Seats</c> is null for Volunteer: no limit.
+/// </summary>
+public sealed record GroupRoleResponse(
+    Guid Id,
+    string Title,
+    string Kind,
+    int? Seats,
+    int HolderCount,
+    bool IsEditable,
+    bool IsElected);
 
 public sealed record GroupApplicationResponse(
     Guid Id,
@@ -61,4 +83,5 @@ public sealed record GroupApplicationResponse(
 /// </summary>
 public sealed record GroupDetailResponse(
     GroupResponse Group,
-    IReadOnlyList<GroupMemberResponse> Members);
+    IReadOnlyList<GroupMemberResponse> Members,
+    IReadOnlyList<GroupRoleResponse> Roles);

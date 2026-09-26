@@ -63,7 +63,7 @@ public sealed class MoveElectionCommandHandler(
 
         var group = await groups.GetByIdAsync(election.GroupId, cancellationToken);
 
-        if (group is null || !group.CanRunElection(actorId, currentUser.Administers(areaScope, group), election.PositionTitle))
+        if (group is null || !group.CanRunElections(actorId, currentUser.Administers(areaScope, group)))
         {
             return Result.Failure<ElectionResponse>(
                 Error.NotFound("Election.NotFound", "No such election in this Samaaj."));
@@ -89,6 +89,6 @@ public sealed class MoveElectionCommandHandler(
 
         await unitOfWork.SaveChangesAsync(cancellationToken);
 
-        return Result.Success(election.ToResponse(now, myVoteCandidateId: null));
+        return Result.Success(election.ToResponse(now, myVoteCandidateIds: []));
     }
 }

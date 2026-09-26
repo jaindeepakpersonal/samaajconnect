@@ -36,7 +36,7 @@ public sealed class ListElectionsQueryHandler(
             // ListCampaignsQuery already applies.
             var mine = await votes.FindForVoterAsync(election.Id, memberId, cancellationToken);
 
-            results.Add(election.ToResponse(now, mine?.CandidateId));
+            results.Add(election.ToResponse(now, [.. mine.Select(v => v.CandidateId)]));
         }
 
         return Result.Success<IReadOnlyList<ElectionResponse>>(
@@ -75,6 +75,6 @@ public sealed class GetElectionQueryHandler(
         var tally = await votes.TallyAsync(election.Id, cancellationToken);
         var mine = await votes.FindForVoterAsync(election.Id, memberId, cancellationToken);
 
-        return Result.Success(election.ToDetail(clock.UtcNow, mine?.CandidateId, tally));
+        return Result.Success(election.ToDetail(clock.UtcNow, [.. mine.Select(v => v.CandidateId)], tally));
     }
 }

@@ -24,6 +24,15 @@ public sealed class ElectionRepository(VolunteerGroupsDbContext dbContext) : IEl
             .OrderByDescending(e => e.CreatedAt)
             .ToListAsync(cancellationToken);
 
+    public Task<bool> HasUnpublishedForRoleAsync(
+        Guid groupId, Guid roleId, Guid? exceptElectionId, CancellationToken cancellationToken = default) =>
+        dbContext.Elections.AnyAsync(
+            e => e.GroupId == groupId
+                && e.RoleId == roleId
+                && e.Id != exceptElectionId
+                && e.Status != ElectionStatus.Published,
+            cancellationToken);
+
     public void Add(GroupElection election) => dbContext.Elections.Add(election);
 }
 
@@ -35,13 +44,13 @@ public sealed class VoteRepository(
     /// <summary>Postgres unique-violation SQLSTATE.</summary>
     private const string UniqueViolation = "23505";
 
-    public Task<Vote?> FindForVoterAsync(
+    public async Task<IReadOnlyList<Vote>> FindForVoterAsync(
         Guid electionId, Guid voterMemberId, CancellationToken cancellationToken = default) =>
-        dbContext.Votes
+        await dbContext.Votes
             .AsNoTracking()
-            .FirstOrDefaultAsync(
-                v => v.ElectionId == electionId && v.VoterMemberId == voterMemberId,
-                cancellationToken);
+            .Where(v => v.ElectionId == electionId && v.VoterMemberId == voterMemberId)
+            .OrderBy(v => v.Choice)
+            .ToListAsync(cancellationToken);
 
     /// <summary>
     /// Inserts one vote on its own scope, context and connection - the
@@ -53,12 +62,14 @@ public sealed class VoteRepository(
     /// simply discarded rather than left retrying a failed insert on the
     /// next SaveChanges).
     /// </summary>
-    public async Task<bool> TryCastAsync(Vote vote, CancellationToken cancellationToken = default)
+    public async Task<bool> TryCastAsync(IReadOnlyList<Vote> ballot, CancellationToken cancellationToken = default)
     {
         await using var scope = scopeFactory.CreateAsyncScope();
         var context = scope.ServiceProvider.GetRequiredService<VolunteerGroupsDbContext>();
 
-        context.Votes.Add(vote);
+        // One SaveChanges is one transaction: a ballot lands whole or not at
+        // all, so a refused pick never leaves the voter's others behind.
+        context.Votes.AddRange(ballot);
 
         try
         {

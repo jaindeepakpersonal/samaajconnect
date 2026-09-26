@@ -11,6 +11,11 @@ public sealed class GroupRepository(VolunteerGroupsDbContext dbContext) : IGroup
         dbContext.Groups
             .Include(g => g.Applications)
             .Include(g => g.Members)
+            .Include(g => g.Roles)
+
+            // Three collections joined in one query multiply into each other's
+            // rows; split, each is read once.
+            .AsSplitQuery()
             .FirstOrDefaultAsync(g => g.Id == id, cancellationToken);
 
     public async Task<IReadOnlyList<VolunteerGroup>> ListAsync(

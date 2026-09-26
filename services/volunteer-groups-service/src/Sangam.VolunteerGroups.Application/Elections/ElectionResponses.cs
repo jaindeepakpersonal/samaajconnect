@@ -15,14 +15,20 @@ public sealed record ElectionResponse(
     bool AcceptsNominations,
     bool AcceptsVotes,
 
-    /// <summary>The candidate this member voted for, if they have voted.</summary>
-    Guid? MyVoteCandidateId,
+    /// <summary>The candidates this member picked, if they have voted. Empty until then.</summary>
+    IReadOnlyList<Guid> MyVoteCandidateIds,
     int CandidateCount,
 
-    /// <summary>Set once the election is Published. Null until then.</summary>
-    Guid? WinnerMemberId,
+    /// <summary>Set once the election is Published, in ranked order. Empty until then.</summary>
+    IReadOnlyList<Guid> WinnerMemberIds,
     DateTimeOffset? PublishedAt,
-    DateTimeOffset CreatedAt);
+    DateTimeOffset CreatedAt,
+
+    /// <summary>The group role it fills; <c>PositionTitle</c> is that role's title when it was opened.</summary>
+    Guid RoleId,
+
+    /// <summary>How many winners it produces, and how many candidates each voter may pick.</summary>
+    int Seats);
 
 /// <summary>
 /// One name on the ballot. Unlike celebrity-voting-service's own

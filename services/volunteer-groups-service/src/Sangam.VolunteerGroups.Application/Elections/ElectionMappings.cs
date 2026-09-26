@@ -6,7 +6,7 @@ namespace Sangam.VolunteerGroups.Application.Elections;
 internal static class ElectionMappings
 {
     public static ElectionResponse ToResponse(
-        this GroupElection election, DateTimeOffset now, Guid? myVoteCandidateId) =>
+        this GroupElection election, DateTimeOffset now, IReadOnlyList<Guid> myVoteCandidateIds) =>
         new(election.Id,
             election.GroupId,
             election.PositionTitle,
@@ -17,18 +17,20 @@ internal static class ElectionMappings
             election.Status.ToString(),
             election.AcceptsNominations(now),
             election.AcceptsVotes(now),
-            myVoteCandidateId,
+            myVoteCandidateIds,
             election.Candidates.Count,
-            election.WinnerMemberId,
+            election.WinnerMemberIds,
             election.PublishedAt,
-            election.CreatedAt);
+            election.CreatedAt,
+            election.RoleId,
+            election.Seats);
 
     public static ElectionDetailResponse ToDetail(
         this GroupElection election,
         DateTimeOffset now,
-        Guid? myVoteCandidateId,
+        IReadOnlyList<Guid> myVoteCandidateIds,
         IReadOnlyDictionary<Guid, int> tally) =>
-        new(election.ToResponse(now, myVoteCandidateId),
+        new(election.ToResponse(now, myVoteCandidateIds),
             [.. election.Candidates.Select(c => new ElectionCandidateResponse(
                 c.Id, c.MemberId, c.Status.ToString(), c.NominatedBy, tally.GetValueOrDefault(c.Id)))]);
 }

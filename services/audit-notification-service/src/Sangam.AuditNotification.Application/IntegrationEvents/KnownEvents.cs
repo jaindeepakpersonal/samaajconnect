@@ -348,6 +348,27 @@ public static class KnownEvents
             EntityName: "GroupMember",
             EntityIdProperty: "memberId"),
 
+        // A group's own volunteer roles - defined, renamed or resized, removed -
+        // by its president or an administrator. Each names who, because both
+        // can, and "who added a Treasurer role?" should not need guessing.
+        ["volunteer-groups.role.defined.v1"] = new(
+            Action: "RoleDefined",
+            EntityName: "GroupRole",
+            EntityIdProperty: "roleId",
+            ActorIdProperty: "changedBy"),
+
+        ["volunteer-groups.role.updated.v1"] = new(
+            Action: "RoleUpdated",
+            EntityName: "GroupRole",
+            EntityIdProperty: "roleId",
+            ActorIdProperty: "changedBy"),
+
+        ["volunteer-groups.role.removed.v1"] = new(
+            Action: "RoleRemoved",
+            EntityName: "GroupRole",
+            EntityIdProperty: "roleId",
+            ActorIdProperty: "changedBy"),
+
         ["volunteer-groups.member.removed.v1"] = new(
             Action: "MemberRemoved",
             EntityName: "GroupMember",

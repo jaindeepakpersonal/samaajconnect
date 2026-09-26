@@ -16,6 +16,24 @@ public sealed class VolunteerGroupTests
             TenantId, "  Seva Group  ", "Food drives and blood donation camps.",
             "Social Service", PresidentId, Now);
 
+    private static string RoleTitleOf(VolunteerGroup group, Guid memberId) =>
+        group.FindRole(group.Members.Single(m => m.MemberId == memberId).RoleId)!.Title;
+
+    private static Guid Join(VolunteerGroup group, Guid? memberId = null)
+    {
+        var id = memberId ?? Guid.NewGuid();
+        group.DecideApplication(group.Apply(id, null, Now)!.Id, accepted: true, PresidentId, Now);
+
+        return id;
+    }
+
+    private static GroupRole Define(VolunteerGroup group, string title, int seats)
+    {
+        group.DefineRole(title, seats, PresidentId, Now, out var role).Should().Be(RoleRefusal.None);
+
+        return role!;
+    }
+
     // ---- Creation ---------------------------------------------------------
 
     [Fact]
@@ -27,7 +45,7 @@ public sealed class VolunteerGroupTests
 
         group.Status.Should().Be(GroupStatus.Active);
         group.HasMember(PresidentId).Should().BeTrue();
-        group.Members.Should().ContainSingle().Which.RolePosition.Should().Be("President");
+        RoleTitleOf(group, group.Members.Single().MemberId).Should().Be("President");
     }
 
     [Fact]
@@ -60,24 +78,23 @@ public sealed class VolunteerGroupTests
         group.ChangePresident(ApplicantId, Now).Should().BeTrue();
 
         group.PresidentMemberId.Should().Be(ApplicantId);
-        group.Members.Should().ContainSingle().Which.RolePosition.Should().Be("President");
+        RoleTitleOf(group, group.Members.Single().MemberId).Should().Be("President");
     }
 
     [Fact]
-    public void Electing_the_President_position_installs_a_real_president()
+    public void Electing_the_President_role_installs_a_real_president()
     {
         // Before, only the label moved, so the winner read "President" while
         // IsPresident stayed false for them and the old president kept every power.
         var group = Group();
-        var request = group.Apply(ApplicantId, null, Now)!;
-        group.DecideApplication(request.Id, accepted: true, PresidentId, Now);
+        Join(group, ApplicantId);
 
-        group.ElectPosition("President", ApplicantId, Now).Should().BeTrue();
+        group.ElectRole(group.PresidentRole.Id, [ApplicantId], Now).Should().BeTrue();
 
         group.IsPresident(ApplicantId).Should().BeTrue();
         group.IsPresident(PresidentId).Should().BeFalse();
-        group.Members.Single(m => m.MemberId == PresidentId).RolePosition.Should().BeNull();
-        group.Members.Single(m => m.MemberId == ApplicantId).RolePosition.Should().Be("President");
+        RoleTitleOf(group, PresidentId).Should().Be("Volunteer");
+        RoleTitleOf(group, ApplicantId).Should().Be("President");
     }
 
     [Fact]
@@ -86,10 +103,22 @@ public sealed class VolunteerGroupTests
         var group = Group();
         group.ClearDomainEvents();
 
-        group.ElectPosition("president", PresidentId, Now).Should().BeTrue();
+        group.ElectRole(group.PresidentRole.Id, [PresidentId], Now).Should().BeTrue();
 
         group.IsPresident(PresidentId).Should().BeTrue();
         group.DomainEvents.Should().BeEmpty();
+    }
+
+    [Fact]
+    public void Every_group_is_created_with_the_two_built_in_roles()
+    {
+        var group = Group();
+
+        group.Roles.Select(r => (r.Title, r.Kind, r.Seats)).Should().BeEquivalentTo(new[]
+        {
+            ("Volunteer", GroupRoleKind.Volunteer, (int?)null),
+            ("President", GroupRoleKind.President, (int?)1),
+        });
     }
 
     [Fact]
@@ -158,10 +187,10 @@ public sealed class VolunteerGroupTests
     // ---- Deciding ---------------------------------------------------------
 
     [Fact]
-    public void Accepting_makes_the_applicant_a_member_with_no_position()
+    public void Accepting_makes_the_applicant_a_member_in_the_Volunteer_role()
     {
-        // Positions come from an election now, or a later manual assignment -
-        // never from the accept itself.
+        // Every member holds a role. Anything but Volunteer comes from an
+        // election, or a later manual assignment - never from the accept itself.
         var group = Group();
         var application = group.Apply(ApplicantId, null, Now)!;
 
@@ -169,8 +198,7 @@ public sealed class VolunteerGroupTests
             .Should().BeTrue();
 
         group.HasMember(ApplicantId).Should().BeTrue();
-        group.Members.Single(m => m.MemberId == ApplicantId)
-            .RolePosition.Should().BeNull();
+        RoleTitleOf(group, ApplicantId).Should().Be("Volunteer");
     }
 
     [Fact]
@@ -250,27 +278,109 @@ public sealed class VolunteerGroupTests
             .Should().NotContain(nameof(GroupApplication.Note));
     }
 
-    // ---- Positions and membership ----------------------------------------
+    // ---- Roles and membership --------------------------------------------
 
     [Fact]
-    public void A_position_can_be_given_and_cleared()
+    public void A_role_can_be_given_and_taken_back_to_Volunteer()
     {
         var group = Group();
-        var application = group.Apply(ApplicantId, null, Now)!;
-        group.DecideApplication(application.Id, accepted: true, PresidentId, Now);
+        Join(group, ApplicantId);
+        var secretary = Define(group, "  Secretary  ", 1);
 
-        group.AssignRolePosition(ApplicantId, "  Secretary  ", Now).Should().BeTrue();
-        group.Members.Single(m => m.MemberId == ApplicantId)
-            .RolePosition.Should().Be("Secretary");
+        secretary.Title.Should().Be("Secretary");
 
-        group.AssignRolePosition(ApplicantId, null, Now).Should().BeTrue();
-        group.Members.Single(m => m.MemberId == ApplicantId).RolePosition.Should().BeNull();
+        group.AssignRole(ApplicantId, secretary.Id, Now).Should().Be(RoleRefusal.None);
+        RoleTitleOf(group, ApplicantId).Should().Be("Secretary");
+
+        group.AssignRole(ApplicantId, group.VolunteerRole.Id, Now).Should().Be(RoleRefusal.None);
+        RoleTitleOf(group, ApplicantId).Should().Be("Volunteer");
     }
 
     [Fact]
-    public void Somebody_outside_the_group_cannot_be_given_a_position_in_it()
+    public void Somebody_outside_the_group_cannot_be_given_a_role_in_it()
     {
-        Group().AssignRolePosition(Guid.NewGuid(), "Secretary", Now).Should().BeFalse();
+        var group = Group();
+        var secretary = Define(group, "Secretary", 1);
+
+        group.AssignRole(Guid.NewGuid(), secretary.Id, Now).Should().Be(RoleRefusal.NotAMember);
+    }
+
+    [Fact]
+    public void A_role_takes_no_more_holders_than_it_has_seats()
+    {
+        var group = Group();
+        var coordinators = Define(group, "Coordinator", 2);
+        var (a, b, c) = (Join(group), Join(group), Join(group));
+
+        group.AssignRole(a, coordinators.Id, Now).Should().Be(RoleRefusal.None);
+        group.AssignRole(b, coordinators.Id, Now).Should().Be(RoleRefusal.None);
+        group.AssignRole(c, coordinators.Id, Now).Should().Be(RoleRefusal.RoleFull);
+
+        group.HoldersOf(coordinators.Id).Should().Be(2);
+    }
+
+    [Fact]
+    public void The_President_role_moves_only_with_the_presidency()
+    {
+        // Otherwise the title and PresidentMemberId would disagree about who
+        // runs the group.
+        var group = Group();
+        Join(group, ApplicantId);
+        var secretary = Define(group, "Secretary", 1);
+
+        group.AssignRole(ApplicantId, group.PresidentRole.Id, Now).Should().Be(RoleRefusal.PresidencyIsSeparate);
+        group.AssignRole(PresidentId, secretary.Id, Now).Should().Be(RoleRefusal.PresidencyIsSeparate);
+    }
+
+    [Fact]
+    public void Two_roles_cannot_share_a_title_whatever_its_case()
+    {
+        var group = Group();
+        Define(group, "Secretary", 1);
+
+        group.DefineRole("secretary", 1, PresidentId, Now, out _).Should().Be(RoleRefusal.DuplicateTitle);
+        group.DefineRole("VOLUNTEER", 1, PresidentId, Now, out _).Should().Be(RoleRefusal.DuplicateTitle);
+    }
+
+    [Fact]
+    public void The_built_in_roles_cannot_be_changed_or_removed()
+    {
+        var group = Group();
+
+        group.UpdateRole(group.VolunteerRole.Id, "Helper", 5, PresidentId, Now).Should().Be(RoleRefusal.NotEditable);
+        group.UpdateRole(group.PresidentRole.Id, "Chair", 2, PresidentId, Now).Should().Be(RoleRefusal.NotEditable);
+        group.RemoveRole(group.PresidentRole.Id, PresidentId, Now).Should().Be(RoleRefusal.NotEditable);
+    }
+
+    [Fact]
+    public void A_role_cannot_shrink_below_its_holders_or_be_removed_while_held()
+    {
+        var group = Group();
+        var coordinators = Define(group, "Coordinator", 3);
+        group.AssignRole(Join(group), coordinators.Id, Now);
+        group.AssignRole(Join(group), coordinators.Id, Now);
+
+        group.UpdateRole(coordinators.Id, "Coordinator", 1, PresidentId, Now).Should().Be(RoleRefusal.SeatsBelowHolders);
+        group.RemoveRole(coordinators.Id, PresidentId, Now).Should().Be(RoleRefusal.HasHolders);
+
+        group.UpdateRole(coordinators.Id, "Co-ordinator", 2, PresidentId, Now).Should().Be(RoleRefusal.None);
+        group.FindRole(coordinators.Id)!.Title.Should().Be("Co-ordinator");
+    }
+
+    [Fact]
+    public void Defining_changing_and_removing_a_role_each_name_who_did_it()
+    {
+        var group = Group();
+        group.ClearDomainEvents();
+
+        var role = Define(group, "Treasurer", 1);
+        group.UpdateRole(role.Id, "Treasurer", 2, PresidentId, Now);
+        group.RemoveRole(role.Id, PresidentId, Now).Should().Be(RoleRefusal.None);
+
+        group.DomainEvents.OfType<GroupRoleDefinedDomainEvent>().Single().ChangedBy.Should().Be(PresidentId);
+        group.DomainEvents.OfType<GroupRoleUpdatedDomainEvent>().Single().ChangedBy.Should().Be(PresidentId);
+        group.DomainEvents.OfType<GroupRoleRemovedDomainEvent>().Single().RoleId.Should().Be(role.Id);
+        group.FindRole(role.Id).Should().BeNull();
     }
 
     [Fact]
@@ -341,7 +451,7 @@ public sealed class VolunteerGroupTests
 
         group.IsPresident(successor).Should().BeTrue();
         group.HasMember(PresidentId).Should().BeTrue();
-        group.Members.Single(m => m.MemberId == PresidentId).RolePosition.Should().BeNull();
+        RoleTitleOf(group, PresidentId).Should().Be("Volunteer");
     }
 
     [Fact]
@@ -391,7 +501,7 @@ public sealed class VolunteerGroupTests
         group.ChangePresident(successor, Now);
 
         group.HasMember(successor).Should().BeTrue();
-        group.Members.Single(m => m.MemberId == successor).RolePosition.Should().Be("President");
+        RoleTitleOf(group, successor).Should().Be("President");
     }
 
     [Fact]
@@ -479,59 +589,97 @@ public sealed class VolunteerGroupTests
         group.DomainEvents.Should().ContainSingle().Subject.Should().BeOfType<GroupUpdatedDomainEvent>();
     }
 
-    // ---- Installing an election's winner -----------------------------------
+    // ---- Installing an election's winners ----------------------------------
 
     [Fact]
-    public void Electing_installs_the_winner_in_the_position()
+    public void Electing_installs_the_winner_in_the_role()
     {
         var group = Group();
-        var application = group.Apply(ApplicantId, null, Now)!;
-        group.DecideApplication(application.Id, accepted: true, PresidentId, Now);
+        Join(group, ApplicantId);
+        var secretary = Define(group, "Secretary", 1);
 
-        group.ElectPosition("Secretary", ApplicantId, Now).Should().BeTrue();
+        group.ElectRole(secretary.Id, [ApplicantId], Now).Should().BeTrue();
 
-        group.Members.Single(m => m.MemberId == ApplicantId)
-            .RolePosition.Should().Be("Secretary");
+        RoleTitleOf(group, ApplicantId).Should().Be("Secretary");
     }
 
     [Fact]
-    public void Electing_clears_the_same_title_from_whoever_held_it_before()
+    public void Electing_sends_whoever_held_the_role_and_did_not_win_back_to_Volunteer()
     {
         var group = Group();
-        var firstSecretary = Guid.NewGuid();
-        group.DecideApplication(group.Apply(firstSecretary, null, Now)!.Id, true, PresidentId, Now);
-        group.AssignRolePosition(firstSecretary, "Secretary", Now);
+        var secretary = Define(group, "Secretary", 1);
+        var firstSecretary = Join(group);
+        group.AssignRole(firstSecretary, secretary.Id, Now);
+        var newSecretary = Join(group);
 
-        var newSecretary = Guid.NewGuid();
-        group.DecideApplication(group.Apply(newSecretary, null, Now)!.Id, true, PresidentId, Now);
+        group.ElectRole(secretary.Id, [newSecretary], Now);
 
-        group.ElectPosition("Secretary", newSecretary, Now);
-
-        group.Members.Single(m => m.MemberId == firstSecretary).RolePosition.Should().BeNull();
-        group.Members.Single(m => m.MemberId == newSecretary).RolePosition.Should().Be("Secretary");
+        RoleTitleOf(group, firstSecretary).Should().Be("Volunteer");
+        RoleTitleOf(group, newSecretary).Should().Be("Secretary");
     }
 
     [Fact]
-    public void Electing_one_position_leaves_a_different_one_alone()
+    public void Electing_every_seat_of_a_multi_seat_role_at_once()
     {
         var group = Group();
-        var treasurer = Guid.NewGuid();
-        group.DecideApplication(group.Apply(treasurer, null, Now)!.Id, true, PresidentId, Now);
-        group.AssignRolePosition(treasurer, "Treasurer", Now);
+        var coordinators = Define(group, "Coordinator", 3);
+        var kept = Join(group);
+        var dropped = Join(group);
+        group.AssignRole(kept, coordinators.Id, Now);
+        group.AssignRole(dropped, coordinators.Id, Now);
+        var (new1, new2) = (Join(group), Join(group));
 
-        var newSecretary = Guid.NewGuid();
-        group.DecideApplication(group.Apply(newSecretary, null, Now)!.Id, true, PresidentId, Now);
+        group.ElectRole(coordinators.Id, [kept, new1, new2], Now).Should().BeTrue();
 
-        group.ElectPosition("Secretary", newSecretary, Now);
-
-        group.Members.Single(m => m.MemberId == treasurer).RolePosition.Should().Be("Treasurer");
+        group.Members.Where(m => m.RoleId == coordinators.Id).Select(m => m.MemberId)
+            .Should().BeEquivalentTo([kept, new1, new2]);
+        RoleTitleOf(group, dropped).Should().Be("Volunteer");
     }
 
     [Fact]
-    public void Electing_somebody_no_longer_in_the_group_is_refused()
+    public void Electing_one_role_leaves_a_different_one_alone()
+    {
+        var group = Group();
+        var treasurerRole = Define(group, "Treasurer", 1);
+        var secretary = Define(group, "Secretary", 1);
+        var treasurer = Join(group);
+        group.AssignRole(treasurer, treasurerRole.Id, Now);
+
+        group.ElectRole(secretary.Id, [Join(group)], Now);
+
+        RoleTitleOf(group, treasurer).Should().Be("Treasurer");
+    }
+
+    [Fact]
+    public void Electing_somebody_no_longer_in_the_group_changes_nothing()
+    {
+        var group = Group();
+        var secretary = Define(group, "Secretary", 1);
+        var holder = Join(group);
+        group.AssignRole(holder, secretary.Id, Now);
+
+        group.ElectRole(secretary.Id, [Guid.NewGuid()], Now).Should().BeFalse();
+
+        RoleTitleOf(group, holder).Should().Be("Secretary", "a refused result is not half applied");
+    }
+
+    [Fact]
+    public void The_president_cannot_be_elected_into_another_role()
+    {
+        var group = Group();
+        var secretary = Define(group, "Secretary", 1);
+
+        group.ElectRole(secretary.Id, [PresidentId], Now).Should().BeFalse();
+
+        group.IsPresident(PresidentId).Should().BeTrue();
+        RoleTitleOf(group, PresidentId).Should().Be("President");
+    }
+
+    [Fact]
+    public void Volunteer_has_no_election()
     {
         var group = Group();
 
-        group.ElectPosition("Secretary", Guid.NewGuid(), Now).Should().BeFalse();
+        group.ElectRole(group.VolunteerRole.Id, [Join(group)], Now).Should().BeFalse();
     }
 }

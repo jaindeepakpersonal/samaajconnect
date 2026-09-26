@@ -29,14 +29,29 @@ internal static class GroupMappings
         group.HasMember(viewerId),
         group.IsPresident(viewerId),
         group.CanLead(viewerId, viewerIsGroupAdmin),
-        group.CreatedAt);
+        group.CreatedAt,
+        group.CanRunElections(viewerId, viewerIsGroupAdmin));
 
     public static GroupDetailResponse ToDetail(
         this VolunteerGroup group, Guid viewerId, bool viewerIsGroupAdmin = false) => new(
         group.ToResponse(viewerId, viewerIsGroupAdmin),
         [.. group.Members
             .OrderBy(m => m.JoinedAt)
-            .Select(m => new GroupMemberResponse(m.MemberId, m.RolePosition, m.JoinedAt))]);
+            .Select(m => new GroupMemberResponse(
+                m.MemberId, group.FindRole(m.RoleId)?.Title, m.JoinedAt, m.RoleId))],
+
+        // President, then the group's own roles in the order they were defined,
+        // then Volunteer - the order a roster reads in.
+        [.. group.Roles
+            .OrderBy(r => r.Kind switch
+            {
+                GroupRoleKind.President => 0,
+                GroupRoleKind.Elected => 1,
+                _ => 2,
+            })
+            .ThenBy(r => r.CreatedAt)
+            .Select(r => new GroupRoleResponse(
+                r.Id, r.Title, r.Kind.ToString(), r.Seats, group.HoldersOf(r.Id), r.IsEditable, r.IsElected))]);
 
     public static GroupApplicationResponse ToResponse(this GroupApplication application) => new(
         application.Id,

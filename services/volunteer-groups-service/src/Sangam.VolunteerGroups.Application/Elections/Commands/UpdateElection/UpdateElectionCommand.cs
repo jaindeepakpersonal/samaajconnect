@@ -9,7 +9,7 @@ using Sangam.VolunteerGroups.Domain.Elections;
 namespace Sangam.VolunteerGroups.Application.Elections.Commands.UpdateElection;
 
 /// <summary>
-/// Corrects an election's position title and windows. Allowed while it is a
+/// Corrects an election's role and windows. Allowed while it is a
 /// draft or taking nominations, refused from voting onward - the same rule
 /// celebrity-voting-service's own <c>UpdateCampaignCommand</c> uses.
 /// </summary>
@@ -24,7 +24,9 @@ namespace Sangam.VolunteerGroups.Application.Elections.Commands.UpdateElection;
 [RequiresPermission(PermissionKeys.VolunteerGroupsLead)]
 public sealed record UpdateElectionCommand(
     Guid ElectionId,
-    string PositionTitle,
+
+    // A string, not a Guid - see OpenElectionCommand.
+    string RoleId,
     DateTimeOffset NominationStartAt,
     DateTimeOffset NominationEndAt,
     DateTimeOffset VotingStartAt,
@@ -36,7 +38,9 @@ public sealed class UpdateElectionCommandValidator : AbstractValidator<UpdateEle
     public UpdateElectionCommandValidator()
     {
         RuleFor(x => x.ElectionId).NotEmpty();
-        RuleFor(x => x.PositionTitle).NotEmpty().MaximumLength(100);
+        RuleFor(x => x.RoleId)
+            .Must(v => Guid.TryParse(v, out var id) && id != Guid.Empty)
+            .WithMessage("Choose which role this election is for.");
 
         RuleFor(x => x.NominationEndAt)
             .GreaterThan(x => x.NominationStartAt)
@@ -84,7 +88,7 @@ public sealed class UpdateElectionCommandHandler(
 
         // "Not found", the same answer every other president-only command in
         // this service gives a non-president - see OpenElectionCommand.
-        if (group is null || !group.CanRunElection(actorId, currentUser.Administers(areaScope, group), election.PositionTitle))
+        if (group is null || !group.CanRunElections(actorId, currentUser.Administers(areaScope, group)))
         {
             return Result.Failure<ElectionResponse>(
                 Error.NotFound("Election.NotFound", "No such election in this Samaaj."));
@@ -98,10 +102,21 @@ public sealed class UpdateElectionCommandHandler(
                 + "have been told its windows and may already have voted against them."));
         }
 
+        var resolved = await ElectionRoles.ResolveAsync(
+            group, command.RoleId, elections, exceptElectionId: election.Id, cancellationToken);
+
+        if (resolved.IsFailure)
+        {
+            return Result.Failure<ElectionResponse>(resolved.Error);
+        }
+
+        var role = resolved.Value;
         var now = clock.UtcNow;
 
         election.Update(
-            command.PositionTitle,
+            role.Id,
+            role.Title,
+            role.Seats ?? 1,
             command.NominationStartAt,
             command.NominationEndAt,
             command.VotingStartAt,
@@ -110,6 +125,6 @@ public sealed class UpdateElectionCommandHandler(
 
         await unitOfWork.SaveChangesAsync(cancellationToken);
 
-        return Result.Success(election.ToResponse(now, myVoteCandidateId: null));
+        return Result.Success(election.ToResponse(now, myVoteCandidateIds: []));
     }
 }

@@ -16,11 +16,15 @@ public sealed class GroupElectionTests
     private static readonly Guid PresidentId = Guid.NewGuid();
     private static readonly DateTimeOffset Now = new(2026, 3, 1, 9, 0, 0, TimeSpan.Zero);
 
-    private static GroupElection Election(DateTimeOffset? now = null) =>
+    private static readonly Guid RoleId = Guid.NewGuid();
+
+    private static GroupElection Election(DateTimeOffset? now = null, int seats = 1) =>
         GroupElection.Open(
             TenantId,
             GroupId,
+            RoleId,
             "  Secretary  ",
+            seats,
             nominationStartAt: now ?? Now,
             nominationEndAt: (now ?? Now).AddDays(7),
             votingStartAt: (now ?? Now).AddDays(7),
@@ -150,7 +154,7 @@ public sealed class GroupElectionTests
 
         var tally = new Dictionary<Guid, int> { [leader.Id] = 5, [runnerUp.Id] = 3 };
 
-        election.WinnerBy(tally)!.Id.Should().Be(leader.Id);
+        election.WinnersBy(tally).Should().ContainSingle().Which.Id.Should().Be(leader.Id);
     }
 
     [Fact]
@@ -171,13 +175,43 @@ public sealed class GroupElectionTests
 
         var tally = new Dictionary<Guid, int> { [later.Id] = 2, [earlier.Id] = 2 };
 
-        election.WinnerBy(tally)!.Id.Should().Be(earlier.Id);
+        election.WinnersBy(tally).Should().ContainSingle().Which.Id.Should().Be(earlier.Id);
     }
 
     [Fact]
     public void No_candidates_means_no_winner()
     {
-        Election().WinnerBy(new Dictionary<Guid, int>()).Should().BeNull();
+        Election().WinnersBy(new Dictionary<Guid, int>()).Should().BeEmpty();
+    }
+
+    [Fact]
+    public void A_multi_seat_role_elects_the_top_candidates_up_to_its_seats()
+    {
+        var election = Election(seats: 2);
+        election.MoveTo(ElectionStatus.NominationsOpen, Now);
+        var first = election.Nominate(Guid.NewGuid(), PresidentId, Now)!;
+        var third = election.Nominate(Guid.NewGuid(), PresidentId, Now)!;
+        var second = election.Nominate(Guid.NewGuid(), PresidentId, Now)!;
+
+        foreach (var candidate in new[] { first, second, third })
+        {
+            election.ApproveCandidate(candidate.Id, PresidentId, Now);
+        }
+
+        var tally = new Dictionary<Guid, int> { [first.Id] = 9, [second.Id] = 6, [third.Id] = 2 };
+
+        election.WinnersBy(tally).Select(c => c.Id).Should().Equal(first.Id, second.Id);
+    }
+
+    [Fact]
+    public void A_ballot_shorter_than_the_seats_elects_everybody_on_it()
+    {
+        var election = Election(seats: 3);
+        election.MoveTo(ElectionStatus.NominationsOpen, Now);
+        var only = election.Nominate(Guid.NewGuid(), PresidentId, Now)!;
+        election.ApproveCandidate(only.Id, PresidentId, Now);
+
+        election.WinnersBy(new Dictionary<Guid, int>()).Should().ContainSingle().Which.Id.Should().Be(only.Id);
     }
 
     // ---- Publishing -----------------------------------------------------------
@@ -187,7 +221,7 @@ public sealed class GroupElectionTests
     {
         var election = Election();
 
-        election.Publish(Guid.NewGuid(), Now).Should().BeFalse();
+        election.Publish([Guid.NewGuid()], Now).Should().BeFalse();
     }
 
     [Fact]
@@ -200,14 +234,14 @@ public sealed class GroupElectionTests
 
         var winnerId = Guid.NewGuid();
 
-        election.Publish(winnerId, Now).Should().BeTrue();
+        election.Publish([winnerId], Now).Should().BeTrue();
         election.Status.Should().Be(ElectionStatus.Published);
-        election.WinnerMemberId.Should().Be(winnerId);
+        election.WinnerMemberIds.Should().Equal(winnerId);
         election.PublishedAt.Should().Be(Now);
 
-        election.Publish(Guid.NewGuid(), Now).Should()
+        election.Publish([Guid.NewGuid()], Now).Should()
             .BeFalse("a second publish would leave \"the result\" with no single referent");
-        election.WinnerMemberId.Should().Be(winnerId, "the first result is the one that stands");
+        election.WinnerMemberIds.Should().Equal([winnerId], "the first result is the one that stands");
     }
 
     // ---- Correcting it, and reopening nominations that closed too early -------
@@ -240,7 +274,7 @@ public sealed class GroupElectionTests
 
         if (status is ElectionStatus.Published)
         {
-            election.Publish(Guid.NewGuid(), Now);
+            election.Publish([Guid.NewGuid()], Now);
         }
 
         election.CanBeEdited.Should().Be(expected);
@@ -262,7 +296,9 @@ public sealed class GroupElectionTests
         election.AcceptsNominations(closed).Should().BeFalse();
 
         election.Update(
+            RoleId,
             "Secretary",
+            1,
             nominationStartAt: Now,
             nominationEndAt: closed.AddDays(7),
             votingStartAt: closed.AddDays(7),
@@ -280,7 +316,7 @@ public sealed class GroupElectionTests
         election.ClearDomainEvents();
 
         election.Update(
-            "  Assistant Secretary  ", Now, Now.AddDays(7), Now.AddDays(7), Now.AddDays(14), Now);
+            RoleId, "  Assistant Secretary  ", 1, Now, Now.AddDays(7), Now.AddDays(7), Now.AddDays(14), Now);
 
         election.PositionTitle.Should().Be("Assistant Secretary");
         election.DomainEvents.Should().ContainSingle()

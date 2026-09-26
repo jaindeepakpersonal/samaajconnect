@@ -56,7 +56,7 @@ public sealed class DecideCandidateCommandHandler(
 
         var group = await groups.GetByIdAsync(election.GroupId, cancellationToken);
 
-        if (group is null || !group.CanRunElection(actorId, currentUser.Administers(areaScope, group), election.PositionTitle))
+        if (group is null || !group.CanRunElections(actorId, currentUser.Administers(areaScope, group)))
         {
             return Result.Failure<ElectionDetailResponse>(
                 Error.NotFound("Election.NotFound", "No such election in this Samaaj."));
@@ -85,6 +85,6 @@ public sealed class DecideCandidateCommandHandler(
 
         var tally = await votes.TallyAsync(election.Id, cancellationToken);
 
-        return Result.Success(election.ToDetail(now, myVoteCandidateId: null, tally));
+        return Result.Success(election.ToDetail(now, myVoteCandidateIds: [], tally));
     }
 }

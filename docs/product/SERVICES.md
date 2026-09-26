@@ -81,9 +81,12 @@ and expose its endpoints behind the gateway at the route prefix shown.
 ## 4. volunteer-groups-service
 
 - **First / primary aggregate:** `VolunteerGroup`
-- **Owns:** VolunteerGroup, GroupApplication, GroupMember
+- **Owns:** VolunteerGroup, GroupApplication, GroupMember, GroupRole,
+  GroupElection, Vote
 - **Key commands:** `CreateGroupCommand`, `ApplyToGroupCommand`,
-  `DecideApplicationCommand`, `AssignRolePositionCommand`
+  `DecideApplicationCommand`, `DefineGroupRoleCommand`,
+  `AssignGroupRoleCommand`, `OpenElectionCommand`, `CastVoteCommand`,
+  `PublishElectionResultsCommand`
 - **Key queries:** `ListGroupsQuery`, `GetGroupApplicationsQuery`
 - **Events published:** `GroupApplicationSubmitted`,
   `GroupApplicationDecided`

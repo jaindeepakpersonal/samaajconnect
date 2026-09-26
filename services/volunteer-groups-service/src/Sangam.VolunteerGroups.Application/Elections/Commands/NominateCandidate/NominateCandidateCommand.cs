@@ -96,6 +96,17 @@ public sealed class NominateCandidateCommandHandler(
                 "Election.NotAMember", "Only a member of this group can be nominated."));
         }
 
+        // A member holds one role, and the President role moves only with the
+        // presidency - so the president winning, say, Secretary would either
+        // leave the group headless or leave the seat unfilled. Refused here,
+        // before anybody votes for them.
+        if (group.IsPresident(memberId) && election.RoleId != group.PresidentRole.Id)
+        {
+            return Result.Failure<NominateResponse>(Error.Conflict(
+                "Election.IsPresident",
+                "The president holds the President role, so cannot stand for another one."));
+        }
+
         var now = clock.UtcNow;
 
         if (!election.AcceptsNominations(now))

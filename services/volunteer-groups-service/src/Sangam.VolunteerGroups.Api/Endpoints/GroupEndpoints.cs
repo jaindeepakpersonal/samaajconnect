@@ -2,7 +2,7 @@ using MediatR;
 using Sangam.VolunteerGroups.Api.Extensions;
 using Sangam.VolunteerGroups.Application.Groups;
 using Sangam.VolunteerGroups.Application.Groups.Commands.ApplyToGroup;
-using Sangam.VolunteerGroups.Application.Groups.Commands.AssignRolePosition;
+using Sangam.VolunteerGroups.Application.Groups.Commands.GroupRoles;
 using Sangam.VolunteerGroups.Application.Groups.Commands.ChangeGroupPresident;
 using Sangam.VolunteerGroups.Application.Groups.Commands.ChangeGroupStatus;
 using Sangam.VolunteerGroups.Application.Groups.Commands.CreateGroup;
@@ -184,27 +184,90 @@ public static class GroupEndpoints
             .ProducesProblem(StatusCodes.Status403Forbidden)
             .ProducesProblem(StatusCodes.Status404NotFound);
 
-        group.MapPut("/groups/{id:guid}/members/{memberId:guid}/position", async (
+        group.MapPut("/groups/{id:guid}/members/{memberId:guid}/role", async (
                 Guid id,
                 Guid memberId,
-                PositionRequest request,
+                AssignRoleRequest request,
                 ISender sender,
                 CancellationToken cancellationToken) =>
             {
                 var result = await sender.Send(
-                    new AssignRolePositionCommand(id, memberId, request.RolePosition),
+                    new AssignGroupRoleCommand(id, memberId, request.RoleId),
                     cancellationToken);
 
                 return result.ToApiResult();
             })
             .RequireAuthorization()
-            .WithName("AssignRolePosition")
-            .WithSummary("Give a member a position within the group, or clear it.")
+            .WithName("AssignGroupRole")
+            .WithSummary("Move a member into one of the group's roles - not President, which moves with the presidency.")
             .Produces<GroupDetailResponse>()
             .ProducesValidationProblem()
             .ProducesProblem(StatusCodes.Status401Unauthorized)
             .ProducesProblem(StatusCodes.Status403Forbidden)
-            .ProducesProblem(StatusCodes.Status404NotFound);
+            .ProducesProblem(StatusCodes.Status404NotFound)
+            .ProducesProblem(StatusCodes.Status409Conflict);
+
+        group.MapPost("/groups/{id:guid}/roles", async (
+                Guid id,
+                RoleRequest request,
+                ISender sender,
+                CancellationToken cancellationToken) =>
+            {
+                var result = await sender.Send(
+                    new DefineGroupRoleCommand(id, request.Title, request.Seats), cancellationToken);
+
+                return result.ToApiResult();
+            })
+            .RequireAuthorization()
+            .WithName("DefineGroupRole")
+            .WithSummary("Define a volunteer role and how many seats an election for it fills.")
+            .Produces<GroupDetailResponse>()
+            .ProducesValidationProblem()
+            .ProducesProblem(StatusCodes.Status401Unauthorized)
+            .ProducesProblem(StatusCodes.Status403Forbidden)
+            .ProducesProblem(StatusCodes.Status404NotFound)
+            .ProducesProblem(StatusCodes.Status409Conflict);
+
+        group.MapPatch("/groups/{id:guid}/roles/{roleId:guid}", async (
+                Guid id,
+                Guid roleId,
+                RoleRequest request,
+                ISender sender,
+                CancellationToken cancellationToken) =>
+            {
+                var result = await sender.Send(
+                    new UpdateGroupRoleCommand(id, roleId, request.Title, request.Seats), cancellationToken);
+
+                return result.ToApiResult();
+            })
+            .RequireAuthorization()
+            .WithName("UpdateGroupRole")
+            .WithSummary("Rename a volunteer role or change its seats.")
+            .Produces<GroupDetailResponse>()
+            .ProducesValidationProblem()
+            .ProducesProblem(StatusCodes.Status401Unauthorized)
+            .ProducesProblem(StatusCodes.Status403Forbidden)
+            .ProducesProblem(StatusCodes.Status404NotFound)
+            .ProducesProblem(StatusCodes.Status409Conflict);
+
+        group.MapDelete("/groups/{id:guid}/roles/{roleId:guid}", async (
+                Guid id,
+                Guid roleId,
+                ISender sender,
+                CancellationToken cancellationToken) =>
+            {
+                var result = await sender.Send(new RemoveGroupRoleCommand(id, roleId), cancellationToken);
+
+                return result.ToApiResult();
+            })
+            .RequireAuthorization()
+            .WithName("RemoveGroupRole")
+            .WithSummary("Remove a volunteer role nobody holds.")
+            .Produces<GroupDetailResponse>()
+            .ProducesProblem(StatusCodes.Status401Unauthorized)
+            .ProducesProblem(StatusCodes.Status403Forbidden)
+            .ProducesProblem(StatusCodes.Status404NotFound)
+            .ProducesProblem(StatusCodes.Status409Conflict);
 
         group.MapDelete("/groups/{id:guid}/members/{memberId:guid}", async (
                 Guid id,
@@ -274,7 +337,9 @@ public static class GroupEndpoints
     public sealed record DecideRequest(bool Accept);
 
     /// <summary>A null position clears it.</summary>
-    public sealed record PositionRequest(string? RolePosition);
+    public sealed record AssignRoleRequest(Guid RoleId);
+
+    public sealed record RoleRequest(string Title, int Seats);
 
     public sealed record ChangePresidentRequest(Guid NewPresidentMemberId);
 }

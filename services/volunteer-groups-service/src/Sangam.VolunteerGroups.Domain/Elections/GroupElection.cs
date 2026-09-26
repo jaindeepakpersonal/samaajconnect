@@ -4,8 +4,8 @@ using Sangam.VolunteerGroups.Domain.Elections.Events;
 namespace Sangam.VolunteerGroups.Domain.Elections;
 
 /// <summary>
-/// An election for one position within one volunteer group: a nomination
-/// window, a voting window, and - once closed - a single winner.
+/// An election for one volunteer role within one group: a nomination window,
+/// a voting window, and - once closed - as many winners as the role has seats.
 /// </summary>
 /// <remarks>
 /// Copies the shape of celebrity-voting-service's <c>VotingCampaign</c>
@@ -33,12 +33,21 @@ public sealed class GroupElection : AggregateRoot, ITenantScopedEntity
     /// <summary>The group this election fills a position for. A plain reference - see CLAUDE.md.</summary>
     public Guid GroupId { get; private set; }
 
+    /// <summary>The group's <c>GroupRole</c> this election fills. A plain reference, within one group.</summary>
+    public Guid RoleId { get; private set; }
+
     /// <summary>
-    /// What is being elected - Secretary, Coordinator. Free text, the same
-    /// label <c>GroupMember.RolePosition</c> already holds; not a closed
-    /// list, for the identical reason that field is not one.
+    /// The role's title when the election was opened. Kept on the election so
+    /// its history still reads correctly after the role is renamed or removed.
     /// </summary>
     public string PositionTitle { get; private set; } = null!;
+
+    /// <summary>
+    /// How many winners it produces, and how many candidates each voter may
+    /// pick - the role's seats when the election was set up, frozen here so a
+    /// role resized mid-vote does not change the ballot under anybody.
+    /// </summary>
+    public int Seats { get; private set; }
 
     public DateTimeOffset NominationStartAt { get; private set; }
     public DateTimeOffset NominationEndAt { get; private set; }
@@ -49,8 +58,8 @@ public sealed class GroupElection : AggregateRoot, ITenantScopedEntity
     public DateTimeOffset CreatedAt { get; private set; }
     public DateTimeOffset? ClosedAt { get; private set; }
 
-    /// <summary>Set once, by <see cref="Publish"/>. Null until then.</summary>
-    public Guid? WinnerMemberId { get; private set; }
+    /// <summary>Set once, by <see cref="Publish"/>, in ranked order. Empty until then.</summary>
+    public List<Guid> WinnerMemberIds { get; private set; } = [];
 
     public DateTimeOffset? PublishedAt { get; private set; }
 
@@ -61,7 +70,9 @@ public sealed class GroupElection : AggregateRoot, ITenantScopedEntity
     public static GroupElection Open(
         Guid tenantId,
         Guid groupId,
+        Guid roleId,
         string positionTitle,
+        int seats,
         DateTimeOffset nominationStartAt,
         DateTimeOffset nominationEndAt,
         DateTimeOffset votingStartAt,
@@ -69,13 +80,16 @@ public sealed class GroupElection : AggregateRoot, ITenantScopedEntity
         DateTimeOffset now)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(positionTitle);
+        ArgumentOutOfRangeException.ThrowIfLessThan(seats, 1);
 
         return new GroupElection
         {
             Id = Guid.NewGuid(),
             TenantId = tenantId,
             GroupId = groupId,
+            RoleId = roleId,
             PositionTitle = positionTitle.Trim(),
+            Seats = seats,
             NominationStartAt = nominationStartAt,
             NominationEndAt = nominationEndAt,
             VotingStartAt = votingStartAt,
@@ -114,7 +128,9 @@ public sealed class GroupElection : AggregateRoot, ITenantScopedEntity
     /// by <see cref="CanBeEdited"/> before this runs.
     /// </remarks>
     public void Update(
+        Guid roleId,
         string positionTitle,
+        int seats,
         DateTimeOffset nominationStartAt,
         DateTimeOffset nominationEndAt,
         DateTimeOffset votingStartAt,
@@ -122,8 +138,11 @@ public sealed class GroupElection : AggregateRoot, ITenantScopedEntity
         DateTimeOffset now)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(positionTitle);
+        ArgumentOutOfRangeException.ThrowIfLessThan(seats, 1);
 
+        RoleId = roleId;
         PositionTitle = positionTitle.Trim();
+        Seats = seats;
         NominationStartAt = nominationStartAt;
         NominationEndAt = nominationEndAt;
         VotingStartAt = votingStartAt;
@@ -258,34 +277,37 @@ public sealed class GroupElection : AggregateRoot, ITenantScopedEntity
             .OrderBy(c => c.NominatedAt)];
 
     /// <summary>
-    /// Picks the winner by tally, tie-broken by earliest nomination - the
-    /// identical tie-break <c>VotingCampaign.RankBy</c> already uses, held by
-    /// the same two mechanisms agreeing: this ordering, and the stable sort
-    /// LINQ's own <c>OrderBy</c> already performs.
+    /// The top <see cref="Seats"/> candidates by tally, tie-broken by earliest
+    /// nomination - the identical tie-break <c>VotingCampaign.RankBy</c>
+    /// already uses, held by the same two mechanisms agreeing: this ordering,
+    /// and the stable sort LINQ's own <c>OrderBy</c> already performs. Fewer
+    /// than <see cref="Seats"/> when the ballot is shorter: every name on it
+    /// wins, and the rest of the seats stay empty.
     /// </summary>
-    public ElectionCandidate? WinnerBy(IReadOnlyDictionary<Guid, int> tally) =>
-        Ballot
+    public IReadOnlyList<ElectionCandidate> WinnersBy(IReadOnlyDictionary<Guid, int> tally) =>
+        [.. Ballot
             .OrderByDescending(c => tally.GetValueOrDefault(c.Id))
             .ThenBy(c => c.NominatedAt)
-            .FirstOrDefault();
+            .Take(Seats)];
 
     /// <summary>
-    /// Freezes the winner and moves to Published. Only from Closed. Returns
+    /// Freezes the winners and moves to Published. Only from Closed. Returns
     /// false on a second attempt - publishing twice would leave "the result"
     /// with no single referent.
     /// </summary>
-    public bool Publish(Guid winnerMemberId, DateTimeOffset now)
+    public bool Publish(IReadOnlyList<Guid> winnerMemberIds, DateTimeOffset now)
     {
-        if (Status != ElectionStatus.Closed)
+        if (Status != ElectionStatus.Closed || winnerMemberIds.Count == 0)
         {
             return false;
         }
 
         Status = ElectionStatus.Published;
-        WinnerMemberId = winnerMemberId;
+        WinnerMemberIds = [.. winnerMemberIds];
         PublishedAt = now;
 
-        Raise(new GroupElectionResultsPublishedDomainEvent(Id, TenantId, GroupId, winnerMemberId, now));
+        Raise(new GroupElectionResultsPublishedDomainEvent(
+            Id, TenantId, GroupId, winnerMemberIds[0], now, [.. winnerMemberIds]));
 
         return true;
     }

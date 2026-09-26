@@ -48,15 +48,54 @@ public sealed record GroupApplicationDecidedDomainEvent(
     public string Topic => "volunteer-groups.application.decided.v1";
 }
 
-/// <summary>A member was given, or relieved of, a position inside the group.</summary>
+/// <summary>A member was moved into a role inside the group.</summary>
+/// <remarks>
+/// <c>RoleId</c> was added with defined roles; <c>RolePosition</c> stays, as
+/// the role's title, so a v1 consumer reading it still gets what it always
+/// did.
+/// </remarks>
 public sealed record GroupRolePositionAssignedDomainEvent(
     Guid GroupId,
     Guid TenantId,
     Guid MemberId,
     string? RolePosition,
-    DateTimeOffset OccurredAt) : IDomainEvent
+    DateTimeOffset OccurredAt,
+    Guid? RoleId = null) : IDomainEvent
 {
     public string Topic => "volunteer-groups.role-position.assigned.v1";
+}
+
+/// <summary>A group defined a new volunteer role. Ids only; the title is in this service's own table.</summary>
+public sealed record GroupRoleDefinedDomainEvent(
+    Guid GroupId,
+    Guid TenantId,
+    Guid RoleId,
+    Guid ChangedBy,
+    DateTimeOffset OccurredAt) : IDomainEvent
+{
+    public string Topic => "volunteer-groups.role.defined.v1";
+}
+
+/// <summary>A group renamed a volunteer role or changed how many seats it has.</summary>
+public sealed record GroupRoleUpdatedDomainEvent(
+    Guid GroupId,
+    Guid TenantId,
+    Guid RoleId,
+    Guid ChangedBy,
+    DateTimeOffset OccurredAt) : IDomainEvent
+{
+    public string Topic => "volunteer-groups.role.updated.v1";
+}
+
+/// <summary>A group removed a volunteer role nobody held.</summary>
+public sealed record GroupRoleRemovedDomainEvent(
+    Guid GroupId,
+    Guid TenantId,
+    Guid RoleId,
+    Guid ChangedBy,
+    DateTimeOffset OccurredAt) : IDomainEvent
+{
+    public string Topic => "volunteer-groups.role.removed.v1";
 }
 
 /// <summary>

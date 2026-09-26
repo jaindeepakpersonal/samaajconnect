@@ -37,6 +37,9 @@ public sealed class VolunteerGroupsApiFactory : WebApplicationFactory<Program>, 
 
     public async Task InitializeAsync() => await _postgres.StartAsync();
 
+    /// <summary>The container's own connection string, for a test that needs a database of its own.</summary>
+    public string ConnectionString => _postgres.GetConnectionString();
+
     async Task IAsyncLifetime.DisposeAsync()
     {
         await base.DisposeAsync();
@@ -78,7 +81,7 @@ public sealed class VolunteerGroupsApiFactory : WebApplicationFactory<Program>, 
 
         await dbContext.Database.ExecuteSqlRawAsync(
             "TRUNCATE TABLE election_votes, election_candidates, group_elections, "
-            + "group_members, group_applications, volunteer_groups, "
+            + "group_members, group_roles, group_applications, volunteer_groups, "
             + "outbox_messages RESTART IDENTITY CASCADE;");
     }
 

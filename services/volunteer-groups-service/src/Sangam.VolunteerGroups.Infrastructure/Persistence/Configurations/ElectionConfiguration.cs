@@ -19,6 +19,13 @@ public sealed class ElectionConfiguration : IEntityTypeConfiguration<GroupElecti
 
         builder.HasIndex(e => new { e.GroupId, e.Status });
 
+        // "Is an election for this role still running?"
+        builder.HasIndex(e => new { e.GroupId, e.RoleId });
+
+        // A Postgres uuid[], in ranked order. Never queried into, only read
+        // back with the election, so a child table would buy nothing.
+        builder.Property(e => e.WinnerMemberIds).HasColumnType("uuid[]");
+
         builder.HasMany(e => e.Candidates)
             .WithOne()
             .HasForeignKey(c => c.ElectionId)
@@ -56,12 +63,15 @@ public sealed class VoteConfiguration : IEntityTypeConfiguration<Vote>
         builder.Property(v => v.Id).ValueGeneratedNever();
 
         // ---------------------------------------------------------------
-        // This index is the double-voting guarantee, not the handler's own
-        // courtesy check and not a distributed lock. See CastVoteCommand's
-        // remarks, and celebrity-voting-service's own VoteConfiguration,
-        // which this copies verbatim at a smaller scale.
+        // These two indexes are the double-voting guarantee, not the
+        // handler's own courtesy check and not a distributed lock. A ballot's
+        // picks are numbered from 1, so a second ballot always collides on
+        // its first pick; and nobody picks one candidate twice. See Vote's
+        // remarks, CastVoteCommand's, and celebrity-voting-service's own
+        // VoteConfiguration, which the one-seat case still copies exactly.
         // ---------------------------------------------------------------
-        builder.HasIndex(v => new { v.ElectionId, v.VoterMemberId }).IsUnique();
+        builder.HasIndex(v => new { v.ElectionId, v.VoterMemberId, v.Choice }).IsUnique();
+        builder.HasIndex(v => new { v.ElectionId, v.VoterMemberId, v.CandidateId }).IsUnique();
 
         // The tally: GROUP BY candidate within an election.
         builder.HasIndex(v => new { v.ElectionId, v.CandidateId });

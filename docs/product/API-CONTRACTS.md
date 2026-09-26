@@ -139,24 +139,27 @@ who never passed the check that produced it.
 |---|---|---|---|
 | GET | `/groups` | `Members.Read` | This Samaaj's groups, each with the asking member's standing |
 | POST | `/groups` | `VolunteerGroups.Manage` | Create a group. `presidentMemberId` is **optional** (a string, empty or omitted for none): a group may exist before anyone leads it. `localityId` optional; an Area Admin's group is always in their own locality (omitted: filled in; other: **403**) |
-| GET | `/groups/{id}` | `Members.Read` | One group with its members |
+| GET | `/groups/{id}` | `Members.Read` | One group with its members (each with `roleId` and the role's title as `rolePosition`) and its `roles` (title, kind, seats, holder count). `iCanRunElections` says whether the caller may manage roles and elections |
 | PATCH | `/groups/{id}` | `VolunteerGroups.Manage` | Correct the name, description, focus area or locality. Not the president, membership or status — each its own endpoint. An Area Admin: own locality's groups only (**404** otherwise), and cannot move one out (**403**) |
 | PATCH | `/groups/{id}/status` | `VolunteerGroups.Manage` | Activate or deactivate. A deactivated group keeps its members |
 | POST | `/groups/{id}/applications` | `Members.Read` | Ask to join |
 | GET | `/groups/{id}/applications` | `VolunteerGroups.Lead` + this group's president, or a Samaaj admin while it has none | The review queue |
-| POST | `/groups/{id}/applications/{applicationId}/decide` | `VolunteerGroups.Lead` + president, or a Samaaj admin while it has none | `{accept, rolePosition}` |
-| PUT | `/groups/{id}/members/{memberId}/position` | `VolunteerGroups.Lead` + president | Give a position, or clear it |
+| POST | `/groups/{id}/applications/{applicationId}/decide` | `VolunteerGroups.Lead` + president, or a Samaaj admin while it has none | `{accept}`. An accepted member starts as a Volunteer |
+| POST | `/groups/{id}/roles` | `VolunteerGroups.Lead` + president or an administrator of the group | Define a role `{title, seats}` (1-100). Titles unique per group, whatever their case |
+| PATCH | `/groups/{id}/roles/{roleId}` | `VolunteerGroups.Lead` + president or administrator | Rename or resize. **409** for Volunteer/President, or seats below its holders |
+| DELETE | `/groups/{id}/roles/{roleId}` | `VolunteerGroups.Lead` + president or administrator | **409** while anybody holds it or an election is deciding it |
+| PUT | `/groups/{id}/members/{memberId}/role` | `VolunteerGroups.Lead` + president or administrator | `{roleId}`. **409** when the role is full, or for the President role either way — that moves only with the presidency |
 | DELETE | `/groups/{id}/members/{memberId}` | `VolunteerGroups.Lead` + president | Remove a member. **409** on the president — see below |
 | PATCH | `/groups/{id}/president` | `VolunteerGroups.Manage` | Hand the group to a different member, who joins it if they were not in it. The outgoing president stays on as an ordinary member |
 | GET | `/groups/{id}/elections` | `Members.Read` | This group's elections, newest first, each with the caller's own vote |
-| POST | `/groups/{id}/elections` | `VolunteerGroups.Lead` + president, or a Samaaj admin running the *President* election of a group with none | Set an election up for a named position. Starts `Draft` |
-| GET | `/elections/{id}` | `Members.Read` | One election with its ballot and tally — never hidden, unlike Celebrities of Samaaj |
-| PATCH | `/elections/{id}` | `VolunteerGroups.Lead` + president | Correct the position title or windows — how nominations that closed too early are reopened. `Draft`/`NominationsOpen` only |
-| POST | `/elections/{id}/status` | `VolunteerGroups.Lead` + president | `NominationsOpen`, `VotingOpen` or `Closed`. Strictly forward; 409 moving to `VotingOpen` on an empty ballot |
-| POST | `/elections/{id}/candidates` | `VolunteerGroups.Lead` + a member of the group | Nominate a fellow group member. A repeat nomination is a no-op reported as success |
-| POST | `/elections/{id}/candidates/{candidateId}/decide` | `VolunteerGroups.Lead` + president | Approve onto the ballot, or remove before voting opens |
-| POST | `/elections/{id}/votes` | `VolunteerGroups.Lead` + a member of the group | Cast this member's one vote. Self-votes are refused; a second vote is reported as `accepted: false` |
-| POST | `/elections/{id}/publish` | `VolunteerGroups.Lead` + president | Only from `Closed`. Installs the winner's position, clearing it from any prior holder |
+| POST | `/groups/{id}/elections` | `VolunteerGroups.Lead` + president or an administrator of the group, at any time | `{roleId, …windows}`. Set an election up for one of the group's roles, filling its seats. Starts `Draft`. **409** for Volunteer, or a role with an election already running |
+| GET | `/elections/{id}` | `Members.Read` | One election with its ballot and tally — never hidden, unlike Celebrities of Samaaj. `seats`, `myVoteCandidateIds`, `winnerMemberIds` |
+| PATCH | `/elections/{id}` | `VolunteerGroups.Lead` + president or administrator | Correct the role or windows — how nominations that closed too early are reopened. `Draft`/`NominationsOpen` only |
+| POST | `/elections/{id}/status` | `VolunteerGroups.Lead` + president or administrator | `NominationsOpen`, `VotingOpen` or `Closed`. Strictly forward; 409 moving to `VotingOpen` on an empty ballot |
+| POST | `/elections/{id}/candidates` | `VolunteerGroups.Lead` + a member of the group | Nominate a fellow group member. A repeat nomination is a no-op reported as success. **409** nominating the president for any role but President |
+| POST | `/elections/{id}/candidates/{candidateId}/decide` | `VolunteerGroups.Lead` + president or administrator | Approve onto the ballot, or remove before voting opens |
+| POST | `/elections/{id}/votes` | `VolunteerGroups.Lead` + a member of the group | `{candidateIds}`: one final ballot of up to `seats` picks, all counted the same (**400** above that). Self-votes are refused; a second ballot is reported as `accepted: false` |
+| POST | `/elections/{id}/publish` | `VolunteerGroups.Lead` + president or administrator | Only from `Closed`. Installs the top `seats` candidates in the role; anyone who held it and did not win goes back to Volunteer |
 
 > The draft gated the president's operations on the `VolunteerGroupPresident`
 > role, which nothing grants. They ship on `VolunteerGroups.Lead`, which every

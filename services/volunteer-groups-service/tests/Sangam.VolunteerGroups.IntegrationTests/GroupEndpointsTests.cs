@@ -254,10 +254,10 @@ public sealed class GroupEndpointsTests(VolunteerGroupsApiFactory factory)
     // ---- Deciding ---------------------------------------------------------
 
     [Fact]
-    public async Task The_president_accepts_and_the_applicant_becomes_a_member_with_no_position()
+    public async Task The_president_accepts_and_the_applicant_becomes_a_member_in_the_Volunteer_role()
     {
-        // Positions come from an election now (or a later manual assignment),
-        // never from the accept itself.
+        // Every member holds a role. Anything but Volunteer comes from an
+        // election (or a later manual assignment), never from the accept itself.
         var id = await CreateGroupAsync();
         await ApplyAsync(Member(), id);
         var applicationId = await PendingApplicationIdAsync(id);
@@ -274,7 +274,7 @@ public sealed class GroupEndpointsTests(VolunteerGroupsApiFactory factory)
         detail.GetProperty("group").GetProperty("iAmAMember").GetBoolean().Should().BeTrue();
         detail.GetProperty("members").EnumerateArray()
             .Single(m => m.GetProperty("memberId").GetGuid() == ApplicantId)
-            .GetProperty("rolePosition").ValueKind.Should().Be(JsonValueKind.Null);
+            .GetProperty("rolePosition").GetString().Should().Be("Volunteer");
     }
 
     [Fact]
@@ -378,10 +378,15 @@ public sealed class GroupEndpointsTests(VolunteerGroupsApiFactory factory)
         queue.EnumerateArray().Should().BeEmpty();
     }
 
-    // ---- Positions and status --------------------------------------------
+    // ---- Roles and status ------------------------------------------------
+
+    private static Guid RoleIdOf(JsonElement detail, string title) =>
+        detail.GetProperty("roles").EnumerateArray()
+            .Single(r => r.GetProperty("title").GetString() == title)
+            .GetProperty("id").GetGuid();
 
     [Fact]
-    public async Task A_president_assigns_a_position_and_a_member_cannot()
+    public async Task A_president_defines_a_role_and_assigns_it_and_a_member_cannot()
     {
         var id = await CreateGroupAsync();
         await ApplyAsync(Member(), id);
@@ -391,13 +396,68 @@ public sealed class GroupEndpointsTests(VolunteerGroupsApiFactory factory)
             $"/v1/volunteer-groups/groups/{id}/applications/{applicationId}/decide",
             new { accept = true });
 
-        var url = $"/v1/volunteer-groups/groups/{id}/members/{ApplicantId}/position";
+        var defined = await Manager().PostAsJsonAsync(
+            $"/v1/volunteer-groups/groups/{id}/roles", new { title = "Secretary", seats = 1 });
 
-        (await Manager().PutAsJsonAsync(url, new { rolePosition = "Secretary" }))
-            .StatusCode.Should().Be(HttpStatusCode.OK);
+        defined.StatusCode.Should().Be(HttpStatusCode.OK);
+        var secretary = RoleIdOf(await defined.Content.ReadFromJsonAsync<JsonElement>(), "Secretary");
 
-        (await Member().PutAsJsonAsync(url, new { rolePosition = "President" }))
+        var url = $"/v1/volunteer-groups/groups/{id}/members/{ApplicantId}/role";
+
+        var assigned = await Manager().PutAsJsonAsync(url, new { roleId = secretary });
+
+        assigned.StatusCode.Should().Be(HttpStatusCode.OK);
+        (await assigned.Content.ReadFromJsonAsync<JsonElement>()).GetProperty("members").EnumerateArray()
+            .Single(m => m.GetProperty("memberId").GetGuid() == ApplicantId)
+            .GetProperty("rolePosition").GetString().Should().Be("Secretary");
+
+        (await Member().PutAsJsonAsync(url, new { roleId = secretary }))
             .StatusCode.Should().Be(HttpStatusCode.NotFound);
+
+        (await Member().PostAsJsonAsync(
+                $"/v1/volunteer-groups/groups/{id}/roles", new { title = "Treasurer", seats = 1 }))
+            .StatusCode.Should().Be(HttpStatusCode.NotFound, "a member learns nothing about a group's roles");
+    }
+
+    [Fact]
+    public async Task A_new_group_lists_its_two_built_in_roles()
+    {
+        var id = await CreateGroupAsync();
+
+        var detail = await Member().GetFromJsonAsync<JsonElement>($"/v1/volunteer-groups/groups/{id}");
+
+        detail.GetProperty("roles").EnumerateArray()
+            .Select(r => (r.GetProperty("title").GetString(), r.GetProperty("isEditable").GetBoolean()))
+            .Should().BeEquivalentTo(new[] { ("President", false), ("Volunteer", false) });
+    }
+
+    [Fact]
+    public async Task A_role_someone_holds_cannot_be_removed_and_one_nobody_holds_can()
+    {
+        var id = await CreateGroupAsync();
+        var member = await AcceptedMemberIdAsync(id);
+
+        var detail = await (await Manager().PostAsJsonAsync(
+            $"/v1/volunteer-groups/groups/{id}/roles", new { title = "Coordinator", seats = 2 }))
+            .Content.ReadFromJsonAsync<JsonElement>();
+        var coordinator = RoleIdOf(detail, "Coordinator");
+
+        await Manager().PutAsJsonAsync(
+            $"/v1/volunteer-groups/groups/{id}/members/{member}/role", new { roleId = coordinator });
+
+        (await Manager().DeleteAsync($"/v1/volunteer-groups/groups/{id}/roles/{coordinator}"))
+            .StatusCode.Should().Be(HttpStatusCode.Conflict);
+
+        (await Manager().PatchAsJsonAsync(
+                $"/v1/volunteer-groups/groups/{id}/roles/{coordinator}", new { title = "Coordinator", seats = 0 }))
+            .StatusCode.Should().Be(HttpStatusCode.BadRequest);
+
+        var volunteer = RoleIdOf(detail, "Volunteer");
+        await Manager().PutAsJsonAsync(
+            $"/v1/volunteer-groups/groups/{id}/members/{member}/role", new { roleId = volunteer });
+
+        (await Manager().DeleteAsync($"/v1/volunteer-groups/groups/{id}/roles/{coordinator}"))
+            .StatusCode.Should().Be(HttpStatusCode.OK);
     }
 
     [Fact]
@@ -576,7 +636,7 @@ public sealed class GroupEndpointsTests(VolunteerGroupsApiFactory factory)
         var outgoing = detail.GetProperty("members").EnumerateArray()
             .Single(m => m.GetProperty("memberId").GetGuid() == PresidentId);
 
-        outgoing.GetProperty("rolePosition").ValueKind.Should().Be(JsonValueKind.Null);
+        outgoing.GetProperty("rolePosition").GetString().Should().Be("Volunteer");
     }
 
     [Fact]
