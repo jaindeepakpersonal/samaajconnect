@@ -20,7 +20,13 @@ public sealed record CreateGroupCommand(
     string Name,
     string? Description,
     string? FocusArea,
-    string? PresidentMemberId) : ICommand<GroupResponse>;
+    string? PresidentMemberId,
+
+    /// <summary>
+    /// The locality the group serves, optional. An Area Admin's groups are
+    /// always in their own locality: omitted, it is filled in; any other, refused.
+    /// </summary>
+    Guid? LocalityId = null) : ICommand<GroupResponse>;
 
 public sealed class CreateGroupCommandValidator : AbstractValidator<CreateGroupCommand>
 {
@@ -44,6 +50,7 @@ public sealed class CreateGroupCommandHandler(
     IGroupRepository groups,
     IUnitOfWork unitOfWork,
     ICurrentUser currentUser,
+    IAreaScope areaScope,
     ITenantContext tenantContext,
     IDateTimeProvider clock)
     : IRequestHandler<CreateGroupCommand, Result<GroupResponse>>
@@ -72,18 +79,28 @@ public sealed class CreateGroupCommandHandler(
                 "Group.NameTaken", "This Samaaj already has a group with that name."));
         }
 
+        // An Area Admin sets groups up in their own locality and nowhere else.
+        var localityId = command.LocalityId ?? areaScope.AreaLocalityId;
+
+        if (!areaScope.MayAdminister(localityId))
+        {
+            return Result.Failure<GroupResponse>(Error.Forbidden(
+                "Group.OutsideLocality", "You can only set up groups in your own locality."));
+        }
+
         var group = VolunteerGroup.Create(
             tenantId,
             command.Name,
             command.Description,
             command.FocusArea,
             string.IsNullOrWhiteSpace(command.PresidentMemberId) ? null : Guid.Parse(command.PresidentMemberId),
-            clock.UtcNow);
+            clock.UtcNow,
+            localityId);
 
         groups.Add(group);
 
         await unitOfWork.SaveChangesAsync(cancellationToken);
 
-        return Result.Success(group.ToResponse(actorId, currentUser.IsGroupAdmin()));
+        return Result.Success(group.ToResponse(actorId, currentUser.Administers(areaScope, group)));
     }
 }

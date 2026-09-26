@@ -57,6 +57,7 @@ public sealed class OpenElectionCommandHandler(
     IElectionRepository elections,
     IUnitOfWork unitOfWork,
     ICurrentUser currentUser,
+    IAreaScope areaScope,
     ITenantContext tenantContext,
     IDateTimeProvider clock)
     : IRequestHandler<OpenElectionCommand, Result<ElectionResponse>>
@@ -82,7 +83,7 @@ public sealed class OpenElectionCommandHandler(
         // "Not found", the same answer every other president-only command in
         // this service gives a non-president - it does not confirm the group
         // exists to somebody who may not run it.
-        if (!group.CanRunElection(actorId, currentUser.IsGroupAdmin(), command.PositionTitle))
+        if (!group.CanRunElection(actorId, currentUser.Administers(areaScope, group), command.PositionTitle))
         {
             return Result.Failure<ElectionResponse>(
                 Error.NotFound("Group.NotFound", "No such group in this Samaaj."));

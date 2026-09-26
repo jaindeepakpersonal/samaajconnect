@@ -280,6 +280,10 @@ namespace Sangam.VolunteerGroups.Infrastructure.Migrations
                         .HasColumnType("character varying(100)")
                         .HasColumnName("focus_area");
 
+                    b.Property<Guid?>("LocalityId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("locality_id");
+
                     b.Property<string>("Name")
                         .IsRequired()
                         .HasMaxLength(150)

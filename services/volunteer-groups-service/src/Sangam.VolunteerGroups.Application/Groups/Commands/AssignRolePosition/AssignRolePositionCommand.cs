@@ -35,6 +35,7 @@ public sealed class AssignRolePositionCommandHandler(
     IGroupRepository groups,
     IUnitOfWork unitOfWork,
     ICurrentUser currentUser,
+    IAreaScope areaScope,
     ITenantContext tenantContext,
     IDateTimeProvider clock)
     : IRequestHandler<AssignRolePositionCommand, Result<GroupDetailResponse>>
@@ -75,6 +76,6 @@ public sealed class AssignRolePositionCommandHandler(
 
         await unitOfWork.SaveChangesAsync(cancellationToken);
 
-        return Result.Success(group.ToDetail(actorId, currentUser.IsGroupAdmin()));
+        return Result.Success(group.ToDetail(actorId, currentUser.Administers(areaScope, group)));
     }
 }

@@ -138,9 +138,9 @@ who never passed the check that produced it.
 | Method | Path | Roles | Purpose |
 |---|---|---|---|
 | GET | `/groups` | `Members.Read` | This Samaaj's groups, each with the asking member's standing |
-| POST | `/groups` | `VolunteerGroups.Manage` | Create a group. `presidentMemberId` is **optional** (a string, empty or omitted for none): a group may exist before anyone leads it |
+| POST | `/groups` | `VolunteerGroups.Manage` | Create a group. `presidentMemberId` is **optional** (a string, empty or omitted for none): a group may exist before anyone leads it. `localityId` optional; an Area Admin's group is always in their own locality (omitted: filled in; other: **403**) |
 | GET | `/groups/{id}` | `Members.Read` | One group with its members |
-| PATCH | `/groups/{id}` | `VolunteerGroups.Manage` | Correct the name, description or focus area. Not the president, membership or status — each its own endpoint |
+| PATCH | `/groups/{id}` | `VolunteerGroups.Manage` | Correct the name, description, focus area or locality. Not the president, membership or status — each its own endpoint. An Area Admin: own locality's groups only (**404** otherwise), and cannot move one out (**403**) |
 | PATCH | `/groups/{id}/status` | `VolunteerGroups.Manage` | Activate or deactivate. A deactivated group keeps its members |
 | POST | `/groups/{id}/applications` | `Members.Read` | Ask to join |
 | GET | `/groups/{id}/applications` | `VolunteerGroups.Lead` + this group's president, or a Samaaj admin while it has none | The review queue |

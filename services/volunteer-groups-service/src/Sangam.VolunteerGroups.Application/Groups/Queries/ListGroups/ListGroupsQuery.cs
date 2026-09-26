@@ -26,7 +26,7 @@ public sealed class ListGroupsQueryValidator : AbstractValidator<ListGroupsQuery
     }
 }
 
-public sealed class ListGroupsQueryHandler(IGroupRepository groups, ICurrentUser currentUser)
+public sealed class ListGroupsQueryHandler(IGroupRepository groups, ICurrentUser currentUser, IAreaScope areaScope)
     : IRequestHandler<ListGroupsQuery, Result<IReadOnlyList<GroupResponse>>>
 {
     public async Task<Result<IReadOnlyList<GroupResponse>>> Handle(
@@ -45,7 +45,7 @@ public sealed class ListGroupsQueryHandler(IGroupRepository groups, ICurrentUser
 
         var found = await groups.ListAsync(status, cancellationToken);
 
-        IReadOnlyList<GroupResponse> results = [.. found.Select(g => g.ToResponse(memberId, currentUser.IsGroupAdmin()))];
+        IReadOnlyList<GroupResponse> results = [.. found.Select(g => g.ToResponse(memberId, currentUser.Administers(areaScope, g)))];
 
         return Result.Success(results);
     }

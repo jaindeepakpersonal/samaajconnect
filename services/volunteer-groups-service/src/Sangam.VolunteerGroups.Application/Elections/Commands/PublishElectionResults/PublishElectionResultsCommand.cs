@@ -43,6 +43,7 @@ public sealed class PublishElectionResultsCommandHandler(
     IVoteRepository votes,
     IUnitOfWork unitOfWork,
     ICurrentUser currentUser,
+    IAreaScope areaScope,
     ITenantContext tenantContext,
     IDateTimeProvider clock,
     ILogger<PublishElectionResultsCommandHandler> logger)
@@ -68,7 +69,7 @@ public sealed class PublishElectionResultsCommandHandler(
 
         var group = await groups.GetByIdAsync(election.GroupId, cancellationToken);
 
-        if (group is null || !group.CanRunElection(actorId, currentUser.IsGroupAdmin(), election.PositionTitle))
+        if (group is null || !group.CanRunElection(actorId, currentUser.Administers(areaScope, group), election.PositionTitle))
         {
             return Result.Failure<ElectionResponse>(
                 Error.NotFound("Election.NotFound", "No such election in this Samaaj."));

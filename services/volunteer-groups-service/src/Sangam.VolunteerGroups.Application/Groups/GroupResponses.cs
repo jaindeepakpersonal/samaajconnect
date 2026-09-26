@@ -15,6 +15,9 @@ public sealed record GroupResponse(
     string Name,
     string? Description,
     string? FocusArea,
+
+    /// <summary>The locality the group serves, or null for the whole Samaaj.</summary>
+    Guid? LocalityId,
     Guid? PresidentMemberId,
     string Status,
     int MemberCount,

@@ -19,7 +19,7 @@ namespace Sangam.VolunteerGroups.Application.Groups.Queries.GetApplications;
 public sealed record GetApplicationsQuery(Guid GroupId, bool PendingOnly = true)
     : IQuery<IReadOnlyList<GroupApplicationResponse>>;
 
-public sealed class GetApplicationsQueryHandler(IGroupRepository groups, ICurrentUser currentUser)
+public sealed class GetApplicationsQueryHandler(IGroupRepository groups, ICurrentUser currentUser, IAreaScope areaScope)
     : IRequestHandler<GetApplicationsQuery, Result<IReadOnlyList<GroupApplicationResponse>>>
 {
     public async Task<Result<IReadOnlyList<GroupApplicationResponse>>> Handle(
@@ -40,7 +40,7 @@ public sealed class GetApplicationsQueryHandler(IGroupRepository groups, ICurren
                 Error.NotFound("Group.NotFound", "No such group in this Samaaj."));
         }
 
-        if (!group.CanLead(actorId, currentUser.IsGroupAdmin()))
+        if (!group.CanLead(actorId, currentUser.Administers(areaScope, group)))
         {
             // "Not found" rather than "forbidden": whether a group has
             // applications waiting is itself the president's business.

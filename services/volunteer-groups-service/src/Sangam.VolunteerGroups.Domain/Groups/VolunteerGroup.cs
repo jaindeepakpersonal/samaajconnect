@@ -33,6 +33,14 @@ public sealed class VolunteerGroup : AggregateRoot, ITenantScopedEntity
     /// <summary>What the group is for. The wireframe's tag: Social Service, Youth, Education.</summary>
     public string? FocusArea { get; private set; }
 
+    /// <summary>
+    /// The locality the group serves - a master-data-service id, no referential
+    /// integrity across the boundary. Optional: a group may serve the whole
+    /// Samaaj. It decides which Area Admin may administer the group, and
+    /// nothing about who may join it.
+    /// </summary>
+    public Guid? LocalityId { get; private set; }
+
     /// <summary>The title a president holds, and the position whose election installs one.</summary>
     public const string PresidentPosition = "President";
 
@@ -58,7 +66,8 @@ public sealed class VolunteerGroup : AggregateRoot, ITenantScopedEntity
         string? description,
         string? focusArea,
         Guid? presidentMemberId,
-        DateTimeOffset createdAt)
+        DateTimeOffset createdAt,
+        Guid? localityId = null)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(name);
 
@@ -77,6 +86,7 @@ public sealed class VolunteerGroup : AggregateRoot, ITenantScopedEntity
             Name = name.Trim(),
             Description = Normalize(description),
             FocusArea = Normalize(focusArea),
+            LocalityId = localityId,
             PresidentMemberId = presidentMemberId,
             Status = GroupStatus.Active,
             CreatedAt = createdAt,
@@ -97,17 +107,20 @@ public sealed class VolunteerGroup : AggregateRoot, ITenantScopedEntity
     }
 
     /// <summary>
-    /// Corrects the group's name, description and focus area - a typo, or the
-    /// group renaming itself. Does not touch the president, membership or
-    /// status; those are each their own decision with their own command.
+    /// Corrects the group's name, description, focus area and locality - a
+    /// typo, or the group renaming itself. Does not touch the president,
+    /// membership or status; those are each their own decision with their own
+    /// command.
     /// </summary>
-    public void Update(string name, string? description, string? focusArea, DateTimeOffset now)
+    public void Update(
+        string name, string? description, string? focusArea, DateTimeOffset now, Guid? localityId = null)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(name);
 
         Name = name.Trim();
         Description = Normalize(description);
         FocusArea = Normalize(focusArea);
+        LocalityId = localityId;
 
         Raise(new GroupUpdatedDomainEvent(Id, TenantId, now));
     }

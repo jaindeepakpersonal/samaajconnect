@@ -48,6 +48,7 @@ public sealed class ChangeGroupPresidentCommandHandler(
     IGroupRepository groups,
     IUnitOfWork unitOfWork,
     ICurrentUser currentUser,
+    IAreaScope areaScope,
     ITenantContext tenantContext,
     IDateTimeProvider clock)
     : IRequestHandler<ChangeGroupPresidentCommand, Result<GroupResponse>>
@@ -65,7 +66,8 @@ public sealed class ChangeGroupPresidentCommandHandler(
         var group = await groups.GetByIdAsync(command.GroupId, cancellationToken);
 
         if (group is null
-            || (tenantContext.TenantId is { } tenantId && group.TenantId != tenantId))
+            || (tenantContext.TenantId is { } tenantId && group.TenantId != tenantId)
+            || !areaScope.MayAdminister(group.LocalityId))
         {
             return Result.Failure<GroupResponse>(
                 Error.NotFound("Group.NotFound", "No such group in this Samaaj."));
@@ -78,6 +80,6 @@ public sealed class ChangeGroupPresidentCommandHandler(
 
         await unitOfWork.SaveChangesAsync(cancellationToken);
 
-        return Result.Success(group.ToResponse(actorId, currentUser.IsGroupAdmin()));
+        return Result.Success(group.ToResponse(actorId, currentUser.Administers(areaScope, group)));
     }
 }

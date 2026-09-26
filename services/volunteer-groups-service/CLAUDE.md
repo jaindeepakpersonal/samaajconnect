@@ -245,6 +245,19 @@ portals never re-derive it from a role. Nominating and voting were already open
 to every member.
 
 
+**A group may serve one locality, and that decides which Area Admin
+administers it - never who may join it.** `VolunteerGroup.LocalityId` is
+optional (null: the whole Samaaj) and set on create and edit. An Area Admin
+(identity-tenant-service's `AreaAdmin`, the `locality_id` token claim read
+into `IAreaScope`) holds `VolunteerGroups.Manage` for their own locality's
+groups only: a group they set up lands there, one elsewhere or with no
+locality answers 404 to status, president and edit, and they cannot move one
+out. The president-less-group powers in `GroupAuthority` follow the same line
+- `Administers(user, area, group)` replaced a role-only `IsGroupAdmin()`, so
+`iCanLead` and every election and join-request check ask about *this* group.
+Listing, applying, nominating and voting are untouched: an Area Admin is a
+member of the whole Samaaj like anybody else.
+
 **Creating a group is the Samaaj's decision; who joins it is the president's.**
 That asymmetry is the whole service. A Samaaj admin who is not a given group's
 president cannot decide its applications, and gets the same answer a stranger

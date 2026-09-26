@@ -20,7 +20,13 @@ public sealed record UpdateGroupCommand(
     Guid GroupId,
     string Name,
     string? Description,
-    string? FocusArea) : ICommand<GroupResponse>;
+    string? FocusArea,
+
+    /// <summary>
+    /// The locality the group serves; null for none. An Area Admin cannot move
+    /// a group out of their own locality - omitted, it stays there.
+    /// </summary>
+    Guid? LocalityId = null) : ICommand<GroupResponse>;
 
 public sealed class UpdateGroupCommandValidator : AbstractValidator<UpdateGroupCommand>
 {
@@ -37,6 +43,7 @@ public sealed class UpdateGroupCommandHandler(
     IGroupRepository groups,
     IUnitOfWork unitOfWork,
     ICurrentUser currentUser,
+    IAreaScope areaScope,
     ITenantContext tenantContext,
     IDateTimeProvider clock)
     : IRequestHandler<UpdateGroupCommand, Result<GroupResponse>>
@@ -54,10 +61,19 @@ public sealed class UpdateGroupCommandHandler(
         var group = await groups.GetByIdAsync(command.GroupId, cancellationToken);
 
         if (group is null
-            || (tenantContext.TenantId is { } tenantId && group.TenantId != tenantId))
+            || (tenantContext.TenantId is { } tenantId && group.TenantId != tenantId)
+            || !areaScope.MayAdminister(group.LocalityId))
         {
             return Result.Failure<GroupResponse>(
                 Error.NotFound("Group.NotFound", "No such group in this Samaaj."));
+        }
+
+        var localityId = command.LocalityId ?? areaScope.AreaLocalityId;
+
+        if (!areaScope.MayAdminister(localityId))
+        {
+            return Result.Failure<GroupResponse>(Error.Forbidden(
+                "Group.OutsideLocality", "You cannot move a group out of your own locality."));
         }
 
         var name = command.Name.Trim();
@@ -68,10 +84,10 @@ public sealed class UpdateGroupCommandHandler(
                 "Group.NameTaken", "This Samaaj already has a group with that name."));
         }
 
-        group.Update(name, command.Description, command.FocusArea, clock.UtcNow);
+        group.Update(name, command.Description, command.FocusArea, clock.UtcNow, localityId);
 
         await unitOfWork.SaveChangesAsync(cancellationToken);
 
-        return Result.Success(group.ToResponse(actorId, currentUser.IsGroupAdmin()));
+        return Result.Success(group.ToResponse(actorId, currentUser.Administers(areaScope, group)));
     }
 }

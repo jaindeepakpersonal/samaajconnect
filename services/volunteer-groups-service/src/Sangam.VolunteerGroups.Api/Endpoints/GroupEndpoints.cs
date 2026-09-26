@@ -48,7 +48,8 @@ public static class GroupEndpoints
                 CancellationToken cancellationToken) =>
             {
                 var command = new CreateGroupCommand(
-                    request.Name, request.Description, request.FocusArea, request.PresidentMemberId);
+                    request.Name, request.Description, request.FocusArea, request.PresidentMemberId,
+                    request.LocalityId);
 
                 var result = await sender.Send(command, cancellationToken);
 
@@ -87,7 +88,7 @@ public static class GroupEndpoints
                 CancellationToken cancellationToken) =>
             {
                 var command = new UpdateGroupCommand(
-                    id, request.Name, request.Description, request.FocusArea);
+                    id, request.Name, request.Description, request.FocusArea, request.LocalityId);
 
                 var result = await sender.Send(command, cancellationToken);
 
@@ -254,9 +255,11 @@ public static class GroupEndpoints
         string Name,
         string? Description,
         string? FocusArea,
-        string? PresidentMemberId);
+        string? PresidentMemberId,
+        Guid? LocalityId = null);
 
-    public sealed record UpdateGroupRequest(string Name, string? Description, string? FocusArea);
+    public sealed record UpdateGroupRequest(
+        string Name, string? Description, string? FocusArea, Guid? LocalityId = null);
 
     public sealed record ChangeStatusRequest(string Status);
 

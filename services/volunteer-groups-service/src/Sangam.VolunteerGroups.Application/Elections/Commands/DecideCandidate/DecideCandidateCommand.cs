@@ -31,6 +31,7 @@ public sealed class DecideCandidateCommandHandler(
     IVoteRepository votes,
     IUnitOfWork unitOfWork,
     ICurrentUser currentUser,
+    IAreaScope areaScope,
     ITenantContext tenantContext,
     IDateTimeProvider clock)
     : IRequestHandler<DecideCandidateCommand, Result<ElectionDetailResponse>>
@@ -55,7 +56,7 @@ public sealed class DecideCandidateCommandHandler(
 
         var group = await groups.GetByIdAsync(election.GroupId, cancellationToken);
 
-        if (group is null || !group.CanRunElection(actorId, currentUser.IsGroupAdmin(), election.PositionTitle))
+        if (group is null || !group.CanRunElection(actorId, currentUser.Administers(areaScope, group), election.PositionTitle))
         {
             return Result.Failure<ElectionDetailResponse>(
                 Error.NotFound("Election.NotFound", "No such election in this Samaaj."));

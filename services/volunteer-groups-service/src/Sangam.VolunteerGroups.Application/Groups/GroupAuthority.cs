@@ -17,11 +17,18 @@ namespace Sangam.VolunteerGroups.Application.Groups;
 /// election - keeps waiting for a president. The moment one exists these
 /// powers stop, which is why this reads the group's current state each time
 /// rather than granting anybody a standing role.
+///
+/// An Area Admin holds the same admin powers, for groups in their own
+/// locality only (<see cref="VolunteerGroup.LocalityId"/>); a group serving no
+/// particular locality is the Samaaj Admin's alone.
 /// </remarks>
 internal static class GroupAuthority
 {
-    public static bool IsGroupAdmin(this ICurrentUser user) =>
-        user.IsInRole(Roles.SamaajAdmin) || user.IsInRole(Roles.SuperAdmin);
+    /// <summary>Whether this caller administers this particular group.</summary>
+    public static bool Administers(this ICurrentUser user, IAreaScope area, VolunteerGroup group) =>
+        user.IsInRole(Roles.SamaajAdmin)
+        || user.IsInRole(Roles.SuperAdmin)
+        || area.AdministersLocality(group.LocalityId);
 
     /// <summary>The president, or an admin while there is no president.</summary>
     public static bool CanLead(this VolunteerGroup group, Guid actorId, bool actorIsGroupAdmin) =>

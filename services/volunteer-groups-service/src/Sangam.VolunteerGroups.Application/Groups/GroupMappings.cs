@@ -14,6 +14,7 @@ internal static class GroupMappings
         group.Name,
         group.Description,
         group.FocusArea,
+        group.LocalityId,
         group.PresidentMemberId,
         group.Status.ToString(),
         group.Members.Count,

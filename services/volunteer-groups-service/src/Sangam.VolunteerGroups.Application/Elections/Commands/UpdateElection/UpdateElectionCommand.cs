@@ -57,6 +57,7 @@ public sealed class UpdateElectionCommandHandler(
     IElectionRepository elections,
     IUnitOfWork unitOfWork,
     ICurrentUser currentUser,
+    IAreaScope areaScope,
     ITenantContext tenantContext,
     IDateTimeProvider clock)
     : IRequestHandler<UpdateElectionCommand, Result<ElectionResponse>>
@@ -83,7 +84,7 @@ public sealed class UpdateElectionCommandHandler(
 
         // "Not found", the same answer every other president-only command in
         // this service gives a non-president - see OpenElectionCommand.
-        if (group is null || !group.CanRunElection(actorId, currentUser.IsGroupAdmin(), election.PositionTitle))
+        if (group is null || !group.CanRunElection(actorId, currentUser.Administers(areaScope, group), election.PositionTitle))
         {
             return Result.Failure<ElectionResponse>(
                 Error.NotFound("Election.NotFound", "No such election in this Samaaj."));

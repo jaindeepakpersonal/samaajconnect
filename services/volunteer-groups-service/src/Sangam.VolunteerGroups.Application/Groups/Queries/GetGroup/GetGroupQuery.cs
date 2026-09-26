@@ -12,7 +12,7 @@ namespace Sangam.VolunteerGroups.Application.Groups.Queries.GetGroup;
 [RequiresPermission(PermissionKeys.MembersRead)]
 public sealed record GetGroupQuery(Guid GroupId) : IQuery<GroupDetailResponse>;
 
-public sealed class GetGroupQueryHandler(IGroupRepository groups, ICurrentUser currentUser)
+public sealed class GetGroupQueryHandler(IGroupRepository groups, ICurrentUser currentUser, IAreaScope areaScope)
     : IRequestHandler<GetGroupQuery, Result<GroupDetailResponse>>
 {
     public async Task<Result<GroupDetailResponse>> Handle(
@@ -30,6 +30,6 @@ public sealed class GetGroupQueryHandler(IGroupRepository groups, ICurrentUser c
         return group is null
             ? Result.Failure<GroupDetailResponse>(
                 Error.NotFound("Group.NotFound", "No such group in this Samaaj."))
-            : Result.Success(group.ToDetail(memberId, currentUser.IsGroupAdmin()));
+            : Result.Success(group.ToDetail(memberId, currentUser.Administers(areaScope, group)));
     }
 }
