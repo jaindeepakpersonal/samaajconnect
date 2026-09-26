@@ -114,6 +114,42 @@ describe('PathshalaDetailComponent', () => {
     // http.verify() in afterEach is the other half: no queue request was made.
     expect(text()).toContain('another locality');
     expect(text()).not.toContain('Open session');
+    expect(text()).not.toContain('Edit details');
+  });
+
+  it('lets an Area Admin edit their own Pathshala with the locality fixed', async () => {
+    TestBed.inject(AuthService).ensureCurrentUser().subscribe();
+    http.expectOne('/v1/identity/me').flush({
+      userId: 'u9',
+      tenantId: 't1',
+      tenantSlug: 'dasha-nagda',
+      mobileOrEmail: 'area@example.com',
+      fullName: 'Area Admin',
+      status: 'Active',
+      isContactVerified: true,
+      lastLoginAt: null,
+      roles: ['Member', 'AreaAdmin'],
+      permissions: ['Pathshala.Manage'],
+      areaLocalityId: 'loc-hm',
+    });
+
+    fixture = TestBed.createComponent(PathshalaDetailComponent);
+    component = fixture.componentInstance;
+    const address = { line: null, countryId: 'in', stateId: null, cityId: 'udr', localityId: 'loc-hm' };
+    load(detail({ address }));
+
+    component.openEdit(component.pathshala()!, click);
+    http.expectOne((r) => r.url === '/v1/master-data/lookup-items').flush([]);
+    http.expectOne((r) => r.url === '/v1/master-data/states').flush([]);
+    http.expectOne((r) => r.url === '/v1/master-data/cities').flush([]);
+    http.expectOne((r) => r.url === '/v1/master-data/localities').flush([]);
+    fixture.detectChanges();
+    await fixture.whenStable();
+
+    const locality = fixture.nativeElement.querySelector('#edit-locality') as HTMLSelectElement;
+
+    expect(locality.disabled).toBe(true);
+    expect(text()).toContain('The locality stays yours');
   });
 
   function load(
@@ -276,6 +312,88 @@ describe('PathshalaDetailComponent', () => {
     http.expectOne(`/v1/pathshala/pathshalas/${PATHSHALA_ID}/enrollments/requests`).flush(requests);
     fixture.detectChanges();
   }
+
+  // ---- Editing -------------------------------------------------------------
+
+  const click = { currentTarget: null } as unknown as MouseEvent;
+
+  it('opens the edit form on the Pathshala as it is, with each level of the address loaded', () => {
+    const address = {
+      line: 'Hiran Magri',
+      countryId: 'in',
+      stateId: 'rj',
+      cityId: 'udr',
+      localityId: 'loc-hm',
+    };
+    load(detail({ address, contactPerson: 'Smt. Kavita Jain' }));
+
+    component.openEdit(component.pathshala()!, click);
+
+    // A select whose options have not arrived renders blank, which would read
+    // as the address being empty - so every level above a set one is asked for.
+    http.expectOne((r) => r.url === '/v1/master-data/lookup-items').flush([]);
+    http.expectOne((r) => r.url === '/v1/master-data/states').flush([]);
+    http.expectOne((r) => r.url === '/v1/master-data/cities').flush([]);
+    http.expectOne((r) => r.url === '/v1/master-data/localities').flush([]);
+
+    expect(component.editName).toBe('Shri Mahavir Jain Pathshala');
+    expect(component.editLine).toBe('Hiran Magri');
+    expect(component.editContact).toBe('Smt. Kavita Jain');
+    expect(component.cityId()).toBe('udr');
+    expect(component.localityId).toBe('loc-hm');
+  });
+
+  it('saves the whole record and re-reads it', () => {
+    load();
+
+    component.openEdit(component.pathshala()!, click);
+    http.expectOne((r) => r.url === '/v1/master-data/lookup-items').flush([]);
+
+    component.editName = '  Shri Parshwanath Jain Pathshala ';
+    component.editLine = '   ';
+    component.editContact = 'Shri Anil Jain';
+    component.saveEdit();
+
+    const call = http.expectOne(`/v1/pathshala/pathshalas/${PATHSHALA_ID}`);
+
+    expect(call.request.method).toBe('PATCH');
+    expect(call.request.body).toEqual({
+      name: 'Shri Parshwanath Jain Pathshala',
+      addressLine: null,
+      countryId: null,
+      stateId: null,
+      cityId: null,
+      localityId: null,
+      contactPerson: 'Shri Anil Jain',
+    });
+
+    call.flush({});
+    reload();
+
+    expect(component.editing()).toBe(false);
+    expect(text()).toContain('is saved');
+  });
+
+  it('keeps the form open, with what was typed, when a save is refused', () => {
+    load();
+
+    component.openEdit(component.pathshala()!, click);
+    http.expectOne((r) => r.url === '/v1/master-data/lookup-items').flush([]);
+
+    component.editName = 'Something else';
+    component.saveEdit();
+
+    http
+      .expectOne(`/v1/pathshala/pathshalas/${PATHSHALA_ID}`)
+      .flush(
+        { title: 'Pathshala.OutsideLocality', detail: 'No.' },
+        { status: 403, statusText: 'Forbidden' },
+      );
+
+    expect(component.editing()).toBe(true);
+    expect(component.editName).toBe('Something else');
+    expect(component.editError()).not.toBeNull();
+  });
 
   it('offers to stand a Pathshala down, behind a confirmation', () => {
     // Records are kept and enrolments stop, and it cannot be undone from this

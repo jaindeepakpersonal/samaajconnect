@@ -83,6 +83,66 @@ public sealed class AreaAdminPathshalaTests(PathshalaApiFactory factory)
             .StatusCode.Should().Be(HttpStatusCode.Forbidden);
     }
 
+    private HttpClient SamaajAdmin() => factory.CreateClientAs(
+        Guid.NewGuid(), TenantId, [Roles.SamaajAdmin],
+        [PermissionKeys.MembersRead, PermissionKeys.PathshalaManage]);
+
+    private static Task<HttpResponseMessage> Update(HttpClient client, Guid pathshalaId, Guid? locality) =>
+        client.PatchAsJsonAsync($"/v1/pathshala/pathshalas/{pathshalaId}", new
+        {
+            name = "Corrected Pathshala",
+            addressLine = "Near the upashray",
+            localityId = locality?.ToString(),
+            contactPerson = (string?)null,
+        });
+
+    [Fact]
+    public async Task A_Samaaj_Admin_gives_a_Pathshala_created_without_a_locality_one_and_its_Area_Admin_can_then_run_it()
+    {
+        // The case this command exists for: a Pathshala from before localities
+        // mattered was the Samaaj Admin's for good, with no route to change it.
+        var legacy = await PathshalaAsync("Samaaj Pathshala", null);
+
+        (await OpenSession(AreaAdmin(Hiran), legacy)).StatusCode.Should().Be(HttpStatusCode.NotFound);
+
+        var updated = await Update(SamaajAdmin(), legacy, Hiran);
+
+        updated.StatusCode.Should().Be(HttpStatusCode.OK);
+        var body = await updated.Content.ReadFromJsonAsync<JsonElement>();
+        body.GetProperty("name").GetString().Should().Be("Corrected Pathshala");
+        body.GetProperty("address").GetProperty("localityId").GetGuid().Should().Be(Hiran);
+
+        (await OpenSession(AreaAdmin(Hiran), legacy)).StatusCode.Should().Be(HttpStatusCode.OK);
+    }
+
+    [Fact]
+    public async Task An_Area_Admin_corrects_their_own_Pathshala_but_cannot_move_it_or_touch_another()
+    {
+        var own = await PathshalaAsync("Hiran Magri Pathshala", Hiran);
+        var elsewhere = await PathshalaAsync("Sector 14 Pathshala", Sector14);
+
+        (await Update(AreaAdmin(Hiran), elsewhere, Sector14)).StatusCode.Should().Be(HttpStatusCode.NotFound);
+        (await Update(AreaAdmin(Hiran), own, Sector14)).StatusCode.Should().Be(HttpStatusCode.Forbidden);
+
+        // Blank is filled with theirs: clearing it would hand the Pathshala
+        // to the Samaaj Admin.
+        var blank = await Update(AreaAdmin(Hiran), own, null);
+
+        blank.StatusCode.Should().Be(HttpStatusCode.OK);
+        (await blank.Content.ReadFromJsonAsync<JsonElement>())
+            .GetProperty("address").GetProperty("localityId").GetGuid().Should().Be(Hiran);
+    }
+
+    [Fact]
+    public async Task A_member_cannot_correct_a_Pathshala()
+    {
+        var own = await PathshalaAsync("Hiran Magri Pathshala", Hiran);
+        var member = factory.CreateClientAs(
+            Guid.NewGuid(), TenantId, [Roles.Member], [PermissionKeys.MembersRead]);
+
+        (await Update(member, own, Hiran)).StatusCode.Should().Be(HttpStatusCode.Forbidden);
+    }
+
     [Fact]
     public async Task As_a_member_an_Area_Admin_still_sees_every_Pathshala()
     {

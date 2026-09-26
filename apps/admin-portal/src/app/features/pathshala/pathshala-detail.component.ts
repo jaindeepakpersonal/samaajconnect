@@ -1,12 +1,19 @@
 import { DatePipe } from '@angular/common';
-import { Component, OnInit, computed, inject, signal } from '@angular/core';
+import { Component, ElementRef, OnInit, ViewChild, computed, inject, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { ActivatedRoute, RouterLink } from '@angular/router';
 import { describeError } from '@samaajconnect/shared';
 import { AdminApi } from '../../core/admin-api';
 import { AdminScope } from '../../core/admin-scope';
 import { AreaScope } from '../../core/area-scope';
-import { Enrolment, PathshalaDetail } from '../../core/admin.models';
+import {
+  City,
+  Enrolment,
+  Locality,
+  LookupItem,
+  PathshalaDetail,
+  State,
+} from '../../core/admin.models';
 import { isNotFound } from '../../core/http-status';
 
 /**
@@ -56,6 +63,8 @@ import { isNotFound } from '../../core/http-status';
         } @else {
           No session is open, so nothing can be taught yet.
         }
+        @if (school.address?.line; as line) { · {{ line }} }
+        @if (school.contactPerson; as contact) { · Contact: {{ contact }} }
       </p>
 
       @if (school.status !== 'Active') {
@@ -71,6 +80,12 @@ import { isNotFound } from '../../core/http-status';
           administrators.
         </p>
       } @else {
+      <p>
+        <button class="btn alt" type="button" (click)="openEdit(school, $event)">
+          Edit details
+        </button>
+      </p>
+
       <!-- Sessions ------------------------------------------------------- -->
       <div class="card">
         <h2>Academic sessions</h2>
@@ -322,6 +337,96 @@ import { isNotFound } from '../../core/http-status';
       }
       }
     }
+
+    <!-- Edit modal --------------------------------------------------------- -->
+    @if (editing()) {
+      <div class="modal-backdrop" (click)="closeEdit()">
+        <div
+          class="card modal-card modal-dialog"
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="pathshala-edit-title"
+          (click)="$event.stopPropagation()"
+          (keydown)="onModalKeydown($event)"
+        >
+          <h2 id="pathshala-edit-title">Edit {{ pathshala()?.name }}</h2>
+
+          @if (editError(); as message) {
+            <p class="notice error" role="alert">{{ message }}</p>
+          }
+
+          <form (ngSubmit)="saveEdit()">
+            <label for="edit-name">Name</label>
+            <input id="edit-name" class="input" name="name" [(ngModel)]="editName"
+              maxlength="200" #firstField />
+
+            <label for="edit-address">Address line</label>
+            <input id="edit-address" class="input" name="address" [(ngModel)]="editLine"
+              maxlength="500" placeholder="Building, street" />
+
+            @if (area.localityId()) {
+              <p class="small">
+                The locality stays yours: moving a Pathshala to another is its Samaaj
+                Admin's decision.
+              </p>
+            }
+
+            <label for="edit-country">Country</label>
+            <select id="edit-country" class="input" name="country" [disabled]="!!area.localityId()"
+              [ngModel]="countryId()" (ngModelChange)="onCountryChange($event)">
+              <option value="">Not specified</option>
+              @for (country of countries(); track country.id) {
+                <option [value]="country.id">{{ country.label }}</option>
+              }
+            </select>
+
+            @if (countryId() !== '') {
+              <label for="edit-state">State</label>
+              <select id="edit-state" class="input" name="state" [disabled]="!!area.localityId()"
+                [ngModel]="stateId()" (ngModelChange)="onStateChange($event)">
+                <option value="">Not specified</option>
+                @for (state of states(); track state.id) {
+                  <option [value]="state.id">{{ state.name }}</option>
+                }
+              </select>
+
+              <label for="edit-city">City/Village</label>
+              <select id="edit-city" class="input" name="city" [disabled]="!!area.localityId()"
+                [ngModel]="cityId()" (ngModelChange)="onCityChange($event)">
+                <option value="">Not specified</option>
+                @for (city of cities(); track city.id) {
+                  <option [value]="city.id">{{ city.name }}</option>
+                }
+              </select>
+            }
+
+            @if (cityId() !== '') {
+              <label for="edit-locality">Locality</label>
+              <select id="edit-locality" class="input" name="locality" [disabled]="!!area.localityId()"
+                [(ngModel)]="localityId">
+                <option value="">Not specified</option>
+                @for (locality of localities(); track locality.id) {
+                  <option [value]="locality.id">{{ locality.name }}</option>
+                }
+              </select>
+              <p class="small">
+                The locality decides which Area Admin runs this Pathshala. With none, only the
+                Samaaj Admin does.
+              </p>
+            }
+
+            <label for="edit-contact">Contact person</label>
+            <input id="edit-contact" class="input" name="contactPerson"
+              [(ngModel)]="editContact" maxlength="200" />
+
+            <div class="actions">
+              <button class="btn" type="submit" [disabled]="busy() || !editName.trim()">Save</button>
+              <button class="btn alt" type="button" (click)="closeEdit()">Cancel</button>
+            </div>
+          </form>
+        </div>
+      </div>
+    }
   `,
   styles: `
     .spaced {
@@ -371,8 +476,210 @@ export class PathshalaDetailComponent implements OnInit {
   roomLabel = '';
   chosenClass: Record<string, string> = {};
 
+  // ---- Editing: name, address, contact person ------------------------------
+
+  readonly editing = signal(false);
+  readonly editError = signal<string | null>(null);
+
+  editName = '';
+  editLine = '';
+  editContact = '';
+
+  readonly countries = signal<readonly LookupItem[]>([]);
+  readonly countryId = signal('');
+  readonly states = signal<readonly State[]>([]);
+  readonly stateId = signal('');
+  readonly cities = signal<readonly City[]>([]);
+  readonly cityId = signal('');
+  readonly localities = signal<readonly Locality[]>([]);
+  localityId = '';
+
+  @ViewChild('firstField') private readonly firstFieldRef?: ElementRef<HTMLInputElement>;
+  private editTrigger: HTMLElement | null = null;
+
   private get id(): string {
     return this.route.snapshot.paramMap.get('id') ?? '';
+  }
+
+  /**
+   * Opens the form on what the Pathshala holds now, with each level of the
+   * cascade already loaded for the level above it - a select whose options
+   * have not arrived shows nothing, which would read as the address being
+   * blank.
+   */
+  openEdit(school: PathshalaDetail, event: MouseEvent): void {
+    const address = school.address;
+
+    this.editName = school.name;
+    this.editLine = address?.line ?? '';
+    this.editContact = school.contactPerson ?? '';
+    this.countryId.set(address?.countryId ?? '');
+    this.stateId.set(address?.stateId ?? '');
+    this.cityId.set(address?.cityId ?? '');
+    this.localityId = address?.localityId ?? '';
+    this.states.set([]);
+    this.cities.set([]);
+    this.localities.set([]);
+
+    this.api.listLookupItems('Country', false).subscribe({
+      next: (found) => this.countries.set(found),
+      error: () => this.countries.set([]),
+    });
+    this.loadStatesAndCities();
+    this.loadLocalities();
+
+    this.editTrigger = event.currentTarget as HTMLElement;
+    this.editError.set(null);
+    this.done.set(null);
+    this.editing.set(true);
+    setTimeout(() => this.firstFieldRef?.nativeElement.focus());
+  }
+
+  closeEdit(): void {
+    if (!this.editing()) {
+      return;
+    }
+
+    this.editing.set(false);
+
+    const trigger = this.editTrigger;
+    this.editTrigger = null;
+
+    if (trigger) {
+      setTimeout(() => trigger.focus());
+    }
+  }
+
+  onCountryChange(countryId: string): void {
+    this.countryId.set(countryId);
+    this.stateId.set('');
+    this.cityId.set('');
+    this.localityId = '';
+    this.states.set([]);
+    this.cities.set([]);
+    this.localities.set([]);
+    this.loadStatesAndCities();
+  }
+
+  onStateChange(stateId: string): void {
+    this.stateId.set(stateId);
+    this.cityId.set('');
+    this.localityId = '';
+    this.localities.set([]);
+
+    this.api.listCities(this.countryId(), stateId || null).subscribe({
+      next: (found) => this.cities.set(found),
+      error: () => this.cities.set([]),
+    });
+  }
+
+  onCityChange(cityId: string): void {
+    this.cityId.set(cityId);
+    this.localityId = '';
+    this.localities.set([]);
+    this.loadLocalities();
+  }
+
+  private loadStatesAndCities(): void {
+    const countryId = this.countryId();
+
+    if (countryId === '') {
+      return;
+    }
+
+    this.api.listStates(countryId).subscribe({
+      next: (found) => this.states.set(found),
+      error: () => this.states.set([]),
+    });
+    this.api.listCities(countryId, this.stateId() || null).subscribe({
+      next: (found) => this.cities.set(found),
+      error: () => this.cities.set([]),
+    });
+  }
+
+  private loadLocalities(): void {
+    const cityId = this.cityId();
+
+    if (cityId === '') {
+      return;
+    }
+
+    this.api.listLocalities(cityId).subscribe({
+      next: (found) => this.localities.set(found),
+      error: () => this.localities.set([]),
+    });
+  }
+
+  saveEdit(): void {
+    const name = this.editName.trim();
+
+    if (name.length === 0 || this.busy()) {
+      return;
+    }
+
+    this.busy.set(true);
+    this.editError.set(null);
+
+    this.api
+      .updatePathshala(
+        this.id,
+        name,
+        {
+          addressLine: blankToNull(this.editLine),
+          countryId: this.countryId() || null,
+          stateId: this.stateId() || null,
+          cityId: this.cityId() || null,
+          localityId: this.localityId || null,
+        },
+        blankToNull(this.editContact),
+      )
+      .subscribe({
+        next: () => {
+          this.busy.set(false);
+          this.closeEdit();
+          this.done.set(`${name} is saved.`);
+          this.load();
+        },
+        error: (failure: unknown) => {
+          // Kept inside the dialog with the form open, so a refusal does not
+          // cost what was typed.
+          this.editError.set(describeError(failure));
+          this.busy.set(false);
+        },
+      });
+  }
+
+  onModalKeydown(event: KeyboardEvent): void {
+    if (event.key === 'Escape') {
+      event.stopPropagation();
+      this.closeEdit();
+
+      return;
+    }
+
+    if (event.key !== 'Tab') {
+      return;
+    }
+
+    const dialog = event.currentTarget as HTMLElement;
+    const focusable = dialog.querySelectorAll<HTMLElement>(
+      'a[href], button:not([disabled]), input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])',
+    );
+
+    if (focusable.length === 0) {
+      return;
+    }
+
+    const first = focusable[0]!;
+    const last = focusable[focusable.length - 1]!;
+
+    if (event.shiftKey && document.activeElement === first) {
+      event.preventDefault();
+      last.focus();
+    } else if (!event.shiftKey && document.activeElement === last) {
+      event.preventDefault();
+      first.focus();
+    }
   }
 
   ngOnInit(): void {

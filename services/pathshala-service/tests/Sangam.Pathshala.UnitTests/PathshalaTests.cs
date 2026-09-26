@@ -32,6 +32,26 @@ public sealed class PathshalaTests
         return (pathshala, pathshala.AddClass(session.Id, "Class 8", "Room 2")!);
     }
 
+    // ---- Correcting the master record ----------------------------------------
+
+    [Fact]
+    public void Correcting_a_Pathshala_replaces_its_details_and_says_so()
+    {
+        var pathshala = APathshala();
+        var locality = Guid.NewGuid();
+
+        pathshala.UpdateDetails(
+            "  Shri Parshwanath Jain Pathshala ",
+            new PathshalaAddress("Sector 4", null, null, null, locality),
+            "   ",
+            Now);
+
+        pathshala.Name.Should().Be("Shri Parshwanath Jain Pathshala");
+        pathshala.Address!.LocalityId.Should().Be(locality);
+        pathshala.ContactPerson.Should().BeNull();
+        pathshala.DomainEvents.OfType<PathshalaUpdatedDomainEvent>().Should().ContainSingle();
+    }
+
     // ---- One current session -----------------------------------------------
 
     [Fact]

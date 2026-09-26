@@ -20,7 +20,7 @@ screen. The spec is `docs/product/wireframes/admin-panel-wireframes.html`.
 | Audit Logs | `/audit` | `#audit` | built |
 | Timeline / Moderation | `/moderation` | `#content` | built |
 | Jain Pathshala | `/pathshala` | `#pathshala` | built — the list |
-| Pathshala detail | `/pathshala/:id` | — | built; no wireframe covers running one. Sessions, classes and the placement queue |
+| Pathshala detail | `/pathshala/:id` | — | built; no wireframe covers running one. Edit details (a modal), sessions, classes and the placement queue |
 | Class detail | `/pathshala/:id/classes/:classId` | — | built. Teachers, timetable, roll, register, exams and results |
 | Notifications | `/notifications` | `#notifications` | built — compose and recent, without the Audience and Channel dropdowns |
 | Auctions / Boli | `/boli` | `#boli` + `#publishboli` | built. Occasions, and the publication queue with its confirmation |
@@ -269,6 +269,18 @@ would be offering to create one nowhere in particular.
 Worth generalising: a control that one role may use is not a control the panel
 should omit. The role matrix screen has always got this right by rendering what
 the server says the caller may do.
+
+**A Pathshala's name, address and contact person are edited from its detail
+screen (2026-09-26), by anybody who runs it.** Creating one stays a Super
+Admin's act; correcting one is `Pathshala.Manage`, because a wrong address is
+the Samaaj's to fix and the address is also what decides which Area Admin runs
+it. "Edit details" opens the modal Events and Groups use, on the same
+Country -> State -> City -> Locality cascade as the create form, with every
+level above a set one loaded before it is shown - a select whose options have
+not arrived renders blank, which would read as the address being empty. An
+Area Admin sees the cascade disabled: the service refuses to move a Pathshala
+out of their locality, so the form does not offer to. Save replaces all
+three fields and re-reads the Pathshala.
 
 **Standing a Pathshala down is confirmed and not reversible here.** Every
 session, class, register and exam result is kept — a Pathshala that closed still
@@ -870,8 +882,8 @@ placement queue, sessions and classes for one, because the services answer
 404 there and a screen should not ask for what it has been told it may not
 have. `core/area-scope.ts`'s `AreaScope.administers(localityId)` is that one
 check, true for anybody who is not an Area Admin. A Pathshala's locality is
-its address's, which only a Super Admin sets at creation - so an existing
-Pathshala with none stays the Samaaj Admin's until an edit command exists.
+its address's, so one created before localities mattered stays the Samaaj
+Admin's until somebody gives it one with Edit details (below).
 Social issues are filtered by the service itself: the approval queue simply
 returns only the Area Admin's locality's issues.
 

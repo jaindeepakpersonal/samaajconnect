@@ -31,6 +31,7 @@ Two entities in DATA-MODEL.md §9 are deliberately absent. See "Decisions".
 | Command | Policy | Notes |
 |---|---|---|
 | `CreatePathshalaCommand` | `SuperAdmin` + `Pathshala.Manage` | The one act reserved to the platform |
+| `UpdatePathshalaCommand` | `Pathshala.Manage` | Name, address, contact person. An Area Admin cannot move it out of their locality |
 | `OpenSessionCommand` | `Pathshala.Manage` | Makes the new session current |
 | `CreateClassCommand` | `Pathshala.Manage` | |
 | `AddClassSlotCommand` | `Pathshala.Manage` | Refuses an overlap |
@@ -64,6 +65,7 @@ Two entities in DATA-MODEL.md §9 are deliberately absent. See "Decisions".
 ## Events published
 
 - `pathshala.created.v1`
+- `pathshala.updated.v1` (ids only, like its creation)
 - `pathshala.session.opened.v1`
 - `pathshala.deactivated.v1`
 - `pathshala.enrolment.requested.v1`
@@ -129,9 +131,14 @@ else here. The Samaaj-wide attendance figure refuses them outright (403): it
 is a whole-Samaaj number, and there is no one Pathshala to scope it to.
 Listing Pathshalas and a parent's own requests stay Samaaj-wide.
 
-Because a Pathshala's address can only be set when a Super Admin creates it,
-a Pathshala created before its locality mattered has none, and stays the
-Samaaj Admin's until an update command exists.
+A Pathshala created before its locality mattered has none, and stays the
+Samaaj Admin's until somebody gives it one with `UpdatePathshalaCommand`
+(2026-09-26). That command is `Pathshala.Manage` alone - creating decides a
+Pathshala exists, which is the platform's call, but a wrong address on one
+that exists is the Samaaj's to put right. An Area Admin may correct their own
+locality's Pathshala and not move it out: a blank locality is filled with
+theirs, because clearing it would hand the Pathshala to the Samaaj Admin, and
+naming another answers 403 - events-service's rule for an event.
 
 ## The register
 
@@ -210,10 +217,11 @@ member profile always carries *an* address object even with every field
 inside it empty. The cascade goes Country -> State -> City -> Locality
 because master-data-service's own `Locality` is scoped to a `City`, which is
 scoped to a `Country` and, optionally, a `State` — there is no way to filter
-a Locality list without a City chosen first. `CreatePathshalaCommand` is the
-only place the address is ever set: there is no update command for a
-Pathshala at all, so correcting one after creation is not yet possible
-through any route this service offers.
+a Locality list without a City chosen first. The address is set on creation
+and corrected with `UpdatePathshalaCommand`, which replaces the name, the
+whole address and the contact person together - a partial patch would need
+"leave it" and "clear it" told apart on every field, and the admin form
+always has all three on screen anyway.
 
 The migration renamed the old `address` column to `address_line` rather than
 discarding it — a Pathshala's one address always meant its physical line —

@@ -83,6 +83,32 @@ public static class PathshalaEndpoints
             .ProducesProblem(StatusCodes.Status401Unauthorized)
             .ProducesProblem(StatusCodes.Status404NotFound);
 
+        group.MapPatch("/pathshalas/{id:guid}", async (
+                Guid id, UpdatePathshalaRequest request, ISender sender, CancellationToken cancellationToken) =>
+            {
+                var command = new UpdatePathshalaCommand(
+                    id,
+                    request.Name,
+                    request.AddressLine,
+                    request.CountryId,
+                    request.StateId,
+                    request.CityId,
+                    request.LocalityId,
+                    request.ContactPerson);
+
+                var result = await sender.Send(command, cancellationToken);
+
+                return result.ToApiResult();
+            })
+            .RequireAuthorization()
+            .WithName("UpdatePathshala")
+            .WithSummary("Correct a Pathshala's name, address and contact person.")
+            .Produces<PathshalaResponse>()
+            .ProducesValidationProblem()
+            .ProducesProblem(StatusCodes.Status401Unauthorized)
+            .ProducesProblem(StatusCodes.Status403Forbidden)
+            .ProducesProblem(StatusCodes.Status404NotFound);
+
         group.MapPost("/pathshalas/{id:guid}/sessions", async (
                 Guid id, OpenSessionRequest request, ISender sender, CancellationToken cancellationToken) =>
             {
@@ -454,6 +480,15 @@ public static class PathshalaEndpoints
     // ---- Wire shapes ------------------------------------------------------
 
     public sealed record CreatePathshalaRequest(
+        string Name,
+        string? AddressLine,
+        string? CountryId,
+        string? StateId,
+        string? CityId,
+        string? LocalityId,
+        string? ContactPerson);
+
+    public sealed record UpdatePathshalaRequest(
         string Name,
         string? AddressLine,
         string? CountryId,

@@ -34,6 +34,18 @@ public sealed record AcademicSessionOpenedDomainEvent(
     public string Topic => "pathshala.session.opened.v1";
 }
 
+/// <summary>
+/// A Pathshala's name, address or contact person was corrected. Ids only, like
+/// its creation: the new values are in this service's own table.
+/// </summary>
+public sealed record PathshalaUpdatedDomainEvent(
+    Guid PathshalaId,
+    Guid TenantId,
+    DateTimeOffset OccurredAt) : IDomainEvent
+{
+    public string Topic => "pathshala.updated.v1";
+}
+
 /// <summary>A Pathshala has stopped operating and takes no more enrolments.</summary>
 public sealed record PathshalaDeactivatedDomainEvent(
     Guid PathshalaId,

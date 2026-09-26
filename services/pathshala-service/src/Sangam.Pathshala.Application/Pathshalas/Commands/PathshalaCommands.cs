@@ -71,7 +71,8 @@ public sealed class CreatePathshalaCommandHandler(
                 "Pathshala.NoSamaaj", "Select a Samaaj before creating a Pathshala in it."));
         }
 
-        var address = ToAddress(command);
+        var address = AddressInput.ToAddress(
+            command.AddressLine, command.CountryId, command.StateId, command.CityId, command.LocalityId);
 
         var pathshala = Domain.Pathshalas.Pathshala.Create(
             tenantId, command.Name, address, command.ContactPerson, clock.UtcNow);
@@ -82,30 +83,116 @@ public sealed class CreatePathshalaCommandHandler(
 
         return Result.Success(pathshala.ToResponse());
     }
+}
 
-    // Guaranteed null-or-parseable by CreatePathshalaCommandValidator. Null
+internal static class AddressInput
+{
+    // Guaranteed null-or-parseable by the create and update validators. Null
     // when nothing at all was given, rather than an address with every field
     // empty - the same "nothing filled in is nothing, not an empty struct"
     // reasoning PathshalaAddress's own doc comment gives.
-    private static PathshalaAddress? ToAddress(CreatePathshalaCommand command)
+    public static PathshalaAddress? ToAddress(
+        string? addressLine, string? countryId, string? stateId, string? cityId, string? localityId)
     {
-        var line = string.IsNullOrWhiteSpace(command.AddressLine) ? null : command.AddressLine.Trim();
+        var line = string.IsNullOrWhiteSpace(addressLine) ? null : addressLine.Trim();
 
-        if (line is null && command.CountryId is null && command.StateId is null
-            && command.CityId is null && command.LocalityId is null)
+        if (line is null && countryId is null && stateId is null && cityId is null && localityId is null)
         {
             return null;
         }
 
         return new PathshalaAddress(
-            line,
-            ParseGuid(command.CountryId),
-            ParseGuid(command.StateId),
-            ParseGuid(command.CityId),
-            ParseGuid(command.LocalityId));
+            line, ParseGuid(countryId), ParseGuid(stateId), ParseGuid(cityId), ParseGuid(localityId));
     }
 
-    private static Guid? ParseGuid(string? value) => value is null ? null : Guid.Parse(value);
+    public static Guid? ParseGuid(string? value) => value is null ? null : Guid.Parse(value);
+}
+
+// ---- Correct the master record -----------------------------------------------
+
+/// <summary>
+/// Corrects a Pathshala's name, address and contact person.
+/// </summary>
+/// <remarks>
+/// <para>
+/// <c>Pathshala.Manage</c> alone, unlike creating one. Creating decides that a
+/// Pathshala exists, which is the platform's call; a wrong address on one that
+/// exists is the Samaaj's to put right, and until this there was no route at
+/// all - so a Pathshala created before localities mattered could never become
+/// an Area Admin's to run.
+/// </para>
+/// <para>
+/// <b>An Area Admin corrects only their own locality's Pathshala, and cannot
+/// move it out.</b> Elsewhere, or with no locality, it answers "not found" like
+/// every other Pathshala.Manage command. A locality left blank is filled with
+/// theirs rather than clearing it - clearing it would hand the Pathshala to
+/// the Samaaj Admin - and naming another is refused (403), the same rule
+/// events-service applies to an event.
+/// </para>
+/// </remarks>
+[RequiresPermission(PermissionKeys.PathshalaManage)]
+public sealed record UpdatePathshalaCommand(
+    Guid PathshalaId,
+    string Name,
+    string? AddressLine,
+    string? CountryId,
+    string? StateId,
+    string? CityId,
+    string? LocalityId,
+    string? ContactPerson) : ICommand<PathshalaResponse>;
+
+public sealed class UpdatePathshalaCommandValidator : AbstractValidator<UpdatePathshalaCommand>
+{
+    public UpdatePathshalaCommandValidator()
+    {
+        RuleFor(x => x.PathshalaId).NotEmpty();
+        RuleFor(x => x.Name).NotEmpty().MaximumLength(200);
+        RuleFor(x => x.AddressLine).MaximumLength(500);
+        RuleFor(x => x.CountryId).Must(BeNullOrAGuid).WithMessage("Country is not valid.");
+        RuleFor(x => x.StateId).Must(BeNullOrAGuid).WithMessage("State is not valid.");
+        RuleFor(x => x.CityId).Must(BeNullOrAGuid).WithMessage("City is not valid.");
+        RuleFor(x => x.LocalityId).Must(BeNullOrAGuid).WithMessage("Locality is not valid.");
+        RuleFor(x => x.ContactPerson).MaximumLength(200);
+    }
+
+    private static bool BeNullOrAGuid(string? value) => value is null || Guid.TryParse(value, out _);
+}
+
+public sealed class UpdatePathshalaCommandHandler(
+    IPathshalaRepository pathshalas,
+    IUnitOfWork unitOfWork,
+    ITenantContext tenantContext,
+    IAreaScope areaScope,
+    IDateTimeProvider clock)
+    : IRequestHandler<UpdatePathshalaCommand, Result<PathshalaResponse>>
+{
+    public async Task<Result<PathshalaResponse>> Handle(
+        UpdatePathshalaCommand command, CancellationToken cancellationToken)
+    {
+        var pathshala = await pathshalas.GetByIdAsync(command.PathshalaId, cancellationToken);
+
+        if (!pathshala.IsInTenant(tenantContext.TenantId) || !pathshala.IsAdministeredBy(areaScope))
+        {
+            return Result.Failure<PathshalaResponse>(PathshalaAccess.NoSuchPathshala);
+        }
+
+        var localityId = command.LocalityId ?? areaScope.AreaLocalityId?.ToString();
+
+        if (!areaScope.MayAdminister(AddressInput.ParseGuid(localityId)))
+        {
+            return Result.Failure<PathshalaResponse>(Error.Forbidden(
+                "Pathshala.OutsideLocality", "You cannot move a Pathshala out of your own locality."));
+        }
+
+        var address = AddressInput.ToAddress(
+            command.AddressLine, command.CountryId, command.StateId, command.CityId, localityId);
+
+        pathshala!.UpdateDetails(command.Name, address, command.ContactPerson, clock.UtcNow);
+
+        await unitOfWork.SaveChangesAsync(cancellationToken);
+
+        return Result.Success(pathshala.ToResponse());
+    }
 }
 
 // ---- Academic sessions -------------------------------------------------------

@@ -419,6 +419,30 @@ export class AdminApi {
    * still taught the children who attended it, and a Samaaj asked what its
    * attendance was that year has to be able to answer.
    */
+  /**
+   * Corrects a Pathshala's name, address and contact person, replacing all
+   * three. `Pathshala.Manage`, so a Samaaj Admin can give a Pathshala created
+   * before localities mattered the one that makes it an Area Admin's to run.
+   */
+  updatePathshala(
+    id: string,
+    name: string,
+    address: {
+      addressLine: string | null;
+      countryId: string | null;
+      stateId: string | null;
+      cityId: string | null;
+      localityId: string | null;
+    },
+    contactPerson: string | null,
+  ): Observable<Pathshala> {
+    return this.http.patch<Pathshala>(`/v1/pathshala/pathshalas/${id}`, {
+      name,
+      ...address,
+      contactPerson,
+    });
+  }
+
   deactivatePathshala(id: string): Observable<Pathshala> {
     return this.http.delete<Pathshala>(`/v1/pathshala/pathshalas/${id}`);
   }

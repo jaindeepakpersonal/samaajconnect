@@ -149,6 +149,7 @@ and expose its endpoints behind the gateway at the route prefix shown.
   TeacherAssignment, StudentEnrollment, Attendance, Exam, ExamResult,
   ProgressRecord, PathshalaEvent
 - **Key commands:** `CreatePathshalaCommand` (Super Admin only),
+  `UpdatePathshalaCommand` (name, address, contact person),
   `EnrollStudentCommand`, `MarkAttendanceCommand`,
   `RecordExamResultCommand`
 - **Key queries:** `GetMyClassQuery`, `GetMyAttendanceQuery`,

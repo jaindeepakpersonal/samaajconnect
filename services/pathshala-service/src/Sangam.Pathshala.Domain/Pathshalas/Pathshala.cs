@@ -69,6 +69,28 @@ public sealed class Pathshala : AggregateRoot, ITenantScopedEntity
         return pathshala;
     }
 
+    /// <summary>
+    /// Corrects the name, address and contact person, replacing all three.
+    /// </summary>
+    /// <remarks>
+    /// Allowed on a stood-down Pathshala too: its records are kept, and a
+    /// record kept under a misspelt name or the wrong address is worth
+    /// correcting. The address is also what decides which Area Admin runs it,
+    /// so moving it is the one way a Pathshala created before localities
+    /// mattered becomes a locality's to run.
+    /// </remarks>
+    public void UpdateDetails(
+        string name, PathshalaAddress? address, string? contactPerson, DateTimeOffset now)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(name);
+
+        Name = name.Trim();
+        Address = address;
+        ContactPerson = Blank(contactPerson);
+
+        Raise(new PathshalaUpdatedDomainEvent(Id, TenantId, now));
+    }
+
     private static string? Blank(string? value) =>
         string.IsNullOrWhiteSpace(value) ? null : value.Trim();
 
