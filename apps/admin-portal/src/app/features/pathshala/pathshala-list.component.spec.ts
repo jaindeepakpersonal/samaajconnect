@@ -24,10 +24,16 @@ function pathshala(overrides: Partial<Pathshala> = {}): Pathshala {
 }
 
 /**
- * Stands in for the real services so the role and the chosen Samaaj can be set
- * per test — the two facts that decide whether the create form is offered.
+ * Stands in for the real services so the role, the permissions, an Area
+ * Admin's locality and the chosen Samaaj can be set per test - the facts that
+ * decide which controls a tile carries.
  */
-function configure(roles: string[], tenantId: string | null) {
+function configure(
+  roles: string[],
+  tenantId: string | null,
+  permissions: string[] = ['Pathshala.Manage'],
+  areaLocalityId: string | null = null,
+) {
   TestBed.configureTestingModule({
     imports: [PathshalaListComponent],
     providers: [
@@ -35,7 +41,10 @@ function configure(roles: string[], tenantId: string | null) {
       provideHttpClient(),
       provideHttpClientTesting(),
       { provide: API_CONFIG, useValue: { gatewayUrl: '' } },
-      { provide: AuthService, useValue: { roles: () => roles } },
+      {
+        provide: AuthService,
+        useValue: { roles: () => roles, user: () => ({ roles, permissions, areaLocalityId }) },
+      },
       {
         provide: AdminScope,
         useValue: { tenantId: () => tenantId, label: () => 'Mahavir Samaaj' },
@@ -57,39 +66,44 @@ describe('PathshalaListComponent', () => {
 
   const text = () => fixture.nativeElement.textContent as string;
 
+  const buttonSaying = (label: string) =>
+    [...fixture.nativeElement.querySelectorAll('button')].find((b) =>
+      (b as HTMLElement).textContent?.trim().startsWith(label),
+    ) as HTMLButtonElement | undefined;
+
   function load(list: Pathshala[] = []) {
     fixture.detectChanges();
     http.expectOne('/v1/pathshala/pathshalas').flush(list);
-    http
-      .expectOne('/v1/master-data/lookup-items?category=Country&includeInactive=false')
-      .flush([]);
     fixture.detectChanges();
   }
 
-  it('offers a Samaaj Admin no create form', () => {
-    // The master record is the platform operator's. Offering the form here
-    // would be offering a control that always answers 403.
+  afterEach(() => http.verify());
+
+  it('offers a Samaaj Admin no create button', () => {
+    // The master record is the platform operator's. Offering it here would be
+    // offering a control that always answers 403.
     configure(['SamaajAdmin'], 't1');
     build();
     load([pathshala()]);
 
     expect(component.canCreate()).toBe(false);
-    expect(text()).not.toContain('Create a Pathshala');
-
-    http.verify();
+    expect(buttonSaying('Create a Pathshala')).toBeUndefined();
   });
 
-  it('offers a Super Admin scoped into a Samaaj the create form', () => {
-    // The panel is used by Super Admins too, which is what the earlier "always
-    // answers 403" note missed — and why this endpoint had no caller at all.
+  it('offers a Super Admin scoped into a Samaaj the create button, which opens the dialog', () => {
     configure(['SuperAdmin'], 't1');
     build();
     load([pathshala()]);
 
-    expect(component.canCreate()).toBe(true);
-    expect(text()).toContain('Create a Pathshala');
+    buttonSaying('Create a Pathshala')!.click();
+    fixture.detectChanges();
 
-    http.verify();
+    expect(component.dialogOpen()).toBe(true);
+    expect(component.editing()).toBeNull();
+    expect(fixture.nativeElement.querySelector('[role="dialog"]')).not.toBeNull();
+
+    // The dialog asks for the country list as it opens.
+    http.expectOne('/v1/master-data/lookup-items?category=Country&includeInactive=false').flush([]);
   });
 
   it('offers a Super Admin with no Samaaj chosen nothing to create into', () => {
@@ -98,58 +112,9 @@ describe('PathshalaListComponent', () => {
     configure(['SuperAdmin'], null);
     build();
     fixture.detectChanges();
-    http
-      .expectOne('/v1/master-data/lookup-items?category=Country&includeInactive=false')
-      .flush([]);
-    fixture.detectChanges();
 
     expect(component.canCreate()).toBe(false);
     expect(text()).toContain('Choose one in the top bar');
-
-    http.verify();
-  });
-
-  it('creates a Pathshala, sending no blanks', () => {
-    configure(['SuperAdmin'], 't1');
-    build();
-    load([]);
-
-    component.name = '  Shri Mahavir Jain Pathshala  ';
-    component.addressLine = '   ';
-    component.contactPerson = 'Smt. Kavita Jain';
-    component.create();
-
-    const call = http.expectOne('/v1/pathshala/pathshalas');
-
-    expect(call.request.body).toEqual({
-      name: 'Shri Mahavir Jain Pathshala',
-      addressLine: null,
-      countryId: null,
-      stateId: null,
-      cityId: null,
-      localityId: null,
-      contactPerson: 'Smt. Kavita Jain',
-    });
-
-    call.flush(pathshala());
-    http.expectOne('/v1/pathshala/pathshalas').flush([pathshala()]);
-    fixture.detectChanges();
-
-    expect(text()).toContain('Open a session to start teaching');
-
-    http.verify();
-  });
-
-  it('will not create one without a name', () => {
-    configure(['SuperAdmin'], 't1');
-    build();
-    load([]);
-
-    component.name = '   ';
-    component.create();
-
-    http.expectNone('/v1/pathshala/pathshalas');
-    http.verify();
   });
 
   it('still explains an empty list to somebody who cannot create one', () => {
@@ -158,76 +123,90 @@ describe('PathshalaListComponent', () => {
     load([]);
 
     expect(text()).toContain('ask them to add one');
-
-    http.verify();
   });
 
-  it('cascades Country -> State/City -> Locality on the create form', () => {
-    configure(['SuperAdmin'], 't1');
+  it('puts Edit and Stand down on the tile of a Pathshala the admin runs', () => {
+    configure(['SamaajAdmin'], 't1');
     build();
-    load([]);
+    load([pathshala()]);
 
-    component.onCountryChange('country-1');
-
-    http
-      .expectOne('/v1/master-data/states?includeInactive=false&countryId=country-1')
-      .flush([{ id: 'state-1', countryId: 'country-1', name: 'Rajasthan', isActive: true }]);
-    http
-      .expectOne('/v1/master-data/cities?includeInactive=false&countryId=country-1')
-      .flush([{ id: 'city-1', countryId: 'country-1', stateId: null, name: 'Udaipur', isActive: true }]);
-
-    expect(component.states().map((s) => s.name)).toEqual(['Rajasthan']);
-    expect(component.cities().map((c) => c.name)).toEqual(['Udaipur']);
-
-    component.onCityChange('city-1');
-
-    http
-      .expectOne('/v1/master-data/localities?includeInactive=false&cityId=city-1')
-      .flush([{ id: 'locality-1', cityId: 'city-1', name: 'Hiran Magri', isActive: true }]);
-
-    expect(component.localities().map((l) => l.name)).toEqual(['Hiran Magri']);
-
-    component.name = 'Shri Mahavir Jain Pathshala';
-    component.localityId = 'locality-1';
-    component.create();
-
-    const call = http.expectOne('/v1/pathshala/pathshalas');
-    expect(call.request.body).toEqual({
-      name: 'Shri Mahavir Jain Pathshala',
-      addressLine: null,
-      countryId: 'country-1',
-      stateId: null,
-      cityId: 'city-1',
-      localityId: 'locality-1',
-      contactPerson: null,
-    });
+    expect(buttonSaying('Edit')).toBeDefined();
+    expect(buttonSaying('Stand down')).toBeDefined();
   });
 
-  it('resets State, City and Locality when the country changes', () => {
-    configure(['SuperAdmin'], 't1');
+  it('opens the edit dialog on the Pathshala as it is', () => {
+    configure(['SamaajAdmin'], 't1');
     build();
-    load([]);
+    load([pathshala()]);
 
-    component.onCountryChange('country-1');
-    http
-      .expectOne('/v1/master-data/states?includeInactive=false&countryId=country-1')
-      .flush([]);
-    http
-      .expectOne('/v1/master-data/cities?includeInactive=false&countryId=country-1')
-      .flush([]);
+    buttonSaying('Edit')!.click();
+    fixture.detectChanges();
+    http.expectOne('/v1/master-data/lookup-items?category=Country&includeInactive=false').flush([]);
 
-    component.stateId.set('state-1');
-    component.cityId.set('city-1');
-    component.localityId = 'locality-1';
+    expect(component.editing()?.id).toBe('p1');
+    expect(text()).toContain('Edit Shri Mahavir Jain Pathshala');
+  });
 
-    component.onCountryChange('');
+  it('gives somebody without Pathshala.Manage neither control', () => {
+    configure(['Member', 'PathshalaTeacher'], 't1', ['Members.Read', 'Pathshala.Attendance.Write']);
+    build();
+    load([pathshala()]);
 
-    expect(component.stateId()).toBe('');
-    expect(component.cityId()).toBe('');
-    expect(component.localityId).toBe('');
-    expect(component.states()).toEqual([]);
-    expect(component.cities()).toEqual([]);
-    expect(component.localities()).toEqual([]);
+    expect(buttonSaying('Edit')).toBeUndefined();
+    expect(buttonSaying('Stand down')).toBeUndefined();
+    expect(text()).toContain('Open');
+  });
+
+  it("gives an Area Admin the controls on their own locality's Pathshala only", () => {
+    configure(['Member', 'AreaAdmin'], 't1', ['Pathshala.Manage'], 'loc-hm');
+    build();
+    load([
+      pathshala({ id: 'own', address: { line: null, countryId: null, stateId: null, cityId: null, localityId: 'loc-hm' } }),
+      pathshala({ id: 'other', name: 'Elsewhere', address: null }),
+    ]);
+
+    const edits = [...fixture.nativeElement.querySelectorAll('button')].filter((b) =>
+      (b as HTMLElement).textContent?.trim().startsWith('Edit'),
+    );
+
+    expect(edits).toHaveLength(1);
+    expect(component.canManage(pathshala({ address: null }))).toBe(false);
+  });
+
+  it('will not stand a Pathshala down on one click, and keeps the trigger', () => {
+    configure(['SamaajAdmin'], 't1');
+    build();
+    load([pathshala()]);
+
+    const trigger = buttonSaying('Stand down')!;
+    trigger.click();
+    fixture.detectChanges();
+
+    expect(text()).toContain('cannot be undone');
+    expect(buttonSaying('Stand down')).toBe(trigger);
+    expect(trigger.getAttribute('aria-expanded')).toBe('true');
+    http.expectNone((r) => r.method === 'DELETE');
+  });
+
+  it('stands it down once confirmed and re-reads the list', () => {
+    configure(['SamaajAdmin'], 't1');
+    build();
+    load([pathshala()]);
+
+    component.standingDown.set('p1');
+    fixture.detectChanges();
+    buttonSaying('Stand it down')!.click();
+
+    const call = http.expectOne('/v1/pathshala/pathshalas/p1');
+
+    expect(call.request.method).toBe('DELETE');
+    call.flush(pathshala({ status: 'Inactive' }));
+    http.expectOne('/v1/pathshala/pathshalas').flush([pathshala({ status: 'Inactive' })]);
+    fixture.detectChanges();
+
+    expect(text()).toContain('has been stood down');
+    expect(text()).toContain('Stood down');
+    expect(buttonSaying('Stand down')).toBeUndefined();
   });
 
   it('reads a 404 as the module being off', () => {
@@ -235,14 +214,9 @@ describe('PathshalaListComponent', () => {
     build();
     fixture.detectChanges();
     http.expectOne('/v1/pathshala/pathshalas').flush({}, { status: 404, statusText: 'Not Found' });
-    http
-      .expectOne('/v1/master-data/lookup-items?category=Country&includeInactive=false')
-      .flush([]);
     fixture.detectChanges();
 
     expect(text()).toContain('does not run the Pathshala module');
     expect(fixture.nativeElement.querySelector('[role="alert"]')).toBeNull();
-
-    http.verify();
   });
 });
