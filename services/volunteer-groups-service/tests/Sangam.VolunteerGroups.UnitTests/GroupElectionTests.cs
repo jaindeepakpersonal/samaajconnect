@@ -1,5 +1,6 @@
 using FluentAssertions;
 using Sangam.VolunteerGroups.Domain.Elections;
+using Sangam.VolunteerGroups.Domain.Elections.Events;
 using Xunit;
 
 namespace Sangam.VolunteerGroups.UnitTests;
@@ -207,5 +208,82 @@ public sealed class GroupElectionTests
         election.Publish(Guid.NewGuid(), Now).Should()
             .BeFalse("a second publish would leave \"the result\" with no single referent");
         election.WinnerMemberId.Should().Be(winnerId, "the first result is the one that stands");
+    }
+
+    // ---- Correcting it, and reopening nominations that closed too early -------
+
+    [Theory]
+    [InlineData(ElectionStatus.Draft, true)]
+    [InlineData(ElectionStatus.NominationsOpen, true)]
+    [InlineData(ElectionStatus.VotingOpen, false)]
+    [InlineData(ElectionStatus.Closed, false)]
+    [InlineData(ElectionStatus.Published, false)]
+    public void CanBeEdited_only_before_voting_opens(ElectionStatus status, bool expected)
+    {
+        var election = Election();
+
+        if (status is ElectionStatus.NominationsOpen or ElectionStatus.VotingOpen
+            or ElectionStatus.Closed or ElectionStatus.Published)
+        {
+            election.MoveTo(ElectionStatus.NominationsOpen, Now);
+        }
+
+        if (status is ElectionStatus.VotingOpen or ElectionStatus.Closed or ElectionStatus.Published)
+        {
+            election.MoveTo(ElectionStatus.VotingOpen, Now);
+        }
+
+        if (status is ElectionStatus.Closed or ElectionStatus.Published)
+        {
+            election.MoveTo(ElectionStatus.Closed, Now);
+        }
+
+        if (status is ElectionStatus.Published)
+        {
+            election.Publish(Guid.NewGuid(), Now);
+        }
+
+        election.CanBeEdited.Should().Be(expected);
+    }
+
+    [Fact]
+    public void Reopening_extends_the_nomination_window_without_touching_status()
+    {
+        // Nominations closed by the clock: the status never advanced past
+        // NominationsOpen, so AcceptsNominations is already false with nothing
+        // to walk back - extending the date is the whole fix.
+        var election = Election();
+        election.MoveTo(ElectionStatus.NominationsOpen, Now);
+
+        // Past the fixture's own nominationEndAt (Now + 7 days) - the window
+        // has closed by the clock, with the status never having moved on.
+        var closed = Now.AddDays(10);
+
+        election.AcceptsNominations(closed).Should().BeFalse();
+
+        election.Update(
+            "Secretary",
+            nominationStartAt: Now,
+            nominationEndAt: closed.AddDays(7),
+            votingStartAt: closed.AddDays(7),
+            votingEndAt: closed.AddDays(14),
+            closed);
+
+        election.Status.Should().Be(ElectionStatus.NominationsOpen, "reopening is not a status move");
+        election.AcceptsNominations(closed).Should().BeTrue();
+    }
+
+    [Fact]
+    public void Updating_trims_the_position_title_and_announces_it()
+    {
+        var election = Election();
+        election.ClearDomainEvents();
+
+        election.Update(
+            "  Assistant Secretary  ", Now, Now.AddDays(7), Now.AddDays(7), Now.AddDays(14), Now);
+
+        election.PositionTitle.Should().Be("Assistant Secretary");
+        election.DomainEvents.Should().ContainSingle()
+            .Which.Should().BeOfType<GroupElectionUpdatedDomainEvent>();
     }
 }

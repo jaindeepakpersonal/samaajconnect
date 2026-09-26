@@ -147,6 +147,15 @@ who never passed the check that produced it.
 | PUT | `/groups/{id}/members/{memberId}/position` | `VolunteerGroups.Lead` + president | Give a position, or clear it |
 | DELETE | `/groups/{id}/members/{memberId}` | `VolunteerGroups.Lead` + president | Remove a member. **409** on the president — see below |
 | PATCH | `/groups/{id}/president` | `VolunteerGroups.Manage` | Hand the group to a different member, who joins it if they were not in it. The outgoing president stays on as an ordinary member |
+| GET | `/groups/{id}/elections` | `Members.Read` | This group's elections, newest first, each with the caller's own vote |
+| POST | `/groups/{id}/elections` | `VolunteerGroups.Lead` + president, or a Samaaj admin running the *President* election of a group with none | Set an election up for a named position. Starts `Draft` |
+| GET | `/elections/{id}` | `Members.Read` | One election with its ballot and tally — never hidden, unlike Celebrities of Samaaj |
+| PATCH | `/elections/{id}` | `VolunteerGroups.Lead` + president | Correct the position title or windows — how nominations that closed too early are reopened. `Draft`/`NominationsOpen` only |
+| POST | `/elections/{id}/status` | `VolunteerGroups.Lead` + president | `NominationsOpen`, `VotingOpen` or `Closed`. Strictly forward; 409 moving to `VotingOpen` on an empty ballot |
+| POST | `/elections/{id}/candidates` | `VolunteerGroups.Lead` + a member of the group | Nominate a fellow group member. A repeat nomination is a no-op reported as success |
+| POST | `/elections/{id}/candidates/{candidateId}/decide` | `VolunteerGroups.Lead` + president | Approve onto the ballot, or remove before voting opens |
+| POST | `/elections/{id}/votes` | `VolunteerGroups.Lead` + a member of the group | Cast this member's one vote. Self-votes are refused; a second vote is reported as `accepted: false` |
+| POST | `/elections/{id}/publish` | `VolunteerGroups.Lead` + president | Only from `Closed`. Installs the winner's position, clearing it from any prior holder |
 
 > The draft gated the president's operations on the `VolunteerGroupPresident`
 > role, which nothing grants. They ship on `VolunteerGroups.Lead`, which every

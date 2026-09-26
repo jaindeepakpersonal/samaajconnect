@@ -366,6 +366,11 @@ public static class KnownEvents
             EntityIdProperty: "groupId",
             BeforeProperties: ["previousStatus"]),
 
+        ["volunteer-groups.election.updated.v1"] = new(
+            Action: "ElectionUpdated",
+            EntityName: "GroupElection",
+            EntityIdProperty: "electionId"),
+
         ["volunteer-groups.election.status-changed.v1"] = new(
             Action: "ElectionStatusChanged",
             EntityName: "GroupElection",

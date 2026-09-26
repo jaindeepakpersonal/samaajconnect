@@ -223,4 +223,115 @@ public sealed class ElectionEndpointsTests(VolunteerGroupsApiFactory factory)
 
         response.StatusCode.Should().Be(HttpStatusCode.Conflict);
     }
+
+    // ---- Reopening nominations that closed too early ---------------------------
+
+    [Fact]
+    public async Task Extending_the_nomination_window_lets_a_late_nomination_through()
+    {
+        var groupId = await CreateGroupAsync();
+        var candidate = await AcceptedMemberAsync(groupId);
+        var electionId = await OpenElectionAsync(groupId);
+
+        await President().PostAsJsonAsync(
+            $"/v1/volunteer-groups/elections/{electionId}/status", new { status = "NominationsOpen" });
+
+        // Wait past the original window's own close, the same real-clock delay
+        // OpenElectionAsync's own remarks describe.
+        await Task.Delay(1600);
+
+        (await Member(candidate).PostAsJsonAsync(
+                $"/v1/volunteer-groups/elections/{electionId}/candidates",
+                new { memberId = candidate.ToString() }))
+            .StatusCode.Should().Be(HttpStatusCode.Conflict, "nominations closed by the clock");
+
+        var now = DateTimeOffset.UtcNow;
+        var extended = now.AddSeconds(3);
+
+        var update = await President().PatchAsJsonAsync($"/v1/volunteer-groups/elections/{electionId}", new
+        {
+            positionTitle = "Secretary",
+            nominationStartAt = now.AddMinutes(-1),
+            nominationEndAt = extended,
+            votingStartAt = extended,
+            votingEndAt = extended.AddMinutes(10),
+        });
+
+        update.StatusCode.Should().Be(HttpStatusCode.OK);
+        (await update.Content.ReadFromJsonAsync<JsonElement>())
+            .GetProperty("status").GetString().Should().Be("NominationsOpen", "reopening moves no status");
+
+        var afterExtending = await Member(candidate).PostAsJsonAsync(
+            $"/v1/volunteer-groups/elections/{electionId}/candidates",
+            new { memberId = candidate.ToString() });
+
+        afterExtending.StatusCode.Should().Be(HttpStatusCode.OK);
+        (await afterExtending.Content.ReadFromJsonAsync<JsonElement>())
+            .GetProperty("nominated").GetBoolean().Should().BeTrue();
+    }
+
+    [Fact]
+    public async Task Updating_is_refused_once_voting_has_opened()
+    {
+        var groupId = await CreateGroupAsync();
+        var electionId = await OpenElectionAsync(groupId);
+
+        await President().PostAsJsonAsync(
+            $"/v1/volunteer-groups/elections/{electionId}/status", new { status = "NominationsOpen" });
+
+        var candidate = await AcceptedMemberAsync(groupId);
+
+        var nominate = await Member(candidate).PostAsJsonAsync(
+            $"/v1/volunteer-groups/elections/{electionId}/candidates",
+            new { memberId = candidate.ToString() });
+
+        var candidateId = (await nominate.Content.ReadFromJsonAsync<JsonElement>())
+            .GetProperty("candidateId").GetGuid();
+
+        // The ballot needs at least one approved name before voting can open.
+        await President().PostAsJsonAsync(
+            $"/v1/volunteer-groups/elections/{electionId}/candidates/{candidateId}/decide",
+            new { approve = true });
+
+        await Task.Delay(1600);
+
+        (await President().PostAsJsonAsync(
+                $"/v1/volunteer-groups/elections/{electionId}/status", new { status = "VotingOpen" }))
+            .StatusCode.Should().Be(HttpStatusCode.OK);
+
+        var now = DateTimeOffset.UtcNow;
+
+        var response = await President().PatchAsJsonAsync($"/v1/volunteer-groups/elections/{electionId}", new
+        {
+            positionTitle = "Secretary",
+            nominationStartAt = now.AddMinutes(-10),
+            nominationEndAt = now.AddMinutes(-1),
+            votingStartAt = now,
+            votingEndAt = now.AddMinutes(10),
+        });
+
+        response.StatusCode.Should().Be(HttpStatusCode.Conflict);
+    }
+
+    [Fact]
+    public async Task A_member_who_is_not_the_president_cannot_correct_the_election()
+    {
+        var groupId = await CreateGroupAsync();
+        var electionId = await OpenElectionAsync(groupId);
+        var stranger = await AcceptedMemberAsync(groupId);
+
+        var now = DateTimeOffset.UtcNow;
+
+        var response = await Member(stranger).PatchAsJsonAsync(
+            $"/v1/volunteer-groups/elections/{electionId}", new
+            {
+                positionTitle = "Secretary",
+                nominationStartAt = now,
+                nominationEndAt = now.AddDays(7),
+                votingStartAt = now.AddDays(7),
+                votingEndAt = now.AddDays(14),
+            });
+
+        response.StatusCode.Should().Be(HttpStatusCode.NotFound);
+    }
 }

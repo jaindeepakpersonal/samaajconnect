@@ -233,6 +233,16 @@ public sealed class KnownEventsTests
         descriptor.BeforeProperties.Should().BeEquivalentTo(["previousStatus"]);
     }
 
+    [Fact]
+    public void An_election_correction_is_recorded_against_the_election_it_reopened()
+    {
+        var descriptor = KnownEvents.Describe("volunteer-groups.election.updated.v1");
+
+        descriptor.Action.Should().Be("ElectionUpdated");
+        descriptor.EntityName.Should().Be("GroupElection");
+        descriptor.EntityIdProperty.Should().Be("electionId");
+    }
+
     // ---- social-issues-service ------------------------------------------
     //
     // IssueStatusChangedDomainEvent's own doc comment names two different

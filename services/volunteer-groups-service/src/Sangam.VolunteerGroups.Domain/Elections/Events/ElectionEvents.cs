@@ -13,6 +13,21 @@ public sealed record GroupElectionStatusChangedDomainEvent(
     public string Topic => "volunteer-groups.election.status-changed.v1";
 }
 
+/// <summary>
+/// The election's details were corrected - most often its nomination window
+/// pushed out. Ids only: the position title and the windows are the group's
+/// own copy, and audit-notification-service records payloads verbatim into an
+/// append-only table.
+/// </summary>
+public sealed record GroupElectionUpdatedDomainEvent(
+    Guid ElectionId,
+    Guid TenantId,
+    Guid GroupId,
+    DateTimeOffset OccurredAt) : IDomainEvent
+{
+    public string Topic => "volunteer-groups.election.updated.v1";
+}
+
 public sealed record GroupElectionClosedDomainEvent(
     Guid ElectionId,
     Guid TenantId,

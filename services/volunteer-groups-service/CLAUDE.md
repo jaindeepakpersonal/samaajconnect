@@ -33,6 +33,7 @@ module off takes both away.
 | `ChangeGroupPresidentCommand` | `VolunteerGroups.Manage` | built |
 | `OpenElectionCommand` | `VolunteerGroups.Lead` + is this group's president | built |
 | `MoveElectionCommand` | `VolunteerGroups.Lead` + is this group's president | built |
+| `UpdateElectionCommand` | `VolunteerGroups.Lead` + is this group's president | built. Corrects the position title or windows - Draft/NominationsOpen only |
 | `NominateCandidateCommand` | `VolunteerGroups.Lead` + caller is a member of the group | built |
 | `DecideCandidateCommand` | `VolunteerGroups.Lead` + is this group's president | built |
 | `CastVoteCommand` | `VolunteerGroups.Lead` + caller is a member of the group | built |
@@ -62,6 +63,7 @@ module off takes both away.
 | `GroupElectionStatusChangedDomainEvent` | `volunteer-groups.election.status-changed.v1` | `GroupElection.MoveTo` |
 | `GroupElectionClosedDomainEvent` | `volunteer-groups.election.closed.v1` | `GroupElection.MoveTo` |
 | `GroupElectionResultsPublishedDomainEvent` | `volunteer-groups.election.results-published.v1` | `GroupElection.Publish` |
+| `GroupElectionUpdatedDomainEvent` | `volunteer-groups.election.updated.v1` | `GroupElection.Update` |
 
 **Both `GroupMemberRemovedDomainEvent` and `GroupPresidentChangedDomainEvent` were
 fiction until 2026-09-05.** This table said "Raised by `VolunteerGroup
@@ -93,6 +95,7 @@ here and no Kafka in its integration tests.
 | GET | `/v1/volunteer-groups/groups/{id}/elections` | `Members.Read` |
 | POST | `/v1/volunteer-groups/groups/{id}/elections` | `VolunteerGroups.Lead` + president |
 | GET | `/v1/volunteer-groups/elections/{id}` | `Members.Read` |
+| PATCH | `/v1/volunteer-groups/elections/{id}` | `VolunteerGroups.Lead` + president |
 | POST | `/v1/volunteer-groups/elections/{id}/status` | `VolunteerGroups.Lead` + president |
 | POST | `/v1/volunteer-groups/elections/{id}/candidates` | `VolunteerGroups.Lead` + group member |
 | POST | `/v1/volunteer-groups/elections/{id}/candidates/{candidateId}/decide` | `VolunteerGroups.Lead` + president |
@@ -193,6 +196,17 @@ request, no nomination, no vote. That parameter is gone; a new member has no
 position until an election gives them one, or the president assigns one
 directly through `AssignRolePositionCommand`, which is untouched and remains
 the manual override path this plan deliberately left alone.
+
+**Nominations that closed too early are reopened by editing, not by a
+separate "reopen" command.** `UpdateElectionCommand` (`PATCH
+/elections/{id}`) corrects the position title and all four windows, allowed
+in `Draft`/`NominationsOpen` and refused from `VotingOpen` on - the identical
+rule and reasoning celebrity-voting-service's own campaign-editing command
+uses. An election left at `NominationsOpen` past its own `NominationEndAt`
+never advanced `Status`; `AcceptsNominations` is already false with nothing
+to walk back, so pushing the date out again is the whole fix. Nothing here
+moves `Status` itself, so this is not a backdoor around "strictly forward" -
+an election already at `VotingOpen` or later is refused before the write.
 
 ## Decisions worth knowing before you change this service
 

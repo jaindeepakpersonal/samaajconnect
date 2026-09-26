@@ -7,6 +7,7 @@ using Sangam.VolunteerGroups.Application.Elections.Commands.MoveElection;
 using Sangam.VolunteerGroups.Application.Elections.Commands.NominateCandidate;
 using Sangam.VolunteerGroups.Application.Elections.Commands.OpenElection;
 using Sangam.VolunteerGroups.Application.Elections.Commands.PublishElectionResults;
+using Sangam.VolunteerGroups.Application.Elections.Commands.UpdateElection;
 using Sangam.VolunteerGroups.Application.Elections.Queries;
 
 namespace Sangam.VolunteerGroups.Api.Endpoints;
@@ -78,6 +79,35 @@ public static class ElectionEndpoints
             .Produces<ElectionDetailResponse>()
             .ProducesProblem(StatusCodes.Status401Unauthorized)
             .ProducesProblem(StatusCodes.Status404NotFound);
+
+        group.MapPatch("/elections/{id:guid}", async (
+                Guid id,
+                OpenElectionRequest request,
+                ISender sender,
+                CancellationToken cancellationToken) =>
+            {
+                var command = new UpdateElectionCommand(
+                    id,
+                    request.PositionTitle,
+                    request.NominationStartAt,
+                    request.NominationEndAt,
+                    request.VotingStartAt,
+                    request.VotingEndAt);
+
+                var result = await sender.Send(command, cancellationToken);
+
+                return result.ToApiResult();
+            })
+            .RequireAuthorization()
+            .WithName("UpdateElection")
+            .WithSummary(
+                "Correct the position title or windows - how nominations that closed too early "
+                + "are reopened. Allowed in Draft or NominationsOpen; refused from VotingOpen on.")
+            .Produces<ElectionResponse>()
+            .ProducesValidationProblem()
+            .ProducesProblem(StatusCodes.Status401Unauthorized)
+            .ProducesProblem(StatusCodes.Status404NotFound)
+            .ProducesProblem(StatusCodes.Status409Conflict);
 
         group.MapPost("/elections/{id:guid}/status", async (
                 Guid id,

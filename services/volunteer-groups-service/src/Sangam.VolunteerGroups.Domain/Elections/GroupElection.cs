@@ -85,6 +85,53 @@ public sealed class GroupElection : AggregateRoot, ITenantScopedEntity
         };
     }
 
+    /// <summary>
+    /// Whether the president (or the admin running a president-less group's own
+    /// President election) can still correct this election's details.
+    /// </summary>
+    /// <remarks>
+    /// Draft or NominationsOpen only - the identical rule and the identical
+    /// reasoning celebrity-voting-service's own <c>VotingCampaign.CanBeEdited</c>
+    /// uses. Once voting has opened, group members have been told the windows
+    /// and may already have voted against them; changing the ballot's timing
+    /// out from under them is a bigger act than a correction.
+    /// </remarks>
+    public bool CanBeEdited => Status is ElectionStatus.Draft or ElectionStatus.NominationsOpen;
+
+    /// <summary>
+    /// Replaces the election's position title and windows - most often to push
+    /// <see cref="NominationEndAt"/> out when nominations closed with too few
+    /// names on the ballot. The caller has already checked <see cref="CanBeEdited"/>
+    /// and the window ordering; this only does the write.
+    /// </summary>
+    /// <remarks>
+    /// Not a way around the "strictly forward" rule on <see cref="Status"/>:
+    /// this never moves <see cref="Status"/> itself. An election left at
+    /// NominationsOpen past its own <see cref="NominationEndAt"/> has
+    /// <see cref="AcceptsNominations"/> already false with nothing to undo - it
+    /// never advanced to VotingOpen, so extending the date here is enough to
+    /// reopen it. An election already moved to VotingOpen or beyond is refused
+    /// by <see cref="CanBeEdited"/> before this runs.
+    /// </remarks>
+    public void Update(
+        string positionTitle,
+        DateTimeOffset nominationStartAt,
+        DateTimeOffset nominationEndAt,
+        DateTimeOffset votingStartAt,
+        DateTimeOffset votingEndAt,
+        DateTimeOffset now)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(positionTitle);
+
+        PositionTitle = positionTitle.Trim();
+        NominationStartAt = nominationStartAt;
+        NominationEndAt = nominationEndAt;
+        VotingStartAt = votingStartAt;
+        VotingEndAt = votingEndAt;
+
+        Raise(new GroupElectionUpdatedDomainEvent(Id, TenantId, GroupId, now));
+    }
+
     public ElectionCandidate? FindCandidate(Guid candidateId) =>
         _candidates.FirstOrDefault(c => c.Id == candidateId);
 
