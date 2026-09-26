@@ -62,6 +62,7 @@ function samaajEvent(id: string): SamaajEvent {
     endAt: null,
     venue: 'Jain Bhavan',
     eventTypeId: null,
+    localityId: null,
     organizerType: 'Samaaj',
     organizerId: null,
     status: 'Draft',

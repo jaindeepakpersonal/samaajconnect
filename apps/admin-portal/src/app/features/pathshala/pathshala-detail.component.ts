@@ -5,6 +5,7 @@ import { ActivatedRoute, RouterLink } from '@angular/router';
 import { describeError } from '@samaajconnect/shared';
 import { AdminApi } from '../../core/admin-api';
 import { AdminScope } from '../../core/admin-scope';
+import { AreaScope } from '../../core/area-scope';
 import { Enrolment, PathshalaDetail } from '../../core/admin.models';
 import { isNotFound } from '../../core/http-status';
 
@@ -64,6 +65,12 @@ import { isNotFound } from '../../core/http-status';
         </p>
       }
 
+      @if (!area.administers(school.address?.localityId)) {
+        <p class="notice" role="status">
+          This Pathshala is in another locality, or has none recorded, so it is run by its own
+          administrators.
+        </p>
+      } @else {
       <!-- Sessions ------------------------------------------------------- -->
       <div class="card">
         <h2>Academic sessions</h2>
@@ -313,6 +320,7 @@ import { isNotFound } from '../../core/http-status';
           }
         </div>
       }
+      }
     }
   `,
   styles: `
@@ -336,6 +344,7 @@ export class PathshalaDetailComponent implements OnInit {
   private readonly route = inject(ActivatedRoute);
 
   readonly scope = inject(AdminScope);
+  readonly area = inject(AreaScope);
 
   readonly pathshala = signal<PathshalaDetail | null>(null);
   readonly requests = signal<readonly Enrolment[]>([]);
@@ -393,7 +402,12 @@ export class PathshalaDetailComponent implements OnInit {
       next: (found) => {
         this.pathshala.set(found);
         this.loading.set(false);
-        this.loadRequests();
+
+        // The placement queue answers 404 to an Area Admin for a Pathshala
+        // outside their locality, so it is not asked for.
+        if (this.area.administers(found.address?.localityId)) {
+          this.loadRequests();
+        }
       },
       error: (failure: unknown) => {
         if (isNotFound(failure)) {

@@ -2,7 +2,7 @@ import { provideHttpClient } from '@angular/common/http';
 import { HttpTestingController, provideHttpClientTesting } from '@angular/common/http/testing';
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { ActivatedRoute, provideRouter } from '@angular/router';
-import { API_CONFIG } from '@samaajconnect/shared';
+import { API_CONFIG, AuthService } from '@samaajconnect/shared';
 import { PathshalaDetailComponent } from './pathshala-detail.component';
 import { Enrolment, PathshalaDetail } from '../../core/admin.models';
 
@@ -85,6 +85,36 @@ describe('PathshalaDetailComponent', () => {
   afterEach(() => http.verify());
 
   const text = () => fixture.nativeElement.textContent as string;
+
+  it('shows an Area Admin a Pathshala elsewhere without asking for its placement queue', () => {
+    TestBed.inject(AuthService).ensureCurrentUser().subscribe();
+    http.expectOne('/v1/identity/me').flush({
+      userId: 'u9',
+      tenantId: 't1',
+      tenantSlug: 'dasha-nagda',
+      mobileOrEmail: 'area@example.com',
+      fullName: 'Area Admin',
+      status: 'Active',
+      isContactVerified: true,
+      lastLoginAt: null,
+      roles: ['Member', 'AreaAdmin'],
+      permissions: ['Pathshala.Manage'],
+      areaLocalityId: 'loc-hm',
+    });
+
+    fixture = TestBed.createComponent(PathshalaDetailComponent);
+    fixture.detectChanges();
+    http.expectOne(`/v1/pathshala/pathshalas/${PATHSHALA_ID}`).flush(
+      detail({
+        address: { line: null, countryId: null, stateId: null, cityId: null, localityId: 'loc-other' },
+      }),
+    );
+    fixture.detectChanges();
+
+    // http.verify() in afterEach is the other half: no queue request was made.
+    expect(text()).toContain('another locality');
+    expect(text()).not.toContain('Open session');
+  });
 
   function load(
     school: PathshalaDetail = detail(),

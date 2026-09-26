@@ -2,7 +2,7 @@ import { provideHttpClient } from '@angular/common/http';
 import { HttpTestingController, provideHttpClientTesting } from '@angular/common/http/testing';
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { provideRouter } from '@angular/router';
-import { API_CONFIG } from '@samaajconnect/shared';
+import { API_CONFIG, AuthService } from '@samaajconnect/shared';
 import { GroupsListComponent } from './groups-list.component';
 import { VolunteerGroup } from '../../core/admin.models';
 
@@ -12,6 +12,7 @@ function group(overrides: Partial<VolunteerGroup> = {}): VolunteerGroup {
     name: 'Seva Group',
     description: 'Food drives and blood donation camps.',
     focusArea: 'Social Service',
+    localityId: null,
     presidentMemberId: 'm1',
     status: 'Active',
     memberCount: 12,
@@ -49,15 +50,79 @@ describe('GroupsListComponent', () => {
 
   const text = () => fixture.nativeElement.textContent as string;
 
+  const LOCALITIES = [{ id: 'loc-hm', cityId: 'c1', name: 'Hiran Magri', isActive: true }];
+  const CITIES = [{ id: 'c1', countryId: 'in', stateId: null, name: 'Udaipur', isActive: true }];
+
+  /** The locality names the Locality column and the popup's picker show. */
+  function flushLocalities() {
+    http.expectOne((r) => r.url === '/v1/master-data/localities').flush(LOCALITIES);
+    http.expectOne((r) => r.url === '/v1/master-data/cities').flush(CITIES);
+  }
+
   function load(groups: VolunteerGroup[] = [], members = MEMBERS) {
     fixture.detectChanges();
+    flushLocalities();
     http.expectOne('/v1/volunteer-groups/groups').flush(groups);
     http.expectOne('/v1/members?take=100').flush({ items: members, hasMore: false });
     fixture.detectChanges();
   }
 
+  /** Signs this test in as an Area Admin for Hiran Magri, then builds a fresh screen. */
+  function asAreaAdmin() {
+    TestBed.inject(AuthService).ensureCurrentUser().subscribe();
+    http.expectOne('/v1/identity/me').flush({
+      userId: 'u9',
+      tenantId: 't1',
+      tenantSlug: 'dasha-nagda',
+      mobileOrEmail: 'area@example.com',
+      fullName: 'Area Admin',
+      status: 'Active',
+      isContactVerified: true,
+      lastLoginAt: null,
+      roles: ['Member', 'AreaAdmin'],
+      permissions: ['VolunteerGroups.Manage'],
+      areaLocalityId: 'loc-hm',
+    });
+
+    fixture = TestBed.createComponent(GroupsListComponent);
+    component = fixture.componentInstance;
+  }
+
+  it('offers an Area Admin controls only on their own locality s groups', () => {
+    asAreaAdmin();
+    load([
+      group({ id: 'g1', name: 'Hiran Seva', localityId: 'loc-hm' }),
+      group({ id: 'g2', name: 'Sector Seva', localityId: 'loc-other' }),
+    ]);
+
+    const rows = Array.from(
+      (fixture.nativeElement as HTMLElement).querySelectorAll('tbody tr'),
+    ) as HTMLElement[];
+
+    expect(rows[0]!.textContent).toContain('Hiran Magri, Udaipur');
+    expect(rows[0]!.textContent).toContain('Stand down');
+    expect(rows[1]!.textContent).not.toContain('Stand down');
+    expect(rows[1]!.textContent).toContain('Another locality');
+  });
+
+  it('sets up an Area Admin s group in their own locality', () => {
+    asAreaAdmin();
+    load();
+
+    const clickEvent = { currentTarget: document.createElement('button') } as unknown as MouseEvent;
+    component.openCreateModal(clickEvent);
+    component.name = 'Hiran Seva';
+    component.create();
+
+    expect(
+      (http.expectOne('/v1/volunteer-groups/groups').request.body as { localityId: string })
+        .localityId,
+    ).toBe('loc-hm');
+  });
+
   it('reads a 404 as the community module being off', () => {
     fixture.detectChanges();
+    flushLocalities();
     http
       .expectOne('/v1/volunteer-groups/groups')
       .flush({}, { status: 404, statusText: 'Not Found' });
@@ -85,6 +150,7 @@ describe('GroupsListComponent', () => {
       description: null,
       focusArea: null,
       presidentMemberId: null,
+      localityId: null,
     });
   });
 
@@ -119,6 +185,7 @@ describe('GroupsListComponent', () => {
       description: null,
       focusArea: 'Social Service',
       presidentMemberId: 'm2',
+      localityId: null,
     });
 
     call.flush(group());
@@ -213,6 +280,7 @@ describe('GroupsListComponent', () => {
       name: 'Seva Group (Renamed)',
       description: 'Food drives and blood donation camps.',
       focusArea: 'Social Service',
+      localityId: null,
     });
 
     call.flush(group({ name: 'Seva Group (Renamed)' }));

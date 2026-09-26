@@ -6,7 +6,8 @@ import { AuthService, describeError } from '@samaajconnect/shared';
 import { forkJoin } from 'rxjs';
 import { AdminApi } from '../../core/admin-api';
 import { AdminScope } from '../../core/admin-scope';
-import { AdminMember, City, InviteAdminResult, Locality, Role } from '../../core/admin.models';
+import { AdminMember, InviteAdminResult, Role } from '../../core/admin.models';
+import { labelLocalities } from '../../core/area-scope';
 
 const AREA_ADMIN = 'AreaAdmin';
 
@@ -621,18 +622,4 @@ export class InviteAdminComponent implements OnInit {
   spaced(name: string): string {
     return name.replace(/([a-z])([A-Z])/g, '$1 $2');
   }
-}
-
-function labelLocalities(
-  localities: readonly Locality[],
-  cities: readonly City[],
-): { id: string; label: string }[] {
-  const cityNames = new Map(cities.map((c) => [c.id, c.name]));
-
-  return localities
-    .map((l) => {
-      const city = cityNames.get(l.cityId);
-      return { id: l.id, label: city ? `${l.name}, ${city}` : l.name };
-    })
-    .sort((a, b) => a.label.localeCompare(b.label));
 }

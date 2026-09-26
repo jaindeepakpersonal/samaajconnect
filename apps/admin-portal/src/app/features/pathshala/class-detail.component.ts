@@ -4,6 +4,7 @@ import { ActivatedRoute, RouterLink } from '@angular/router';
 import { describeError } from '@samaajconnect/shared';
 import { AdminApi } from '../../core/admin-api';
 import { AdminScope } from '../../core/admin-scope';
+import { AreaScope } from '../../core/area-scope';
 import {
   AttendanceStatus,
   ClassExam,
@@ -412,6 +413,7 @@ export class ClassDetailComponent implements OnInit {
   private readonly route = inject(ActivatedRoute);
 
   readonly scope = inject(AdminScope);
+  readonly area = inject(AreaScope);
 
   readonly klass = signal<PathshalaClass | null>(null);
   readonly roll = signal<readonly Enrolment[]>([]);
@@ -535,7 +537,11 @@ export class ClassDetailComponent implements OnInit {
 
     this.api.pathshala(this.pathshalaId).subscribe({
       next: (school) => {
-        const found = school.classes.find((c) => c.id === this.classId) ?? null;
+        // An Area Admin runs only their own locality's Pathshalas; anything
+        // else answers 404 from every call below, so it reads as not found.
+        const found = this.area.administers(school.address?.localityId)
+          ? (school.classes.find((c) => c.id === this.classId) ?? null)
+          : null;
 
         this.klass.set(found);
         this.notFound.set(found === null);

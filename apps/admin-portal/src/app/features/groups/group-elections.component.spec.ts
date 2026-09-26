@@ -21,6 +21,7 @@ function group(overrides: Partial<LedGroup> = {}): LedGroup {
     name: 'Seva Sangh',
     description: null,
     focusArea: null,
+    localityId: null,
     presidentMemberId: null,
     status: 'Active',
     memberCount: 3,

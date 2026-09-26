@@ -2,12 +2,30 @@ import { provideHttpClient } from '@angular/common/http';
 import { HttpTestingController, provideHttpClientTesting } from '@angular/common/http/testing';
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { ActivatedRoute, provideRouter } from '@angular/router';
-import { API_CONFIG } from '@samaajconnect/shared';
+import { API_CONFIG, AuthService } from '@samaajconnect/shared';
 import { EventDetailComponent } from './event-detail.component';
 import { EventsListComponent } from './events-list.component';
 import { Attendee, OrganizerGroup, SamaajEvent } from '../../core/admin.models';
 
 const EVENT_ID = 'e1';
+
+/** Signs the test in as an Area Admin for 'loc-hm'. Build the component after. */
+function signInAsAreaAdmin(http: HttpTestingController) {
+  TestBed.inject(AuthService).ensureCurrentUser().subscribe();
+  http.expectOne('/v1/identity/me').flush({
+    userId: 'u9',
+    tenantId: 't1',
+    tenantSlug: 'dasha-nagda',
+    mobileOrEmail: 'area@example.com',
+    fullName: 'Area Admin',
+    status: 'Active',
+    isContactVerified: true,
+    lastLoginAt: null,
+    roles: ['Member', 'AreaAdmin'],
+    permissions: ['Events.Publish'],
+    areaLocalityId: 'loc-hm',
+  });
+}
 
 function anEvent(overrides: Partial<SamaajEvent> = {}): SamaajEvent {
   return {
@@ -18,6 +36,7 @@ function anEvent(overrides: Partial<SamaajEvent> = {}): SamaajEvent {
     endAt: null,
     venue: 'Jain Bhavan',
     eventTypeId: null,
+    localityId: null,
     organizerType: 'Samaaj',
     organizerId: null,
     status: 'Draft',
@@ -70,8 +89,15 @@ describe('EventsListComponent', () => {
 
   const text = () => fixture.nativeElement.textContent as string;
 
+  /** The Locality picker's names, asked for once on arrival. */
+  function flushLocalities() {
+    http.expectOne((r) => r.url === '/v1/master-data/localities').flush([]);
+    http.expectOne((r) => r.url === '/v1/master-data/cities').flush([]);
+  }
+
   function load(events: SamaajEvent[] = [], groups: OrganizerGroup[] = GROUPS, past = false) {
     fixture.detectChanges();
+    flushLocalities();
     http
       .expectOne(`/v1/events?includeDrafts=true&includePast=${past}`)
       .flush(events);
@@ -81,6 +107,42 @@ describe('EventsListComponent', () => {
       .flush([]);
     fixture.detectChanges();
   }
+
+  it('offers an Area Admin controls only on their own locality s events', () => {
+    signInAsAreaAdmin(http);
+    fixture = TestBed.createComponent(EventsListComponent);
+    component = fixture.componentInstance;
+
+    load([
+      anEvent({ id: 'e1', title: 'Hiran Pravachan', localityId: 'loc-hm' }),
+      anEvent({ id: 'e2', title: 'Sector Mela', localityId: 'loc-other', status: 'Published' }),
+    ]);
+
+    const rows = Array.from(
+      (fixture.nativeElement as HTMLElement).querySelectorAll('tbody tr'),
+    ) as HTMLElement[];
+    const row = (title: string) => rows.find((r) => r.textContent?.includes(title))!;
+
+    expect(row('Hiran Pravachan').textContent).toContain('Publish');
+    expect(row('Sector Mela').textContent).toContain('Another locality');
+    expect(row('Sector Mela').textContent).not.toContain('Edit');
+  });
+
+  it('sets up an Area Admin s event in their own locality', () => {
+    signInAsAreaAdmin(http);
+    fixture = TestBed.createComponent(EventsListComponent);
+    component = fixture.componentInstance;
+    load();
+
+    const clickEvent = { currentTarget: document.createElement('button') } as unknown as MouseEvent;
+    component.openCreateModal(clickEvent);
+    component.title = 'Hiran Pravachan';
+    component.startAt = '2026-10-01T18:00';
+    component.create();
+
+    const body = http.expectOne('/v1/events').request.body as Record<string, unknown>;
+    expect(body['localityId']).toBe('loc-hm');
+  });
 
   it('asks for drafts, because showing them is the point of the screen', () => {
     // Creating and publishing are separate commands precisely so an event can
@@ -93,6 +155,7 @@ describe('EventsListComponent', () => {
 
   it('reads a 404 as the community module being off', () => {
     fixture.detectChanges();
+    flushLocalities();
     http
       .expectOne('/v1/events?includeDrafts=true&includePast=false')
       .flush({}, { status: 404, statusText: 'Not Found' });
@@ -354,6 +417,24 @@ describe('EventDetailComponent', () => {
     http.expectOne('/v1/members?take=100').flush({ items: members, hasMore: false });
     fixture.detectChanges();
   }
+
+  it('does not ask an Area Admin for the attendees of an event elsewhere', () => {
+    signInAsAreaAdmin(http);
+    fixture = TestBed.createComponent(EventDetailComponent);
+    component = fixture.componentInstance;
+
+    fixture.detectChanges();
+    http
+      .expectOne(`/v1/events/${EVENT_ID}`)
+      .flush(anEvent({ localityId: 'loc-other', status: 'Published' }));
+    http
+      .expectOne('/v1/master-data/lookup-items?category=EventType&includeInactive=false')
+      .flush([]);
+    fixture.detectChanges();
+
+    // http.verify() in afterEach is the other half: no attendee call was made.
+    expect(text()).toContain('another locality');
+  });
 
   it('asks the service for the one event rather than filtering the list', () => {
     // The 404-for-a-draft check belongs to the server. Filtering a list

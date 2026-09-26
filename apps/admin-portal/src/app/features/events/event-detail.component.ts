@@ -4,6 +4,7 @@ import { ActivatedRoute, RouterLink } from '@angular/router';
 import { describeError } from '@samaajconnect/shared';
 import { AdminApi } from '../../core/admin-api';
 import { AdminScope } from '../../core/admin-scope';
+import { AreaScope } from '../../core/area-scope';
 import { Attendee, LookupItem, SamaajEvent } from '../../core/admin.models';
 import { isNotFound } from '../../core/http-status';
 
@@ -63,6 +64,11 @@ import { isNotFound } from '../../core/http-status';
         <p>{{ subject.description }}</p>
       }
 
+      @if (!area.administers(subject.localityId)) {
+        <p class="notice" role="status">
+          This event is in another locality. Who is going is for its own administrators.
+        </p>
+      } @else {
       <!-- Going ---------------------------------------------------------- -->
       <div class="card">
         <h2>Going</h2>
@@ -163,6 +169,7 @@ import { isNotFound } from '../../core/http-status';
           </div>
         </div>
       }
+      }
     }
   `,
   styles: `
@@ -176,6 +183,7 @@ export class EventDetailComponent implements OnInit {
   private readonly route = inject(ActivatedRoute);
 
   readonly scope = inject(AdminScope);
+  readonly area = inject(AreaScope);
 
   readonly event = signal<SamaajEvent | null>(null);
   readonly attendees = signal<readonly Attendee[]>([]);
@@ -227,7 +235,12 @@ export class EventDetailComponent implements OnInit {
       next: (subject) => {
         this.event.set(subject);
         this.loading.set(false);
-        this.loadAttendees();
+
+        // The attendee list answers 404 to an Area Admin for an event
+        // elsewhere, so it is not asked for.
+        if (this.area.administers(subject.localityId)) {
+          this.loadAttendees();
+        }
       },
       error: (failure: unknown) => {
         if (isNotFound(failure)) {

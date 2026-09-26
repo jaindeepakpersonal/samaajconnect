@@ -153,8 +153,8 @@ interface NavGroup {
         @if (isAreaAdmin()) {
           <p class="notice" role="status">
             You are an Area Admin for
-            <b>{{ areaLocalityName() ?? 'one locality' }}</b>. You see and correct only members
-            whose permanent address is there.
+            <b>{{ areaLocalityName() ?? 'one locality' }}</b>. You administer its members, volunteer
+            groups, events, Pathshalas and social issues; everything else here you see as a member.
           </p>
         }
 
@@ -190,9 +190,9 @@ export class ShellComponent implements OnInit {
 
   /**
    * An Area Admin holds no other admin role (identity-tenant-service refuses
-   * the mixture), and every screen but Members would answer 403 - so the nav
-   * shows them only what they can use. A courtesy: member-family-service
-   * enforces the locality from the token regardless.
+   * the mixture), and every screen outside the locality-scoped modules would
+   * answer 403 - so the nav shows them only what they can use. A courtesy:
+   * each service enforces the locality from the token regardless.
    */
   readonly isAreaAdmin = computed(() =>
     this.auth.roles().every((role) => role === 'AreaAdmin' || role === 'Member') &&
@@ -317,9 +317,9 @@ const NAV: readonly NavGroup[] = [
       { label: 'Members', route: '/members', forAreaAdmin: true },
       { label: 'Families & Children', route: '/conversions' },
       { label: 'Timeline / Moderation', route: '/moderation' },
-      { label: 'Volunteer Groups', route: '/groups' },
-      { label: 'Events', route: '/events' },
-      { label: 'Social Issues', route: '/issues' },
+      { label: 'Volunteer Groups', route: '/groups', forAreaAdmin: true },
+      { label: 'Events', route: '/events', forAreaAdmin: true },
+      { label: 'Social Issues', route: '/issues', forAreaAdmin: true },
       { label: 'Celebrities / Voting', route: '/voting' },
       { label: 'Samaaj Panch', route: '/panch' },
       { label: 'Trusts', route: '/trust' },
@@ -327,7 +327,7 @@ const NAV: readonly NavGroup[] = [
   },
   {
     heading: 'Education',
-    items: [{ label: 'Jain Pathshala', route: '/pathshala' }],
+    items: [{ label: 'Jain Pathshala', route: '/pathshala', forAreaAdmin: true }],
   },
   {
     heading: 'Boli',

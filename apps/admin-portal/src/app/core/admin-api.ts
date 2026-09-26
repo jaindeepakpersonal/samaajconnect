@@ -498,30 +498,35 @@ export class AdminApi {
     description: string | null,
     focusArea: string | null,
     presidentMemberId: string | null,
+    localityId: string | null = null,
   ): Observable<VolunteerGroup> {
     return this.http.post<VolunteerGroup>('/v1/volunteer-groups/groups', {
       name,
       description,
       focusArea,
       presidentMemberId,
+      localityId,
     });
   }
 
   /**
-   * Corrects a group's name, description or focus area.
+   * Corrects a group's name, description, focus area or locality.
    *
    * Not the president, membership or status - each already has its own call.
+   * The locality is always sent: omitted, it would clear the group's.
    */
   updateGroup(
     id: string,
     name: string,
     description: string | null,
     focusArea: string | null,
+    localityId: string | null,
   ): Observable<VolunteerGroup> {
     return this.http.patch<VolunteerGroup>(`/v1/volunteer-groups/groups/${id}`, {
       name,
       description,
       focusArea,
+      localityId,
     });
   }
 
@@ -943,6 +948,7 @@ export class AdminApi {
     organizerId: string | null;
     registrationEnabled: boolean;
     capacity: number | null;
+    localityId: string | null;
   }): Observable<SamaajEvent> {
     return this.http.post<SamaajEvent>('/v1/events', event);
   }
@@ -964,6 +970,8 @@ export class AdminApi {
       eventTypeId: string | null;
       registrationEnabled: boolean;
       capacity: number | null;
+      // Always sent: omitted, it would clear the event's locality.
+      localityId: string | null;
     },
   ): Observable<SamaajEvent> {
     return this.http.patch<SamaajEvent>(`/v1/events/${id}`, event);

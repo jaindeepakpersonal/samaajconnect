@@ -10,8 +10,10 @@ import {
 import { FormsModule } from '@angular/forms';
 import { RouterLink } from '@angular/router';
 import { describeError } from '@samaajconnect/shared';
+import { forkJoin } from 'rxjs';
 import { AdminApi } from '../../core/admin-api';
 import { AdminScope } from '../../core/admin-scope';
+import { AreaScope, labelLocalities } from '../../core/area-scope';
 import { VolunteerGroup } from '../../core/admin.models';
 import { isNotFound } from '../../core/http-status';
 
@@ -91,7 +93,7 @@ import { isNotFound } from '../../core/http-status';
               <caption class="sr-only">Volunteer groups</caption>
               <thead>
                 <tr>
-                  <th>Group</th><th>Focus</th><th>President</th>
+                  <th>Group</th><th>Focus</th><th>Locality</th><th>President</th>
                   <th>Members</th><th>Status</th><th></th>
                 </tr>
               </thead>
@@ -105,22 +107,25 @@ import { isNotFound } from '../../core/http-status';
                       }
                     </td>
                     <td>{{ group.focusArea ?? '—' }}</td>
+                    <td>{{ localityName(group.localityId) }}</td>
                     <td>
                       @if (group.presidentMemberId) {
                         {{ memberName(group.presidentMemberId) }}
                       } @else {
                         <span class="muted">Not set</span>
                       }
-                      <div>
-                        <button
-                          class="btn link small"
-                          type="button"
-                          [attr.aria-expanded]="presidentFor() === group.id"
-                          (click)="openChangePresident(group)"
-                        >
-                          {{ group.presidentMemberId ? 'Change' : 'Set president' }}
-                        </button>
-                      </div>
+                      @if (area.administers(group.localityId)) {
+                        <div>
+                          <button
+                            class="btn link small"
+                            type="button"
+                            [attr.aria-expanded]="presidentFor() === group.id"
+                            (click)="openChangePresident(group)"
+                          >
+                            {{ group.presidentMemberId ? 'Change' : 'Set president' }}
+                          </button>
+                        </div>
+                      }
                     </td>
                     <td>{{ group.memberCount }}</td>
                     <td>
@@ -129,30 +134,34 @@ import { isNotFound } from '../../core/http-status';
                       </span>
                     </td>
                     <td>
-                      <div class="row-actions">
-                        <button class="btn small alt" type="button" [disabled]="busy()"
-                          (click)="openEditModal($event, group)">
-                          Edit
-                        </button>
-
-                        @if (group.status === 'Active') {
+                      @if (area.administers(group.localityId)) {
+                        <div class="row-actions">
                           <button class="btn small alt" type="button" [disabled]="busy()"
-                            (click)="setStatus(group, 'Inactive')">
-                            Stand down
+                            (click)="openEditModal($event, group)">
+                            Edit
                           </button>
-                        } @else {
-                          <button class="btn small" type="button" [disabled]="busy()"
-                            (click)="setStatus(group, 'Active')">
-                            Bring back
-                          </button>
-                        }
-                      </div>
+
+                          @if (group.status === 'Active') {
+                            <button class="btn small alt" type="button" [disabled]="busy()"
+                              (click)="setStatus(group, 'Inactive')">
+                              Stand down
+                            </button>
+                          } @else {
+                            <button class="btn small" type="button" [disabled]="busy()"
+                              (click)="setStatus(group, 'Active')">
+                              Bring back
+                            </button>
+                          }
+                        </div>
+                      } @else {
+                        <span class="muted small">Another locality</span>
+                      }
                     </td>
                   </tr>
 
                   @if (presidentFor() === group.id) {
                     <tr>
-                      <td colspan="6">
+                      <td colspan="7">
                         <div class="notice" role="status">
                           <label [for]="group.id + '-newpres'">{{ group.presidentMemberId ? 'New president' : 'President' }}</label>
                           <select
@@ -248,6 +257,23 @@ import { isNotFound } from '../../core/http-status';
                   maxlength="120" placeholder="Social Service" />
               </div>
 
+              <!--
+                An Area Admin's groups are always in their own locality, so the
+                choice is shown to them but not offered.
+              -->
+              <div class="field">
+                <label for="group-locality">Locality</label>
+                <select id="group-locality" class="input" name="locality" [(ngModel)]="localityId"
+                  [disabled]="area.localityId() !== null">
+                  @if (area.localityId() === null) {
+                    <option value="">The whole Samaaj</option>
+                  }
+                  @for (option of localityOptions(); track option.id) {
+                    <option [value]="option.id">{{ option.label }}</option>
+                  }
+                </select>
+              </div>
+
               @if (modalMode() === 'create') {
                 <div class="field">
                   <label for="group-president">President</label>
@@ -308,10 +334,12 @@ export class GroupsListComponent implements OnInit {
   private readonly api = inject(AdminApi);
 
   readonly scope = inject(AdminScope);
+  readonly area = inject(AreaScope);
 
   @ViewChild('firstField') private readonly firstFieldRef?: ElementRef<HTMLInputElement>;
 
   readonly groups = signal<readonly VolunteerGroup[]>([]);
+  readonly localityOptions = signal<readonly { id: string; label: string }[]>([]);
   readonly members = signal<readonly { id: string; fullName: string }[]>([]);
   readonly loading = signal(true);
   readonly busy = signal(false);
@@ -328,13 +356,29 @@ export class GroupsListComponent implements OnInit {
   description = '';
   focusArea = '';
   presidentMemberId = '';
+  localityId = '';
 
   private readonly names = computed(
     () => new Map(this.members().map((m) => [m.id, m.fullName])),
   );
 
+  private readonly localityLabels = computed(
+    () => new Map(this.localityOptions().map((o) => [o.id, o.label])),
+  );
+
   ngOnInit(): void {
     this.load();
+
+    // Names for the Locality column and the picker. A failure leaves both
+    // showing a dash, not an error: the groups themselves still load.
+    forkJoin({ localities: this.api.listLocalities(), cities: this.api.listCities() }).subscribe({
+      next: ({ localities, cities }) => this.localityOptions.set(labelLocalities(localities, cities)),
+      error: () => this.localityOptions.set([]),
+    });
+  }
+
+  localityName(localityId: string | null): string {
+    return localityId === null ? 'Whole Samaaj' : (this.localityLabels().get(localityId) ?? '—');
   }
 
   canSubmit(): boolean {
@@ -390,6 +434,7 @@ export class GroupsListComponent implements OnInit {
     this.description = '';
     this.focusArea = '';
     this.presidentMemberId = '';
+    this.localityId = this.area.localityId() ?? '';
     this.openModal(event);
   }
 
@@ -399,6 +444,7 @@ export class GroupsListComponent implements OnInit {
     this.name = group.name;
     this.description = group.description ?? '';
     this.focusArea = group.focusArea ?? '';
+    this.localityId = group.localityId ?? '';
     this.openModal(event);
   }
 
@@ -479,6 +525,7 @@ export class GroupsListComponent implements OnInit {
         blankToNull(this.description),
         blankToNull(this.focusArea),
         this.presidentMemberId || null,
+        this.localityId || null,
       ),
       this.presidentMemberId
         ? `${name} created, with ${this.memberName(this.presidentMemberId)} as president.`
@@ -497,7 +544,13 @@ export class GroupsListComponent implements OnInit {
     const name = this.name.trim();
 
     this.act(
-      this.api.updateGroup(editing.id, name, blankToNull(this.description), blankToNull(this.focusArea)),
+      this.api.updateGroup(
+        editing.id,
+        name,
+        blankToNull(this.description),
+        blankToNull(this.focusArea),
+        this.localityId || null,
+      ),
       `${name} updated.`,
       () => this.closeModal(),
     );

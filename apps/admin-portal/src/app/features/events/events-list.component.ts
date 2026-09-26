@@ -11,8 +11,10 @@ import {
 import { FormsModule } from '@angular/forms';
 import { RouterLink } from '@angular/router';
 import { describeError } from '@samaajconnect/shared';
+import { forkJoin } from 'rxjs';
 import { AdminApi } from '../../core/admin-api';
 import { AdminScope } from '../../core/admin-scope';
+import { AreaScope, labelLocalities } from '../../core/area-scope';
 import { LookupItem, OrganizerGroup, OrganizerType, SamaajEvent } from '../../core/admin.models';
 import { isNotFound } from '../../core/http-status';
 
@@ -130,6 +132,9 @@ import { isNotFound } from '../../core/http-status';
                       }
                     </td>
                     <td>
+                      @if (!area.administers(event.localityId)) {
+                        <span class="muted small">Another locality</span>
+                      } @else {
                       <div class="row-actions">
                         @if (event.status !== 'Cancelled') {
                           <button class="btn small alt" type="button" [disabled]="busy()"
@@ -186,6 +191,7 @@ import { isNotFound } from '../../core/http-status';
                           </div>
                         </div>
                       }
+                      }
                     </td>
                   </tr>
                 }
@@ -229,6 +235,20 @@ import { isNotFound } from '../../core/http-status';
                 <label for="event-venue">Venue</label>
                 <input id="event-venue" class="input" name="venue" [(ngModel)]="venue"
                   maxlength="200" placeholder="Jain Bhavan, Hiran Magri" />
+              </div>
+
+              <!-- An Area Admin's events are always in their own locality: shown, not offered. -->
+              <div class="field">
+                <label for="event-locality">Locality</label>
+                <select id="event-locality" class="input" name="locality" [(ngModel)]="localityId"
+                  [disabled]="area.localityId() !== null">
+                  @if (area.localityId() === null) {
+                    <option value="">The whole Samaaj</option>
+                  }
+                  @for (option of localityOptions(); track option.id) {
+                    <option [value]="option.id">{{ option.label }}</option>
+                  }
+                </select>
               </div>
 
               <div class="field">
@@ -334,12 +354,14 @@ export class EventsListComponent implements OnInit {
   private readonly api = inject(AdminApi);
 
   readonly scope = inject(AdminScope);
+  readonly area = inject(AreaScope);
 
   @ViewChild('firstField') private readonly firstFieldRef?: ElementRef<HTMLInputElement>;
 
   readonly events = signal<readonly SamaajEvent[]>([]);
   readonly groups = signal<readonly OrganizerGroup[]>([]);
   readonly eventTypes = signal<readonly LookupItem[]>([]);
+  readonly localityOptions = signal<readonly { id: string; label: string }[]>([]);
   readonly loading = signal(true);
   readonly busy = signal(false);
   readonly moduleOff = signal(false);
@@ -364,6 +386,7 @@ export class EventsListComponent implements OnInit {
   organizerId = '';
   registrationEnabled = true;
   capacity: number | null = null;
+  localityId = '';
   reason = '';
 
   /** Group id → name, for the Organiser column and the create form. */
@@ -374,6 +397,13 @@ export class EventsListComponent implements OnInit {
   ngOnInit(): void {
     this.load();
     this.loadEventTypes();
+
+    // Names for the popup's Locality picker. A failure leaves it offering only
+    // the whole Samaaj, and the events still load.
+    forkJoin({ localities: this.api.listLocalities(), cities: this.api.listCities() }).subscribe({
+      next: ({ localities, cities }) => this.localityOptions.set(labelLocalities(localities, cities)),
+      error: () => this.localityOptions.set([]),
+    });
   }
 
   canSubmit(): boolean {
@@ -475,6 +505,7 @@ export class EventsListComponent implements OnInit {
     this.organizerId = '';
     this.registrationEnabled = true;
     this.capacity = null;
+    this.localityId = this.area.localityId() ?? '';
     this.openModal(event);
   }
 
@@ -489,6 +520,7 @@ export class EventsListComponent implements OnInit {
     this.eventTypeId = samaajEvent.eventTypeId ?? '';
     this.registrationEnabled = samaajEvent.registrationEnabled;
     this.capacity = samaajEvent.capacity;
+    this.localityId = samaajEvent.localityId ?? '';
     this.openModal(event);
   }
 
@@ -578,6 +610,7 @@ export class EventsListComponent implements OnInit {
 
         // Only when registration is on, and null rather than 0 for "no limit".
         capacity: this.registrationEnabled ? (this.capacity || null) : null,
+        localityId: this.localityId || null,
       }),
       `${title} created as a draft. Nobody has been told yet.`,
       () => this.closeModal(),
@@ -603,6 +636,7 @@ export class EventsListComponent implements OnInit {
         eventTypeId: this.eventTypeId || null,
         registrationEnabled: this.registrationEnabled,
         capacity: this.registrationEnabled ? (this.capacity || null) : null,
+        localityId: this.localityId || null,
       }),
       `${title} updated.`,
       () => this.closeModal(),

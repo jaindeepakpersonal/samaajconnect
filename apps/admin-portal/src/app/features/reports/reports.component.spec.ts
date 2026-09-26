@@ -32,6 +32,7 @@ function samaajEvent(id: string, year: number, registeredCount: number): SamaajE
     endAt: null,
     venue: 'Jain Bhavan',
     eventTypeId: null,
+    localityId: null,
     organizerType: 'Samaaj',
     organizerId: null,
     status: 'Published',

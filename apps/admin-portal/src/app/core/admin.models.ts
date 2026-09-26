@@ -474,6 +474,9 @@ export interface SamaajEvent {
 
   /** A master-data-service LookupItem id (Category EventType), or null. */
   readonly eventTypeId: string | null;
+
+  /** The master-data locality the event is for, or null for the whole Samaaj. */
+  readonly localityId: string | null;
   readonly organizerType: OrganizerType;
 
   /** The group's id when the organiser is one. Names live in another service. */
@@ -705,6 +708,9 @@ export interface VolunteerGroup {
   readonly name: string;
   readonly description: string | null;
   readonly focusArea: string | null;
+
+  /** The master-data locality the group serves, or null for the whole Samaaj. */
+  readonly localityId: string | null;
 
   /** An id, or null until one is set. Names live in member-family-service and are resolved here. */
   readonly presidentMemberId: string | null;
