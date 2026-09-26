@@ -26,7 +26,7 @@ public sealed record CreateGroupCommand(
     /// The locality the group serves, optional. An Area Admin's groups are
     /// always in their own locality: omitted, it is filled in; any other, refused.
     /// </summary>
-    Guid? LocalityId = null) : ICommand<GroupResponse>;
+    string? LocalityId = null) : ICommand<GroupResponse>;
 
 public sealed class CreateGroupCommandValidator : AbstractValidator<CreateGroupCommand>
 {
@@ -35,6 +35,12 @@ public sealed class CreateGroupCommandValidator : AbstractValidator<CreateGroupC
         RuleFor(x => x.Name).NotEmpty().MaximumLength(150);
         RuleFor(x => x.Description).MaximumLength(2000);
         RuleFor(x => x.FocusArea).MaximumLength(100);
+
+        // A string on the wire, parsed only in the handler, so a malformed id
+        // fails here rather than in the JSON binder.
+        RuleFor(x => x.LocalityId)
+            .Must(value => string.IsNullOrWhiteSpace(value) || Guid.TryParse(value, out _))
+            .WithMessage("Locality is not valid.");
 
         // Optional: a group may be created before anyone is chosen to lead it.
         // A string on the wire, parsed only in the handler, so a malformed id
@@ -80,7 +86,9 @@ public sealed class CreateGroupCommandHandler(
         }
 
         // An Area Admin sets groups up in their own locality and nowhere else.
-        var localityId = command.LocalityId ?? areaScope.AreaLocalityId;
+        var localityId = string.IsNullOrWhiteSpace(command.LocalityId)
+            ? areaScope.AreaLocalityId
+            : Guid.Parse(command.LocalityId);
 
         if (!areaScope.MayAdminister(localityId))
         {

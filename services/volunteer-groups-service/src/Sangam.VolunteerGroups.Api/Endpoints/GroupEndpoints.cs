@@ -256,10 +256,10 @@ public static class GroupEndpoints
         string? Description,
         string? FocusArea,
         string? PresidentMemberId,
-        Guid? LocalityId = null);
+        string? LocalityId = null);
 
     public sealed record UpdateGroupRequest(
-        string Name, string? Description, string? FocusArea, Guid? LocalityId = null);
+        string Name, string? Description, string? FocusArea, string? LocalityId = null);
 
     public sealed record ChangeStatusRequest(string Status);
 

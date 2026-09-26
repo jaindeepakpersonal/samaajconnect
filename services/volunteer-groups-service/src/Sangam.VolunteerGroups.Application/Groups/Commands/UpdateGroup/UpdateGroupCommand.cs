@@ -26,7 +26,7 @@ public sealed record UpdateGroupCommand(
     /// The locality the group serves; null for none. An Area Admin cannot move
     /// a group out of their own locality - omitted, it stays there.
     /// </summary>
-    Guid? LocalityId = null) : ICommand<GroupResponse>;
+    string? LocalityId = null) : ICommand<GroupResponse>;
 
 public sealed class UpdateGroupCommandValidator : AbstractValidator<UpdateGroupCommand>
 {
@@ -36,6 +36,12 @@ public sealed class UpdateGroupCommandValidator : AbstractValidator<UpdateGroupC
         RuleFor(x => x.Name).NotEmpty().MaximumLength(150);
         RuleFor(x => x.Description).MaximumLength(2000);
         RuleFor(x => x.FocusArea).MaximumLength(100);
+
+        // A string on the wire, parsed only in the handler, so a malformed id
+        // fails here rather than in the JSON binder.
+        RuleFor(x => x.LocalityId)
+            .Must(value => string.IsNullOrWhiteSpace(value) || Guid.TryParse(value, out _))
+            .WithMessage("Locality is not valid.");
     }
 }
 
@@ -68,7 +74,9 @@ public sealed class UpdateGroupCommandHandler(
                 Error.NotFound("Group.NotFound", "No such group in this Samaaj."));
         }
 
-        var localityId = command.LocalityId ?? areaScope.AreaLocalityId;
+        var localityId = string.IsNullOrWhiteSpace(command.LocalityId)
+            ? areaScope.AreaLocalityId
+            : Guid.Parse(command.LocalityId);
 
         if (!areaScope.MayAdminister(localityId))
         {
