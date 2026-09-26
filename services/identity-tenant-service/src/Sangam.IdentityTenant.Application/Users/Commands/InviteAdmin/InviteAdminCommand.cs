@@ -33,7 +33,16 @@ namespace Sangam.IdentityTenant.Application.Users.Commands.InviteAdmin;
 public sealed record InviteAdminCommand(
     string FullName,
     string MobileOrEmail,
-    IReadOnlyList<string> Roles) : ICommand<InviteAdminResponse>;
+    IReadOnlyList<string> Roles,
+
+    /// <summary>
+    /// The one locality an AreaAdmin invitation is restricted to. Required
+    /// exactly when <see cref="Roles"/> is <c>["AreaAdmin"]</c>, and refused
+    /// otherwise - see <see cref="InviteAdminCommandValidator"/>. A string on
+    /// the wire, parsed only in the handler, the same shape
+    /// CreateGroupCommand's own optional id takes.
+    /// </summary>
+    string? LocalityId = null) : ICommand<InviteAdminResponse>;
 
 /// <summary>
 /// <paramref name="ActivationCode"/> is plaintext and is returned exactly once;

@@ -249,6 +249,11 @@ namespace Sangam.IdentityTenant.Infrastructure.Persistence.Migrations
                         {
                             Id = new Guid("a0000000-0000-0000-0000-000000000009"),
                             Name = "BoliManager"
+                        },
+                        new
+                        {
+                            Id = new Guid("a0000000-0000-0000-0000-00000000000a"),
+                            Name = "AreaAdmin"
                         });
                 });
 
@@ -630,6 +635,16 @@ namespace Sangam.IdentityTenant.Infrastructure.Persistence.Migrations
                         {
                             RoleId = new Guid("a0000000-0000-0000-0000-000000000009"),
                             PermissionId = new Guid("b0000000-0000-0000-0000-000000000011")
+                        },
+                        new
+                        {
+                            RoleId = new Guid("a0000000-0000-0000-0000-00000000000a"),
+                            PermissionId = new Guid("b0000000-0000-0000-0000-000000000003")
+                        },
+                        new
+                        {
+                            RoleId = new Guid("a0000000-0000-0000-0000-00000000000a"),
+                            PermissionId = new Guid("b0000000-0000-0000-0000-000000000004")
                         });
                 });
 
@@ -682,6 +697,10 @@ namespace Sangam.IdentityTenant.Infrastructure.Persistence.Migrations
                     b.Property<DateTimeOffset>("AssignedAt")
                         .HasColumnType("timestamp with time zone")
                         .HasColumnName("assigned_at");
+
+                    b.Property<Guid?>("LocalityId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("locality_id");
 
                     b.Property<Guid>("RoleId")
                         .HasColumnType("uuid")

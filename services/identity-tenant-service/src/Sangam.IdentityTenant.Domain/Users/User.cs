@@ -101,7 +101,7 @@ public sealed class User : AggregateRoot, ITenantScopedEntity
             CreatedAt = createdAt,
         };
 
-        user._roles.Add(new UserRole(user.Id, memberRoleId, tenantId, createdAt));
+        user._roles.Add(new UserRole(user.Id, memberRoleId, tenantId, localityId: null, createdAt));
 
         user.Raise(new UserRegisteredDomainEvent(
             user.Id, tenantId, user.MobileOrEmail, user.FullName, createdAt));
@@ -134,7 +134,7 @@ public sealed class User : AggregateRoot, ITenantScopedEntity
             CreatedAt = createdAt,
         };
 
-        user._roles.Add(new UserRole(user.Id, superAdminRoleId, null, createdAt));
+        user._roles.Add(new UserRole(user.Id, superAdminRoleId, null, localityId: null, createdAt));
 
         return user;
     }
@@ -178,7 +178,7 @@ public sealed class User : AggregateRoot, ITenantScopedEntity
             CreatedAt = createdAt,
         };
 
-        user._roles.Add(new UserRole(user.Id, memberRoleId, tenantId, createdAt));
+        user._roles.Add(new UserRole(user.Id, memberRoleId, tenantId, localityId: null, createdAt));
 
         return user;
     }
@@ -208,7 +208,8 @@ public sealed class User : AggregateRoot, ITenantScopedEntity
         Guid memberRoleId,
         IEnumerable<Guid> roleIds,
         Guid invitedBy,
-        DateTimeOffset createdAt)
+        DateTimeOffset createdAt,
+        Guid? areaLocalityId = null)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(mobileOrEmail);
         ArgumentException.ThrowIfNullOrWhiteSpace(fullName);
@@ -226,11 +227,18 @@ public sealed class User : AggregateRoot, ITenantScopedEntity
             CreatedAt = createdAt,
         };
 
-        user._roles.Add(new UserRole(user.Id, memberRoleId, tenantId, createdAt));
+        user._roles.Add(new UserRole(user.Id, memberRoleId, tenantId, localityId: null, createdAt));
 
         foreach (var roleId in roleIds.Distinct().Where(id => id != memberRoleId))
         {
-            user._roles.Add(new UserRole(user.Id, roleId, tenantId, createdAt));
+            // Only the AreaAdmin grant itself ever carries a locality - the
+            // caller must have validated that AreaAdmin is the only role being
+            // requested when a locality is supplied (InviteAdminCommandValidator),
+            // since a locality attached to any other role's grant would mean
+            // nothing.
+            var localityId = roleId == AuthorizationCatalog.RoleIds.AreaAdmin ? areaLocalityId : null;
+
+            user._roles.Add(new UserRole(user.Id, roleId, tenantId, localityId, createdAt));
         }
 
         user.Raise(new AdminInvitedDomainEvent(
@@ -542,7 +550,7 @@ public sealed class User : AggregateRoot, ITenantScopedEntity
             return;
         }
 
-        _roles.Add(new UserRole(Id, roleId, tenantScope, now));
+        _roles.Add(new UserRole(Id, roleId, tenantScope, localityId: null, now));
     }
 
 
@@ -551,14 +559,21 @@ public sealed class User : AggregateRoot, ITenantScopedEntity
     /// holds it at that scope, so a repeated click is a no-op rather than a
     /// second identical grant and a second audit row.
     /// </summary>
-    public bool GrantRole(Guid roleId, Guid? tenantScope, Guid grantedBy, DateTimeOffset now)
+    /// <remarks>
+    /// <paramref name="localityId"/> means something only for
+    /// <see cref="AuthorizationCatalog.RoleIds.AreaAdmin"/> - the caller is
+    /// responsible for supplying one exactly when <paramref name="roleId"/> is
+    /// that role, the same split <see cref="Invite"/> makes.
+    /// </remarks>
+    public bool GrantRole(
+        Guid roleId, Guid? tenantScope, Guid grantedBy, DateTimeOffset now, Guid? localityId = null)
     {
         if (_roles.Any(r => r.RoleId == roleId && r.TenantScope == tenantScope))
         {
             return false;
         }
 
-        _roles.Add(new UserRole(Id, roleId, tenantScope, now));
+        _roles.Add(new UserRole(Id, roleId, tenantScope, localityId, now));
 
         Raise(new UserRoleGrantedDomainEvent(Id, TenantId, roleId, tenantScope, grantedBy, now));
 

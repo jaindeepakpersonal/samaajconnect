@@ -95,6 +95,9 @@ export interface InviteAdminRequest {
   readonly fullName: string;
   readonly mobileOrEmail: string;
   readonly roles: readonly string[];
+
+  /** Required exactly when `roles` is `['AreaAdmin']`, and refused otherwise. */
+  readonly localityId?: string;
 }
 
 /**

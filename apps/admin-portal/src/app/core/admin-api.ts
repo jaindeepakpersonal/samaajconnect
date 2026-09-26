@@ -197,11 +197,19 @@ export class AdminApi {
     return this.http.post<InviteAdminResult>('/v1/identity/admins', request);
   }
 
-  /** One role per call: the screen is a checkbox, so this is one checkbox. */
-  setRole(userId: string, role: string, granted: boolean): Observable<AssignRoleResult> {
+  /**
+   * One role per call: the screen is a checkbox, so this is one checkbox.
+   * `localityId` is required when granting AreaAdmin and refused otherwise.
+   */
+  setRole(
+    userId: string,
+    role: string,
+    granted: boolean,
+    localityId?: string,
+  ): Observable<AssignRoleResult> {
     return this.http.put<AssignRoleResult>(
       `/v1/identity/admins/${userId}/roles/${encodeURIComponent(role)}`,
-      { granted },
+      localityId ? { granted, localityId } : { granted },
     );
   }
 

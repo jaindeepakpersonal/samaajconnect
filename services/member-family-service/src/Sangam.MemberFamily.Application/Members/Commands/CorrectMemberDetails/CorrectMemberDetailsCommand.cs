@@ -48,7 +48,7 @@ namespace Sangam.MemberFamily.Application.Members.Commands.CorrectMemberDetails;
 /// something they are entitled to change, without being told why.
 /// </para>
 /// </remarks>
-[RequiresRoles(Roles.SamaajAdmin, Roles.SuperAdmin)]
+[RequiresRoles(Roles.SamaajAdmin, Roles.SuperAdmin, Roles.AreaAdmin)]
 [RequiresPermission(PermissionKeys.MembersWrite)]
 public sealed record CorrectMemberDetailsCommand(
     Guid MemberId,
@@ -109,6 +109,7 @@ public sealed class CorrectMemberDetailsCommandHandler(
     IUnitOfWork unitOfWork,
     ICurrentUser currentUser,
     ITenantContext tenantContext,
+    IAreaScope areaScope,
     IDateTimeProvider clock)
     : IRequestHandler<CorrectMemberDetailsCommand, Result<MemberResponse>>
 {
@@ -133,6 +134,16 @@ public sealed class CorrectMemberDetailsCommandHandler(
         // The IDOR guard root CLAUDE.md §6 requires: the write path re-checks
         // the target's tenant rather than trusting the query filter alone.
         if (tenantContext.TenantId is { } tenantId && profile.TenantId != tenantId)
+        {
+            return Result.Failure<MemberResponse>(
+                Error.NotFound("Member.NotFound", "No such member in this Samaaj."));
+        }
+
+        // The same guard for an Area Admin's own, narrower scope: correcting
+        // somebody outside the caller's locality is refused as "not found",
+        // exactly as reading them already is (GetMemberQueryHandler).
+        if (areaScope.AreaLocalityId is { } restricted
+            && profile.PermanentAddress.LocalityId != restricted)
         {
             return Result.Failure<MemberResponse>(
                 Error.NotFound("Member.NotFound", "No such member in this Samaaj."));

@@ -229,6 +229,41 @@ public sealed class AssignRoleCommandValidatorTests
     {
         IsValid(Roles.ContentModerator).Should().BeTrue();
     }
+
+    [Fact]
+    public void Granting_AreaAdmin_with_no_locality_is_refused()
+    {
+        // A restriction to nothing is not a restriction at all.
+        new AssignRoleCommandValidator()
+            .Validate(new AssignRoleCommand(Guid.NewGuid(), Roles.AreaAdmin, true))
+            .IsValid.Should().BeFalse();
+    }
+
+    [Fact]
+    public void Granting_AreaAdmin_with_a_locality_is_accepted()
+    {
+        new AssignRoleCommandValidator()
+            .Validate(new AssignRoleCommand(
+                Guid.NewGuid(), Roles.AreaAdmin, true, Guid.NewGuid().ToString()))
+            .IsValid.Should().BeTrue();
+    }
+
+    [Fact]
+    public void A_locality_on_any_other_role_is_refused()
+    {
+        new AssignRoleCommandValidator()
+            .Validate(new AssignRoleCommand(
+                Guid.NewGuid(), Roles.ContentModerator, true, Guid.NewGuid().ToString()))
+            .IsValid.Should().BeFalse();
+    }
+
+    [Fact]
+    public void Revoking_AreaAdmin_needs_no_locality()
+    {
+        new AssignRoleCommandValidator()
+            .Validate(new AssignRoleCommand(Guid.NewGuid(), Roles.AreaAdmin, false))
+            .IsValid.Should().BeTrue();
+    }
 }
 
 public sealed class InviteAdminCommandValidatorTests
@@ -272,6 +307,39 @@ public sealed class InviteAdminCommandValidatorTests
     public void And_rejects_what_registration_rejects(string identifier)
     {
         IsValid(identifier: identifier).Should().BeFalse();
+    }
+
+    [Fact]
+    public void An_AreaAdmin_invitation_with_no_locality_is_refused()
+    {
+        _validator.Validate(new InviteAdminCommand(
+            "Rajesh Jain", "rajesh@example.com", [Roles.AreaAdmin]))
+            .IsValid.Should().BeFalse();
+    }
+
+    [Fact]
+    public void An_AreaAdmin_invitation_with_a_locality_is_accepted()
+    {
+        _validator.Validate(new InviteAdminCommand(
+            "Rajesh Jain", "rajesh@example.com", [Roles.AreaAdmin], Guid.NewGuid().ToString()))
+            .IsValid.Should().BeTrue();
+    }
+
+    [Fact]
+    public void AreaAdmin_cannot_be_invited_alongside_another_role_even_with_a_locality()
+    {
+        _validator.Validate(new InviteAdminCommand(
+            "Rajesh Jain", "rajesh@example.com",
+            [Roles.AreaAdmin, Roles.ContentModerator], Guid.NewGuid().ToString()))
+            .IsValid.Should().BeFalse();
+    }
+
+    [Fact]
+    public void A_locality_on_an_invitation_for_any_other_role_is_refused()
+    {
+        _validator.Validate(new InviteAdminCommand(
+            "Rajesh Jain", "rajesh@example.com", [Roles.ContentModerator], Guid.NewGuid().ToString()))
+            .IsValid.Should().BeFalse();
     }
 }
 
@@ -326,6 +394,35 @@ public sealed class UserRoleGrantTests
             .Should().BeFalse();
 
         user.DomainEvents.Should().BeEmpty();
+    }
+
+    [Fact]
+    public void Granting_AreaAdmin_carries_the_locality_onto_the_grant()
+    {
+        var user = Member();
+        var locality = Guid.NewGuid();
+
+        user.GrantRole(AuthorizationCatalog.RoleIds.AreaAdmin, TenantId, ActorId, Now, locality);
+
+        user.Roles.Single(r => r.RoleId == AuthorizationCatalog.RoleIds.AreaAdmin)
+            .LocalityId.Should().Be(locality);
+    }
+
+    [Fact]
+    public void An_invitation_carries_the_locality_onto_only_the_AreaAdmin_grant()
+    {
+        var locality = Guid.NewGuid();
+
+        var invited = User.Invite(
+            TenantId, "area-admin@example.com", "Rajesh Jain",
+            AuthorizationCatalog.RoleIds.Member,
+            [AuthorizationCatalog.RoleIds.AreaAdmin],
+            ActorId, Now, locality);
+
+        invited.Roles.Single(r => r.RoleId == AuthorizationCatalog.RoleIds.AreaAdmin)
+            .LocalityId.Should().Be(locality);
+        invited.Roles.Single(r => r.RoleId == AuthorizationCatalog.RoleIds.Member)
+            .LocalityId.Should().BeNull();
     }
 
     [Fact]

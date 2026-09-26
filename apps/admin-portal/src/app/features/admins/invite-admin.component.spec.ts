@@ -19,8 +19,19 @@ const MATRIX = {
     },
     { id: 'a2', name: 'SuperAdmin', assignableToAdmins: false, permissions: ['Tenant.Manage'] },
     { id: 'a3', name: 'Member', assignableToAdmins: false, permissions: [] },
+    {
+      id: 'a4',
+      name: 'AreaAdmin',
+      assignableToAdmins: true,
+      permissions: ['Members.Read', 'Members.Write'],
+    },
   ],
 };
+
+const LOCALITIES = [
+  { id: 'loc-hm', cityId: 'c1', name: 'Hiran Magri', isActive: true },
+  { id: 'loc-sc', cityId: 'c1', name: 'Sector 14', isActive: true },
+];
 
 describe('InviteAdminComponent', () => {
   let fixture: ComponentFixture<InviteAdminComponent>;
@@ -49,6 +60,12 @@ describe('InviteAdminComponent', () => {
     fixture.detectChanges();
 
     http.expectOne('/v1/identity/roles').flush(MATRIX);
+    http
+      .expectOne((r) => r.url === '/v1/master-data/localities')
+      .flush(LOCALITIES);
+    http
+      .expectOne((r) => r.url === '/v1/master-data/cities')
+      .flush([{ id: 'c1', countryId: 'in', stateId: null, name: 'Udaipur', isActive: true }]);
     fixture.detectChanges();
   });
 
@@ -67,7 +84,76 @@ describe('InviteAdminComponent', () => {
     // SuperAdmin can only come from the platform bootstrap; Member is earned
     // by registering. Offering either would be offering something the backend
     // refuses.
-    expect(names).toEqual(['SamaajAdmin']);
+    expect(names).toEqual(['SamaajAdmin', 'AreaAdmin']);
+  });
+
+  // ---- Area Admin ----------------------------------------------------------
+
+  it('offers a locality picker only once AreaAdmin is chosen', () => {
+    expect(fixture.nativeElement.querySelector('#invite-locality')).toBeNull();
+
+    component.toggle('AreaAdmin');
+    fixture.detectChanges();
+
+    const select = fixture.nativeElement.querySelector('#invite-locality') as HTMLSelectElement;
+    expect(select).not.toBeNull();
+
+    // With its city: locality names repeat across cities.
+    expect(text()).toContain('Hiran Magri, Udaipur');
+  });
+
+  it('never lets AreaAdmin sit alongside another role', () => {
+    component.toggle('SamaajAdmin');
+    component.toggle('AreaAdmin');
+    expect(component.selected()).toEqual(['AreaAdmin']);
+
+    component.toggle('SamaajAdmin');
+    expect(component.selected()).toEqual(['SamaajAdmin']);
+  });
+
+  it('unticks the other boxes on screen when AreaAdmin is ticked, not just in state', () => {
+    const box = (name: string) =>
+      fixture.nativeElement.querySelector(`#role-${name}`) as HTMLInputElement;
+
+    box('SamaajAdmin').click();
+    fixture.detectChanges();
+    box('AreaAdmin').click();
+    fixture.detectChanges();
+
+    expect(box('AreaAdmin').checked).toBe(true);
+    expect(box('SamaajAdmin').checked).toBe(false);
+
+    box('SamaajAdmin').click();
+    fixture.detectChanges();
+
+    expect(box('SamaajAdmin').checked).toBe(true);
+    expect(box('AreaAdmin').checked).toBe(false);
+  });
+
+  it('refuses to invite an Area Admin with no locality', () => {
+    component.form.setValue({ fullName: 'Rajesh Jain', mobileOrEmail: 'rajesh@example.com' });
+    component.toggle('AreaAdmin');
+
+    component.submit();
+
+    http.expectNone('/v1/identity/admins');
+    fixture.detectChanges();
+    expect(text()).toContain('An Area Admin needs a locality');
+  });
+
+  it('sends the locality with an Area Admin invitation', () => {
+    component.form.setValue({ fullName: 'Rajesh Jain', mobileOrEmail: 'rajesh@example.com' });
+    component.toggle('AreaAdmin');
+    component.localityId.set('loc-hm');
+
+    component.submit();
+
+    expect(http.expectOne('/v1/identity/admins').request.body).toEqual({
+      fullName: 'Rajesh Jain',
+      mobileOrEmail: 'rajesh@example.com',
+      roles: ['AreaAdmin'],
+      localityId: 'loc-hm',
+    });
   });
 
   it('does not call the API without a role', () => {
@@ -190,6 +276,22 @@ describe('InviteAdminComponent', () => {
     expect(text()).toContain('Ravi Shah');
     expect(text()).toContain('SamaajAdmin');
     expect(text()).toContain('already have a password');
+  });
+
+  it('grants AreaAdmin to an existing member only with a locality, and sends it', () => {
+    component.setMode('existing');
+    component.selectMember({ id: 'm5', fullName: 'Ravi Shah' } as never);
+    component.toggle('AreaAdmin');
+
+    component.grant();
+    http.expectNone('/v1/identity/admins/m5/roles/AreaAdmin');
+
+    component.localityId.set('loc-sc');
+    component.grant();
+
+    expect(
+      http.expectOne('/v1/identity/admins/m5/roles/AreaAdmin').request.body,
+    ).toEqual({ granted: true, localityId: 'loc-sc' });
   });
 
   it('refuses to grant with nobody selected', () => {

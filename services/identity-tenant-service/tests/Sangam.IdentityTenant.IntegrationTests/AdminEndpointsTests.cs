@@ -1,3 +1,4 @@
+using System.IdentityModel.Tokens.Jwt;
 using System.Net;
 using System.Net.Http.Json;
 using System.Text.Json;
@@ -768,5 +769,104 @@ public sealed class AdminEndpointsTests(IdentityTenantApiFactory factory)
         outbox.Should().ContainSingle();
         outbox[0].Payload.Should().Contain("\"previousStatus\": \"Active\"");
         outbox[0].Payload.Should().Contain($"\"changedByUserId\": \"{adminId}\"");
+    }
+
+    // ---- Area Admin: an administrator restricted to one locality -----------
+    //
+    // AreaAdmin's whole substance is UserRole.LocalityId. These prove the
+    // locality actually reaches the one place that matters: the token a
+    // downstream service reads to enforce it.
+
+    private async Task<(string Token, JsonElement Me)> SignInAsync(string identifier, string password)
+    {
+        var login = await factory.CreateClient().PostAsJsonAsync("/v1/identity/login", new
+        {
+            mobileOrEmail = identifier,
+            password,
+        });
+
+        login.StatusCode.Should().Be(HttpStatusCode.OK);
+
+        var token = (await login.Content.ReadFromJsonAsync<JsonElement>())
+            .GetProperty("accessToken").GetString()!;
+
+        var client = factory.CreateClient();
+        client.DefaultRequestHeaders.Authorization = new("Bearer", token);
+
+        var me = await client.GetFromJsonAsync<JsonElement>("/v1/identity/me");
+
+        return (token, me);
+    }
+
+    [Fact]
+    public async Task An_Area_Admin_invitation_needs_a_locality_and_no_other_role()
+    {
+        var locality = Guid.NewGuid();
+
+        var mixed = await InviteAsync(
+            SamaajAdmin(), "area-admin@example.com", [Roles.AreaAdmin, Roles.ContentModerator]);
+        mixed.StatusCode.Should().Be(HttpStatusCode.BadRequest);
+
+        var noLocality = await SamaajAdmin().PostAsJsonAsync("/v1/identity/admins", new
+        {
+            fullName = "Rajesh Jain",
+            mobileOrEmail = "area-admin@example.com",
+            roles = new[] { Roles.AreaAdmin },
+        });
+        noLocality.StatusCode.Should().Be(HttpStatusCode.BadRequest);
+
+        var withLocality = await SamaajAdmin().PostAsJsonAsync("/v1/identity/admins", new
+        {
+            fullName = "Rajesh Jain",
+            mobileOrEmail = "area-admin@example.com",
+            roles = new[] { Roles.AreaAdmin },
+            localityId = locality.ToString(),
+        });
+        withLocality.StatusCode.Should().Be(HttpStatusCode.Created);
+    }
+
+    [Fact]
+    public async Task An_Area_Admin_s_token_and_own_profile_both_carry_their_locality()
+    {
+        var locality = Guid.NewGuid();
+        const string identifier = "area-admin@example.com";
+
+        var invited = await SamaajAdmin().PostAsJsonAsync("/v1/identity/admins", new
+        {
+            fullName = "Rajesh Jain",
+            mobileOrEmail = identifier,
+            roles = new[] { Roles.AreaAdmin },
+            localityId = locality.ToString(),
+        });
+
+        var code = (await invited.Content.ReadFromJsonAsync<JsonElement>())
+            .GetProperty("activationCode").GetString();
+
+        (await factory.CreateClient().PostAsJsonAsync("/v1/identity/activations/redeem", new
+        {
+            mobileOrEmail = identifier,
+            code,
+            password = RealPassword,
+        })).StatusCode.Should().Be(HttpStatusCode.OK);
+
+        var (token, me) = await SignInAsync(identifier, RealPassword);
+
+        me.GetProperty("areaLocalityId").GetGuid().Should().Be(locality);
+
+        var claims = new JwtSecurityTokenHandler().ReadJwtToken(token).Claims;
+        claims.Single(c => c.Type == "locality_id").Value.Should().Be(locality.ToString());
+    }
+
+    [Fact]
+    public async Task An_ordinary_SamaajAdmin_s_token_carries_no_locality_claim_at_all()
+    {
+        await RealAdminIdAsync("plain-admin@example.com");
+        var (token, me) = await SignInAsync("plain-admin@example.com", RealPassword);
+
+        me.TryGetProperty("areaLocalityId", out var value).Should().BeTrue();
+        value.ValueKind.Should().Be(JsonValueKind.Null);
+
+        var claims = new JwtSecurityTokenHandler().ReadJwtToken(token).Claims;
+        claims.Should().NotContain(c => c.Type == "locality_id");
     }
 }

@@ -93,7 +93,8 @@ public sealed class LoginCommandHandler(
         await unitOfWork.SaveChangesAsync(cancellationToken);
 
         var token = tokenIssuer.Issue(
-            user.Id, user.TenantId, user.MobileOrEmail, authorization.Roles, authorization.Permissions);
+            user.Id, user.TenantId, user.MobileOrEmail, authorization.Roles, authorization.Permissions,
+            authorization.AreaLocalityId);
 
         return Result.Success(new LoginResponse(
             token.Token,

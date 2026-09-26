@@ -73,7 +73,7 @@ public static class AdminEndpoints
                 CancellationToken cancellationToken) =>
             {
                 var command = new InviteAdminCommand(
-                    request.FullName, request.MobileOrEmail, request.Roles);
+                    request.FullName, request.MobileOrEmail, request.Roles, request.LocalityId);
 
                 var result = await sender.Send(command, cancellationToken);
 
@@ -97,7 +97,8 @@ public static class AdminEndpoints
                 CancellationToken cancellationToken) =>
             {
                 var result = await sender.Send(
-                    new AssignRoleCommand(userId, role, request.Granted), cancellationToken);
+                    new AssignRoleCommand(userId, role, request.Granted, request.LocalityId),
+                    cancellationToken);
 
                 return result.ToApiResult();
             })
@@ -144,14 +145,21 @@ public static class AdminEndpoints
     public sealed record InviteAdminRequest(
         string FullName,
         string MobileOrEmail,
-        IReadOnlyList<string> Roles);
+        IReadOnlyList<string> Roles,
+
+        /// <summary>Required, and only meaningful, when Roles is exactly ["AreaAdmin"].</summary>
+        string? LocalityId = null);
 
     /// <summary>
     /// A body with one boolean rather than PUT-to-grant and DELETE-to-revoke.
     /// The screen is a checkbox, and one endpoint means one place the checks in
     /// AssignRoleCommandHandler have to be right.
     /// </summary>
-    public sealed record AssignRoleRequest(bool Granted);
+    public sealed record AssignRoleRequest(
+        bool Granted,
+
+        /// <summary>Required, and only meaningful, when granting the AreaAdmin role.</summary>
+        string? LocalityId = null);
 
     public sealed record SetUserSuspensionRequest(bool Suspended, string? Password = null);
 

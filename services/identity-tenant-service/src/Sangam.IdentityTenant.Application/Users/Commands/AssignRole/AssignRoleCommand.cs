@@ -19,8 +19,16 @@ namespace Sangam.IdentityTenant.Application.Users.Commands.AssignRole;
 /// </remarks>
 [RequiresRoles(Roles.SuperAdmin, Roles.SamaajAdmin)]
 [RequiresPermission(PermissionKeys.AdminUsersManage)]
-public sealed record AssignRoleCommand(Guid UserId, string Role, bool Granted)
-    : ICommand<AssignRoleResponse>;
+public sealed record AssignRoleCommand(
+    Guid UserId,
+    string Role,
+    bool Granted,
+
+    /// <summary>
+    /// Required, and only meaningful, when granting the AreaAdmin role - see
+    /// <see cref="AssignRoleCommandValidator"/>.
+    /// </summary>
+    string? LocalityId = null) : ICommand<AssignRoleResponse>;
 
 public sealed record AssignRoleResponse(
     Guid UserId,

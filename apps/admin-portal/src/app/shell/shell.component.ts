@@ -14,6 +14,9 @@ interface NavItem {
 
   /** Roles that see the item at all. Empty means everyone signed in. */
   readonly roles?: readonly string[];
+
+  /** Shown to an Area Admin, who manages one locality's members and nothing else. */
+  readonly forAreaAdmin?: true;
 }
 
 interface NavGroup {
@@ -147,6 +150,14 @@ interface NavGroup {
           </p>
         }
 
+        @if (isAreaAdmin()) {
+          <p class="notice" role="status">
+            You are an Area Admin for
+            <b>{{ areaLocalityName() ?? 'one locality' }}</b>. You see and correct only members
+            whose permanent address is there.
+          </p>
+        }
+
         <router-outlet />
       </main>
     </div>
@@ -177,11 +188,26 @@ export class ShellComponent implements OnInit {
     return this.isSuperAdmin() ? 'All Samaaj • Super Admin' : (this.auth.user()?.tenantSlug ?? '');
   });
 
+  /**
+   * An Area Admin holds no other admin role (identity-tenant-service refuses
+   * the mixture), and every screen but Members would answer 403 - so the nav
+   * shows them only what they can use. A courtesy: member-family-service
+   * enforces the locality from the token regardless.
+   */
+  readonly isAreaAdmin = computed(() =>
+    this.auth.roles().every((role) => role === 'AreaAdmin' || role === 'Member') &&
+    this.auth.roles().includes('AreaAdmin'),
+  );
+
+  readonly areaLocalityName = signal<string | null>(null);
+
   readonly visibleNav = computed(() =>
     NAV.map((group) => ({
       heading: group.heading,
-      items: group.items.filter(
-        (item) => item.roles === undefined || this.auth.hasAnyRole(...item.roles),
+      items: group.items.filter((item) =>
+        this.isAreaAdmin()
+          ? item.forAreaAdmin === true
+          : item.roles === undefined || this.auth.hasAnyRole(...item.roles),
       ),
     })).filter((group) => group.items.length > 0),
   );
@@ -191,6 +217,7 @@ export class ShellComponent implements OnInit {
     // by the time anything renders. The shell only has to fill the Samaaj
     // selector, and only a Super Admin has one.
     this.loadTenantsIfPlatformAdmin();
+    this.loadAreaLocalityName();
   }
 
   toggleNav(): void {
@@ -226,6 +253,21 @@ export class ShellComponent implements OnInit {
     this.auth.signOut().subscribe();
 
     void this.router.navigate(['/login']);
+  }
+
+  /** The locality's name for the banner; the id alone means nothing to a person. */
+  private loadAreaLocalityName(): void {
+    const localityId = this.auth.user()?.areaLocalityId;
+
+    if (!this.isAreaAdmin() || !localityId) {
+      return;
+    }
+
+    this.api.listLocalities().subscribe({
+      next: (found) =>
+        this.areaLocalityName.set(found.find((l) => l.id === localityId)?.name ?? null),
+      error: () => this.areaLocalityName.set(null),
+    });
   }
 
   private loadTenantsIfPlatformAdmin(): void {
@@ -272,7 +314,7 @@ const NAV: readonly NavGroup[] = [
       // at which point the panel was telling administrators something plainly
       // untrue about their own platform - and the member portal has screens for
       // all of them. What is missing here is the administrative view.
-      { label: 'Members', route: '/members' },
+      { label: 'Members', route: '/members', forAreaAdmin: true },
       { label: 'Families & Children', route: '/conversions' },
       { label: 'Timeline / Moderation', route: '/moderation' },
       { label: 'Volunteer Groups', route: '/groups' },

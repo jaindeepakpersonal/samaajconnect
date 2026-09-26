@@ -10,6 +10,7 @@ const ADMIN_ROLES = [
   'VolunteerGroupPresident',
   'PathshalaTeacher',
   'BoliManager',
+  'AreaAdmin',
 ] as const;
 
 /**
@@ -138,8 +139,14 @@ export class AdminLoginComponent {
           return;
         }
 
+        // An Area Admin manages one locality's members and nothing else, so
+        // the dashboard's Samaaj-wide tiles are not theirs to read.
+        const home = result.roles.every((role) => role === 'AreaAdmin' || role === 'Member')
+          ? '/members'
+          : '/dashboard';
+
         void this.router.navigateByUrl(
-          this.route.snapshot.queryParamMap.get('returnUrl') ?? '/dashboard',
+          this.route.snapshot.queryParamMap.get('returnUrl') ?? home,
         );
       },
       error: (failure: unknown) => {

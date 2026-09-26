@@ -1,4 +1,5 @@
 using FluentValidation;
+using Sangam.IdentityTenant.Application.Security;
 using Sangam.IdentityTenant.Domain.Authorization;
 
 namespace Sangam.IdentityTenant.Application.Users.Commands.AssignRole;
@@ -29,5 +30,19 @@ public sealed class AssignRoleCommandValidator : AbstractValidator<AssignRoleCom
                     .Select(r => r.Name))
                 + ".")
             .When(x => AuthorizationCatalog.FindRoleByName(x.Role) is not null);
+
+        // AreaAdmin's whole substance is the locality it is restricted to
+        // (UserRole.LocalityId); granting it with none would be an
+        // administrator restricted to nothing, which is not restricted at all.
+        RuleFor(x => x.LocalityId)
+            .Must(value => !string.IsNullOrWhiteSpace(value)
+                && Guid.TryParse(value, out var id) && id != Guid.Empty)
+            .WithMessage("A locality is required to grant the AreaAdmin role.")
+            .When(x => x.Granted && string.Equals(x.Role, Roles.AreaAdmin, StringComparison.OrdinalIgnoreCase));
+
+        RuleFor(x => x.LocalityId)
+            .Must(string.IsNullOrWhiteSpace)
+            .WithMessage("A locality only applies to granting the AreaAdmin role.")
+            .When(x => !(x.Granted && string.Equals(x.Role, Roles.AreaAdmin, StringComparison.OrdinalIgnoreCase)));
     }
 }

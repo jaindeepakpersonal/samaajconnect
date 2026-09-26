@@ -5,6 +5,7 @@ public static class Roles
 {
     public const string SuperAdmin = "SuperAdmin";
     public const string SamaajAdmin = "SamaajAdmin";
+    public const string AreaAdmin = "AreaAdmin";
     public const string Member = "Member";
     public const string FamilyHead = "FamilyHead";
     public const string VolunteerGroupPresident = "VolunteerGroupPresident";

@@ -30,6 +30,12 @@ export interface CurrentUser {
   readonly lastLoginAt: string | null;
   readonly roles: readonly string[];
   readonly permissions: readonly string[];
+
+  /**
+   * Set only for an Area Admin: the one locality their role is restricted to.
+   * Display only - member-family-service enforces it from the token itself.
+   */
+  readonly areaLocalityId?: string | null;
 }
 
 /** Mirrors RefreshSessionResponse. The same shape as a login, by design. */

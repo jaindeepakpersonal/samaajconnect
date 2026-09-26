@@ -43,8 +43,8 @@ enforced by `TenantAuthorizationBehavior`, not just UI hiding.
 | GET | `/roles` | Authenticated | The role and permission matrix the backend enforces, as this Samaaj has it |
 | PUT | `/roles/{roleId}/permissions/{permissionKey}` | `Roles.Manage` | Grant or revoke one permission on one role, body `{"granted":bool}`. One key per call, for the same reason `/admins/{userId}/roles/{role}` is. Two floors a Samaaj cannot cross: editing SuperAdmin at all is **403**, and revoking `Roles.Manage` from SamaajAdmin is **409** |
 | GET | `/admins` | `SuperAdmin`, `SamaajAdmin` + `AdminUsers.Manage` | This Samaaj's administrators and their roles |
-| POST | `/admins` | `SuperAdmin`, `SamaajAdmin` + `AdminUsers.Manage` | Invite an administrator; returns a one-time activation code |
-| PUT | `/admins/{userId}/roles/{role}` | `SuperAdmin`, `SamaajAdmin` + `AdminUsers.Manage` | Grant or revoke one role, body `{"granted":bool}` |
+| POST | `/admins` | `SuperAdmin`, `SamaajAdmin` + `AdminUsers.Manage` | Invite an administrator; returns a one-time activation code. `localityId` is required when `roles` is exactly `["AreaAdmin"]` and refused otherwise; an `AreaAdmin` invitation may name no other role |
+| PUT | `/admins/{userId}/roles/{role}` | `SuperAdmin`, `SamaajAdmin` + `AdminUsers.Manage` | Grant or revoke one role, body `{"granted":bool,"localityId"?:string}`. `localityId` is required when granting `AreaAdmin` and refused otherwise |
 | PUT | `/admins/{userId}/status` | `SuperAdmin`, `SamaajAdmin` + `AdminUsers.Manage` | Suspend or reinstate an account, body `{"suspended":bool,"password"?:string}`. `password` is the caller's own and required only to suspend — reinstating needs none, the same asymmetry `/tenants/{id}/status` draws. **409** on suspending yourself, or on either direction against an erased account |
 | POST | `/logout` | Anonymous (the refresh token is the credential) | End this session; `everywhere: true` ends every session for the account |
 | GET | `/me` | Authenticated | Current user + roles + tenant |
@@ -82,11 +82,11 @@ enforced by `TenantAuthorizationBehavior`, not just UI hiding.
 
 | Method | Path | Roles | Purpose |
 |---|---|---|---|
-| GET | `/members` | Member, SamaajAdmin | Search/filter tenant directory. `term` matches full name; `localityId` is an exact match against the searched member's permanent Locality (a master-data-service id, not a substring — see below) |
+| GET | `/members` | Member, SamaajAdmin | Search/filter tenant directory. `term` matches full name; `localityId` is an exact match against the searched member's permanent Locality (a master-data-service id, not a substring — see below). For an Area Admin the token's own `locality_id` replaces whatever `localityId` was asked for, and `/members/{id}` answers 404 outside it |
 | GET | `/members/registration-summary` | `SamaajAdmin`/`SuperAdmin` + `Members.Read` | Registrations in the current 30-day window against the 30 days before it, for the admin Reports & Analytics screen |
 | GET | `/members/{id}` | `Members.Read` | One member, through the same per-field privacy mapper the directory uses |
 | PATCH | `/members/{id}` | Member, **self only** | Update your own profile. Replaces it whole: `privacy` and `isListedInDirectory` are both **required**, because defaulting either would silently reopen something a member had closed. Also carries `gautraId`, `professionId`, `qualificationId` (all master-data-service ids), `permanentAddress` (`{line, cityId, localityId}`, required) and `temporaryAddress` (same shape, nullable). Takes **no** photo field — see below |
-| PATCH | `/members/{id}/details` | `SamaajAdmin` + `Members.Write`, never self | Correct somebody else's factual details. The same fields **minus** `privacy` and `isListedInDirectory`, which are the member's own. **409** on your own id: use the profile screen, which can set them |
+| PATCH | `/members/{id}/details` | `SamaajAdmin` or `AreaAdmin` (own locality only) + `Members.Write`, never self | Correct somebody else's factual details. The same fields **minus** `privacy` and `isListedInDirectory`, which are the member's own. **409** on your own id: use the profile screen, which can set them |
 | POST | `/members/{id}/photo` | Member (self), `Members.Write` | `multipart/form-data`, one file part. JPEG, PNG or WebP, 2 MB |
 | GET | `/members/{id}/photo` | `Members.Read` | The bytes. `ETag` + `Cache-Control: private` |
 | DELETE | `/members/{id}/photo` | Member (self), `Members.Write` | Idempotent |

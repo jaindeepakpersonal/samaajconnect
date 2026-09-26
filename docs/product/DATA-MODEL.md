@@ -94,14 +94,15 @@ LastLoginAt, CreatedAt`
 
 **Role** *(platform-level, seeded)* — `Id, Name` (SuperAdmin, SamaajAdmin,
 Member, FamilyHead, VolunteerGroupPresident, PathshalaTeacher,
-PathshalaStudent, ContentModerator, BoliManager)
+PathshalaStudent, ContentModerator, BoliManager, AreaAdmin)
 
 **Permission** *(platform-level, seeded)* — `Id, Key` (e.g.
 `Pathshala.Attendance.Write`, `SocialIssues.Approve` — see
 `SECURITY-CHECKLIST.md` for the full key list)
 
 **UserRole** — `UserId, RoleId, TenantScope (specific tenant or "all"
-for Super Admin), AssignedAt`
+for Super Admin), LocalityId (set only on an AreaAdmin grant - the one
+locality it is restricted to), AssignedAt`
 
 ## 3. Member & Family
 

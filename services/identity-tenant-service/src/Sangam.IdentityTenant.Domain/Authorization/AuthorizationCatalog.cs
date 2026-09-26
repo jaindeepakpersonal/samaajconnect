@@ -23,6 +23,13 @@ public static class AuthorizationCatalog
         public static readonly Guid PathshalaStudent = new("a0000000-0000-0000-0000-000000000007");
         public static readonly Guid ContentModerator = new("a0000000-0000-0000-0000-000000000008");
         public static readonly Guid BoliManager = new("a0000000-0000-0000-0000-000000000009");
+
+        /// <summary>
+        /// An administrator restricted to one locality within the Samaaj -
+        /// see <see cref="UserRole.LocalityId"/>. Granted like any other admin
+        /// role; what makes it "area" is that locality, never a separate flag.
+        /// </summary>
+        public static readonly Guid AreaAdmin = new("a0000000-0000-0000-0000-00000000000a");
     }
 
     public static class PermissionIds
@@ -99,6 +106,7 @@ public static class AuthorizationCatalog
         new(RoleIds.PathshalaStudent, "PathshalaStudent"),
         new(RoleIds.ContentModerator, "ContentModerator"),
         new(RoleIds.BoliManager, "BoliManager"),
+        new(RoleIds.AreaAdmin, "AreaAdmin"),
     ];
 
     public static IReadOnlyList<Permission> Permissions { get; } =
@@ -234,6 +242,18 @@ public static class AuthorizationCatalog
         new(RoleIds.BoliManager, PermissionIds.MembersRead),
         new(RoleIds.BoliManager, PermissionIds.BoliManage),
         new(RoleIds.BoliManager, PermissionIds.BoliPublishResults),
+
+        // An Area Admin manages the member directory the same way a Samaaj
+        // Admin does - Members.Read and Members.Write, unchanged - and is held
+        // to one locality by UserRole.LocalityId, an inner gate each
+        // permission-holding service checks for itself, the same shape "is this
+        // group's president" already is for VolunteerGroups.Lead. Volunteer
+        // groups, Events, Pathshala and Social issues are not scoped by
+        // locality yet - none of those aggregates carries one - so this role
+        // carries none of those permissions until they do; granting one now
+        // would make an Area Admin an unrestricted admin for that module.
+        new(RoleIds.AreaAdmin, PermissionIds.MembersRead),
+        new(RoleIds.AreaAdmin, PermissionIds.MembersWrite),
     ];
 
     /// <summary>
@@ -270,6 +290,7 @@ public static class AuthorizationCatalog
         RoleIds.VolunteerGroupPresident,
         RoleIds.PathshalaTeacher,
         RoleIds.BoliManager,
+        RoleIds.AreaAdmin,
     ];
 
     public static bool IsAdminAssignable(Guid roleId) => AdminAssignableRoleIds.Contains(roleId);

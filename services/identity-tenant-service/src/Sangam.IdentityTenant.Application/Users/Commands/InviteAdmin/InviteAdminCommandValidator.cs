@@ -1,5 +1,6 @@
 using System.Text.RegularExpressions;
 using FluentValidation;
+using Sangam.IdentityTenant.Application.Security;
 using Sangam.IdentityTenant.Domain.Authorization;
 
 namespace Sangam.IdentityTenant.Application.Users.Commands.InviteAdmin;
@@ -34,5 +35,25 @@ public sealed partial class InviteAdminCommandValidator : AbstractValidator<Invi
                 && AuthorizationCatalog.IsAdminAssignable(found.Id))
             .WithMessage("{PropertyValue} is not a role an administrator assigns.")
             .When(x => x.Roles is not null);
+
+        // AreaAdmin's whole substance is the locality it is restricted to
+        // (UserRole.LocalityId), so an invitation naming it must supply one,
+        // and never alongside another admin role - mixing would leave it
+        // ambiguous which grant the locality belongs to.
+        RuleFor(x => x.Roles)
+            .Must(roles => roles.Count == 1)
+            .WithMessage("AreaAdmin cannot be invited alongside another role.")
+            .When(x => x.Roles is not null && x.Roles.Contains(Roles.AreaAdmin));
+
+        RuleFor(x => x.LocalityId)
+            .Must(value => !string.IsNullOrWhiteSpace(value)
+                && Guid.TryParse(value, out var id) && id != Guid.Empty)
+            .WithMessage("A locality is required to invite an Area Admin.")
+            .When(x => x.Roles is not null && x.Roles.Contains(Roles.AreaAdmin));
+
+        RuleFor(x => x.LocalityId)
+            .Must(string.IsNullOrWhiteSpace)
+            .WithMessage("A locality only applies to an Area Admin invitation.")
+            .When(x => x.Roles is null || !x.Roles.Contains(Roles.AreaAdmin));
     }
 }

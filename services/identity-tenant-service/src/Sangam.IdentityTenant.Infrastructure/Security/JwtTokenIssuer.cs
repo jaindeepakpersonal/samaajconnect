@@ -14,7 +14,8 @@ public sealed class JwtTokenIssuer(IOptions<JwtOptions> options, IDateTimeProvid
         Guid tenantId,
         string mobileOrEmail,
         IReadOnlyCollection<string> roles,
-        IReadOnlyCollection<string> permissions)
+        IReadOnlyCollection<string> permissions,
+        Guid? areaLocalityId = null)
     {
         var jwt = options.Value;
         var issuedAt = clock.UtcNow;
@@ -35,6 +36,11 @@ public sealed class JwtTokenIssuer(IOptions<JwtOptions> options, IDateTimeProvid
         // re-reads roles rather than carrying them through the session.
         claims.AddRange(roles.Select(role => new Claim(PlatformClaimTypes.Role, role)));
         claims.AddRange(permissions.Select(permission => new Claim(PlatformClaimTypes.Permission, permission)));
+
+        if (areaLocalityId is { } locality)
+        {
+            claims.Add(new Claim(PlatformClaimTypes.LocalityId, locality.ToString()));
+        }
 
         var credentials = new SigningCredentials(
             new SymmetricSecurityKey(Encoding.UTF8.GetBytes(jwt.SigningKey)),

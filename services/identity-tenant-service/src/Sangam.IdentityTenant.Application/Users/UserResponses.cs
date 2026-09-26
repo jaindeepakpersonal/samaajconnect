@@ -39,4 +39,7 @@ public sealed record CurrentUserResponse(
     bool IsContactVerified,
     DateTimeOffset? LastLoginAt,
     IReadOnlyCollection<string> Roles,
-    IReadOnlyCollection<string> Permissions);
+    IReadOnlyCollection<string> Permissions,
+
+    /// <summary>Set only for an AreaAdmin - the one locality their grant is restricted to.</summary>
+    Guid? AreaLocalityId = null);

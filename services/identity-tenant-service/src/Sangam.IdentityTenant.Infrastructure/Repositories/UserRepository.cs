@@ -1,5 +1,6 @@
 using Microsoft.EntityFrameworkCore;
 using Sangam.IdentityTenant.Application.Abstractions;
+using Sangam.IdentityTenant.Domain.Authorization;
 using Sangam.IdentityTenant.Domain.Users;
 using Sangam.IdentityTenant.Infrastructure.Persistence;
 
@@ -102,7 +103,22 @@ public sealed class UserRepository(IdentityTenantDbContext dbContext) : IUserRep
             .Select(p => p.Key)
             .ToListAsync(cancellationToken);
 
-        return new UserAuthorization(roles, permissions);
+        // Only ever set when this user actually holds AreaAdmin for this
+        // tenant - roleIds already narrows that above, so this second query
+        // runs only for the account it can possibly apply to.
+        Guid? areaLocalityId = null;
+
+        if (roleIds.Contains(AuthorizationCatalog.RoleIds.AreaAdmin))
+        {
+            areaLocalityId = await dbContext.UserRoles
+                .Where(ur => ur.UserId == userId
+                    && ur.RoleId == AuthorizationCatalog.RoleIds.AreaAdmin
+                    && (ur.TenantScope == null || ur.TenantScope == tenantId))
+                .Select(ur => ur.LocalityId)
+                .FirstOrDefaultAsync(cancellationToken);
+        }
+
+        return new UserAuthorization(roles, permissions, areaLocalityId);
     }
 
     public Task<User?> GetByConvertedChildAsync(

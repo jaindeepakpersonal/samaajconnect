@@ -15,16 +15,27 @@ public sealed class UserRole
 
     public Guid? TenantScope { get; private set; }
 
+    /// <summary>
+    /// Set only on an <see cref="AuthorizationCatalog.RoleIds.AreaAdmin"/> grant,
+    /// to the one locality that grant is restricted to. Null on every other
+    /// role's grant, and null on an AreaAdmin grant would mean an
+    /// area admin with no area - so callers that mint an AreaAdmin grant must
+    /// supply one; nothing here defaults it.
+    /// </summary>
+    public Guid? LocalityId { get; private set; }
+
     public DateTimeOffset AssignedAt { get; private set; }
 
     private UserRole() { }
 
-    public UserRole(Guid userId, Guid roleId, Guid? tenantScope, DateTimeOffset assignedAt)
+    public UserRole(
+        Guid userId, Guid roleId, Guid? tenantScope, Guid? localityId, DateTimeOffset assignedAt)
     {
         Id = Guid.NewGuid();
         UserId = userId;
         RoleId = roleId;
         TenantScope = tenantScope;
+        LocalityId = localityId;
         AssignedAt = assignedAt;
     }
 

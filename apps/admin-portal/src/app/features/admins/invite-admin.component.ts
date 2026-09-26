@@ -6,7 +6,9 @@ import { AuthService, describeError } from '@samaajconnect/shared';
 import { forkJoin } from 'rxjs';
 import { AdminApi } from '../../core/admin-api';
 import { AdminScope } from '../../core/admin-scope';
-import { AdminMember, InviteAdminResult, Role } from '../../core/admin.models';
+import { AdminMember, City, InviteAdminResult, Locality, Role } from '../../core/admin.models';
+
+const AREA_ADMIN = 'AreaAdmin';
 
 /**
  * Invite Admin, from the admin wireframe's `#inviteadmin` screen.
@@ -161,6 +163,30 @@ import { AdminMember, InviteAdminResult, Role } from '../../core/admin.models';
               }
             </fieldset>
 
+            @if (isAreaAdmin()) {
+              <label for="invite-locality">Locality</label>
+              <select
+                id="invite-locality"
+                class="input"
+                [value]="localityId()"
+                (change)="setLocality($event)"
+                [attr.aria-invalid]="submitted() && !localityId()"
+              >
+                <option value="">Choose the locality they will manage…</option>
+                @for (locality of localityOptions(); track locality.id) {
+                  <option [value]="locality.id">{{ locality.label }}</option>
+                }
+              </select>
+              @if (submitted() && !localityId()) {
+                <p class="field-error">An Area Admin needs a locality.</p>
+              } @else {
+                <p class="field-hint">
+                  They see and correct only members whose permanent address is in this locality.
+                  An Area Admin holds no other admin role.
+                </p>
+              }
+            }
+
             @if (error(); as message) {
               <p class="notice error" role="alert">{{ message }}</p>
             }
@@ -262,6 +288,25 @@ import { AdminMember, InviteAdminResult, Role } from '../../core/admin.models';
             }
           </fieldset>
 
+          @if (isAreaAdmin()) {
+            <label for="existing-locality">Locality</label>
+            <select
+              id="existing-locality"
+              class="input"
+              [value]="localityId()"
+              (change)="setLocality($event)"
+              [attr.aria-invalid]="grantSubmitted() && !localityId()"
+            >
+              <option value="">Choose the locality they will manage…</option>
+              @for (locality of localityOptions(); track locality.id) {
+                <option [value]="locality.id">{{ locality.label }}</option>
+              }
+            </select>
+            @if (grantSubmitted() && !localityId()) {
+              <p class="field-error">An Area Admin needs a locality.</p>
+            }
+          }
+
           @if (error(); as message) {
             <p class="notice error" role="alert">{{ message }}</p>
           }
@@ -360,6 +405,22 @@ export class InviteAdminComponent implements OnInit {
 
   readonly assignableRoles = computed(() => this.roles().filter((r) => r.assignableToAdmins));
 
+  /**
+   * An Area Admin is restricted to one locality, and that restriction is the
+   * whole of the role - so it is granted alone, never alongside another admin
+   * role, and never without a locality. identity-tenant-service refuses both;
+   * this keeps the form from offering either.
+   */
+  readonly isAreaAdmin = computed(() => this.selected().includes(AREA_ADMIN));
+  readonly localityId = signal('');
+
+  /**
+   * Named with their city, because locality names repeat across cities -
+   * three "Hiran Magri" rows in one dropdown would leave an administrator
+   * guessing which area they had just handed somebody.
+   */
+  readonly localityOptions = signal<readonly { id: string; label: string }[]>([]);
+
   readonly needsSamaaj = computed(
     () => this.auth.roles().includes('SuperAdmin') && this.scope.tenantId() === null,
   );
@@ -383,12 +444,25 @@ export class InviteAdminComponent implements OnInit {
       next: (matrix) => this.roles.set(matrix.roles),
       error: (failure: unknown) => this.error.set(describeError(failure)),
     });
+
+    // Only needed once AreaAdmin is picked, but small and anonymous to read, so
+    // it is loaded up front rather than making the picker wait. A failure
+    // leaves the list empty and the submit refused with a clear reason.
+    forkJoin({ localities: this.api.listLocalities(), cities: this.api.listCities() }).subscribe({
+      next: ({ localities, cities }) => this.localityOptions.set(labelLocalities(localities, cities)),
+      error: () => this.localityOptions.set([]),
+    });
   }
 
   setMode(mode: 'invite' | 'existing'): void {
     this.mode.set(mode);
     this.error.set(null);
     this.selected.set([]);
+    this.localityId.set('');
+  }
+
+  setLocality(event: Event): void {
+    this.localityId.set((event.target as HTMLSelectElement).value);
   }
 
   showError(control: 'fullName' | 'mobileOrEmail'): boolean {
@@ -400,15 +474,26 @@ export class InviteAdminComponent implements OnInit {
   toggle(role: string): void {
     const current = this.selected();
 
+    if (current.includes(role)) {
+      this.selected.set(current.filter((r) => r !== role));
+      return;
+    }
+
+    // Checking AreaAdmin clears the others, and checking another clears
+    // AreaAdmin - the service would refuse the mixture either way.
     this.selected.set(
-      current.includes(role) ? current.filter((r) => r !== role) : [...current, role],
+      role === AREA_ADMIN ? [AREA_ADMIN] : [...current.filter((r) => r !== AREA_ADMIN), role],
     );
   }
 
   submit(): void {
     this.submitted.set(true);
 
-    if (this.form.invalid || this.selected().length === 0) {
+    if (
+      this.form.invalid ||
+      this.selected().length === 0 ||
+      (this.isAreaAdmin() && !this.localityId())
+    ) {
       this.form.markAllAsTouched();
       return;
     }
@@ -423,6 +508,7 @@ export class InviteAdminComponent implements OnInit {
         fullName: raw.fullName.trim(),
         mobileOrEmail: raw.mobileOrEmail.trim(),
         roles: this.selected(),
+        ...(this.isAreaAdmin() ? { localityId: this.localityId() } : {}),
       })
       .subscribe({
         next: (result) => {
@@ -443,6 +529,7 @@ export class InviteAdminComponent implements OnInit {
     this.invited.set(null);
     this.submitted.set(false);
     this.selected.set([]);
+    this.localityId.set('');
     this.form.reset();
   }
 
@@ -480,6 +567,7 @@ export class InviteAdminComponent implements OnInit {
   clearSelection(): void {
     this.selectedMember.set(null);
     this.selected.set([]);
+    this.localityId.set('');
     this.grantSubmitted.set(false);
     this.searched.set(false);
   }
@@ -495,14 +583,16 @@ export class InviteAdminComponent implements OnInit {
     const member = this.selectedMember();
     const roles = this.selected();
 
-    if (!member || roles.length === 0) {
+    if (!member || roles.length === 0 || (this.isAreaAdmin() && !this.localityId())) {
       return;
     }
 
     this.busy.set(true);
     this.error.set(null);
 
-    forkJoin(roles.map((role) => this.api.setRole(member.id, role, true))).subscribe({
+    const locality = this.isAreaAdmin() ? this.localityId() : undefined;
+
+    forkJoin(roles.map((role) => this.api.setRole(member.id, role, true, locality))).subscribe({
       next: (results) => {
         this.busy.set(false);
         this.granted.set({
@@ -521,6 +611,7 @@ export class InviteAdminComponent implements OnInit {
     this.granted.set(null);
     this.grantSubmitted.set(false);
     this.selected.set([]);
+    this.localityId.set('');
     this.selectedMember.set(null);
     this.searchTerm = '';
     this.searchResults.set([]);
@@ -530,4 +621,18 @@ export class InviteAdminComponent implements OnInit {
   spaced(name: string): string {
     return name.replace(/([a-z])([A-Z])/g, '$1 $2');
   }
+}
+
+function labelLocalities(
+  localities: readonly Locality[],
+  cities: readonly City[],
+): { id: string; label: string }[] {
+  const cityNames = new Map(cities.map((c) => [c.id, c.name]));
+
+  return localities
+    .map((l) => {
+      const city = cityNames.get(l.cityId);
+      return { id: l.id, label: city ? `${l.name}, ${city}` : l.name };
+    })
+    .sort((a, b) => a.label.localeCompare(b.label));
 }

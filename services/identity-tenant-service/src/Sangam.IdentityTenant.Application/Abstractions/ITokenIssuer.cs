@@ -12,7 +12,8 @@ public interface ITokenIssuer
         Guid tenantId,
         string mobileOrEmail,
         IReadOnlyCollection<string> roles,
-        IReadOnlyCollection<string> permissions);
+        IReadOnlyCollection<string> permissions,
+        Guid? areaLocalityId = null);
 }
 
 public sealed record AccessToken(string Token, DateTimeOffset ExpiresAt);

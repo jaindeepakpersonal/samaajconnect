@@ -846,6 +846,18 @@ The service lets an administrator do that only while there is no president, the
 same window as the President election, and this screen asks for the queue only
 when `iCanLead` says it may (anybody else gets a 404).
 
+**An Area Admin is invited like any other administrator, with one extra
+field.** Ticking `AreaAdmin` on Invite Admin (either mode) clears every other
+role and shows a Locality select; ticking another role clears `AreaAdmin`.
+identity-tenant-service refuses both the mixture and a missing locality, so the
+form never offers either. Once signed in, an Area Admin lands on Members
+rather than the dashboard, sees only Members in the nav, and is told which
+locality they manage in a banner above every screen - because every other
+screen would answer 403, and the Samaaj-wide dashboard tiles are not theirs to
+read. None of that is the control: member-family-service applies the locality
+from the token, so the Members screen needs no change of its own, and its
+Locality filter simply has no effect for them.
+
 **Trusts shipped with no admin screen at all until now**, the same shape of gap
 as every other case in this file: `trust-service` (roster CRUD, then
 elections) landed across two backend-only cycles, reachable only by curl.

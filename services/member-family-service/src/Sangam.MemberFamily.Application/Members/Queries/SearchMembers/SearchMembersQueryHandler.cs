@@ -8,21 +8,31 @@ namespace Sangam.MemberFamily.Application.Members.Queries.SearchMembers;
 
 public sealed class SearchMembersQueryHandler(
     IMemberProfileRepository profiles,
-    ICurrentUser currentUser)
+    ICurrentUser currentUser,
+    IAreaScope areaScope)
     : IRequestHandler<SearchMembersQuery, Result<PagedResult<MemberResponse>>>
 {
     public async Task<Result<PagedResult<MemberResponse>>> Handle(
         SearchMembersQuery query,
         CancellationToken cancellationToken)
     {
-        var isAdmin = currentUser.IsInRole(Roles.SamaajAdmin) || currentUser.IsInRole(Roles.SuperAdmin);
+        var isAdmin = currentUser.IsInRole(Roles.SamaajAdmin)
+            || currentUser.IsInRole(Roles.SuperAdmin)
+            || currentUser.IsInRole(Roles.AreaAdmin);
+
+        // An Area Admin's own locality always wins over whatever the request
+        // asked for - the inner gate SECURITY-CHECKLIST.md asks for, the same
+        // shape a write path re-checking TenantId against ITenantContext
+        // already is. Without this an Area Admin could simply pass a
+        // different LocalityId and read the whole Samaaj's directory.
+        var localityId = areaScope.AreaLocalityId ?? query.LocalityId;
 
         // One row more than asked for, so HasMore is known without a second
         // COUNT(*) query - the extra row is sliced off below and never reaches
         // the caller.
         var found = await profiles.SearchAsync(
             query.Term,
-            query.LocalityId,
+            localityId,
             query.Skip,
             query.Take + 1,
             // Administrators see members who have taken themselves out of the

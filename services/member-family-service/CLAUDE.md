@@ -27,7 +27,7 @@ worked example of a cross-service flow with no synchronous call.
 |---|---|---|
 | `CreateProfileForNewUserCommand` | `[InternalRequest]` | built |
 | `UpdateProfileCommand` | self only - see below | built |
-| `CorrectMemberDetailsCommand` | `SamaajAdmin` + `Members.Write`, never self | built |
+| `CorrectMemberDetailsCommand` | `SamaajAdmin` or `AreaAdmin` + `Members.Write`, never self | built |
 | `CreateFamilyCommand` | any member | built |
 | `RequestJoinFamilyCommand` | any member | built |
 | `SetFamilyHeadCommand` | family admin of that family | built |
@@ -115,6 +115,28 @@ here, which looks exactly like a broker problem and is not one.
 | GET | `/health` | anonymous |
 
 ## Decisions worth knowing before you change this service
+
+**An Area Admin sees and corrects only their own locality's members, added
+2026-09-26.** identity-tenant-service puts the restriction on the token as
+`locality_id`; `HttpTenantContext` reads it into `IAreaScope.AreaLocalityId`
+off the validated principal, never a header, because a header is something the
+caller chooses. It is an interface of its own rather than a member of
+`ITenantContext` because that file is a verbatim copy in every service, which
+`scripts/security-invariants.sh` checks, and no other service holds
+locality-scoped data yet. Three handlers treat it as an inner gate beside `TenantId`:
+`SearchMembersQuery` replaces whatever `LocalityId` the request asked for with
+the caller's own, so passing a different one widens nothing;
+`GetMemberQuery` and `CorrectMemberDetailsCommand` answer 404 for a member
+whose `PermanentAddress.LocalityId` is elsewhere, the same "not found" a
+member of another Samaaj gets. Inside their locality an Area Admin has a
+Samaaj Admin's view - unlisted members and every privacy level - because
+correcting a member's details is the same administrative work there.
+
+The two read queries admit an Area Admin through `Roles.Member`, which every
+admin account also holds; `CorrectMemberDetailsCommand`'s role list has no
+`Member` in it, so it names `AreaAdmin` explicitly. A member whose permanent
+address has no locality set is outside every Area Admin's scope, and only a
+Samaaj Admin can reach them.
 
 **A household has an admin and, separately, a head - added 2026-09-19, and until
 then the code said "head" for what is really the admin.** The person who sets a

@@ -47,6 +47,7 @@ public sealed class GetCurrentUserQueryHandler(
             user.IsContactVerified,
             user.LastLoginAt,
             authorization.Roles,
-            authorization.Permissions));
+            authorization.Permissions,
+            authorization.AreaLocalityId));
     }
 }

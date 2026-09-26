@@ -80,7 +80,10 @@ public sealed class InviteAdminCommandHandler(
             AuthorizationCatalog.RoleIds.Member,
             roleIds,
             adminId,
-            clock.UtcNow);
+            clock.UtcNow,
+            // Well-formed by InviteAdminCommandValidator whenever AreaAdmin is
+            // among the requested roles, and absent otherwise.
+            string.IsNullOrWhiteSpace(command.LocalityId) ? null : Guid.Parse(command.LocalityId));
 
         var (code, plaintext) = ActivationCode.Issue(adminId, passwordHasher.Hash, clock.UtcNow);
 

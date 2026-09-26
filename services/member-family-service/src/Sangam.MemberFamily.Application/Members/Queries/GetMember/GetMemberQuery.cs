@@ -35,7 +35,8 @@ public sealed record GetMemberQuery(Guid MemberId) : IQuery<MemberResponse>;
 
 public sealed class GetMemberQueryHandler(
     IMemberProfileRepository profiles,
-    ICurrentUser currentUser)
+    ICurrentUser currentUser,
+    IAreaScope areaScope)
     : IRequestHandler<GetMemberQuery, Result<MemberResponse>>
 {
     public async Task<Result<MemberResponse>> Handle(
@@ -52,9 +53,24 @@ public sealed class GetMemberQueryHandler(
                 Error.NotFound("Member.NotFound", "No such member in this Samaaj."));
         }
 
+        // The IDOR guard for an Area Admin: a locality restriction is only
+        // real if the id-based read enforces it too, not only the search that
+        // fed the id in the first place. Answered as "not found" rather than
+        // "forbidden", the same reasoning the group presidency check uses -
+        // whether this member is in the caller's area is not this caller's to
+        // learn either way.
+        if (areaScope.AreaLocalityId is { } restricted
+            && profile.PermanentAddress.LocalityId != restricted)
+        {
+            return Result.Failure<MemberResponse>(
+                Error.NotFound("Member.NotFound", "No such member in this Samaaj."));
+        }
+
         var viewer = new ProfileViewer(
             currentUser.UserId,
-            currentUser.IsInRole(Roles.SamaajAdmin) || currentUser.IsInRole(Roles.SuperAdmin));
+            currentUser.IsInRole(Roles.SamaajAdmin)
+                || currentUser.IsInRole(Roles.SuperAdmin)
+                || currentUser.IsInRole(Roles.AreaAdmin));
 
         return Result.Success(profile.ToDirectoryResponse(viewer));
     }

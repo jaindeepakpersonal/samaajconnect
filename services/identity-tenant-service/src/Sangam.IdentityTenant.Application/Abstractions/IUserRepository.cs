@@ -74,7 +74,14 @@ public interface IUserRepository
 
 public sealed record UserAuthorization(
     IReadOnlyCollection<string> Roles,
-    IReadOnlyCollection<string> Permissions)
+    IReadOnlyCollection<string> Permissions,
+
+    /// <summary>
+    /// Set when this user holds the AreaAdmin role for this tenant, to the one
+    /// locality that grant is restricted to (UserRole.LocalityId). Minted onto
+    /// the token as the locality_id claim; null for everyone else.
+    /// </summary>
+    Guid? AreaLocalityId = null)
 {
     public static UserAuthorization Empty { get; } = new([], []);
 }

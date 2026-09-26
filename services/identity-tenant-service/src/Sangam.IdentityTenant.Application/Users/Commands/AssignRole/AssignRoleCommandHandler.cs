@@ -65,7 +65,14 @@ public sealed class AssignRoleCommandHandler(
         }
 
         var changed = command.Granted
-            ? user.GrantRole(role.Id, tenantContext.TenantId, actorId, clock.UtcNow)
+            ? user.GrantRole(
+                role.Id,
+                tenantContext.TenantId,
+                actorId,
+                clock.UtcNow,
+                // Well-formed by AssignRoleCommandValidator whenever this grants
+                // AreaAdmin, and absent otherwise.
+                string.IsNullOrWhiteSpace(command.LocalityId) ? null : Guid.Parse(command.LocalityId))
             : user.RevokeRole(role.Id, tenantContext.TenantId, actorId, clock.UtcNow);
 
         await unitOfWork.SaveChangesAsync(cancellationToken);

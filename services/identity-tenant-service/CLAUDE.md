@@ -17,7 +17,7 @@ a `Tenant`'s own `Id` **is** the tenant id every other service references.
 | `Tenant` | built | Platform-level. Not `ITenantScopedEntity` — see below. |
 | `User` | built | Tenant-scoped; the first entity here the query filter actually applies to. |
 | `Role`, `Permission`, `RolePermission` | built | Seeded by migration from `AuthorizationCatalog`. |
-| `UserRole` | built | A null `TenantScope` is the platform-wide grant, i.e. Super Admin. |
+| `UserRole` | built | A null `TenantScope` is the platform-wide grant, i.e. Super Admin. `LocalityId` is set only on an `AreaAdmin` grant - see "Area Admin" below. |
 | `ConsentRecord` | built | Append-only. One row per decision, per purpose. |
 | `RefreshToken` | built | A session step. Hashed, single-use, rotating. Deliberately not tenant-scoped. |
 | `TenantLogo` | built | A Samaaj mark the platform hosts. Not tenant-scoped, for the reason `Tenant` is not. |
@@ -707,6 +707,25 @@ was the only visible symptom. `Activate()` now branches on
 before; absent, raise `UserRegisteredDomainEvent` instead - the same event an
 ordinary registration raises, and exactly what `AdminInvitedDomainEvent`'s own
 doc comment already promised would happen "when the invitation is redeemed".
+
+**Area Admin, added 2026-09-26: an administrator restricted to one locality.**
+The restriction is `UserRole.LocalityId`, a second scope beside `TenantScope`
+on the grant itself rather than a flag on the account, so revoking the role
+takes the restriction with it. `InviteAdminCommand` and `AssignRoleCommand`
+both take an optional `LocalityId`, required exactly when the role is
+`AreaAdmin` and refused otherwise, and an `AreaAdmin` invitation may name no
+other role - a locality beside two roles would leave it unclear which grant it
+belongs to. `GetAuthorizationAsync` reads it back and every token minted for
+the account carries it as the `locality_id` claim (`PlatformClaimTypes`, in
+all sixteen copies); `/me` returns it as `areaLocalityId` for display.
+
+This service only *carries* the restriction; each service holding locality-
+scoped data enforces it, from the token, the same way it enforces `tenant_id`
+- never from a header, which a caller could set. member-family-service is the
+only one so far. `AreaAdmin` therefore holds `Members.Read` and `Members.Write`
+and nothing else: volunteer groups, events and social issues carry no
+`LocalityId` yet, and granting their permissions before they can be scoped
+would make an Area Admin an unrestricted admin of those modules.
 
 **An identifier already on the platform is refused without saying where.**
 `MobileOrEmail` is unique platform-wide, so the existing account may be in

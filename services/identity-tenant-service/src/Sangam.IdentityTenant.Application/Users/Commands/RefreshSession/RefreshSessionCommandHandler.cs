@@ -54,7 +54,8 @@ public sealed class RefreshSessionCommandHandler(
         await unitOfWork.SaveChangesAsync(cancellationToken);
 
         var access = tokenIssuer.Issue(
-            user.Id, user.TenantId, user.MobileOrEmail, authorization.Roles, authorization.Permissions);
+            user.Id, user.TenantId, user.MobileOrEmail, authorization.Roles, authorization.Permissions,
+            authorization.AreaLocalityId);
 
         return Result.Success(new RefreshSessionResponse(
             access.Token,

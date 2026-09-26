@@ -24,6 +24,7 @@ public sealed class MemberEndpointsTests(MemberFamilyApiFactory factory)
     private readonly Guid _ravi = Guid.NewGuid();
     private readonly Guid _meera = Guid.NewGuid();
     private readonly Guid _outsider = Guid.NewGuid();
+    private readonly Guid _puneMember = Guid.NewGuid();
 
     /// <summary>
     /// Suffix making this test method's seeded members distinguishable. The
@@ -37,6 +38,10 @@ public sealed class MemberEndpointsTests(MemberFamilyApiFactory factory)
         await SeedAsync(_ravi, TenantA, Named("Ravi Shah"), UdaipurLocalityId);
         await SeedAsync(_meera, TenantA, Named("Meera Shah"), UdaipurLocalityId);
         await SeedAsync(_outsider, TenantB, Named("Someone Else"), PuneLocalityId);
+
+        // Same Samaaj as Ravi and Meera, different locality - what an Area
+        // Admin restricted to Udaipur must not see.
+        await SeedAsync(_puneMember, TenantA, Named("Pune Member"), PuneLocalityId);
     }
 
     public Task DisposeAsync() => Task.CompletedTask;
@@ -88,6 +93,16 @@ public sealed class MemberEndpointsTests(MemberFamilyApiFactory factory)
     private HttpClient AdminClient(Guid tenantId) =>
         factory.CreateClientAs(
             Guid.NewGuid(), tenantId, ["SamaajAdmin"], ["Members.Read", "Members.Write"]);
+
+    /// <summary>
+    /// "Member" alongside "AreaAdmin", exactly as a real token is minted -
+    /// every admin role is granted alongside Member (User.Invite), and the
+    /// read queries' own role gate relies on that rather than naming every
+    /// admin role individually.
+    /// </summary>
+    private HttpClient AreaAdminClient(Guid tenantId, Guid localityId) =>
+        factory.CreateClientAs(
+            Guid.NewGuid(), tenantId, ["Member", "AreaAdmin"], ["Members.Read", "Members.Write"], localityId);
 
     private string Named(string name) => name + " " + _run;
 
@@ -251,6 +266,93 @@ public sealed class MemberEndpointsTests(MemberFamilyApiFactory factory)
             .GetAsync($"/v1/members/{Guid.NewGuid()}");
 
         response.StatusCode.Should().Be(HttpStatusCode.NotFound);
+    }
+
+    // ---- Area Admin: restricted to one locality -----------------------------
+    //
+    // AreaAdmin's whole substance is the locality_id claim - an inner gate the
+    // same shape TenantId already is, enforced independently of whatever the
+    // request itself asks for.
+
+    [Fact]
+    public async Task An_Area_Admin_s_own_locality_wins_over_whatever_the_request_asks_for()
+    {
+        // Asking for Pune explicitly does not matter - the caller's own
+        // restriction always applies. Without this an Area Admin could read
+        // the whole Samaaj's directory by simply passing a different id.
+        var directory = await AreaAdminClient(TenantA, UdaipurLocalityId)
+            .GetFromJsonAsync<JsonElement>("/v1/members?localityId=" + PuneLocalityId);
+
+        var names = directory.GetProperty("items").EnumerateArray()
+            .Select(m => m.GetProperty("fullName").GetString())
+            .ToList();
+
+        names.Should().Contain(Named("Ravi Shah"));
+        names.Should().Contain(Named("Meera Shah"));
+        names.Should().NotContain(Named("Pune Member"));
+    }
+
+    [Fact]
+    public async Task An_Area_Admin_reads_by_id_only_inside_their_own_locality()
+    {
+        var response = await AreaAdminClient(TenantA, UdaipurLocalityId)
+            .GetAsync($"/v1/members/{_puneMember}");
+
+        // Not found, not forbidden - whether this member exists at all is not
+        // this caller's to learn either way, same reasoning the group
+        // presidency check already uses.
+        response.StatusCode.Should().Be(HttpStatusCode.NotFound);
+    }
+
+    [Fact]
+    public async Task An_Area_Admin_still_reads_a_member_inside_their_own_locality()
+    {
+        var response = await AreaAdminClient(TenantA, UdaipurLocalityId)
+            .GetFromJsonAsync<JsonElement>($"/v1/members/{_meera}");
+
+        response.GetProperty("fullName").GetString().Should().Be(Named("Meera Shah"));
+    }
+
+    [Fact]
+    public async Task An_Area_Admin_cannot_correct_a_member_outside_their_locality()
+    {
+        var response = await AreaAdminClient(TenantA, UdaipurLocalityId).PatchAsJsonAsync(
+            $"/v1/members/{_puneMember}/details", new
+            {
+                fullName = "Renamed",
+                dateOfBirth = (DateOnly?)null,
+                gender = (string?)null,
+                mobile = (string?)null,
+                email = (string?)null,
+                gautraId = (Guid?)null,
+                professionId = (Guid?)null,
+                qualificationId = (Guid?)null,
+                permanentAddress = BlankAddress(),
+                temporaryAddress = (object?)null,
+            });
+
+        response.StatusCode.Should().Be(HttpStatusCode.NotFound);
+    }
+
+    [Fact]
+    public async Task An_Area_Admin_corrects_a_member_inside_their_locality()
+    {
+        var response = await AreaAdminClient(TenantA, UdaipurLocalityId).PatchAsJsonAsync(
+            $"/v1/members/{_meera}/details", new
+            {
+                fullName = "Meera Corrected",
+                dateOfBirth = (DateOnly?)null,
+                gender = (string?)null,
+                mobile = (string?)null,
+                email = (string?)null,
+                gautraId = (Guid?)null,
+                professionId = (Guid?)null,
+                qualificationId = (Guid?)null,
+                permanentAddress = BlankAddress(),
+                temporaryAddress = (object?)null,
+            });
+
+        response.StatusCode.Should().Be(HttpStatusCode.OK);
     }
 
     [Fact]
