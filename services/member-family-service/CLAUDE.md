@@ -122,15 +122,19 @@ here, which looks exactly like a broker problem and is not one.
 off the validated principal, never a header, because a header is something the
 caller chooses. It is an interface of its own rather than a member of
 `ITenantContext` because that file is a verbatim copy in every service, which
-`scripts/security-invariants.sh` checks, and no other service holds
-locality-scoped data yet. Three handlers treat it as an inner gate beside `TenantId`:
-`SearchMembersQuery` replaces whatever `LocalityId` the request asked for with
-the caller's own, so passing a different one widens nothing;
-`GetMemberQuery` and `CorrectMemberDetailsCommand` answer 404 for a member
-whose `PermanentAddress.LocalityId` is elsewhere, the same "not found" a
-member of another Samaaj gets. Inside their locality an Area Admin has a
-Samaaj Admin's view - unlisted members and every privacy level - because
-correcting a member's details is the same administrative work there.
+`scripts/security-invariants.sh` checks.
+
+**The locality bounds the administrator, never the member.** An Area Admin is
+a member of their Samaaj too, and the directory they have as one is the whole
+Samaaj, privacy-filtered like anybody's. What the locality limits is the
+administration: `SearchMembersQuery` gives the administrator's view (unlisted
+members, every privacy level) only to a search confined to their own locality
+- which is what the admin panel's Members screen always sends for them -
+and `GetMemberQuery` only for a member who lives there; everywhere else they
+get the member view. `CorrectMemberDetailsCommand` answers 404 outside it. The
+first version of this filtered every read down to the locality, which would
+have shrunk an Area Admin's own directory in the member portal to one area to
+scope a role they hold in the admin panel.
 
 The two read queries admit an Area Admin through `Roles.Member`, which every
 admin account also holds; `CorrectMemberDetailsCommand`'s role list has no

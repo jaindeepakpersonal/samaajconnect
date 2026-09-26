@@ -268,49 +268,52 @@ public sealed class MemberEndpointsTests(MemberFamilyApiFactory factory)
         response.StatusCode.Should().Be(HttpStatusCode.NotFound);
     }
 
-    // ---- Area Admin: restricted to one locality -----------------------------
+    // ---- Area Admin: an administrator of one locality ------------------------
     //
-    // AreaAdmin's whole substance is the locality_id claim - an inner gate the
-    // same shape TenantId already is, enforced independently of whatever the
-    // request itself asks for.
+    // The locality_id claim bounds the administrator's view - private fields
+    // and unlisted members - and the power to correct. It never shrinks the
+    // directory they have as a member: outside their locality they see what
+    // any member sees.
 
     [Fact]
-    public async Task An_Area_Admin_s_own_locality_wins_over_whatever_the_request_asks_for()
+    public async Task An_Area_Admin_sees_their_own_locality_as_an_administrator()
     {
-        // Asking for Pune explicitly does not matter - the caller's own
-        // restriction always applies. Without this an Area Admin could read
-        // the whole Samaaj's directory by simply passing a different id.
+        var directory = await AreaAdminClient(TenantA, UdaipurLocalityId)
+            .GetFromJsonAsync<JsonElement>("/v1/members?localityId=" + UdaipurLocalityId);
+
+        var meera = directory.GetProperty("items").EnumerateArray()
+            .Single(m => m.GetProperty("id").GetGuid() == _meera);
+
+        meera.GetProperty("email").GetString().Should().NotBeNullOrEmpty();
+    }
+
+    [Fact]
+    public async Task Elsewhere_an_Area_Admin_sees_only_what_any_member_sees()
+    {
+        // Asking for another locality is allowed - it is the member directory -
+        // but the private fields stay private.
         var directory = await AreaAdminClient(TenantA, UdaipurLocalityId)
             .GetFromJsonAsync<JsonElement>("/v1/members?localityId=" + PuneLocalityId);
 
-        var names = directory.GetProperty("items").EnumerateArray()
-            .Select(m => m.GetProperty("fullName").GetString())
-            .ToList();
+        var pune = directory.GetProperty("items").EnumerateArray()
+            .Single(m => m.GetProperty("id").GetGuid() == _puneMember);
 
-        names.Should().Contain(Named("Ravi Shah"));
-        names.Should().Contain(Named("Meera Shah"));
-        names.Should().NotContain(Named("Pune Member"));
+        pune.GetProperty("email").ValueKind.Should().Be(JsonValueKind.Null);
     }
 
     [Fact]
-    public async Task An_Area_Admin_reads_by_id_only_inside_their_own_locality()
+    public async Task An_Area_Admin_opening_a_member_elsewhere_gets_the_member_view()
     {
-        var response = await AreaAdminClient(TenantA, UdaipurLocalityId)
-            .GetAsync($"/v1/members/{_puneMember}");
+        var pune = await AreaAdminClient(TenantA, UdaipurLocalityId)
+            .GetFromJsonAsync<JsonElement>($"/v1/members/{_puneMember}");
 
-        // Not found, not forbidden - whether this member exists at all is not
-        // this caller's to learn either way, same reasoning the group
-        // presidency check already uses.
-        response.StatusCode.Should().Be(HttpStatusCode.NotFound);
-    }
+        pune.GetProperty("fullName").GetString().Should().Be(Named("Pune Member"));
+        pune.GetProperty("email").ValueKind.Should().Be(JsonValueKind.Null);
 
-    [Fact]
-    public async Task An_Area_Admin_still_reads_a_member_inside_their_own_locality()
-    {
-        var response = await AreaAdminClient(TenantA, UdaipurLocalityId)
+        var meera = await AreaAdminClient(TenantA, UdaipurLocalityId)
             .GetFromJsonAsync<JsonElement>($"/v1/members/{_meera}");
 
-        response.GetProperty("fullName").GetString().Should().Be(Named("Meera Shah"));
+        meera.GetProperty("email").GetString().Should().NotBeNullOrEmpty();
     }
 
     [Fact]

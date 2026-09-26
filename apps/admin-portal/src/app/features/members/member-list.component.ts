@@ -77,8 +77,16 @@ import { AdminMember, Locality } from '../../core/admin.models';
 
             <div class="field">
               <label for="locality">Locality</label>
-              <select class="input" id="locality" name="locality" [(ngModel)]="localityId">
-                <option value="">All localities</option>
+              <select
+                class="input"
+                id="locality"
+                name="locality"
+                [(ngModel)]="localityId"
+                [disabled]="areaLocalityId() !== null"
+              >
+                @if (areaLocalityId() === null) {
+                  <option value="">All localities</option>
+                }
                 @for (option of localities(); track option.id) {
                   <option [value]="option.id">{{ option.name }}</option>
                 }
@@ -199,8 +207,16 @@ export class MemberListComponent implements OnInit {
 
   readonly localities = signal<readonly Locality[]>([]);
 
+  /**
+   * An Area Admin administers one locality, and member-family-service gives
+   * the administrator's view only to a search confined to it - anything wider
+   * is the member directory, which is not what this screen is for. So the
+   * filter is fixed to their locality rather than offered.
+   */
+  readonly areaLocalityId = computed(() => this.auth.user()?.areaLocalityId ?? null);
+
   term = '';
-  localityId = '';
+  localityId = this.areaLocalityId() ?? '';
 
   ngOnInit(): void {
     this.api.listLocalities().subscribe({ next: (found) => this.localities.set(found), error: () => {} });
@@ -240,7 +256,7 @@ export class MemberListComponent implements OnInit {
 
   clear(): void {
     this.term = '';
-    this.localityId = '';
+    this.localityId = this.areaLocalityId() ?? '';
     this.search();
   }
 

@@ -2,7 +2,7 @@ import { provideHttpClient } from '@angular/common/http';
 import { HttpTestingController, provideHttpClientTesting } from '@angular/common/http/testing';
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { ActivatedRoute, provideRouter } from '@angular/router';
-import { API_CONFIG } from '@samaajconnect/shared';
+import { API_CONFIG, AuthService } from '@samaajconnect/shared';
 import { AdminMember } from '../../core/admin.models';
 import { MemberDetailComponent } from './member-detail.component';
 import { MemberListComponent } from './member-list.component';
@@ -57,6 +57,44 @@ describe('MemberListComponent', () => {
     http.expectOne((r) => r.url === '/v1/members').flush({ items: members, hasMore: false });
     fixture.detectChanges();
   }
+
+  it('fixes an Area Admin search to their own locality', async () => {
+    // A fresh component, created after /me says who this is.
+    const auth = TestBed.inject(AuthService);
+    auth.ensureCurrentUser().subscribe();
+    http.expectOne('/v1/identity/me').flush({
+      userId: 'u9',
+      tenantId: 't1',
+      tenantSlug: 'dasha-nagda',
+      mobileOrEmail: 'area@example.com',
+      fullName: 'Area Admin',
+      status: 'Active',
+      isContactVerified: true,
+      lastLoginAt: null,
+      roles: ['Member', 'AreaAdmin'],
+      permissions: ['Members.Read', 'Members.Write'],
+      areaLocalityId: 'loc-udaipur',
+    });
+
+    fixture = TestBed.createComponent(MemberListComponent);
+    component = fixture.componentInstance;
+    load();
+
+    // NgModel applies [disabled] in a microtask.
+    await fixture.whenStable();
+    fixture.detectChanges();
+
+    const select = fixture.nativeElement.querySelector('#locality') as HTMLSelectElement;
+    expect(select.disabled).toBe(true);
+    expect(text()).not.toContain('All localities');
+
+    component.term = 'Meera';
+    component.search();
+
+    expect(
+      http.expectOne((r) => r.url === '/v1/members').request.params.get('localityId'),
+    ).toBe('loc-udaipur');
+  });
 
   it('lists the Samaaj it is scoped to', () => {
     load([member(), member({ id: 'm2', fullName: 'Ravi Shah' })]);

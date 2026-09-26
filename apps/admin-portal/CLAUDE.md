@@ -855,8 +855,10 @@ rather than the dashboard, sees only Members in the nav, and is told which
 locality they manage in a banner above every screen - because every other
 screen would answer 403, and the Samaaj-wide dashboard tiles are not theirs to
 read. None of that is the control: member-family-service applies the locality
-from the token, so the Members screen needs no change of its own, and its
-Locality filter simply has no effect for them.
+from the token. The Members screen fixes its Locality filter to theirs,
+because the service gives the administrator's view only to a search confined
+to that locality - anything wider is the member directory they also have as
+a member, which is not what this screen is for.
 
 **Trusts shipped with no admin screen at all until now**, the same shape of gap
 as every other case in this file: `trust-service` (roster CRUD, then

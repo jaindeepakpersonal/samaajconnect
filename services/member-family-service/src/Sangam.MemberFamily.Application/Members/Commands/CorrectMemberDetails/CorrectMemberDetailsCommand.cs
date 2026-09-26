@@ -142,8 +142,7 @@ public sealed class CorrectMemberDetailsCommandHandler(
         // The same guard for an Area Admin's own, narrower scope: correcting
         // somebody outside the caller's locality is refused as "not found",
         // exactly as reading them already is (GetMemberQueryHandler).
-        if (areaScope.AreaLocalityId is { } restricted
-            && profile.PermanentAddress.LocalityId != restricted)
+        if (!areaScope.MayAdminister(profile.PermanentAddress.LocalityId))
         {
             return Result.Failure<MemberResponse>(
                 Error.NotFound("Member.NotFound", "No such member in this Samaaj."));

@@ -82,7 +82,7 @@ enforced by `TenantAuthorizationBehavior`, not just UI hiding.
 
 | Method | Path | Roles | Purpose |
 |---|---|---|---|
-| GET | `/members` | Member, SamaajAdmin | Search/filter tenant directory. `term` matches full name; `localityId` is an exact match against the searched member's permanent Locality (a master-data-service id, not a substring — see below). For an Area Admin the token's own `locality_id` replaces whatever `localityId` was asked for, and `/members/{id}` answers 404 outside it |
+| GET | `/members` | Member, SamaajAdmin | Search/filter tenant directory. `term` matches full name; `localityId` is an exact match against the searched member's permanent Locality (a master-data-service id, not a substring — see below). An Area Admin gets the administrator's view (unlisted members, private fields) only when `localityId` is their token's own `locality_id`, and on `/members/{id}` only for a member living there; otherwise the member view |
 | GET | `/members/registration-summary` | `SamaajAdmin`/`SuperAdmin` + `Members.Read` | Registrations in the current 30-day window against the 30 days before it, for the admin Reports & Analytics screen |
 | GET | `/members/{id}` | `Members.Read` | One member, through the same per-field privacy mapper the directory uses |
 | PATCH | `/members/{id}` | Member, **self only** | Update your own profile. Replaces it whole: `privacy` and `isListedInDirectory` are both **required**, because defaulting either would silently reopen something a member had closed. Also carries `gautraId`, `professionId`, `qualificationId` (all master-data-service ids), `permanentAddress` (`{line, cityId, localityId}`, required) and `temporaryAddress` (same shape, nullable). Takes **no** photo field — see below |
