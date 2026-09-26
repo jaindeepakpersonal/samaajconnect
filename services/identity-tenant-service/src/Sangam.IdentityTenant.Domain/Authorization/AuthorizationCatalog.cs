@@ -243,17 +243,21 @@ public static class AuthorizationCatalog
         new(RoleIds.BoliManager, PermissionIds.BoliManage),
         new(RoleIds.BoliManager, PermissionIds.BoliPublishResults),
 
-        // An Area Admin manages the member directory the same way a Samaaj
-        // Admin does - Members.Read and Members.Write, unchanged - and is held
-        // to one locality by UserRole.LocalityId, an inner gate each
-        // permission-holding service checks for itself, the same shape "is this
-        // group's president" already is for VolunteerGroups.Lead. Volunteer
-        // groups, Events, Pathshala and Social issues are not scoped by
-        // locality yet - none of those aggregates carries one - so this role
-        // carries none of those permissions until they do; granting one now
-        // would make an Area Admin an unrestricted admin for that module.
+        // An Area Admin holds a Samaaj Admin's permissions for the modules
+        // that can be scoped to a locality, and is held to one locality by
+        // UserRole.LocalityId - an inner gate each of those services checks for
+        // itself (IAreaScope), the same shape "is this group's president"
+        // already is for VolunteerGroups.Lead. Every permission here has such a
+        // check in its service; one without it would make an Area Admin an
+        // unrestricted admin of that module, so add a permission to this list
+        // only together with its service's locality check.
         new(RoleIds.AreaAdmin, PermissionIds.MembersRead),
         new(RoleIds.AreaAdmin, PermissionIds.MembersWrite),
+        new(RoleIds.AreaAdmin, PermissionIds.VolunteerGroupsManage),
+        new(RoleIds.AreaAdmin, PermissionIds.VolunteerGroupsLead),
+        new(RoleIds.AreaAdmin, PermissionIds.EventsPublish),
+        new(RoleIds.AreaAdmin, PermissionIds.PathshalaManage),
+        new(RoleIds.AreaAdmin, PermissionIds.SocialIssuesApprove),
     ];
 
     /// <summary>

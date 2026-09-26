@@ -721,11 +721,17 @@ all sixteen copies); `/me` returns it as `areaLocalityId` for display.
 
 This service only *carries* the restriction; each service holding locality-
 scoped data enforces it, from the token, the same way it enforces `tenant_id`
-- never from a header, which a caller could set. member-family-service is the
-only one so far. `AreaAdmin` therefore holds `Members.Read` and `Members.Write`
-and nothing else: volunteer groups, events and social issues carry no
-`LocalityId` yet, and granting their permissions before they can be scoped
-would make an Area Admin an unrestricted admin of those modules.
+- never from a header, which a caller could set. `AreaAdmin` holds exactly the
+permissions of the services that do: `Members.Read`/`Members.Write`
+(member-family-service), `VolunteerGroups.Manage`/`Lead`, `Events.Publish`,
+`Pathshala.Manage` and `SocialIssues.Approve`. A permission granted here
+without its service's locality check would make an Area Admin an
+unrestricted admin of that module, so the two land together.
+
+In every one of those services the locality bounds the **administrator**,
+never the member: an Area Admin browses, registers, applies and votes across
+the whole Samaaj like anybody else, and only the admin powers stop at their
+locality.
 
 **An identifier already on the platform is refused without saying where.**
 `MobileOrEmail` is unique platform-wide, so the existing account may be in
