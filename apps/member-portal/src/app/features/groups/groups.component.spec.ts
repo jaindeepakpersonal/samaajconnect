@@ -735,6 +735,73 @@ describe('GroupDetailComponent', () => {
     expect(text()).toContain('Secretary');
   });
 
+  // ---- Correcting an election: reopening nominations that closed too early --
+
+  it('offers Edit only while nominations can still be reopened', () => {
+    load(detail({ iAmThePresident: true, iAmAMember: true }), [], [election({ status: 'Draft' })]);
+
+    expect(buttonSaying('Edit')).toBeDefined();
+
+    expect(component.canEditElection(election({ status: 'NominationsOpen' }))).toBe(true);
+    expect(component.canEditElection(election({ status: 'VotingOpen' }))).toBe(false);
+    expect(component.canEditElection(election({ status: 'Closed' }))).toBe(false);
+  });
+
+  it('fills the edit form with the election as it stands', async () => {
+    load(detail({ iAmThePresident: true, iAmAMember: true }), [], [election()]);
+
+    buttonSaying('Edit')!.click();
+    fixture.detectChanges();
+    await fixture.whenStable();
+    fixture.detectChanges();
+
+    expect(component.editingElectionId()).toBe('e1');
+    expect(component.editPositionTitle).toBe('Secretary');
+
+    const input = fixture.nativeElement.querySelector('#edit-position-e1') as HTMLInputElement;
+
+    expect(input.value).toBe('Secretary');
+  });
+
+  it('sends the correction and reloads the elections', () => {
+    load(detail({ iAmThePresident: true, iAmAMember: true }), [], [election()]);
+
+    component.toggleEditElection(election());
+    component.editNominationEndAt = '2026-09-01T00:00';
+    component.editVotingStartAt = '2026-09-01T00:00';
+    component.saveElectionEdit('e1');
+
+    const request = http.expectOne(
+      (r) => r.method === 'PATCH' && r.url === '/v1/volunteer-groups/elections/e1',
+    );
+
+    expect(request.request.body.positionTitle).toBe('Secretary');
+    expect(request.request.body.nominationEndAt).toBe(new Date('2026-09-01T00:00').toISOString());
+
+    request.flush(election({ nominationEndAt: request.request.body.nominationEndAt }));
+    http.expectOne('/v1/volunteer-groups/groups/g1/elections').flush([election()]);
+    fixture.detectChanges();
+
+    expect(component.editingElectionId()).toBeNull();
+  });
+
+  it('keeps the form open and shows the refusal once voting has opened', () => {
+    load(detail({ iAmThePresident: true, iAmAMember: true }), [], [election({ status: 'VotingOpen' })]);
+
+    // canEditElection already hides the button in the template; calling the
+    // handler directly exercises what the service itself would refuse.
+    component.toggleEditElection(election({ status: 'VotingOpen' }));
+    component.saveElectionEdit('e1');
+
+    http
+      .expectOne((r) => r.method === 'PATCH')
+      .flush({ title: 'Election.NotEditable' }, { status: 409, statusText: 'Conflict' });
+    fixture.detectChanges();
+
+    expect(component.editingElectionId()).toBe('e1');
+    expect(fixture.nativeElement.querySelector('[role="alert"]')).not.toBeNull();
+  });
+
   it('explains, rather than showing a blank picker, when nobody has joined the group yet', () => {
     // A group created with no president has no members, and only a member can
     // nominate or be nominated - so the picker would be empty for the one person

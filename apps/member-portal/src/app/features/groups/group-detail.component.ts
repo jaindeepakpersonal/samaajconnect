@@ -435,6 +435,13 @@ import {
                   </button>
 
                   @if (found.group.iCanLead) {
+                    @if (canEditElection(election)) {
+                      <button class="btn link" type="button" [disabled]="electionBusy()"
+                        (click)="toggleEditElection(election)">
+                        {{ editingElectionId() === election.id ? 'Cancel edit' : 'Edit' }}
+                      </button>
+                    }
+
                     @if (election.status === 'Draft') {
                       <button class="btn small" type="button" [disabled]="electionBusy()"
                         (click)="moveElection(election.id, 'NominationsOpen')">
@@ -458,6 +465,69 @@ import {
                     }
                   }
                 </div>
+
+                @if (editingElectionId() === election.id) {
+                  <!-- Reopens nominations that closed too early: pushing the
+                       end date out, and the voting window after it if it needs
+                       to move too. Nothing here moves the election's status. -->
+                  <form class="card" (ngSubmit)="saveElectionEdit(election.id)">
+                    <div class="form-grid">
+                      <div class="field span-all">
+                        <label [for]="'edit-position-' + election.id">Position</label>
+                        <input
+                          class="input"
+                          [id]="'edit-position-' + election.id"
+                          name="editPositionTitle"
+                          [(ngModel)]="editPositionTitle"
+                          maxlength="100"
+                        />
+                      </div>
+
+                      <div class="field">
+                        <label [for]="'edit-nom-start-' + election.id">Nominations open</label>
+                        <input class="input" type="datetime-local"
+                          [id]="'edit-nom-start-' + election.id"
+                          name="editNominationStartAt" [(ngModel)]="editNominationStartAt" />
+                      </div>
+
+                      <div class="field">
+                        <label [for]="'edit-nom-end-' + election.id">Nominations close</label>
+                        <input class="input" type="datetime-local"
+                          [id]="'edit-nom-end-' + election.id"
+                          name="editNominationEndAt" [(ngModel)]="editNominationEndAt" />
+                      </div>
+
+                      <div class="field">
+                        <label [for]="'edit-vote-start-' + election.id">Voting opens</label>
+                        <input class="input" type="datetime-local"
+                          [id]="'edit-vote-start-' + election.id"
+                          name="editVotingStartAt" [(ngModel)]="editVotingStartAt" />
+                      </div>
+
+                      <div class="field">
+                        <label [for]="'edit-vote-end-' + election.id">Voting closes</label>
+                        <input class="input" type="datetime-local"
+                          [id]="'edit-vote-end-' + election.id"
+                          name="editVotingEndAt" [(ngModel)]="editVotingEndAt" />
+                      </div>
+                    </div>
+
+                    @if (editElectionError(); as message) {
+                      <p class="notice error" role="alert">{{ message }}</p>
+                    }
+
+                    <div class="actions">
+                      <button class="btn small" type="submit"
+                        [disabled]="electionBusy() || !editPositionTitle.trim()">
+                        Save
+                      </button>
+                      <button class="btn small secondary" type="button"
+                        (click)="editingElectionId.set(null)">
+                        Cancel
+                      </button>
+                    </div>
+                  </form>
+                }
 
                 @if (expandedElectionId() === election.id && expandedDetail(); as detail) {
                   @if (election.acceptsNominations && !isInGroup(found.group)) {
@@ -622,6 +692,17 @@ export class GroupDetailComponent implements OnInit {
   nominationEndAt = '';
   votingStartAt = '';
   votingEndAt = '';
+
+  // ---- Correcting an election: reopening nominations that closed too early --
+
+  readonly editingElectionId = signal<string | null>(null);
+  readonly editElectionError = signal<string | null>(null);
+
+  editPositionTitle = '';
+  editNominationStartAt = '';
+  editNominationEndAt = '';
+  editVotingStartAt = '';
+  editVotingEndAt = '';
 
   /** Which election's ballot is expanded, and its full detail once fetched. */
   readonly expandedElectionId = signal<string | null>(null);
@@ -924,6 +1005,63 @@ export class GroupDetailComponent implements OnInit {
       });
   }
 
+  /** Draft or NominationsOpen only - the service refuses the correction from VotingOpen on. */
+  canEditElection(election: Election): boolean {
+    return election.status === 'Draft' || election.status === 'NominationsOpen';
+  }
+
+  toggleEditElection(election: Election): void {
+    if (this.editingElectionId() === election.id) {
+      this.editingElectionId.set(null);
+      return;
+    }
+
+    this.editPositionTitle = election.positionTitle;
+    this.editNominationStartAt = toLocalInputValue(election.nominationStartAt);
+    this.editNominationEndAt = toLocalInputValue(election.nominationEndAt);
+    this.editVotingStartAt = toLocalInputValue(election.votingStartAt);
+    this.editVotingEndAt = toLocalInputValue(election.votingEndAt);
+    this.editElectionError.set(null);
+    this.editingElectionId.set(election.id);
+  }
+
+  saveElectionEdit(electionId: string): void {
+    const title = this.editPositionTitle.trim();
+
+    if (title.length === 0) {
+      return;
+    }
+
+    this.electionBusy.set(true);
+    this.editElectionError.set(null);
+
+    this.api
+      .updateElection(
+        electionId,
+        title,
+        new Date(this.editNominationStartAt).toISOString(),
+        new Date(this.editNominationEndAt).toISOString(),
+        new Date(this.editVotingStartAt).toISOString(),
+        new Date(this.editVotingEndAt).toISOString(),
+      )
+      .subscribe({
+        next: () => {
+          this.electionBusy.set(false);
+          this.editingElectionId.set(null);
+
+          const found = this.detail();
+
+          if (found) {
+            this.loadElections(found.group.id);
+          }
+        },
+        error: (failure: unknown) => {
+          this.editElectionError.set(describeError(failure));
+          this.electionBusy.set(false);
+        },
+      });
+  }
+
   toggleElection(electionId: string): void {
     if (this.expandedElectionId() === electionId) {
       this.expandedElectionId.set(null);
@@ -1173,4 +1311,20 @@ export class GroupDetailComponent implements OnInit {
 
     this.decisionError.set(rest);
   }
+}
+
+/** An ISO instant to the local `datetime-local` input value it renders as. */
+function toLocalInputValue(iso: string): string {
+  const date = new Date(iso);
+
+  if (Number.isNaN(date.getTime())) {
+    return '';
+  }
+
+  const pad = (n: number) => n.toString().padStart(2, '0');
+
+  return (
+    `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}` +
+    `T${pad(date.getHours())}:${pad(date.getMinutes())}`
+  );
 }

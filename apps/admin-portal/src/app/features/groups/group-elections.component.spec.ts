@@ -231,6 +231,105 @@ describe('GroupElectionsComponent', () => {
     expect(text()).toContain('Not started');
   });
 
+  // ---- Correcting one: reopening nominations that closed too early ---------
+
+  it('offers Edit only while the election can still be edited', () => {
+    load(detail(), [
+      election({ id: 'e1', status: 'Draft' }),
+      election({ id: 'e2', status: 'NominationsOpen' }),
+      election({ id: 'e3', status: 'VotingOpen' }),
+      election({ id: 'e4', status: 'Closed' }),
+    ]);
+
+    expect(component.canEditElection(election({ status: 'Draft' }))).toBe(true);
+    expect(component.canEditElection(election({ status: 'NominationsOpen' }))).toBe(true);
+    expect(component.canEditElection(election({ status: 'VotingOpen' }))).toBe(false);
+    expect(component.canEditElection(election({ status: 'Closed' }))).toBe(false);
+  });
+
+  it('gives an administrator no Edit on an election that is not the President one', () => {
+    load(detail(), [election({ positionTitle: 'Secretary', status: 'Draft' })]);
+
+    expect(buttonSaying('Edit')).toBeUndefined();
+  });
+
+  it('fills the edit form with the election as it stands', async () => {
+    load(detail(), [
+      election({
+        positionTitle: 'President',
+        nominationStartAt: '2026-08-01T09:00:00Z',
+        nominationEndAt: '2026-08-20T09:00:00Z',
+      }),
+    ]);
+
+    buttonSaying('Edit')!.click();
+    fixture.detectChanges();
+
+    // NgModel's initial write to the control is deferred a microtask, the same
+    // reason the member portal's own async ngModel specs await this.
+    await fixture.whenStable();
+    fixture.detectChanges();
+
+    expect(component.editPositionTitle).toBe('President');
+    expect(component.editingId()).toBe('e1');
+
+    const input = fixture.nativeElement.querySelector('#edit-position-e1') as HTMLInputElement;
+
+    expect(input.value).toBe('President');
+  });
+
+  it('sends the correction and re-reads', () => {
+    load(detail(), [election()]);
+
+    component.toggleEditForm(election());
+    component.editNominationEndAt = '2026-09-01T00:00';
+    component.editVotingStartAt = '2026-09-01T00:00';
+    component.saveEdit(election());
+
+    const request = http.expectOne(
+      (r) => r.method === 'PATCH' && r.url === '/v1/volunteer-groups/elections/e1',
+    );
+
+    expect(request.request.body.positionTitle).toBe('President');
+    expect(request.request.body.nominationEndAt).toBe(new Date('2026-09-01T00:00').toISOString());
+
+    request.flush(election({ nominationEndAt: request.request.body.nominationEndAt }));
+    reload();
+
+    expect(text()).toContain('election updated');
+    expect(component.editingId()).toBeNull();
+  });
+
+  it('refuses a corrected voting window that starts before nominations close', () => {
+    load(detail(), [election()]);
+
+    component.toggleEditForm(election());
+    component.editNominationEndAt = '2026-08-20T00:00';
+    component.editVotingStartAt = '2026-08-15T00:00';
+
+    expect(component.editWindowsOverlap()).toBe(true);
+    expect(component.canSaveEdit()).toBe(false);
+
+    component.saveEdit(election());
+    http.expectNone((r) => r.method === 'PATCH');
+  });
+
+  it('keeps the form open and shows the refusal once voting has opened', () => {
+    load(detail(), [election({ status: 'VotingOpen' })]);
+
+    // canEditElection already hides the button in the template; a direct call
+    // exercises what the service itself would refuse.
+    component.toggleEditForm(election({ status: 'VotingOpen' }));
+    component.saveEdit(election({ status: 'VotingOpen' }));
+
+    http
+      .expectOne((r) => r.method === 'PATCH')
+      .flush({ title: 'Election.NotEditable' }, { status: 409, statusText: 'Conflict' });
+    fixture.detectChanges();
+
+    expect(fixture.nativeElement.querySelector('[role="alert"]')).not.toBeNull();
+  });
+
   it('offers the one next stage, and moves it', () => {
     load(detail(), [election({ status: 'Draft' })]);
 

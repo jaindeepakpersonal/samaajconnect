@@ -120,6 +120,29 @@ export class GroupsApi {
     return this.http.get<ElectionDetail>(`/v1/volunteer-groups/elections/${id}`);
   }
 
+  /**
+   * Corrects the position title or windows - how nominations that closed too
+   * early are reopened, since nothing here moves the election's own status.
+   * Allowed in Draft or NominationsOpen; the service refuses it (409) from
+   * VotingOpen on.
+   */
+  updateElection(
+    id: string,
+    positionTitle: string,
+    nominationStartAt: string,
+    nominationEndAt: string,
+    votingStartAt: string,
+    votingEndAt: string,
+  ): Observable<Election> {
+    return this.http.patch<Election>(`/v1/volunteer-groups/elections/${id}`, {
+      positionTitle,
+      nominationStartAt,
+      nominationEndAt,
+      votingStartAt,
+      votingEndAt,
+    });
+  }
+
   /** Opens nominations, opens voting, or closes. Strictly forward. */
   moveElection(id: string, status: string): Observable<Election> {
     return this.http.post<Election>(`/v1/volunteer-groups/elections/${id}/status`, { status });

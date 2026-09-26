@@ -830,6 +830,14 @@ so a group that already has a president shows the elections read-only rather tha
 buttons that answer 403. Nominating and voting are deliberately not here - both
 need a seat in the group.
 
+**An election that ran out of time is reopened by editing it, not by a separate
+control.** Nominations left NominationsOpen past their own close date have
+nothing to undo - the status never advanced - so `Edit` (Draft/NominationsOpen
+only, mirroring the campaign screen's own rule) corrects the position title and
+all four windows, and pushing the nomination close date out is the whole fix.
+The button disappears once voting has opened, the same reasoning every other
+edit-until-a-point control in this panel already uses.
+
 **The page also carries the join-requests queue, because an election with nobody to
 nominate is a dead end.** The electorate is the group's own members, and a group
 created with no president has none - so its nominee picker is empty (and was, in

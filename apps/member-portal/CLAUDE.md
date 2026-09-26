@@ -483,6 +483,13 @@ that title in the Members table above, the same table `AssignRolePosition`'s
 own "Give a position" control still edits directly, for a manual correction
 outside an election.
 
+**Nominations that closed too early are reopened by editing, not a separate
+"reopen" button.** An election left `NominationsOpen` past its own end date
+never advances `Status` - `acceptsNominations` is already false with nothing
+to walk back - so the president's `Edit` control (Draft/NominationsOpen only,
+disappearing once voting has opened) corrects the position title and all four
+windows, and pushing the nomination close date out again is the whole fix.
+
 **The nominee picker is a `<select>` built from the group's own already-
 loaded roster, not a name search.** Celebrities of Samaaj needed
 `MembersApi.search()` and an autosuggest because its ballot is Samaaj-wide;

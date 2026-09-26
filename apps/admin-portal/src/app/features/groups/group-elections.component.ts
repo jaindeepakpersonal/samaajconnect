@@ -254,6 +254,14 @@ import { isNotFound } from '../../core/http-status';
                 </button>
 
                 @if (canRun(found, election)) {
+                  @if (canEditElection(election)) {
+                    <button class="btn small alt" type="button" [disabled]="busy()"
+                      [attr.aria-expanded]="editingId() === election.id"
+                      (click)="toggleEditForm(election)">
+                      {{ editingId() === election.id ? 'Cancel' : 'Edit' }}
+                    </button>
+                  }
+
                   @if (nextStatus(election); as next) {
                     <button class="btn small" type="button" [disabled]="busy()"
                       (click)="move(election, next)">
@@ -268,6 +276,75 @@ import { isNotFound } from '../../core/http-status';
                   }
                 }
               </div>
+
+              @if (editingId() === election.id) {
+                <form class="spaced" (ngSubmit)="saveEdit(election)">
+                  <p class="small">
+                    Reopen nominations that closed too early by pushing their end date out - and
+                    the voting window after it, if it needs to move too.
+                  </p>
+
+                  <div class="form-grid">
+                    <div class="field span-all">
+                      <label [for]="'edit-position-' + election.id">Position</label>
+                      <input
+                        [id]="'edit-position-' + election.id"
+                        class="input"
+                        name="editPositionTitle"
+                        [(ngModel)]="editPositionTitle"
+                        maxlength="100"
+                      />
+                    </div>
+
+                    <div class="field">
+                      <label [for]="'edit-nom-start-' + election.id">Nominations open</label>
+                      <input [id]="'edit-nom-start-' + election.id" class="input" type="datetime-local"
+                        name="editNominationStartAt" [(ngModel)]="editNominationStartAt" />
+                    </div>
+                    <div class="field">
+                      <label [for]="'edit-nom-end-' + election.id">Nominations close</label>
+                      <input [id]="'edit-nom-end-' + election.id" class="input" type="datetime-local"
+                        name="editNominationEndAt" [(ngModel)]="editNominationEndAt"
+                        [attr.aria-invalid]="closesBeforeOpening(editNominationStartAt, editNominationEndAt) ? 'true' : null" />
+                    </div>
+                    <div class="field">
+                      <label [for]="'edit-vote-start-' + election.id">Voting opens</label>
+                      <input [id]="'edit-vote-start-' + election.id" class="input" type="datetime-local"
+                        name="editVotingStartAt" [(ngModel)]="editVotingStartAt"
+                        [attr.aria-invalid]="editWindowsOverlap() ? 'true' : null" />
+                    </div>
+                    <div class="field">
+                      <label [for]="'edit-vote-end-' + election.id">Voting closes</label>
+                      <input [id]="'edit-vote-end-' + election.id" class="input" type="datetime-local"
+                        name="editVotingEndAt" [(ngModel)]="editVotingEndAt"
+                        [attr.aria-invalid]="closesBeforeOpening(editVotingStartAt, editVotingEndAt) ? 'true' : null" />
+                    </div>
+
+                    @if (closesBeforeOpening(editNominationStartAt, editNominationEndAt)) {
+                      <p class="notice span-all" role="alert">Nominations cannot close before they open.</p>
+                    }
+
+                    @if (closesBeforeOpening(editVotingStartAt, editVotingEndAt)) {
+                      <p class="notice span-all" role="alert">Voting cannot close before it opens.</p>
+                    }
+
+                    @if (editWindowsOverlap()) {
+                      <p class="notice span-all" role="alert">
+                        Voting must start after nominations close.
+                      </p>
+                    }
+                  </div>
+
+                  <div class="actions">
+                    <button class="btn small" type="submit" [disabled]="busy() || !canSaveEdit()">
+                      Save
+                    </button>
+                    <button class="btn small alt" type="button" (click)="editingId.set(null)">
+                      Cancel
+                    </button>
+                  </div>
+                </form>
+              }
 
               @if (confirmingPublish() === election.id) {
                 <div class="notice" role="status">
@@ -397,6 +474,13 @@ export class GroupElectionsComponent implements OnInit {
   readonly ballot = signal<GroupElectionDetail | null>(null);
   readonly confirmingPublish = signal<string | null>(null);
 
+  readonly editingId = signal<string | null>(null);
+  editPositionTitle = '';
+  editNominationStartAt = '';
+  editNominationEndAt = '';
+  editVotingStartAt = '';
+  editVotingEndAt = '';
+
   private readonly names = signal<ReadonlyMap<string, string>>(new Map());
 
   readonly groupId = computed(() => this.route.snapshot.paramMap.get('id') ?? '');
@@ -455,6 +539,15 @@ export class GroupElectionsComponent implements OnInit {
 
   /** Nominations can be approved or removed only until voting opens. */
   canDecide(election: GroupElection): boolean {
+    return election.status === 'Draft' || election.status === 'NominationsOpen';
+  }
+
+  /**
+   * Whether the election's own details can still be corrected - the same rule
+   * the service enforces (`CanBeEdited`), copied here so the button is not one
+   * that always answers 409.
+   */
+  canEditElection(election: GroupElection): boolean {
     return election.status === 'Draft' || election.status === 'NominationsOpen';
   }
 
@@ -565,6 +658,61 @@ export class GroupElectionsComponent implements OnInit {
         this.votingStartAt = '';
         this.votingEndAt = '';
       },
+    );
+  }
+
+  // ---- Correcting one: reopening nominations that closed too early ---------
+
+  toggleEditForm(election: GroupElection): void {
+    if (this.editingId() === election.id) {
+      this.editingId.set(null);
+      return;
+    }
+
+    this.editPositionTitle = election.positionTitle;
+    this.editNominationStartAt = toLocalInputValue(election.nominationStartAt);
+    this.editNominationEndAt = toLocalInputValue(election.nominationEndAt);
+    this.editVotingStartAt = toLocalInputValue(election.votingStartAt);
+    this.editVotingEndAt = toLocalInputValue(election.votingEndAt);
+    this.editingId.set(election.id);
+  }
+
+  editWindowsOverlap(): boolean {
+    if (!this.editNominationEndAt || !this.editVotingStartAt) {
+      return false;
+    }
+
+    return new Date(this.editVotingStartAt) < new Date(this.editNominationEndAt);
+  }
+
+  canSaveEdit(): boolean {
+    return (
+      this.editPositionTitle.trim().length > 0 &&
+      this.editNominationStartAt.length > 0 &&
+      this.editNominationEndAt.length > 0 &&
+      this.editVotingStartAt.length > 0 &&
+      this.editVotingEndAt.length > 0 &&
+      !this.closesBeforeOpening(this.editNominationStartAt, this.editNominationEndAt) &&
+      !this.closesBeforeOpening(this.editVotingStartAt, this.editVotingEndAt) &&
+      !this.editWindowsOverlap()
+    );
+  }
+
+  saveEdit(election: GroupElection): void {
+    if (!this.canSaveEdit()) {
+      return;
+    }
+
+    this.act(
+      this.api.updateGroupElection(election.id, {
+        positionTitle: this.editPositionTitle.trim(),
+        nominationStartAt: new Date(this.editNominationStartAt).toISOString(),
+        nominationEndAt: new Date(this.editNominationEndAt).toISOString(),
+        votingStartAt: new Date(this.editVotingStartAt).toISOString(),
+        votingEndAt: new Date(this.editVotingEndAt).toISOString(),
+      }),
+      `${this.editPositionTitle.trim()} election updated.`,
+      () => this.editingId.set(null),
     );
   }
 
@@ -710,4 +858,20 @@ export class GroupElectionsComponent implements OnInit {
       error: () => this.names.set(new Map()),
     });
   }
+}
+
+/** An ISO instant to the local `datetime-local` input value it renders as. */
+function toLocalInputValue(iso: string): string {
+  const date = new Date(iso);
+
+  if (Number.isNaN(date.getTime())) {
+    return '';
+  }
+
+  const pad = (n: number) => n.toString().padStart(2, '0');
+
+  return (
+    `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}` +
+    `T${pad(date.getHours())}:${pad(date.getMinutes())}`
+  );
 }
