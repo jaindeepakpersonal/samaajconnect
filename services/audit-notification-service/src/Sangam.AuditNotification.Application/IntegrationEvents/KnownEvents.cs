@@ -939,6 +939,53 @@ public static class KnownEvents
             Action: "ElectionResultsPublished",
             EntityName: "TrustElection",
             EntityIdProperty: "electionId"),
+
+        // trust-service, phase 3 (money). Every write here moves or approves
+        // money, so each one that a person performs names them: who recorded
+        // a donation or an expense, who collected it, who approved it. The
+        // donor is who a donation is *about*, not who recorded it, the same
+        // subject/actor split trust.member.added.v1 draws with addedBy.
+        ["trust.donation.recorded.v1"] = new(
+            Action: "DonationRecorded",
+            EntityName: "Donation",
+            EntityIdProperty: "donationId",
+            ActorIdProperty: "recordedBy"),
+
+        ["trust.donation.collected.v1"] = new(
+            Action: "DonationCollected",
+            EntityName: "Donation",
+            EntityIdProperty: "donationId",
+            ActorIdProperty: "collectedBy"),
+
+        ["trust.expense.recorded.v1"] = new(
+            Action: "ExpenseRecorded",
+            EntityName: "Expense",
+            EntityIdProperty: "expenseId",
+            ActorIdProperty: "recordedBy"),
+
+        // The approver is deliberately a second person - that is what an
+        // approval is for - so naming them is the half of this row that
+        // matters.
+        ["trust.expense.approved.v1"] = new(
+            Action: "ExpenseApproved",
+            EntityName: "Expense",
+            EntityIdProperty: "expenseId",
+            ActorIdProperty: "approvedBy"),
+
+        // A payment falling due is raised by what caused it - a pledge, or a
+        // Boli result this Trust's locality won - rather than by somebody
+        // acting, so it carries no actor; sourceType/sourceId say where it
+        // came from. Settling it is a person's act and names them.
+        ["trust.collection.due.v1"] = new(
+            Action: "CollectionDue",
+            EntityName: "Collection",
+            EntityIdProperty: "collectionId"),
+
+        ["trust.collection.settled.v1"] = new(
+            Action: "CollectionSettled",
+            EntityName: "Collection",
+            EntityIdProperty: "collectionId",
+            ActorIdProperty: "collectedBy"),
     };
 
     public static EventDescriptor Describe(string topic) =>
