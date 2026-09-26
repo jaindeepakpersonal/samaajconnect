@@ -16,7 +16,7 @@ namespace Sangam.Events.Application.Events.Queries.GetAttendees;
 [RequiresPermission(PermissionKeys.EventsPublish)]
 public sealed record GetAttendeesQuery(Guid EventId) : IQuery<IReadOnlyList<AttendeeResponse>>;
 
-public sealed class GetAttendeesQueryHandler(IEventRepository events)
+public sealed class GetAttendeesQueryHandler(IEventRepository events, IAreaScope areaScope)
     : IRequestHandler<GetAttendeesQuery, Result<IReadOnlyList<AttendeeResponse>>>
 {
     public async Task<Result<IReadOnlyList<AttendeeResponse>>> Handle(
@@ -25,7 +25,9 @@ public sealed class GetAttendeesQueryHandler(IEventRepository events)
     {
         var found = await events.GetByIdAsync(query.EventId, cancellationToken);
 
-        return found is null
+        // Who else is going is an administrator's question, and an Area Admin
+        // is one only for their own locality's events.
+        return found is null || !areaScope.MayAdminister(found.LocalityId)
             ? Result.Failure<IReadOnlyList<AttendeeResponse>>(
                 Error.NotFound("Event.NotFound", "No such event in this Samaaj."))
             : Result.Success(found.ToAttendees());

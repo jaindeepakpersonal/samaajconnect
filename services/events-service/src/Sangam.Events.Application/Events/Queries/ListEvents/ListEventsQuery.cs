@@ -2,6 +2,7 @@ using MediatR;
 using Sangam.Events.Application.Abstractions;
 using Sangam.Events.Application.Common;
 using Sangam.Events.Application.Security;
+using Sangam.Events.Domain.Events;
 
 namespace Sangam.Events.Application.Events.Queries.ListEvents;
 
@@ -21,6 +22,7 @@ public sealed record ListEventsQuery(bool IncludeDrafts = false, bool IncludePas
 public sealed class ListEventsQueryHandler(
     IEventRepository events,
     ICurrentUser currentUser,
+    IAreaScope areaScope,
     IDateTimeProvider clock)
     : IRequestHandler<ListEventsQuery, Result<IReadOnlyList<EventResponse>>>
 {
@@ -47,7 +49,14 @@ public sealed class ListEventsQueryHandler(
             clock.UtcNow,
             cancellationToken);
 
-        IReadOnlyList<EventResponse> results = [.. found.Select(e => e.ToResponse(memberId))];
+        // Published events are the whole Samaaj's, an Area Admin's included;
+        // drafts, only their own locality's.
+        IReadOnlyList<EventResponse> results =
+        [
+            .. found
+                .Where(e => e.Status != EventStatus.Draft || areaScope.MayAdminister(e.LocalityId))
+                .Select(e => e.ToResponse(memberId)),
+        ];
 
         return Result.Success(results);
     }

@@ -172,7 +172,7 @@ who never passed the check that produced it.
 | Method | Path | Roles | Purpose |
 |---|---|---|---|
 | GET | `/` | `Members.Read` | The Samaaj's events, each with the asking member's own standing. `?includeDrafts` needs `Events.Publish`; a member asking gets the published list |
-| POST | `/` | `Events.Publish` | Write an event down. It stays a draft |
+| POST | `/` | `Events.Publish` | Write an event down. It stays a draft. `localityId` optional; an Area Admin's event is always in their own locality (omitted: filled in; other: **403**), and every `Events.Publish` route below answers them **404** for an event elsewhere, whose drafts they also cannot see |
 | GET | `/{id}` | `Members.Read` | One event. A draft answers 404 to a member |
 | POST | `/{id}/publish` | `Events.Publish` | Tell the Samaaj about it |
 | POST | `/{id}/cancel` | `Events.Publish` | `{reason}`, required — members who were going are told it |

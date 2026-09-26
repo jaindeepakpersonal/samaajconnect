@@ -31,7 +31,12 @@ public sealed record CreateEventCommand(
     string OrganizerType,
     Guid? OrganizerId,
     bool RegistrationEnabled,
-    int? Capacity) : ICommand<EventResponse>;
+    int? Capacity,
+
+    // The locality the event is for, optional; a string for the same reason
+    // EventTypeId is. An Area Admin's events are always in their own locality:
+    // omitted, it is filled in; any other, refused.
+    string? LocalityId = null) : ICommand<EventResponse>;
 
 public sealed class CreateEventCommandValidator : AbstractValidator<CreateEventCommand>
 {
@@ -41,6 +46,7 @@ public sealed class CreateEventCommandValidator : AbstractValidator<CreateEventC
         RuleFor(x => x.Description).MaximumLength(5000);
         RuleFor(x => x.Venue).MaximumLength(300);
         RuleFor(x => x.EventTypeId).Must(BeNullOrAGuid).WithMessage("Event type is not valid.");
+        RuleFor(x => x.LocalityId).Must(BeNullOrAGuid).WithMessage("Locality is not valid.");
 
         RuleFor(x => x.OrganizerType)
             .NotEmpty()
@@ -75,6 +81,7 @@ public sealed class CreateEventCommandHandler(
     IEventRepository events,
     IUnitOfWork unitOfWork,
     ICurrentUser currentUser,
+    IAreaScope areaScope,
     ITenantContext tenantContext,
     IDateTimeProvider clock)
     : IRequestHandler<CreateEventCommand, Result<EventResponse>>
@@ -95,6 +102,15 @@ public sealed class CreateEventCommandHandler(
                 "Event.NoSamaaj", "Select a Samaaj before creating an event in it."));
         }
 
+        // An Area Admin holds events in their own locality and nowhere else.
+        var localityId = command.LocalityId is null ? areaScope.AreaLocalityId : Guid.Parse(command.LocalityId);
+
+        if (!areaScope.MayAdminister(localityId))
+        {
+            return Result.Failure<EventResponse>(Error.Forbidden(
+                "Event.OutsideLocality", "You can only set up events in your own locality."));
+        }
+
         var created = SamaajEvent.Create(
             tenantId,
             command.Title,
@@ -109,7 +125,8 @@ public sealed class CreateEventCommandHandler(
             memberId,
             command.RegistrationEnabled,
             command.Capacity,
-            clock.UtcNow);
+            clock.UtcNow,
+            localityId);
 
         events.Add(created);
 

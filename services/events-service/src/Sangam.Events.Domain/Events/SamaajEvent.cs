@@ -40,6 +40,13 @@ public sealed class SamaajEvent : AggregateRoot, ITenantScopedEntity
     /// </summary>
     public Guid? EventTypeId { get; private set; }
 
+    /// <summary>
+    /// The locality the event is for - a master-data-service id, optional (null:
+    /// the whole Samaaj). It decides which Area Admin may administer the event,
+    /// and nothing about who may see it or register.
+    /// </summary>
+    public Guid? LocalityId { get; private set; }
+
     /// <summary>Whether the Samaaj itself or one of its volunteer groups is holding this.</summary>
     public OrganizerType OrganizerType { get; private set; }
 
@@ -81,7 +88,8 @@ public sealed class SamaajEvent : AggregateRoot, ITenantScopedEntity
         Guid createdByMemberId,
         bool registrationEnabled,
         int? capacity,
-        DateTimeOffset now)
+        DateTimeOffset now,
+        Guid? localityId = null)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(title);
 
@@ -95,6 +103,7 @@ public sealed class SamaajEvent : AggregateRoot, ITenantScopedEntity
             EndAt = endAt,
             Venue = Normalize(venue),
             EventTypeId = eventTypeId,
+            LocalityId = localityId,
             OrganizerType = organizerType,
             OrganizerId = organizerType == OrganizerType.VolunteerGroup ? organizerId : null,
             CreatedByMemberId = createdByMemberId,
@@ -167,7 +176,8 @@ public sealed class SamaajEvent : AggregateRoot, ITenantScopedEntity
         Guid? eventTypeId,
         bool registrationEnabled,
         int? capacity,
-        DateTimeOffset now)
+        DateTimeOffset now,
+        Guid? localityId = null)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(title);
 
@@ -179,6 +189,7 @@ public sealed class SamaajEvent : AggregateRoot, ITenantScopedEntity
         EventTypeId = eventTypeId;
         RegistrationEnabled = registrationEnabled;
         Capacity = capacity;
+        LocalityId = localityId;
 
         Raise(new EventUpdatedDomainEvent(Id, TenantId, now));
     }

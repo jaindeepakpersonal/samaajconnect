@@ -57,7 +57,8 @@ public static class EventEndpoints
                     request.OrganizerType,
                     request.OrganizerId,
                     request.RegistrationEnabled,
-                    request.Capacity);
+                    request.Capacity,
+                    request.LocalityId);
 
                 var result = await sender.Send(command, cancellationToken);
 
@@ -103,7 +104,8 @@ public static class EventEndpoints
                     request.Venue,
                     request.EventTypeId,
                     request.RegistrationEnabled,
-                    request.Capacity);
+                    request.Capacity,
+                    request.LocalityId);
 
                 var result = await sender.Send(command, cancellationToken);
 
@@ -226,7 +228,8 @@ public static class EventEndpoints
         string OrganizerType,
         Guid? OrganizerId,
         bool RegistrationEnabled,
-        int? Capacity);
+        int? Capacity,
+        string? LocalityId = null);
 
     /// <summary>The reason is required: members who were going are told it.</summary>
     public sealed record CancelEventRequest(string? Reason);
@@ -240,5 +243,6 @@ public static class EventEndpoints
         string? Venue,
         string? EventTypeId,
         bool RegistrationEnabled,
-        int? Capacity);
+        int? Capacity,
+        string? LocalityId = null);
 }

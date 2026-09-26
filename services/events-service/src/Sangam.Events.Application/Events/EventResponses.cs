@@ -19,6 +19,9 @@ public sealed record EventResponse(
     /// <summary>A master-data-service LookupItem id, or null. Never a name -
     /// resolving one is the portal's job, the same as OrganizerId below.</summary>
     Guid? EventTypeId,
+
+    /// <summary>The locality the event is for, or null for the whole Samaaj.</summary>
+    Guid? LocalityId,
     string OrganizerType,
     Guid? OrganizerId,
     string Status,

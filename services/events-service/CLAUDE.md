@@ -76,6 +76,15 @@ group's president is an ordinary member; that does not apply here.
 `Members.Read` covers seeing events and registering for them. Every member holds
 it.
 
+**An Area Admin holds `Events.Publish` for one locality.** `SamaajEvent.LocalityId`
+is optional (null: the whole Samaaj) and set on create and edit, a `string` on
+the wire like `EventTypeId`. An Area Admin (the `locality_id` token claim, read
+into `IAreaScope`) sets events up only in their own locality; one elsewhere or
+with none answers 404 to edit, publish, cancel and the attendee list, and its
+drafts are invisible to them in the list and by id. Published events are not
+touched: an Area Admin is a member of the whole Samaaj, and sees and registers
+for any of them like anybody else.
+
 ## Decisions worth knowing before you change this service
 
 **Creating and publishing are separate commands, because they are separate

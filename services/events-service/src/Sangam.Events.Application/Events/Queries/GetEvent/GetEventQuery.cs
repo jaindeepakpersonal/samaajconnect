@@ -10,7 +10,8 @@ namespace Sangam.Events.Application.Events.Queries.GetEvent;
 [RequiresPermission(PermissionKeys.MembersRead)]
 public sealed record GetEventQuery(Guid EventId) : IQuery<EventResponse>;
 
-public sealed class GetEventQueryHandler(IEventRepository events, ICurrentUser currentUser)
+public sealed class GetEventQueryHandler(
+    IEventRepository events, ICurrentUser currentUser, IAreaScope areaScope)
     : IRequestHandler<GetEventQuery, Result<EventResponse>>
 {
     public async Task<Result<EventResponse>> Handle(
@@ -31,9 +32,11 @@ public sealed class GetEventQueryHandler(IEventRepository events, ICurrentUser c
                 Error.NotFound("Event.NotFound", "No such event in this Samaaj."));
         }
 
-        // A draft is visible to whoever can publish one, and to nobody else.
+        // A draft is visible to whoever can publish it, and to nobody else - an
+        // Area Admin only for their own locality's drafts.
         var maySee = found.Status != EventStatus.Draft
-            || currentUser.HasPermission(PermissionKeys.EventsPublish);
+            || (currentUser.HasPermission(PermissionKeys.EventsPublish)
+                && areaScope.MayAdminister(found.LocalityId));
 
         return maySee
             ? Result.Success(found.ToResponse(memberId))

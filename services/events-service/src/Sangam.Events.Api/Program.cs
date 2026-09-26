@@ -9,7 +9,9 @@ using Sangam.Events.Infrastructure.Persistence;
 var builder = WebApplication.CreateBuilder(args);
 
 builder.Services.AddHttpContextAccessor();
-builder.Services.AddScoped<ITenantContext, HttpTenantContext>();
+builder.Services.AddScoped<HttpTenantContext>();
+builder.Services.AddScoped<ITenantContext>(sp => sp.GetRequiredService<HttpTenantContext>());
+builder.Services.AddScoped<IAreaScope>(sp => sp.GetRequiredService<HttpTenantContext>());
 builder.Services.AddScoped<ICurrentUser, HttpCurrentUser>();
 builder.Services.AddScoped<ICorrelationContext, HttpCorrelationContext>();
 

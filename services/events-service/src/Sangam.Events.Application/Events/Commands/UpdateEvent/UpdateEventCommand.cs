@@ -35,7 +35,11 @@ public sealed record UpdateEventCommand(
     string? Venue,
     string? EventTypeId,
     bool RegistrationEnabled,
-    int? Capacity) : ICommand<EventResponse>;
+    int? Capacity,
+
+    // The locality the event is for; null for none. An Area Admin cannot move
+    // an event out of their own locality - omitted, it stays there.
+    string? LocalityId = null) : ICommand<EventResponse>;
 
 public sealed class UpdateEventCommandValidator : AbstractValidator<UpdateEventCommand>
 {
@@ -46,6 +50,7 @@ public sealed class UpdateEventCommandValidator : AbstractValidator<UpdateEventC
         RuleFor(x => x.Description).MaximumLength(5000);
         RuleFor(x => x.Venue).MaximumLength(300);
         RuleFor(x => x.EventTypeId).Must(BeNullOrAGuid).WithMessage("Event type is not valid.");
+        RuleFor(x => x.LocalityId).Must(BeNullOrAGuid).WithMessage("Locality is not valid.");
 
         RuleFor(x => x.EndAt)
             .GreaterThan(x => x.StartAt)
@@ -65,6 +70,7 @@ public sealed class UpdateEventCommandHandler(
     IEventRepository events,
     IUnitOfWork unitOfWork,
     ICurrentUser currentUser,
+    IAreaScope areaScope,
     ITenantContext tenantContext,
     IDateTimeProvider clock)
     : IRequestHandler<UpdateEventCommand, Result<EventResponse>>
@@ -82,10 +88,19 @@ public sealed class UpdateEventCommandHandler(
         var samaajEvent = await events.GetByIdAsync(command.EventId, cancellationToken);
 
         if (samaajEvent is null
-            || (tenantContext.TenantId is { } tenantId && samaajEvent.TenantId != tenantId))
+            || (tenantContext.TenantId is { } tenantId && samaajEvent.TenantId != tenantId)
+            || !areaScope.MayAdminister(samaajEvent.LocalityId))
         {
             return Result.Failure<EventResponse>(
                 Error.NotFound("Event.NotFound", "No such event in this Samaaj."));
+        }
+
+        var localityId = command.LocalityId is null ? areaScope.AreaLocalityId : Guid.Parse(command.LocalityId);
+
+        if (!areaScope.MayAdminister(localityId))
+        {
+            return Result.Failure<EventResponse>(Error.Forbidden(
+                "Event.OutsideLocality", "You cannot move an event out of your own locality."));
         }
 
         if (samaajEvent.Status == EventStatus.Cancelled)
@@ -112,7 +127,8 @@ public sealed class UpdateEventCommandHandler(
             command.EventTypeId is null ? null : Guid.Parse(command.EventTypeId),
             command.RegistrationEnabled,
             command.Capacity,
-            clock.UtcNow);
+            clock.UtcNow,
+            localityId);
 
         await unitOfWork.SaveChangesAsync(cancellationToken);
 

@@ -103,6 +103,10 @@ namespace Sangam.Events.Infrastructure.Migrations
                         .HasColumnType("uuid")
                         .HasColumnName("event_type_id");
 
+                    b.Property<Guid?>("LocalityId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("locality_id");
+
                     b.Property<Guid?>("OrganizerId")
                         .HasColumnType("uuid")
                         .HasColumnName("organizer_id");

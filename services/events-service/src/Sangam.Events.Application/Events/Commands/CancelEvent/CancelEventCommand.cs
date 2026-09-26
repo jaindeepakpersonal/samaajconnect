@@ -37,6 +37,7 @@ public sealed class CancelEventCommandHandler(
     IEventRepository events,
     IUnitOfWork unitOfWork,
     ICurrentUser currentUser,
+    IAreaScope areaScope,
     ITenantContext tenantContext,
     IDateTimeProvider clock,
     ILogger<CancelEventCommandHandler> logger)
@@ -55,7 +56,8 @@ public sealed class CancelEventCommandHandler(
         var found = await events.GetByIdAsync(command.EventId, cancellationToken);
 
         if (found is null
-            || (tenantContext.TenantId is { } tenantId && found.TenantId != tenantId))
+            || (tenantContext.TenantId is { } tenantId && found.TenantId != tenantId)
+            || !areaScope.MayAdminister(found.LocalityId))
         {
             return Result.Failure<EventResponse>(
                 Error.NotFound("Event.NotFound", "No such event in this Samaaj."));
