@@ -26,7 +26,14 @@ export interface Issue {
   readonly title: string;
   readonly description: string;
   readonly category: string;
+  /** Display text. Issues raised before localities were picked carry only this. */
   readonly locality: string | null;
+
+  /**
+   * The master-data Locality, when one was picked. What an Area Admin's review
+   * is scoped by - an issue without one is the Samaaj Admin's alone.
+   */
+  readonly localityId: string | null;
 
   /**
    * An id, not a name - names live in member-family-service. `isMine` is the

@@ -2,7 +2,9 @@ import { Component, OnInit, computed, inject, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { RouterLink } from '@angular/router';
 import { describeError } from '@samaajconnect/shared';
+import { MasterDataApi } from '../members/master-data.api';
 import { IssuesApi } from './issues.api';
+import { LocalityOption, loadLocalityOptions } from './locality-options';
 import {
   Issue,
   IssueCategories,
@@ -158,14 +160,12 @@ type IssuesTab = 'community' | 'raise' | 'mine' | 'panch';
 
             <div class="field">
               <label for="issue-locality">Locality (optional)</label>
-              <input
-                class="input"
-                id="issue-locality"
-                name="locality"
-                [(ngModel)]="locality"
-                maxlength="150"
-                placeholder="Hiran Magri"
-              />
+              <select class="input" id="issue-locality" name="localityId" [(ngModel)]="localityId">
+                <option value="">Not about one locality</option>
+                @for (option of localities(); track option.id) {
+                  <option [value]="option.id">{{ option.label }}</option>
+                }
+              </select>
             </div>
 
             <div class="field span-all">
@@ -300,6 +300,7 @@ type IssuesTab = 'community' | 'raise' | 'mine' | 'panch';
 })
 export class IssuesListComponent implements OnInit {
   private readonly api = inject(IssuesApi);
+  private readonly masterData = inject(MasterDataApi);
 
   readonly activeTab = signal<IssuesTab>('community');
 
@@ -325,8 +326,11 @@ export class IssuesListComponent implements OnInit {
   title = '';
   description = '';
   category: string = IssueCategories[0];
-  locality = '';
+  localityId = '';
   filter = '';
+
+  /** Empty until master data answers, and on failure - the field is optional. */
+  readonly localities = signal<readonly LocalityOption[]>([]);
 
   /**
    * What the panel says it shows: issues the Samaaj can see.
@@ -355,6 +359,10 @@ export class IssuesListComponent implements OnInit {
   ngOnInit(): void {
     this.load();
     this.loadAccess();
+    loadLocalityOptions(this.masterData).subscribe({
+      next: (found) => this.localities.set(found),
+      error: () => this.localities.set([]),
+    });
   }
 
   load(): void {
@@ -424,14 +432,15 @@ export class IssuesListComponent implements OnInit {
     this.formError.set(null);
     this.justSubmitted.set(false);
 
-    const locality = this.locality.trim();
+    const locality = this.localities().find((option) => option.id === this.localityId) ?? null;
 
     this.api
       .create(
         this.title.trim(),
         this.description.trim(),
         this.category,
-        locality.length > 0 ? locality : null,
+        locality?.label ?? null,
+        locality?.id ?? null,
         submitNow,
       )
       .subscribe({
@@ -439,7 +448,7 @@ export class IssuesListComponent implements OnInit {
           this.issues.set([created, ...this.issues()]);
           this.title = '';
           this.description = '';
-          this.locality = '';
+          this.localityId = '';
           this.submittedAsDraft.set(!submitNow);
           this.justSubmitted.set(true);
           this.busy.set(false);

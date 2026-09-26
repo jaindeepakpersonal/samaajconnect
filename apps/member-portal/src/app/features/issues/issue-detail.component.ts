@@ -4,7 +4,9 @@ import { ActivatedRoute, RouterLink } from '@angular/router';
 import { AuthService, describeError } from '@samaajconnect/shared';
 import { GroupsApi } from '../groups/groups.api';
 import { VolunteerGroup } from '../groups/groups.models';
+import { MasterDataApi } from '../members/master-data.api';
 import { IssuesApi } from './issues.api';
+import { LocalityOption, loadLocalityOptions } from './locality-options';
 import {
   IssueCategories,
   IssueDetail,
@@ -113,13 +115,15 @@ import {
 
                   <div class="field">
                     <label for="edit-locality">Locality (optional)</label>
-                    <input
-                      class="input"
-                      id="edit-locality"
-                      name="locality"
-                      [(ngModel)]="locality"
-                      maxlength="150"
-                    />
+                    <select class="input" id="edit-locality" name="localityId" [(ngModel)]="localityId">
+                      <option value="">Not about one locality</option>
+                      @if (typedLocality; as typed) {
+                        <option [value]="keepTyped">{{ typed }} (as typed)</option>
+                      }
+                      @for (option of localities(); track option.id) {
+                        <option [value]="option.id">{{ option.label }}</option>
+                      }
+                    </select>
                   </div>
 
                   <div class="field span-all">
@@ -324,6 +328,7 @@ import {
 export class IssueDetailComponent implements OnInit {
   private readonly api = inject(IssuesApi);
   private readonly groupsApi = inject(GroupsApi);
+  private readonly masterData = inject(MasterDataApi);
   private readonly auth = inject(AuthService);
   private readonly route = inject(ActivatedRoute);
 
@@ -347,8 +352,20 @@ export class IssueDetailComponent implements OnInit {
   title = '';
   description = '';
   category: string = IssueCategories[0];
-  locality = '';
+  localityId = '';
   reason = '';
+
+  /**
+   * An issue raised before localities were picked names one as typed text
+   * only. Offered as its own option, and chosen to start with, so correcting
+   * a title does not quietly drop the place it was about.
+   */
+  typedLocality: string | null = null;
+  readonly keepTyped = 'typed';
+
+  /** Loaded the first time the form opens; only the author ever opens it. */
+  readonly localities = signal<readonly LocalityOption[]>([]);
+  private localitiesLoaded = false;
   decisionText = '';
   monitoringGroupId = '';
 
@@ -520,8 +537,17 @@ export class IssueDetailComponent implements OnInit {
     this.title = detail.issue.title;
     this.description = detail.issue.description;
     this.category = detail.issue.category;
-    this.locality = detail.issue.locality ?? '';
+    this.typedLocality = detail.issue.localityId === null ? detail.issue.locality : null;
+    this.localityId = detail.issue.localityId ?? (this.typedLocality !== null ? this.keepTyped : '');
     this.editing.set(true);
+
+    if (!this.localitiesLoaded) {
+      this.localitiesLoaded = true;
+      loadLocalityOptions(this.masterData).subscribe({
+        next: (found) => this.localities.set(found),
+        error: () => this.localities.set([]),
+      });
+    }
   }
 
   cancelEdit(): void {
@@ -538,7 +564,10 @@ export class IssueDetailComponent implements OnInit {
     this.busy.set(true);
     this.actionError.set(null);
 
-    const locality = this.locality.trim();
+    // The service replaces both fields on a revision, so the typed text is
+    // sent back as it was rather than omitted when the author kept it.
+    const picked = this.localities().find((option) => option.id === this.localityId) ?? null;
+    const text = this.localityId === this.keepTyped ? this.typedLocality : (picked?.label ?? null);
 
     this.api
       .revise(
@@ -546,7 +575,8 @@ export class IssueDetailComponent implements OnInit {
         this.title.trim(),
         this.description.trim(),
         this.category,
-        locality.length > 0 ? locality : null,
+        text,
+        picked?.id ?? null,
       )
       .subscribe({
         next: () => {

@@ -31,6 +31,7 @@ function issue(overrides: Partial<Issue> = {}): Issue {
     description: 'Cars come through too fast at closing time.',
     category: 'Safety',
     locality: 'Hiran Magri',
+    localityId: null,
     submittedByMemberId: ME,
     status: 'Submitted',
     isMine: true,
@@ -87,6 +88,16 @@ function providers() {
   ];
 }
 
+/** Answers the Locality select's two master-data reads. */
+function flushLocalities(http: HttpTestingController): void {
+  http
+    .expectOne((r) => r.url === '/v1/master-data/localities')
+    .flush([{ id: 'loc-hm', cityId: 'city-u', name: 'Hiran Magri', isActive: true }]);
+  http
+    .expectOne((r) => r.url === '/v1/master-data/cities')
+    .flush([{ id: 'city-u', countryId: 'in', name: 'Udaipur', isActive: true }]);
+}
+
 describe('IssuesListComponent', () => {
   let fixture: ComponentFixture<IssuesListComponent>;
   let component: IssuesListComponent;
@@ -106,6 +117,7 @@ describe('IssuesListComponent', () => {
     fixture.detectChanges();
     http.expectOne((r) => r.url === '/v1/social-issues').flush(issues);
     http.expectOne('/v1/social-issues/review-access').flush(grant);
+    flushLocalities(http);
     fixture.detectChanges();
   }
 
@@ -172,16 +184,19 @@ describe('IssuesListComponent', () => {
     component.title = '  Community park lighting  ';
     component.description = '  The path is dark by six.  ';
     component.category = 'Safety';
-    component.locality = '  Sector 4  ';
+    component.localityId = 'loc-hm';
     component.submit(true);
 
     const request = http.expectOne('/v1/social-issues');
 
+    // The id is what an Area Admin's review is scoped by; the label is what
+    // every screen shows.
     expect(request.request.body).toEqual({
       title: 'Community park lighting',
       description: 'The path is dark by six.',
       category: 'Safety',
-      locality: 'Sector 4',
+      locality: 'Hiran Magri, Udaipur',
+      localityId: 'loc-hm',
       submitNow: true,
     });
 
@@ -197,10 +212,13 @@ describe('IssuesListComponent', () => {
 
     component.title = 'A title';
     component.description = 'A description.';
-    component.locality = '   ';
+    component.localityId = '';
     component.submit(true);
 
-    expect(http.expectOne('/v1/social-issues').request.body).toMatchObject({ locality: null });
+    expect(http.expectOne('/v1/social-issues').request.body).toMatchObject({
+      locality: null,
+      localityId: null,
+    });
   });
 
   it('saves a draft without submitting it', () => {
@@ -583,6 +601,7 @@ describe('IssueDetailComponent', () => {
     expect(buttonSaying('Edit')).toBeDefined();
 
     component.startEdit(component.detail()!);
+    flushLocalities(http);
     component.title = 'Road safety near the school gate';
     component.saveEdit();
 
@@ -598,6 +617,35 @@ describe('IssueDetailComponent', () => {
     expect(component.editing()).toBe(false);
   });
 
+  it('keeps a locality typed before localities were picked, unless another is chosen', () => {
+    // The service replaces both fields on a revision, so leaving the select
+    // alone must send the typed text back rather than clear it.
+    load({ issue: issue({ isMine: true, locality: 'Sector 4', localityId: null }), history: [history()] });
+
+    component.startEdit(component.detail()!);
+    flushLocalities(http);
+    component.saveEdit();
+
+    expect(http.expectOne('/v1/social-issues/i1').request.body).toMatchObject({
+      locality: 'Sector 4',
+      localityId: null,
+    });
+  });
+
+  it('sends a picked locality by id, which is what an Area Admin reviews by', () => {
+    load({ issue: issue({ isMine: true, locality: 'Sector 4', localityId: null }), history: [history()] });
+
+    component.startEdit(component.detail()!);
+    flushLocalities(http);
+    component.localityId = 'loc-hm';
+    component.saveEdit();
+
+    expect(http.expectOne('/v1/social-issues/i1').request.body).toMatchObject({
+      locality: 'Hiran Magri, Udaipur',
+      localityId: 'loc-hm',
+    });
+  });
+
   it('offers no edit on somebody else issue', () => {
     load({
       issue: issue({ isMine: false, submittedByMemberId: 'x', status: 'DecisionPending' }),
@@ -611,6 +659,7 @@ describe('IssueDetailComponent', () => {
     load({ issue: issue({ isMine: true }), history: [history()] });
 
     component.startEdit(component.detail()!);
+    flushLocalities(http);
     component.title = 'Something';
     component.saveEdit();
 

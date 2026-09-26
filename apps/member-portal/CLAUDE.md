@@ -474,6 +474,16 @@ time somebody added a state the screen would be confidently wrong. It also
 means one screen serves a member and a reviewer without knowing which it is
 talking to.
 
+**An issue's locality is picked, not typed, as of 2026-09-26.** A typed
+"Hiran Magri" matched nobody's token, so no Area Admin could ever be the one
+to review it. The raise and revise forms offer the master-data Localities
+("Name, City", loaded once) and send the id with its label as the display
+text, so every screen still reads the one `locality` field. An issue raised
+before this carries text only; the revise form offers that text back as its
+own "(as typed)" option, chosen to start with, because the service replaces
+both fields on a revision and correcting a title must not quietly drop the
+place an issue was about.
+
 **A screen never asks for something it has been told it may not have.** The
 group detail screen fetches the president's review queue only when the group
 says `iAmThePresident`. That endpoint answers 404 to anyone else - deliberately,

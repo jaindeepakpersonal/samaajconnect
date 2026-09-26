@@ -54,6 +54,7 @@ export class IssuesApi {
     description: string,
     category: string,
     locality: string | null,
+    localityId: string | null,
     submitNow: boolean,
   ): Observable<Issue> {
     return this.http.post<Issue>('/v1/social-issues', {
@@ -61,6 +62,7 @@ export class IssuesApi {
       description,
       category,
       locality,
+      localityId,
       submitNow,
     });
   }
@@ -72,12 +74,14 @@ export class IssuesApi {
     description: string,
     category: string,
     locality: string | null,
+    localityId: string | null,
   ): Observable<Issue> {
     return this.http.put<Issue>(`/v1/social-issues/${id}`, {
       title,
       description,
       category,
       locality,
+      localityId,
     });
   }
 

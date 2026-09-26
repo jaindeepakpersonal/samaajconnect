@@ -851,14 +851,29 @@ field.** Ticking `AreaAdmin` on Invite Admin (either mode) clears every other
 role and shows a Locality select; ticking another role clears `AreaAdmin`.
 identity-tenant-service refuses both the mixture and a missing locality, so the
 form never offers either. Once signed in, an Area Admin lands on Members
-rather than the dashboard, sees only Members in the nav, and is told which
-locality they manage in a banner above every screen - because every other
-screen would answer 403, and the Samaaj-wide dashboard tiles are not theirs to
-read. None of that is the control: member-family-service applies the locality
-from the token. The Members screen fixes its Locality filter to theirs,
-because the service gives the administrator's view only to a search confined
-to that locality - anything wider is the member directory they also have as
-a member, which is not what this screen is for.
+rather than the dashboard, sees Members, Volunteer Groups, Events, Jain
+Pathshala and Social Issues in the nav, and is told which locality they
+manage in a banner above every screen - the Samaaj-wide dashboard tiles are
+not theirs to read. None of that is the control: each service applies the
+locality from the token. The Members screen fixes its Locality filter to
+theirs, because the service gives the administrator's view only to a search
+confined to that locality - anything wider is the member directory they also
+have as a member, which is not what this screen is for.
+
+**Locality bounds the administrator, never the member.** Groups and events
+carry an optional `localityId` now (a Locality column, and a select in their
+modals); an Area Admin's select is fixed to their own locality, and a Samaaj
+Admin's offers "The whole Samaaj". A row in another locality - or with none,
+which is the Samaaj Admin's alone - shows "Another locality" and no controls,
+and the event and Pathshala detail screens hold back their attendee list,
+placement queue, sessions and classes for one, because the services answer
+404 there and a screen should not ask for what it has been told it may not
+have. `core/area-scope.ts`'s `AreaScope.administers(localityId)` is that one
+check, true for anybody who is not an Area Admin. A Pathshala's locality is
+its address's, which only a Super Admin sets at creation - so an existing
+Pathshala with none stays the Samaaj Admin's until an edit command exists.
+Social issues are filtered by the service itself: the approval queue simply
+returns only the Area Admin's locality's issues.
 
 **Trusts shipped with no admin screen at all until now**, the same shape of gap
 as every other case in this file: `trust-service` (roster CRUD, then
