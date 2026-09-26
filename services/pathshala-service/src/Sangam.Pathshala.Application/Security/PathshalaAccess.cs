@@ -53,11 +53,25 @@ public static class PathshalaAccess
         exam is not null && (tenantId is not { } id || exam.TenantId == id);
 
     /// <summary>
-    /// Whether this caller may run the Pathshala - open sessions, create
-    /// classes, place students.
+    /// Whether this caller may run <paramref name="pathshala"/> - open sessions,
+    /// create classes, place students.
     /// </summary>
-    public static bool CanAdminister(ICurrentUser currentUser) =>
-        currentUser.HasPermission(PermissionKeys.PathshalaManage);
+    /// <remarks>
+    /// The permission, and - for an Area Admin - the Pathshala being in their
+    /// own locality. A Pathshala with no locality is the Samaaj Admin's alone.
+    /// </remarks>
+    public static bool CanAdminister(
+        ICurrentUser currentUser, IAreaScope area, Domain.Pathshalas.Pathshala pathshala) =>
+        currentUser.HasPermission(PermissionKeys.PathshalaManage) && pathshala.IsAdministeredBy(area);
+
+    /// <summary>
+    /// The locality half of <see cref="CanAdminister"/>, for the commands whose
+    /// permission attribute has already answered the other half. False for a
+    /// null Pathshala, so it reads as one more "not found" beside
+    /// <c>IsInTenant</c>.
+    /// </summary>
+    public static bool IsAdministeredBy(this Domain.Pathshalas.Pathshala? pathshala, IAreaScope area) =>
+        pathshala is not null && area.MayAdminister(pathshala.Address?.LocalityId);
 
     /// <summary>
     /// Whether this caller may mark <paramref name="pathshalaClass"/>'s
@@ -69,8 +83,12 @@ public static class PathshalaAccess
     /// else - holding the permission is necessary and not sufficient.
     /// </remarks>
     public static bool CanTeach(
-        ICurrentUser currentUser, PathshalaClass pathshalaClass, string permission) =>
-        CanAdminister(currentUser)
+        ICurrentUser currentUser,
+        IAreaScope area,
+        Domain.Pathshalas.Pathshala pathshala,
+        PathshalaClass pathshalaClass,
+        string permission) =>
+        CanAdminister(currentUser, area, pathshala)
         || (currentUser.HasPermission(permission)
             && currentUser.UserId is { } memberId
             && pathshalaClass.IsTaughtBy(memberId));
@@ -87,6 +105,7 @@ public static class PathshalaAccess
     /// </remarks>
     public static bool CanReadRecordsOf(
         ICurrentUser currentUser,
+        IAreaScope area,
         StudentEnrolment enrolment,
         Domain.Pathshalas.Pathshala? pathshala)
     {
@@ -95,7 +114,8 @@ public static class PathshalaAccess
             return false;
         }
 
-        if (enrolment.BelongsTo(memberId) || CanAdminister(currentUser))
+        if (enrolment.BelongsTo(memberId)
+            || (pathshala is not null && CanAdminister(currentUser, area, pathshala)))
         {
             return true;
         }

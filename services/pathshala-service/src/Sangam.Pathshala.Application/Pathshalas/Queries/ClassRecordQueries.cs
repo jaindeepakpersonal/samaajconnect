@@ -31,6 +31,7 @@ public sealed class GetClassRegisterQueryHandler(
     IPathshalaRepository pathshalas,
     IEnrolmentRepository enrolments,
     ICurrentUser currentUser,
+    IAreaScope areaScope,
     ITenantContext tenantContext)
     : IRequestHandler<GetClassRegisterQuery, Result<IReadOnlyList<RegisterEntryResponse>>>
 {
@@ -51,7 +52,7 @@ public sealed class GetClassRegisterQueryHandler(
         // record of somebody's children, and holding the attendance permission
         // somewhere is not permission to read this class's.
         if (!PathshalaAccess.CanTeach(
-                currentUser, pathshalaClass, PermissionKeys.PathshalaAttendanceWrite))
+                currentUser, areaScope, pathshala!, pathshalaClass, PermissionKeys.PathshalaAttendanceWrite))
         {
             return Result.Failure<IReadOnlyList<RegisterEntryResponse>>(
                 PathshalaAccess.NoSuchClass);
@@ -100,6 +101,7 @@ public sealed class ListClassExamsQueryHandler(
     IPathshalaRepository pathshalas,
     IEnrolmentRepository enrolments,
     ICurrentUser currentUser,
+    IAreaScope areaScope,
     ITenantContext tenantContext)
     : IRequestHandler<ListClassExamsQuery, Result<IReadOnlyList<ClassExamResponse>>>
 {
@@ -120,7 +122,7 @@ public sealed class ListClassExamsQueryHandler(
         // child's marks reads them through the progress view, which is scoped
         // to one enrolment.
         if (!PathshalaAccess.CanTeach(
-                currentUser, pathshalaClass, PermissionKeys.PathshalaExamsWrite))
+                currentUser, areaScope, pathshala!, pathshalaClass, PermissionKeys.PathshalaExamsWrite))
         {
             return Result.Failure<IReadOnlyList<ClassExamResponse>>(PathshalaAccess.NoSuchClass);
         }

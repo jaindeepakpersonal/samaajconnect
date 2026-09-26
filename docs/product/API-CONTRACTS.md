@@ -245,7 +245,7 @@ reviews" in `services/social-issues-service/CLAUDE.md`.
 | Method | Path | Permission | Purpose |
 |---|---|---|---|
 | GET | `/pathshalas` | `Members.Read` | This Samaaj's Pathshalas, with class and teacher counts |
-| GET | `/attendance-summary` | `Pathshala.Manage` | Present/absent/excused across every class this Samaaj runs, for the admin Reports & Analytics screen |
+| GET | `/attendance-summary` | `Pathshala.Manage` | Present/absent/excused across every class this Samaaj runs, for the admin Reports & Analytics screen. **403** to an Area Admin; every other `Pathshala.Manage` route below answers them **404** for a Pathshala outside their locality or with no address |
 | POST | `/pathshalas` | SuperAdmin **role** + `Pathshala.Manage` | Create the master record |
 | GET | `/pathshalas/{id}` | `Members.Read` | Sessions and classes |
 | POST | `/pathshalas/{id}/sessions` | `Pathshala.Manage` | Open an academic session; it becomes current |

@@ -33,6 +33,7 @@ internal static class StudentView
             IEnrolmentRepository enrolments,
             IPathshalaRepository pathshalas,
             ICurrentUser currentUser,
+            IAreaScope areaScope,
             ITenantContext tenantContext,
             CancellationToken cancellationToken)
     {
@@ -46,7 +47,7 @@ internal static class StudentView
 
         var pathshala = await pathshalas.GetByIdAsync(enrolment!.PathshalaId, cancellationToken);
 
-        if (pathshala is null || !PathshalaAccess.CanReadRecordsOf(currentUser, enrolment, pathshala))
+        if (pathshala is null || !PathshalaAccess.CanReadRecordsOf(currentUser, areaScope, enrolment, pathshala))
         {
             return Result.Failure<(StudentEnrolment, Domain.Pathshalas.Pathshala)>(
                 PathshalaAccess.NoSuchEnrolment);
@@ -70,6 +71,7 @@ public sealed class GetMyClassQueryHandler(
     IEnrolmentRepository enrolments,
     IPathshalaRepository pathshalas,
     ICurrentUser currentUser,
+    IAreaScope areaScope,
     ITenantContext tenantContext)
     : IRequestHandler<GetMyClassQuery, Result<MyClassResponse>>
 {
@@ -77,7 +79,7 @@ public sealed class GetMyClassQueryHandler(
         GetMyClassQuery query, CancellationToken cancellationToken)
     {
         var resolved = await StudentView.ResolveAsync(
-            query.EnrolmentId, enrolments, pathshalas, currentUser, tenantContext,
+            query.EnrolmentId, enrolments, pathshalas, currentUser, areaScope, tenantContext,
             cancellationToken);
 
         if (resolved.IsFailure)
@@ -125,6 +127,7 @@ public sealed class GetMyAttendanceQueryHandler(
     IEnrolmentRepository enrolments,
     IPathshalaRepository pathshalas,
     ICurrentUser currentUser,
+    IAreaScope areaScope,
     ITenantContext tenantContext)
     : IRequestHandler<GetMyAttendanceQuery, Result<MyAttendanceResponse>>
 {
@@ -132,7 +135,7 @@ public sealed class GetMyAttendanceQueryHandler(
         GetMyAttendanceQuery query, CancellationToken cancellationToken)
     {
         var resolved = await StudentView.ResolveAsync(
-            query.EnrolmentId, enrolments, pathshalas, currentUser, tenantContext,
+            query.EnrolmentId, enrolments, pathshalas, currentUser, areaScope, tenantContext,
             cancellationToken);
 
         if (resolved.IsFailure)
@@ -169,6 +172,7 @@ public sealed class GetMyExamsQueryHandler(
     IEnrolmentRepository enrolments,
     IPathshalaRepository pathshalas,
     ICurrentUser currentUser,
+    IAreaScope areaScope,
     ITenantContext tenantContext,
     IDateTimeProvider clock)
     : IRequestHandler<GetMyExamsQuery, Result<IReadOnlyList<MyExamResponse>>>
@@ -177,7 +181,7 @@ public sealed class GetMyExamsQueryHandler(
         GetMyExamsQuery query, CancellationToken cancellationToken)
     {
         var resolved = await StudentView.ResolveAsync(
-            query.EnrolmentId, enrolments, pathshalas, currentUser, tenantContext,
+            query.EnrolmentId, enrolments, pathshalas, currentUser, areaScope, tenantContext,
             cancellationToken);
 
         if (resolved.IsFailure)
@@ -236,6 +240,7 @@ public sealed class GetMyProgressQueryHandler(
     IEnrolmentRepository enrolments,
     IPathshalaRepository pathshalas,
     ICurrentUser currentUser,
+    IAreaScope areaScope,
     ITenantContext tenantContext)
     : IRequestHandler<GetMyProgressQuery, Result<MyProgressResponse>>
 {
@@ -243,7 +248,7 @@ public sealed class GetMyProgressQueryHandler(
         GetMyProgressQuery query, CancellationToken cancellationToken)
     {
         var resolved = await StudentView.ResolveAsync(
-            query.EnrolmentId, enrolments, pathshalas, currentUser, tenantContext,
+            query.EnrolmentId, enrolments, pathshalas, currentUser, areaScope, tenantContext,
             cancellationToken);
 
         if (resolved.IsFailure)

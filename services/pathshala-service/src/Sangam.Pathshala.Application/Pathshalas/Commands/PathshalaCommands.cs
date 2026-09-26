@@ -133,6 +133,7 @@ public sealed class OpenSessionCommandHandler(
     IPathshalaRepository pathshalas,
     IUnitOfWork unitOfWork,
     ITenantContext tenantContext,
+    IAreaScope areaScope,
     IDateTimeProvider clock)
     : IRequestHandler<OpenSessionCommand, Result<PathshalaDetailResponse>>
 {
@@ -141,7 +142,7 @@ public sealed class OpenSessionCommandHandler(
     {
         var pathshala = await pathshalas.GetByIdAsync(command.PathshalaId, cancellationToken);
 
-        if (!pathshala.IsInTenant(tenantContext.TenantId))
+        if (!pathshala.IsInTenant(tenantContext.TenantId) || !pathshala.IsAdministeredBy(areaScope))
         {
             return Result.Failure<PathshalaDetailResponse>(PathshalaAccess.NoSuchPathshala);
         }
@@ -182,7 +183,7 @@ public sealed class CreateClassCommandValidator : AbstractValidator<CreateClassC
 }
 
 public sealed class CreateClassCommandHandler(
-    IPathshalaRepository pathshalas, IUnitOfWork unitOfWork, ITenantContext tenantContext)
+    IPathshalaRepository pathshalas, IUnitOfWork unitOfWork, ITenantContext tenantContext, IAreaScope areaScope)
     : IRequestHandler<CreateClassCommand, Result<ClassResponse>>
 {
     public async Task<Result<ClassResponse>> Handle(
@@ -190,7 +191,7 @@ public sealed class CreateClassCommandHandler(
     {
         var pathshala = await pathshalas.GetByIdAsync(command.PathshalaId, cancellationToken);
 
-        if (!pathshala.IsInTenant(tenantContext.TenantId))
+        if (!pathshala.IsInTenant(tenantContext.TenantId) || !pathshala.IsAdministeredBy(areaScope))
         {
             return Result.Failure<ClassResponse>(PathshalaAccess.NoSuchPathshala);
         }
@@ -230,7 +231,7 @@ public sealed class AddClassSlotCommandValidator : AbstractValidator<AddClassSlo
 }
 
 public sealed class AddClassSlotCommandHandler(
-    IPathshalaRepository pathshalas, IUnitOfWork unitOfWork, ITenantContext tenantContext)
+    IPathshalaRepository pathshalas, IUnitOfWork unitOfWork, ITenantContext tenantContext, IAreaScope areaScope)
     : IRequestHandler<AddClassSlotCommand, Result<ClassResponse>>
 {
     public async Task<Result<ClassResponse>> Handle(
@@ -238,7 +239,7 @@ public sealed class AddClassSlotCommandHandler(
     {
         var pathshala = await pathshalas.GetByClassIdAsync(command.ClassId, cancellationToken);
 
-        if (!pathshala.IsInTenant(tenantContext.TenantId))
+        if (!pathshala.IsInTenant(tenantContext.TenantId) || !pathshala.IsAdministeredBy(areaScope))
         {
             return Result.Failure<ClassResponse>(PathshalaAccess.NoSuchClass);
         }
@@ -287,6 +288,7 @@ public sealed class AssignTeacherCommandHandler(
     IPathshalaRepository pathshalas,
     IUnitOfWork unitOfWork,
     ITenantContext tenantContext,
+    IAreaScope areaScope,
     IDateTimeProvider clock)
     : IRequestHandler<AssignTeacherCommand, Result<ClassResponse>>
 {
@@ -295,7 +297,7 @@ public sealed class AssignTeacherCommandHandler(
     {
         var pathshala = await pathshalas.GetByClassIdAsync(command.ClassId, cancellationToken);
 
-        if (!pathshala.IsInTenant(tenantContext.TenantId))
+        if (!pathshala.IsInTenant(tenantContext.TenantId) || !pathshala.IsAdministeredBy(areaScope))
         {
             return Result.Failure<ClassResponse>(PathshalaAccess.NoSuchClass);
         }
@@ -333,6 +335,7 @@ public sealed class DeactivatePathshalaCommandHandler(
     IPathshalaRepository pathshalas,
     IUnitOfWork unitOfWork,
     ITenantContext tenantContext,
+    IAreaScope areaScope,
     IDateTimeProvider clock)
     : IRequestHandler<DeactivatePathshalaCommand, Result<PathshalaResponse>>
 {
@@ -341,7 +344,7 @@ public sealed class DeactivatePathshalaCommandHandler(
     {
         var pathshala = await pathshalas.GetByIdAsync(command.PathshalaId, cancellationToken);
 
-        if (!pathshala.IsInTenant(tenantContext.TenantId))
+        if (!pathshala.IsInTenant(tenantContext.TenantId) || !pathshala.IsAdministeredBy(areaScope))
         {
             return Result.Failure<PathshalaResponse>(PathshalaAccess.NoSuchPathshala);
         }

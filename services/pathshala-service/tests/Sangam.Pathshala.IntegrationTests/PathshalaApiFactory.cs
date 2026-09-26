@@ -109,17 +109,19 @@ public sealed class PathshalaApiFactory : WebApplicationFactory<Program>, IAsync
         return await action(dbContext);
     }
 
-    public HttpClient CreateClientAs(Guid userId, Guid tenantId, string[] roles, string[] permissions)
+    public HttpClient CreateClientAs(
+        Guid userId, Guid tenantId, string[] roles, string[] permissions, Guid? areaLocalityId = null)
     {
         var client = CreateClient();
 
         client.DefaultRequestHeaders.Authorization =
-            new("Bearer", CreateToken(userId, tenantId, roles, permissions));
+            new("Bearer", CreateToken(userId, tenantId, roles, permissions, areaLocalityId));
 
         return client;
     }
 
-    private static string CreateToken(Guid userId, Guid tenantId, string[] roles, string[] permissions)
+    private static string CreateToken(
+        Guid userId, Guid tenantId, string[] roles, string[] permissions, Guid? areaLocalityId = null)
     {
         var claims = new List<Claim>
         {
@@ -130,6 +132,11 @@ public sealed class PathshalaApiFactory : WebApplicationFactory<Program>, IAsync
 
         claims.AddRange(roles.Select(r => new Claim(PlatformClaimTypes.Role, r)));
         claims.AddRange(permissions.Select(p => new Claim(PlatformClaimTypes.Permission, p)));
+
+        if (areaLocalityId is { } locality)
+        {
+            claims.Add(new Claim(PlatformClaimTypes.LocalityId, locality.ToString()));
+        }
 
         var credentials = new SigningCredentials(
             new SymmetricSecurityKey(Encoding.UTF8.GetBytes(SigningKey)),

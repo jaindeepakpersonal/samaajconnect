@@ -74,6 +74,7 @@ public sealed class MarkAttendanceCommandHandler(
     // No IUnitOfWork: the whole register is written on the repository's own
     // connection, deliberately outside this request's transaction.
     ICurrentUser currentUser,
+    IAreaScope areaScope,
     ITenantContext tenantContext,
     IDateTimeProvider clock)
     : IRequestHandler<MarkAttendanceCommand, Result<MarkAttendanceResponse>>
@@ -99,7 +100,7 @@ public sealed class MarkAttendanceCommandHandler(
         // Holding Pathshala.Attendance.Write is not enough: it says teacher, not
         // teacher *of this class*.
         if (!PathshalaAccess.CanTeach(
-                currentUser, pathshalaClass, PermissionKeys.PathshalaAttendanceWrite))
+                currentUser, areaScope, pathshala!, pathshalaClass, PermissionKeys.PathshalaAttendanceWrite))
         {
             return Result.Failure<MarkAttendanceResponse>(PathshalaAccess.NoSuchClass);
         }
@@ -189,6 +190,7 @@ public sealed class ScheduleExamCommandHandler(
     IEnrolmentRepository enrolments,
     IUnitOfWork unitOfWork,
     ICurrentUser currentUser,
+    IAreaScope areaScope,
     ITenantContext tenantContext)
     : IRequestHandler<ScheduleExamCommand, Result<ExamResponse>>
 {
@@ -205,7 +207,7 @@ public sealed class ScheduleExamCommandHandler(
         var pathshalaClass = pathshala!.FindClass(command.ClassId)!;
 
         if (!PathshalaAccess.CanTeach(
-                currentUser, pathshalaClass, PermissionKeys.PathshalaExamsWrite))
+                currentUser, areaScope, pathshala!, pathshalaClass, PermissionKeys.PathshalaExamsWrite))
         {
             return Result.Failure<ExamResponse>(PathshalaAccess.NoSuchClass);
         }
@@ -258,6 +260,7 @@ public sealed class RecordExamResultCommandHandler(
     IEnrolmentRepository enrolments,
     IUnitOfWork unitOfWork,
     ICurrentUser currentUser,
+    IAreaScope areaScope,
     ITenantContext tenantContext,
     IDateTimeProvider clock)
     : IRequestHandler<RecordExamResultCommand, Result<ExamResultResponse>>
@@ -283,7 +286,7 @@ public sealed class RecordExamResultCommandHandler(
 
         if (pathshalaClass is null
             || !PathshalaAccess.CanTeach(
-                currentUser, pathshalaClass, PermissionKeys.PathshalaExamsWrite))
+                currentUser, areaScope, pathshala!, pathshalaClass, PermissionKeys.PathshalaExamsWrite))
         {
             return Result.Failure<ExamResultResponse>(PathshalaAccess.NoSuchExam);
         }

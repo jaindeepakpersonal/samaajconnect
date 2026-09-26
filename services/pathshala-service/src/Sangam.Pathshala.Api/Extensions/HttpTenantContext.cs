@@ -22,7 +22,7 @@ namespace Sangam.Pathshala.Api.Extensions;
 /// rather than silently resolved: that combination is what an attempt to point
 /// one Samaaj's token at another Samaaj's data looks like.
 /// </remarks>
-public sealed class HttpTenantContext : ITenantContext
+public sealed class HttpTenantContext : ITenantContext, IAreaScope
 {
     public const string TenantHeader = "X-Tenant-Id";
     public const string TenantOverrideHeader = "X-Tenant-Override-Id";
@@ -36,6 +36,16 @@ public sealed class HttpTenantContext : ITenantContext
             // Background work (the outbox dispatcher) has no request and no
             // tenant. Legitimate, so this stays null rather than throwing.
             return;
+        }
+
+        // Read off the validated token directly, the same way TenantId's own
+        // claim is - never from a header, since a caller could otherwise widen
+        // their own scope by setting one.
+        var localityClaim = httpContext.User.FindFirst(PlatformClaimTypes.LocalityId)?.Value;
+
+        if (Guid.TryParse(localityClaim, out var localityId))
+        {
+            AreaLocalityId = localityId;
         }
 
         if (TryReadGuid(httpContext, TenantOverrideHeader, out var overrideTenantId))
@@ -63,6 +73,8 @@ public sealed class HttpTenantContext : ITenantContext
     }
 
     public Guid? TenantId { get; }
+
+    public Guid? AreaLocalityId { get; }
 
     public bool IsOverride { get; }
 

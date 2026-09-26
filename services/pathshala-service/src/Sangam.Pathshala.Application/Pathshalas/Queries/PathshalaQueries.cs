@@ -28,7 +28,9 @@ public sealed class ListPathshalasQueryHandler(IPathshalaRepository pathshalas)
 public sealed record GetPathshalaQuery(Guid PathshalaId) : IQuery<PathshalaDetailResponse>;
 
 public sealed class GetPathshalaQueryHandler(
-    IPathshalaRepository pathshalas, IEnrolmentRepository enrolments, ITenantContext tenantContext)
+    IPathshalaRepository pathshalas,
+    IEnrolmentRepository enrolments,
+    ITenantContext tenantContext)
     : IRequestHandler<GetPathshalaQuery, Result<PathshalaDetailResponse>>
 {
     public async Task<Result<PathshalaDetailResponse>> Handle(
@@ -68,7 +70,10 @@ public sealed record ListEnrolmentRequestsQuery(Guid PathshalaId)
     : IQuery<IReadOnlyList<EnrolmentResponse>>;
 
 public sealed class ListEnrolmentRequestsQueryHandler(
-    IPathshalaRepository pathshalas, IEnrolmentRepository enrolments, ITenantContext tenantContext)
+    IPathshalaRepository pathshalas,
+    IEnrolmentRepository enrolments,
+    ITenantContext tenantContext,
+    IAreaScope areaScope)
     : IRequestHandler<ListEnrolmentRequestsQuery, Result<IReadOnlyList<EnrolmentResponse>>>
 {
     public async Task<Result<IReadOnlyList<EnrolmentResponse>>> Handle(
@@ -76,7 +81,7 @@ public sealed class ListEnrolmentRequestsQueryHandler(
     {
         var pathshala = await pathshalas.GetByIdAsync(query.PathshalaId, cancellationToken);
 
-        if (!pathshala.IsInTenant(tenantContext.TenantId))
+        if (!pathshala.IsInTenant(tenantContext.TenantId) || !pathshala.IsAdministeredBy(areaScope))
         {
             return Result.Failure<IReadOnlyList<EnrolmentResponse>>(
                 PathshalaAccess.NoSuchPathshala);
@@ -104,6 +109,7 @@ public sealed class GetClassRollQueryHandler(
     IPathshalaRepository pathshalas,
     IEnrolmentRepository enrolments,
     ICurrentUser currentUser,
+    IAreaScope areaScope,
     ITenantContext tenantContext)
     : IRequestHandler<GetClassRollQuery, Result<IReadOnlyList<EnrolmentResponse>>>
 {
@@ -123,7 +129,7 @@ public sealed class GetClassRollQueryHandler(
         // against this class, not against holding a teacher permission
         // somewhere.
         if (!PathshalaAccess.CanTeach(
-                currentUser, pathshalaClass, PermissionKeys.PathshalaAttendanceWrite))
+                currentUser, areaScope, pathshala!, pathshalaClass, PermissionKeys.PathshalaAttendanceWrite))
         {
             return Result.Failure<IReadOnlyList<EnrolmentResponse>>(PathshalaAccess.NoSuchClass);
         }
@@ -150,12 +156,22 @@ public sealed class GetClassRollQueryHandler(
 [RequiresPermission(PermissionKeys.PathshalaManage)]
 public sealed record GetAttendanceSummaryQuery : IQuery<AttendanceTally>;
 
-public sealed class GetAttendanceSummaryQueryHandler(IEnrolmentRepository enrolments)
+public sealed class GetAttendanceSummaryQueryHandler(
+    IEnrolmentRepository enrolments, IAreaScope areaScope)
     : IRequestHandler<GetAttendanceSummaryQuery, Result<AttendanceTally>>
 {
     public async Task<Result<AttendanceTally>> Handle(
         GetAttendanceSummaryQuery query, CancellationToken cancellationToken)
     {
+        // A tally across every Pathshala in the Samaaj is a Samaaj Admin's
+        // figure; an Area Admin administers one locality's, not all of them.
+        if (areaScope.AreaLocalityId is not null)
+        {
+            return Result.Failure<AttendanceTally>(Error.Forbidden(
+                "Pathshala.SamaajWideFigure",
+                "The Samaaj-wide attendance figure is for the Samaaj Admin."));
+        }
+
         var tally = await enrolments.TallyAttendanceForTenantAsync(cancellationToken);
 
         return Result.Success(tally);

@@ -124,6 +124,7 @@ public sealed class PlaceStudentCommandHandler(
     IEnrolmentRepository enrolments,
     IUnitOfWork unitOfWork,
     ITenantContext tenantContext,
+    IAreaScope areaScope,
     IDateTimeProvider clock)
     : IRequestHandler<PlaceStudentCommand, Result<EnrolmentResponse>>
 {
@@ -133,6 +134,15 @@ public sealed class PlaceStudentCommandHandler(
         var enrolment = await enrolments.GetByIdAsync(command.EnrolmentId, cancellationToken);
 
         if (!enrolment.IsInTenant(tenantContext.TenantId))
+        {
+            return Result.Failure<EnrolmentResponse>(PathshalaAccess.NoSuchEnrolment);
+        }
+
+        var pathshala = await pathshalas.GetByIdAsync(enrolment!.PathshalaId, cancellationToken);
+
+        // Declining is as much the Pathshala's decision as placing, so the
+        // locality is checked before either.
+        if (!pathshala.IsAdministeredBy(areaScope))
         {
             return Result.Failure<EnrolmentResponse>(PathshalaAccess.NoSuchEnrolment);
         }
@@ -150,7 +160,6 @@ public sealed class PlaceStudentCommandHandler(
             return Result.Success(enrolment.ToResponse());
         }
 
-        var pathshala = await pathshalas.GetByIdAsync(enrolment!.PathshalaId, cancellationToken);
         var pathshalaClass = pathshala?.FindClass(command.ClassId!.Value);
 
         if (pathshalaClass is null)
@@ -191,9 +200,11 @@ public sealed class WithdrawStudentCommandValidator : AbstractValidator<Withdraw
 }
 
 public sealed class WithdrawStudentCommandHandler(
+    IPathshalaRepository pathshalas,
     IEnrolmentRepository enrolments,
     IUnitOfWork unitOfWork,
     ITenantContext tenantContext,
+    IAreaScope areaScope,
     IDateTimeProvider clock)
     : IRequestHandler<WithdrawStudentCommand, Result<EnrolmentResponse>>
 {
@@ -202,7 +213,9 @@ public sealed class WithdrawStudentCommandHandler(
     {
         var enrolment = await enrolments.GetByIdAsync(command.EnrolmentId, cancellationToken);
 
-        if (!enrolment.IsInTenant(tenantContext.TenantId))
+        if (!enrolment.IsInTenant(tenantContext.TenantId)
+            || !(await pathshalas.GetByIdAsync(enrolment!.PathshalaId, cancellationToken))
+                .IsAdministeredBy(areaScope))
         {
             return Result.Failure<EnrolmentResponse>(PathshalaAccess.NoSuchEnrolment);
         }

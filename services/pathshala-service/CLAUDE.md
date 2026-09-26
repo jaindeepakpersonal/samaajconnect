@@ -116,6 +116,23 @@ reachable by nobody but the platform operator.
 enrolment id confirms the enrolment exists, and these are records about
 somebody's child.
 
+**An Area Admin holds `Pathshala.Manage` for one locality.** The Pathshala's
+own `Address.LocalityId` decides it, read against `IAreaScope` (the
+`locality_id` token claim). `PathshalaAccess.CanAdminister` now takes the
+Pathshala, so the administrator branch of `CanTeach` and `CanReadRecordsOf` -
+reading a roll, a register, a child's records - is locality-bound too, and
+`IsAdministeredBy` sits beside `IsInTenant` in every `Pathshala.Manage`
+handler: opening sessions, classes, slots, teachers, standing one down, the
+placement queue, placing, declining and withdrawing. Outside their locality,
+or on a Pathshala with no address, each answers "not found" like everything
+else here. The Samaaj-wide attendance figure refuses them outright (403): it
+is a whole-Samaaj number, and there is no one Pathshala to scope it to.
+Listing Pathshalas and a parent's own requests stay Samaaj-wide.
+
+Because a Pathshala's address can only be set when a Super Admin creates it,
+a Pathshala created before its locality mattered has none, and stays the
+Samaaj Admin's until an update command exists.
+
 ## The register
 
 **The unique index on `(EnrolmentId, ClassDate)` is what keeps a child's
