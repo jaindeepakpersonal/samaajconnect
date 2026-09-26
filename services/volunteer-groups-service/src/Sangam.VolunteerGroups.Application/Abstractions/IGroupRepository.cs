@@ -11,8 +11,13 @@ public interface IGroupRepository
     Task<IReadOnlyList<VolunteerGroup>> ListAsync(
         GroupStatus? status, CancellationToken cancellationToken = default);
 
-    /// <summary>True when this Samaaj already has a group by that name.</summary>
-    Task<bool> NameExistsAsync(string name, CancellationToken cancellationToken = default);
+    /// <summary>
+    /// True when this Samaaj already has a group by that name. Pass
+    /// <paramref name="excludingGroupId"/> when checking a rename, so the group
+    /// keeping its own name is not mistaken for a collision.
+    /// </summary>
+    Task<bool> NameExistsAsync(
+        string name, Guid? excludingGroupId = null, CancellationToken cancellationToken = default);
 
     void Add(VolunteerGroup group);
 }

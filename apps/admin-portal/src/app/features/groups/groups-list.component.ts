@@ -1,4 +1,12 @@
-import { Component, OnInit, computed, inject, signal } from '@angular/core';
+import {
+  Component,
+  ElementRef,
+  OnInit,
+  ViewChild,
+  computed,
+  inject,
+  signal,
+} from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { RouterLink } from '@angular/router';
 import { describeError } from '@samaajconnect/shared';
@@ -8,7 +16,7 @@ import { VolunteerGroup } from '../../core/admin.models';
 import { isNotFound } from '../../core/http-status';
 
 /**
- * Volunteer groups — creating them, and standing them down.
+ * Volunteer groups — creating them, correcting them, and standing them down.
  *
  * Wireframe `#groups` covers the member-facing directory; no wireframe covers
  * administering it.
@@ -29,13 +37,30 @@ import { isNotFound } from '../../core/http-status';
  * simply takes no new applications — a Samaaj that ran a seva group for one
  * monsoon should still be able to see who was in it — so the action is
  * reversible and the screen says so.
+ *
+ * **Create and Edit are one modal, the same shape Events' own screen already
+ * uses.** The create form used to sit permanently below the table, pushed
+ * further down the page every time the Samaaj had one more group, and there was
+ * no way to correct a typo in a name or description at all until
+ * `UpdateGroupCommand` existed. Setting or changing the president stays its own
+ * inline row-expansion rather than joining the modal — it is a different kind
+ * of decision (who runs the group, not what the group is called) with its own
+ * member-picker, the same way Events keeps its cancellation reason inline
+ * beside the row rather than folding it into the modal too.
  */
 @Component({
   selector: 'app-groups-list',
   imports: [FormsModule, RouterLink],
   template: `
-    <h1 class="title">Volunteer groups</h1>
-    <p class="sub">Set a group up, optionally name its president, and stand one down.</p>
+    <div class="section-head">
+      <div>
+        <h1 class="title">Volunteer groups</h1>
+        <p class="sub">Set a group up, correct it, name its president, and stand one down.</p>
+      </div>
+      <button class="btn small" type="button" (click)="openCreateModal($event)">
+        Set up a group
+      </button>
+    </div>
 
     @if (error(); as message) {
       <p class="notice error" role="alert">{{ message }}</p>
@@ -57,7 +82,9 @@ import { isNotFound } from '../../core/http-status';
         <h2>Groups</h2>
 
         @if (groups().length === 0) {
-          <p class="empty">None yet.</p>
+          <p class="empty">
+            None yet. A group starts with a name and, usually, a president to run it.
+          </p>
         } @else {
           <div class="table-wrap">
             <table>
@@ -102,17 +129,24 @@ import { isNotFound } from '../../core/http-status';
                       </span>
                     </td>
                     <td>
-                      @if (group.status === 'Active') {
+                      <div class="row-actions">
                         <button class="btn small alt" type="button" [disabled]="busy()"
-                          (click)="setStatus(group, 'Inactive')">
-                          Stand down
+                          (click)="openEditModal($event, group)">
+                          Edit
                         </button>
-                      } @else {
-                        <button class="btn small" type="button" [disabled]="busy()"
-                          (click)="setStatus(group, 'Active')">
-                          Bring back
-                        </button>
-                      }
+
+                        @if (group.status === 'Active') {
+                          <button class="btn small alt" type="button" [disabled]="busy()"
+                            (click)="setStatus(group, 'Inactive')">
+                            Stand down
+                          </button>
+                        } @else {
+                          <button class="btn small" type="button" [disabled]="busy()"
+                            (click)="setStatus(group, 'Active')">
+                            Bring back
+                          </button>
+                        }
+                      </div>
                     </td>
                   </tr>
 
@@ -177,60 +211,96 @@ import { isNotFound } from '../../core/http-status';
           </p>
         }
       </div>
+    }
 
-      <!-- Create --------------------------------------------------------- -->
-      <div class="card spaced">
-        <h2>Set up a group</h2>
+    <!-- Create / Edit modal ---------------------------------------------- -->
+    @if (modalOpen()) {
+      <div class="modal-backdrop" (click)="closeModal()">
+        <div
+          class="card modal-card modal-dialog"
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="group-modal-title"
+          (click)="$event.stopPropagation()"
+          (keydown)="onModalKeydown($event)"
+        >
+          <h2 id="group-modal-title">
+            {{ modalMode() === 'create' ? 'Set up a group' : 'Edit ' + editingGroup()?.name }}
+          </h2>
 
-        <form (ngSubmit)="create()">
-          <div class="form-grid">
-            <div class="field">
-              <label for="group-name">Name</label>
-              <input id="group-name" class="input" name="name" [(ngModel)]="name"
-                maxlength="200" placeholder="Seva Group" />
+          <form (ngSubmit)="submitModal()">
+            <div class="form-grid">
+              <div class="field">
+                <label for="group-name">Name</label>
+                <input id="group-name" class="input" name="name" [(ngModel)]="name"
+                  maxlength="200" placeholder="Seva Group" #firstField />
+              </div>
+
+              <div class="field">
+                <label for="group-description">Description</label>
+                <input id="group-description" class="input" name="description"
+                  [(ngModel)]="description" maxlength="1000" />
+              </div>
+
+              <div class="field">
+                <label for="group-focus">Focus area</label>
+                <input id="group-focus" class="input" name="focusArea" [(ngModel)]="focusArea"
+                  maxlength="120" placeholder="Social Service" />
+              </div>
+
+              @if (modalMode() === 'create') {
+                <div class="field">
+                  <label for="group-president">President</label>
+                  <select id="group-president" class="input" name="president"
+                    [(ngModel)]="presidentMemberId">
+                    <option value="">No president yet</option>
+                    @for (member of members(); track member.id) {
+                      <option [value]="member.id">{{ member.fullName }}</option>
+                    }
+                  </select>
+                </div>
+
+                <p class="small span-all">
+                  Optional. Until a group has a president, a Samaaj admin accepts its joiners and
+                  can run a "President" election; choose one later with "Set president".
+                </p>
+              } @else {
+                <p class="small span-all">
+                  President:
+                  {{ editingGroup()!.presidentMemberId ? memberName(editingGroup()!.presidentMemberId) : 'Not set' }}
+                  — changed with "Set president" on the row, not here.
+                </p>
+              }
             </div>
 
-            <div class="field">
-              <label for="group-description">Description</label>
-              <input id="group-description" class="input" name="description"
-                [(ngModel)]="description" maxlength="1000" />
-            </div>
-
-            <div class="field">
-              <label for="group-focus">Focus area</label>
-              <input id="group-focus" class="input" name="focusArea" [(ngModel)]="focusArea"
-                maxlength="120" placeholder="Social Service" />
-            </div>
-
-            <div class="field">
-              <label for="group-president">President</label>
-              <select id="group-president" class="input" name="president"
-                [(ngModel)]="presidentMemberId">
-                <option value="">No president yet</option>
-                @for (member of members(); track member.id) {
-                  <option [value]="member.id">{{ member.fullName }}</option>
-                }
-              </select>
-            </div>
-
-            <p class="small span-all">
-              Optional. Until a group has a president, a Samaaj admin accepts its joiners and can
-              run a "President" election; choose one later with "Set president".
-            </p>
-
-            <div class="span-all">
-              <button class="btn" type="submit" [disabled]="busy() || !canCreate()">
-                Create group
+            <div class="actions">
+              <button class="btn" type="submit" [disabled]="busy() || !canSubmit()">
+                {{ modalMode() === 'create' ? 'Create group' : 'Save' }}
               </button>
+              <button class="btn alt" type="button" (click)="closeModal()">Cancel</button>
             </div>
-          </div>
-        </form>
+          </form>
+        </div>
       </div>
     }
   `,
   styles: `
-    .spaced {
-      margin-top: var(--space-4);
+    .row-actions {
+      display: flex;
+      gap: var(--space-2);
+      flex-wrap: wrap;
+    }
+
+    .section-head {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: var(--space-3);
+      flex-wrap: wrap;
+    }
+
+    .section-head h1 {
+      margin-bottom: 0;
     }
   `,
 })
@@ -239,6 +309,8 @@ export class GroupsListComponent implements OnInit {
 
   readonly scope = inject(AdminScope);
 
+  @ViewChild('firstField') private readonly firstFieldRef?: ElementRef<HTMLInputElement>;
+
   readonly groups = signal<readonly VolunteerGroup[]>([]);
   readonly members = signal<readonly { id: string; fullName: string }[]>([]);
   readonly loading = signal(true);
@@ -246,6 +318,11 @@ export class GroupsListComponent implements OnInit {
   readonly moduleOff = signal(false);
   readonly error = signal<string | null>(null);
   readonly done = signal<string | null>(null);
+
+  readonly modalOpen = signal(false);
+  readonly modalMode = signal<'create' | 'edit'>('create');
+  readonly editingGroup = signal<VolunteerGroup | null>(null);
+  private modalTrigger: HTMLElement | null = null;
 
   name = '';
   description = '';
@@ -260,7 +337,7 @@ export class GroupsListComponent implements OnInit {
     this.load();
   }
 
-  canCreate(): boolean {
+  canSubmit(): boolean {
     return this.name.trim().length > 0;
   }
 
@@ -304,8 +381,93 @@ export class GroupsListComponent implements OnInit {
     });
   }
 
+  // ---- Modal --------------------------------------------------------------
+
+  openCreateModal(event: MouseEvent): void {
+    this.modalMode.set('create');
+    this.editingGroup.set(null);
+    this.name = '';
+    this.description = '';
+    this.focusArea = '';
+    this.presidentMemberId = '';
+    this.openModal(event);
+  }
+
+  openEditModal(event: MouseEvent, group: VolunteerGroup): void {
+    this.modalMode.set('edit');
+    this.editingGroup.set(group);
+    this.name = group.name;
+    this.description = group.description ?? '';
+    this.focusArea = group.focusArea ?? '';
+    this.openModal(event);
+  }
+
+  private openModal(event: MouseEvent): void {
+    this.modalTrigger = event.currentTarget as HTMLElement;
+    this.error.set(null);
+    this.done.set(null);
+    this.modalOpen.set(true);
+    setTimeout(() => this.firstFieldRef?.nativeElement.focus());
+  }
+
+  closeModal(): void {
+    if (!this.modalOpen()) {
+      return;
+    }
+
+    this.modalOpen.set(false);
+
+    const trigger = this.modalTrigger;
+    this.modalTrigger = null;
+
+    if (trigger) {
+      setTimeout(() => trigger.focus());
+    }
+  }
+
+  onModalKeydown(event: KeyboardEvent): void {
+    if (event.key === 'Escape') {
+      event.stopPropagation();
+      this.closeModal();
+
+      return;
+    }
+
+    if (event.key !== 'Tab') {
+      return;
+    }
+
+    const dialog = event.currentTarget as HTMLElement;
+    const focusable = dialog.querySelectorAll<HTMLElement>(
+      'a[href], button:not([disabled]), input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])',
+    );
+
+    if (focusable.length === 0) {
+      return;
+    }
+
+    const first = focusable[0]!;
+    const last = focusable[focusable.length - 1]!;
+
+    if (event.shiftKey && document.activeElement === first) {
+      event.preventDefault();
+      last.focus();
+    } else if (!event.shiftKey && document.activeElement === last) {
+      event.preventDefault();
+      first.focus();
+    }
+  }
+
+  submitModal(): void {
+    if (this.modalMode() === 'create') {
+      this.create();
+    } else {
+      this.update();
+    }
+  }
+
   create(): void {
-    if (!this.canCreate()) {
+    if (!this.canSubmit()) {
       return;
     }
 
@@ -321,12 +483,23 @@ export class GroupsListComponent implements OnInit {
       this.presidentMemberId
         ? `${name} created, with ${this.memberName(this.presidentMemberId)} as president.`
         : `${name} created, with no president yet.`,
-      () => {
-        this.name = '';
-        this.description = '';
-        this.focusArea = '';
-        this.presidentMemberId = '';
-      },
+      () => this.closeModal(),
+    );
+  }
+
+  update(): void {
+    const editing = this.editingGroup();
+
+    if (!editing || !this.canSubmit()) {
+      return;
+    }
+
+    const name = this.name.trim();
+
+    this.act(
+      this.api.updateGroup(editing.id, name, blankToNull(this.description), blankToNull(this.focusArea)),
+      `${name} updated.`,
+      () => this.closeModal(),
     );
   }
 

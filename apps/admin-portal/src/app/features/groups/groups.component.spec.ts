@@ -75,7 +75,7 @@ describe('GroupsListComponent', () => {
     component.name = 'Seva Group';
     component.presidentMemberId = '';
 
-    expect(component.canCreate()).toBe(true);
+    expect(component.canSubmit()).toBe(true);
 
     component.create();
 
@@ -93,7 +93,7 @@ describe('GroupsListComponent', () => {
 
     component.name = '   ';
 
-    expect(component.canCreate()).toBe(false);
+    expect(component.canSubmit()).toBe(false);
   });
 
   it('shows Not set and offers Set president for a group with no president', () => {
@@ -164,6 +164,62 @@ describe('GroupsListComponent', () => {
 
     expect(text()).toContain('Bring back');
     expect(text()).not.toContain('Stand down');
+  });
+
+  // ---- Editing --------------------------------------------------------------
+  //
+  // Create and Edit share one modal, the same shape Events' own screen uses -
+  // UpdateGroupCommand did not exist until this pass, so there was no way to
+  // correct a typo in a name or description at all.
+
+  it('opens the create modal with a blank form', () => {
+    load();
+
+    component.name = 'Leftover text';
+    const clickEvent = { currentTarget: document.createElement('button') } as unknown as MouseEvent;
+    component.openCreateModal(clickEvent);
+    fixture.detectChanges();
+
+    expect(component.modalOpen()).toBe(true);
+    expect(component.name).toBe('');
+    expect(text()).toContain('Set up a group');
+  });
+
+  it('opens the edit modal pre-filled from the row', () => {
+    load([group()]);
+
+    const clickEvent = { currentTarget: document.createElement('button') } as unknown as MouseEvent;
+    component.openEditModal(clickEvent, group());
+    fixture.detectChanges();
+
+    expect(component.name).toBe('Seva Group');
+    expect(component.description).toBe('Food drives and blood donation camps.');
+    expect(component.focusArea).toBe('Social Service');
+    expect(text()).toContain('Edit Seva Group');
+  });
+
+  it('sends a correction and closes the modal', () => {
+    load([group()]);
+
+    const clickEvent = { currentTarget: document.createElement('button') } as unknown as MouseEvent;
+    component.openEditModal(clickEvent, group());
+    component.name = 'Seva Group (Renamed)';
+    component.update();
+
+    const call = http.expectOne('/v1/volunteer-groups/groups/g1');
+
+    expect(call.request.method).toBe('PATCH');
+    expect(call.request.body).toEqual({
+      name: 'Seva Group (Renamed)',
+      description: 'Food drives and blood donation camps.',
+      focusArea: 'Social Service',
+    });
+
+    call.flush(group({ name: 'Seva Group (Renamed)' }));
+    reload();
+
+    expect(component.modalOpen()).toBe(false);
+    expect(text()).toContain('updated');
   });
 
   // ---- Changing a president -----------------------------------------------

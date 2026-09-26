@@ -33,8 +33,10 @@ public sealed class GroupRepository(VolunteerGroupsDbContext dbContext) : IGroup
         return await query.OrderBy(g => g.Name).ToListAsync(cancellationToken);
     }
 
-    public Task<bool> NameExistsAsync(string name, CancellationToken cancellationToken = default) =>
-        dbContext.Groups.AnyAsync(g => g.Name == name, cancellationToken);
+    public Task<bool> NameExistsAsync(
+        string name, Guid? excludingGroupId = null, CancellationToken cancellationToken = default) =>
+        dbContext.Groups.AnyAsync(
+            g => g.Name == name && g.Id != excludingGroupId, cancellationToken);
 
     public void Add(VolunteerGroup group) => dbContext.Groups.Add(group);
 }

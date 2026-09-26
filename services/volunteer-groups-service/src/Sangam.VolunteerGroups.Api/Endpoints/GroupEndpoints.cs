@@ -8,6 +8,7 @@ using Sangam.VolunteerGroups.Application.Groups.Commands.ChangeGroupStatus;
 using Sangam.VolunteerGroups.Application.Groups.Commands.CreateGroup;
 using Sangam.VolunteerGroups.Application.Groups.Commands.DecideApplication;
 using Sangam.VolunteerGroups.Application.Groups.Commands.RemoveGroupMember;
+using Sangam.VolunteerGroups.Application.Groups.Commands.UpdateGroup;
 using Sangam.VolunteerGroups.Application.Groups.Queries.GetApplications;
 using Sangam.VolunteerGroups.Application.Groups.Queries.GetGroup;
 using Sangam.VolunteerGroups.Application.Groups.Queries.ListGroups;
@@ -78,6 +79,29 @@ public static class GroupEndpoints
             .Produces<GroupDetailResponse>()
             .ProducesProblem(StatusCodes.Status401Unauthorized)
             .ProducesProblem(StatusCodes.Status404NotFound);
+
+        group.MapPatch("/groups/{id:guid}", async (
+                Guid id,
+                UpdateGroupRequest request,
+                ISender sender,
+                CancellationToken cancellationToken) =>
+            {
+                var command = new UpdateGroupCommand(
+                    id, request.Name, request.Description, request.FocusArea);
+
+                var result = await sender.Send(command, cancellationToken);
+
+                return result.ToApiResult();
+            })
+            .RequireAuthorization()
+            .WithName("UpdateGroup")
+            .WithSummary("Correct a group's name, description or focus area (Samaaj admins).")
+            .Produces<GroupResponse>()
+            .ProducesValidationProblem()
+            .ProducesProblem(StatusCodes.Status401Unauthorized)
+            .ProducesProblem(StatusCodes.Status403Forbidden)
+            .ProducesProblem(StatusCodes.Status404NotFound)
+            .ProducesProblem(StatusCodes.Status409Conflict);
 
         group.MapPatch("/groups/{id:guid}/status", async (
                 Guid id,
@@ -231,6 +255,8 @@ public static class GroupEndpoints
         string? Description,
         string? FocusArea,
         string? PresidentMemberId);
+
+    public sealed record UpdateGroupRequest(string Name, string? Description, string? FocusArea);
 
     public sealed record ChangeStatusRequest(string Status);
 

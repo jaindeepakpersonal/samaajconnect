@@ -500,6 +500,24 @@ export class AdminApi {
   }
 
   /**
+   * Corrects a group's name, description or focus area.
+   *
+   * Not the president, membership or status - each already has its own call.
+   */
+  updateGroup(
+    id: string,
+    name: string,
+    description: string | null,
+    focusArea: string | null,
+  ): Observable<VolunteerGroup> {
+    return this.http.patch<VolunteerGroup>(`/v1/volunteer-groups/groups/${id}`, {
+      name,
+      description,
+      focusArea,
+    });
+  }
+
+  /**
    * Stands a group down, or brings it back.
    *
    * Inactive is not deletion: the group keeps its members and its history and

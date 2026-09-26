@@ -443,6 +443,42 @@ public sealed class VolunteerGroupTests
         raised.Status.Should().Be(nameof(GroupStatus.Inactive));
     }
 
+    // ---- Updating -----------------------------------------------------------
+
+    [Fact]
+    public void Updating_trims_the_name_and_clears_blank_optional_fields()
+    {
+        var group = Group();
+
+        group.Update("  Renamed Seva Group  ", "   ", "", Now);
+
+        group.Name.Should().Be("Renamed Seva Group");
+        group.Description.Should().BeNull();
+        group.FocusArea.Should().BeNull();
+    }
+
+    [Fact]
+    public void Updating_touches_neither_the_president_nor_the_status()
+    {
+        var group = Group();
+
+        group.Update("Renamed", "New description", "New focus", Now);
+
+        group.PresidentMemberId.Should().Be(PresidentId);
+        group.Status.Should().Be(GroupStatus.Active);
+    }
+
+    [Fact]
+    public void Updating_announces_the_correction()
+    {
+        var group = Group();
+        group.ClearDomainEvents();
+
+        group.Update("Renamed", "New description", "New focus", Now);
+
+        group.DomainEvents.Should().ContainSingle().Subject.Should().BeOfType<GroupUpdatedDomainEvent>();
+    }
+
     // ---- Installing an election's winner -----------------------------------
 
     [Fact]

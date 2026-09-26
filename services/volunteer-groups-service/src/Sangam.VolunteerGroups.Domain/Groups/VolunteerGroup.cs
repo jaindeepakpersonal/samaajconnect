@@ -96,6 +96,22 @@ public sealed class VolunteerGroup : AggregateRoot, ITenantScopedEntity
         return group;
     }
 
+    /// <summary>
+    /// Corrects the group's name, description and focus area - a typo, or the
+    /// group renaming itself. Does not touch the president, membership or
+    /// status; those are each their own decision with their own command.
+    /// </summary>
+    public void Update(string name, string? description, string? focusArea, DateTimeOffset now)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(name);
+
+        Name = name.Trim();
+        Description = Normalize(description);
+        FocusArea = Normalize(focusArea);
+
+        Raise(new GroupUpdatedDomainEvent(Id, TenantId, now));
+    }
+
     public bool IsPresident(Guid memberId) => PresidentMemberId == memberId;
 
     public bool HasMember(Guid memberId) => _members.Any(m => m.MemberId == memberId);

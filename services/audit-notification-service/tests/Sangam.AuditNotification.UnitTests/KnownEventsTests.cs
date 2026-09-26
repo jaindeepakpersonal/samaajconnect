@@ -243,6 +243,16 @@ public sealed class KnownEventsTests
         descriptor.EntityIdProperty.Should().Be("electionId");
     }
 
+    [Fact]
+    public void A_group_correction_is_recorded_against_the_group_it_corrected()
+    {
+        var descriptor = KnownEvents.Describe("volunteer-groups.group.updated.v1");
+
+        descriptor.Action.Should().Be("GroupUpdated");
+        descriptor.EntityName.Should().Be("Group");
+        descriptor.EntityIdProperty.Should().Be("groupId");
+    }
+
     // ---- social-issues-service ------------------------------------------
     //
     // IssueStatusChangedDomainEvent's own doc comment names two different

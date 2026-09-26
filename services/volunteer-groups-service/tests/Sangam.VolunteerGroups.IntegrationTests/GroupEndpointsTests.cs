@@ -604,4 +604,94 @@ public sealed class GroupEndpointsTests(VolunteerGroupsApiFactory factory)
 
         response.StatusCode.Should().Be(HttpStatusCode.NotFound);
     }
+
+    // ---- Updating a group's own fields --------------------------------------
+
+    [Fact]
+    public async Task A_Samaaj_admin_corrects_the_group_s_name_and_description()
+    {
+        var id = await CreateGroupAsync();
+
+        var response = await Manager().PatchAsJsonAsync($"/v1/volunteer-groups/groups/{id}", new
+        {
+            name = "Seva Group (Renamed)",
+            description = "Now also runs a monthly blood donation camp.",
+            focusArea = "Social Service",
+        });
+
+        response.StatusCode.Should().Be(HttpStatusCode.OK);
+
+        var detail = await Manager().GetFromJsonAsync<JsonElement>(
+            $"/v1/volunteer-groups/groups/{id}");
+
+        detail.GetProperty("group").GetProperty("name").GetString()
+            .Should().Be("Seva Group (Renamed)");
+    }
+
+    [Fact]
+    public async Task A_member_cannot_correct_a_group_s_own_fields()
+    {
+        // VolunteerGroups.Manage is a Samaaj admin's permission - the same
+        // split as creating or deactivating a group. The president does not
+        // get to rewrite the group's own name and description either.
+        var id = await CreateGroupAsync();
+
+        var response = await Member(PresidentId).PatchAsJsonAsync(
+            $"/v1/volunteer-groups/groups/{id}", new
+            {
+                name = "Renamed",
+                description = (string?)null,
+                focusArea = (string?)null,
+            });
+
+        response.StatusCode.Should().Be(HttpStatusCode.Forbidden);
+    }
+
+    [Fact]
+    public async Task Renaming_a_group_to_another_group_s_name_in_the_same_Samaaj_is_refused()
+    {
+        await CreateGroupAsync("Seva Group");
+        var second = await CreateGroupAsync("Yuva Mandal", president: Guid.NewGuid());
+
+        var response = await Manager().PatchAsJsonAsync(
+            $"/v1/volunteer-groups/groups/{second}", new
+            {
+                name = "Seva Group",
+                description = (string?)null,
+                focusArea = (string?)null,
+            });
+
+        response.StatusCode.Should().Be(HttpStatusCode.Conflict);
+    }
+
+    [Fact]
+    public async Task A_group_keeping_its_own_name_is_not_mistaken_for_a_collision()
+    {
+        var id = await CreateGroupAsync("Seva Group");
+
+        var response = await Manager().PatchAsJsonAsync($"/v1/volunteer-groups/groups/{id}", new
+        {
+            name = "Seva Group",
+            description = "Updated description only.",
+            focusArea = "Social Service",
+        });
+
+        response.StatusCode.Should().Be(HttpStatusCode.OK);
+    }
+
+    [Fact]
+    public async Task A_group_in_another_Samaaj_cannot_have_its_fields_corrected_even_with_its_id()
+    {
+        var id = await CreateGroupAsync();
+
+        var response = await Manager(tenantId: OtherTenantId).PatchAsJsonAsync(
+            $"/v1/volunteer-groups/groups/{id}", new
+            {
+                name = "Renamed",
+                description = (string?)null,
+                focusArea = (string?)null,
+            });
+
+        response.StatusCode.Should().Be(HttpStatusCode.NotFound);
+    }
 }

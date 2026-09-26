@@ -25,6 +25,7 @@ module off takes both away.
 | Command | Policy | Status |
 |---|---|---|
 | `CreateGroupCommand` | `VolunteerGroups.Manage` | built |
+| `UpdateGroupCommand` | `VolunteerGroups.Manage` | built. Corrects the name, description or focus area - not the president, membership or status, each its own command |
 | `ChangeGroupStatusCommand` | `VolunteerGroups.Manage` | built |
 | `ApplyToGroupCommand` | `Members.Read` | built |
 | `DecideApplicationCommand` | `VolunteerGroups.Lead` + is this group's president | built |
@@ -60,6 +61,7 @@ module off takes both away.
 | `GroupMemberRemovedDomainEvent` | `volunteer-groups.member.removed.v1` | `VolunteerGroup.RemoveMember` |
 | `GroupPresidentChangedDomainEvent` | `volunteer-groups.president.changed.v1` | `VolunteerGroup.ChangePresident` |
 | `GroupStatusChangedDomainEvent` | `volunteer-groups.group.status-changed.v1` | `VolunteerGroup.ChangeStatus` |
+| `GroupUpdatedDomainEvent` | `volunteer-groups.group.updated.v1` | `VolunteerGroup.Update` |
 | `GroupElectionStatusChangedDomainEvent` | `volunteer-groups.election.status-changed.v1` | `GroupElection.MoveTo` |
 | `GroupElectionClosedDomainEvent` | `volunteer-groups.election.closed.v1` | `GroupElection.MoveTo` |
 | `GroupElectionResultsPublishedDomainEvent` | `volunteer-groups.election.results-published.v1` | `GroupElection.Publish` |
@@ -85,6 +87,7 @@ here and no Kafka in its integration tests.
 | GET | `/v1/volunteer-groups/groups` | `Members.Read` |
 | POST | `/v1/volunteer-groups/groups` | `VolunteerGroups.Manage` |
 | GET | `/v1/volunteer-groups/groups/{id}` | `Members.Read` |
+| PATCH | `/v1/volunteer-groups/groups/{id}` | `VolunteerGroups.Manage` |
 | PATCH | `/v1/volunteer-groups/groups/{id}/status` | `VolunteerGroups.Manage` |
 | POST | `/v1/volunteer-groups/groups/{id}/applications` | `Members.Read` |
 | GET | `/v1/volunteer-groups/groups/{id}/applications` | `VolunteerGroups.Lead` + president |
@@ -246,6 +249,17 @@ to every member.
 That asymmetry is the whole service. A Samaaj admin who is not a given group's
 president cannot decide its applications, and gets the same answer a stranger
 would.
+
+**A group's own name, description and focus area could be set once and never
+corrected, until `UpdateGroupCommand` (`PATCH /groups/{id}`) closed that gap.**
+Same policy as creating one, `VolunteerGroups.Manage` - a typo in a group's name
+is the Samaaj's business to fix, not the president's, the same split
+`ChangeGroupPresidentCommand` already draws between running a group and
+deciding who runs it. It touches none of those three, each already its own
+command, and refuses a rename onto a name another group in the same Samaaj
+already holds, the identical check `CreateGroupCommand` makes at creation -
+`NameExistsAsync` grew an `excludingGroupId` so a group keeping its own name is
+not mistaken for colliding with itself.
 
 **Refusals from the presidency check answer "not found", not "forbidden".**
 Whether a group has applications waiting is itself the president's business, so

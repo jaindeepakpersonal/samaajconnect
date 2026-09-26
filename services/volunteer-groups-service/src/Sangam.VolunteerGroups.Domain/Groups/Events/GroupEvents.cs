@@ -98,3 +98,16 @@ public sealed record GroupStatusChangedDomainEvent(
 {
     public string Topic => "volunteer-groups.group.status-changed.v1";
 }
+
+/// <summary>
+/// The group's name, description or focus area was corrected. Ids only, same
+/// reasoning as <see cref="GroupCreatedDomainEvent"/> - the new text is the
+/// Samaaj's own copy, not audit-notification-service's to hold.
+/// </summary>
+public sealed record GroupUpdatedDomainEvent(
+    Guid GroupId,
+    Guid TenantId,
+    DateTimeOffset OccurredAt) : IDomainEvent
+{
+    public string Topic => "volunteer-groups.group.updated.v1";
+}

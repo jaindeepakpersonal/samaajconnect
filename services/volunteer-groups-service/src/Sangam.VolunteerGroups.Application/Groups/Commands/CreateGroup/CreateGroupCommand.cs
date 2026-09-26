@@ -64,7 +64,7 @@ public sealed class CreateGroupCommandHandler(
                 "Group.NoSamaaj", "Select a Samaaj before creating a group in it."));
         }
 
-        if (await groups.NameExistsAsync(command.Name.Trim(), cancellationToken))
+        if (await groups.NameExistsAsync(command.Name.Trim(), cancellationToken: cancellationToken))
         {
             // Two groups with the same name in one Samaaj is a support ticket
             // waiting to happen - nobody can tell which one they applied to.
