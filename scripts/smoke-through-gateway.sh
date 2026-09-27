@@ -70,6 +70,10 @@ json_number() {
   { grep -oE "\"$1\":[0-9]+" || true; } | head -1 | cut -d':' -f2
 }
 
+# Signing in takes a CAPTCHA and a code now - see lib/sign-in.sh.
+# shellcheck source=lib/sign-in.sh
+source "$(dirname "$0")/lib/sign-in.sh"
+
 # Stops the run the moment an id extraction comes back empty or malformed.
 #
 # **This is the check the session-id bug went without.** `json_field id` was
@@ -188,18 +192,14 @@ check "the Samaaj directory is public" 200 "$(status "$GATEWAY/v1/identity/tenan
 echo
 echo "Super Admin signs in"
 sign_in_super_admin() {
-  curl -s -X POST "$GATEWAY/v1/identity/login" \
-    -H 'Content-Type: application/json' \
-    -d "{\"mobileOrEmail\":\"$SUPERADMIN\",\"password\":\"$SUPERADMIN_PASSWORD\"}" \
+  sign_in "{\"mobileOrEmail\":\"$SUPERADMIN\",\"password\":\"$SUPERADMIN_PASSWORD\"}" \
     | json_field accessToken
 }
 
 ADMIN_TOKEN=$(sign_in_super_admin)
 
 sign_in_as() {
-  curl -s -X POST "$GATEWAY/v1/identity/login" \
-    -H 'Content-Type: application/json' \
-    -d "{\"mobileOrEmail\":\"$1\",\"password\":\"$2\"}" \
+  sign_in "{\"mobileOrEmail\":\"$1\",\"password\":\"$2\"}" \
     | json_field accessToken
 }
 
@@ -246,7 +246,7 @@ refresh_tokens() {
 # 429. Waiting it out beats failing on a condition the previous run created.
 if [ -z "$ADMIN_TOKEN" ]; then
   probe=$(status -X POST "$GATEWAY/v1/identity/login" -H 'Content-Type: application/json' \
-    -d "{\"mobileOrEmail\":\"$SUPERADMIN\",\"password\":\"$SUPERADMIN_PASSWORD\"}")
+    -d "$(with_captcha "{\"mobileOrEmail\":\"$SUPERADMIN\",\"password\":\"$SUPERADMIN_PASSWORD\"}")")
 
   if [ "$probe" = "429" ]; then
     echo "  ..    rate-limited by a previous run; waiting for the window to reset"
@@ -319,9 +319,7 @@ fi
 
 echo
 echo "Member signs in and the token decides their Samaaj"
-MEMBER_LOGIN=$(curl -s -X POST "$GATEWAY/v1/identity/login" \
-  -H 'Content-Type: application/json' \
-  -d "{\"mobileOrEmail\":\"$MEMBER\",\"password\":\"$MEMBER_PASSWORD\"}")
+MEMBER_LOGIN=$(sign_in "{\"mobileOrEmail\":\"$MEMBER\",\"password\":\"$MEMBER_PASSWORD\"}")
 
 MEMBER_TOKEN=$(printf '%s' "$MEMBER_LOGIN" | json_field accessToken)
 RESOLVED_SLUG=$(printf '%s' "$MEMBER_LOGIN" | json_field tenantSlug)
@@ -785,7 +783,7 @@ check "the code cannot be redeemed twice" 403 \
 
 check "the converted child can now sign in" 200 \
   "$(status -X POST "$GATEWAY/v1/identity/login" -H 'Content-Type: application/json' \
-     -d "{\"mobileOrEmail\":\"$CHILD_EMAIL\",\"password\":\"$CHILD_PASSWORD\"}")"
+     -d "$(with_captcha "{\"mobileOrEmail\":\"$CHILD_EMAIL\",\"password\":\"$CHILD_PASSWORD\"}")")"
 
 # member-family consumes the activation and closes the loop.
 converted=0
@@ -989,7 +987,7 @@ fi
 
 check "the invited account cannot be signed into until the code is redeemed" 401 \
   "$(status -X POST "$GATEWAY/v1/identity/login" -H 'Content-Type: application/json' \
-     -d "{\"mobileOrEmail\":\"$INVITE_EMAIL\",\"password\":\"$MEMBER_PASSWORD\"}")"
+     -d "$(with_captcha "{\"mobileOrEmail\":\"$INVITE_EMAIL\",\"password\":\"$MEMBER_PASSWORD\"}")")"
 
 check "the same identifier cannot be invited twice" 409 \
   "$(status -X POST "$GATEWAY/v1/identity/admins" -H 'Content-Type: application/json' \
@@ -1032,9 +1030,7 @@ check "the invited admin redeems the code and sets a password" 200 \
   "$(status -X POST "$GATEWAY/v1/identity/activations/redeem" -H 'Content-Type: application/json' \
      -d "{\"mobileOrEmail\":\"$INVITE_EMAIL\",\"code\":\"$SECOND_CODE\",\"password\":\"$MEMBER_PASSWORD\"}")"
 
-SAMAAJ_ADMIN_TOKEN=$(curl -s -X POST "$GATEWAY/v1/identity/login" \
-  -H 'Content-Type: application/json' \
-  -d "{\"mobileOrEmail\":\"$INVITE_EMAIL\",\"password\":\"$MEMBER_PASSWORD\"}" | json_field accessToken)
+SAMAAJ_ADMIN_TOKEN=$(sign_in "{\"mobileOrEmail\":\"$INVITE_EMAIL\",\"password\":\"$MEMBER_PASSWORD\"}" | json_field accessToken)
 
 if [ -n "$SAMAAJ_ADMIN_TOKEN" ]; then
   echo "  ok    the invited admin signs in with the role they were invited into"
@@ -1179,8 +1175,7 @@ check "a second member registers" 201 \
   "$(status -X POST "$GATEWAY/v1/identity/register" -H 'Content-Type: application/json' \
      -d "{\"tenantSlug\":\"$SLUG\",\"fullName\":\"Joiner $JOIN_STAMP\",\"mobileOrEmail\":\"$JOIN_EMAIL\",\"password\":\"$MEMBER_PASSWORD\",\"consentedPurposes\":[\"Membership\"],\"noticeVersion\":\"$NOTICE_VERSION\"}")"
 
-JOIN_TOKEN=$(curl -s -X POST "$GATEWAY/v1/identity/login" -H 'Content-Type: application/json' \
-  -d "{\"mobileOrEmail\":\"$JOIN_EMAIL\",\"password\":\"$MEMBER_PASSWORD\"}" | json_field accessToken)
+JOIN_TOKEN=$(sign_in "{\"mobileOrEmail\":\"$JOIN_EMAIL\",\"password\":\"$MEMBER_PASSWORD\"}" | json_field accessToken)
 
 # Not require_id: that guard is for GUIDs, and a JWT is not one - it aborted
 # the whole run on its first outing. The same is true of a family code.
@@ -1564,8 +1559,7 @@ check "a throwaway member registers" 201 \
   "$(status -X POST "$GATEWAY/v1/identity/register" -H 'Content-Type: application/json' \
      -d "{\"tenantSlug\":\"$SLUG\",\"fullName\":\"$ERASE_NAME\",\"mobileOrEmail\":\"$ERASE_EMAIL\",\"password\":\"$MEMBER_PASSWORD\",\"consentedPurposes\":[\"Membership\"],\"noticeVersion\":\"$NOTICE_VERSION\"}")"
 
-ERASE_TOKEN=$(curl -s -X POST "$GATEWAY/v1/identity/login" -H 'Content-Type: application/json' \
-  -d "{\"mobileOrEmail\":\"$ERASE_EMAIL\",\"password\":\"$MEMBER_PASSWORD\"}" | json_field accessToken)
+ERASE_TOKEN=$(sign_in "{\"mobileOrEmail\":\"$ERASE_EMAIL\",\"password\":\"$MEMBER_PASSWORD\"}" | json_field accessToken)
 
 ERASE_USER_ID=$(curl -s -H "Authorization: Bearer $ERASE_TOKEN" "$GATEWAY/v1/identity/me" \
   | json_field userId)
@@ -1623,7 +1617,7 @@ check "the member erases their own account" 200 \
 
 check "an erased member cannot sign in" 401 \
   "$(status -X POST "$GATEWAY/v1/identity/login" -H 'Content-Type: application/json' \
-     -d "{\"mobileOrEmail\":\"$ERASE_EMAIL\",\"password\":\"$MEMBER_PASSWORD\"}")"
+     -d "$(with_captcha "{\"mobileOrEmail\":\"$ERASE_EMAIL\",\"password\":\"$MEMBER_PASSWORD\"}")")"
 
 # member-family-service consumes identity.user.erased.v1.
 profile_erased=0
@@ -1870,7 +1864,7 @@ require_id member_id "$MEMBER_ID"
 
 # The converted child from the conversion section: a second real member, so the
 # applicant and the president are genuinely different people.
-CHILD_TOKEN=$(curl -s -X POST "$GATEWAY/v1/identity/login" -H 'Content-Type: application/json'   -d "{\"mobileOrEmail\":\"$CHILD_EMAIL\",\"password\":\"$CHILD_PASSWORD\"}"   | json_field accessToken)
+CHILD_TOKEN=$(sign_in "{\"mobileOrEmail\":\"$CHILD_EMAIL\",\"password\":\"$CHILD_PASSWORD\"}"   | json_field accessToken)
 
 CHILD_USER_ID=$(curl -s -H "Authorization: Bearer $CHILD_TOKEN" "$GATEWAY/v1/identity/me"   | json_field userId)
 require_id child_user_id "$CHILD_USER_ID"
@@ -2841,8 +2835,7 @@ check "while the timeline, on a different module, is untouched" 200 \
 echo
 echo "Sessions: rotation, reuse detection and sign-out"
 
-SESSION_LOGIN=$(curl -s -X POST "$GATEWAY/v1/identity/login" -H 'Content-Type: application/json' \
-  -d "{\"mobileOrEmail\":\"$MEMBER\",\"password\":\"$MEMBER_PASSWORD\"}")
+SESSION_LOGIN=$(sign_in "{\"mobileOrEmail\":\"$MEMBER\",\"password\":\"$MEMBER_PASSWORD\"}")
 
 REFRESH_1=$(printf '%s' "$SESSION_LOGIN" | json_field refreshToken)
 
@@ -2912,8 +2905,7 @@ else
   fail=$((fail + 1))
 fi
 
-SESSION_LOGIN=$(curl -s -X POST "$GATEWAY/v1/identity/login" -H 'Content-Type: application/json' \
-  -d "{\"mobileOrEmail\":\"$MEMBER\",\"password\":\"$MEMBER_PASSWORD\"}")
+SESSION_LOGIN=$(sign_in "{\"mobileOrEmail\":\"$MEMBER\",\"password\":\"$MEMBER_PASSWORD\"}")
 REFRESH_3=$(printf '%s' "$SESSION_LOGIN" | json_field refreshToken)
 
 check "signing out is accepted" 200 \
@@ -2955,8 +2947,7 @@ check "an account to suspend registers" 201 \
   "$(status -X POST "$GATEWAY/v1/identity/register" -H 'Content-Type: application/json' \
      -d "{\"tenantSlug\":\"$SLUG\",\"fullName\":\"Suspendable Member\",\"mobileOrEmail\":\"$SUSPEND_EMAIL\",\"password\":\"$MEMBER_PASSWORD\",\"consentedPurposes\":[\"Membership\"],\"noticeVersion\":\"$NOTICE_VERSION\"}")"
 
-SUSPEND_TOKEN=$(curl -s -X POST "$GATEWAY/v1/identity/login" -H 'Content-Type: application/json' \
-  -d "{\"mobileOrEmail\":\"$SUSPEND_EMAIL\",\"password\":\"$MEMBER_PASSWORD\"}" | json_field accessToken)
+SUSPEND_TOKEN=$(sign_in "{\"mobileOrEmail\":\"$SUSPEND_EMAIL\",\"password\":\"$MEMBER_PASSWORD\"}" | json_field accessToken)
 require_nonempty suspend_token "$SUSPEND_TOKEN"
 
 SUSPEND_USER_ID=$(curl -s -H "Authorization: Bearer $SUSPEND_TOKEN" "$GATEWAY/v1/identity/me" \
@@ -2975,7 +2966,7 @@ check "and with it, suspending succeeds" 200 \
 
 check "a suspended account cannot sign in" 403 \
   "$(status -X POST "$GATEWAY/v1/identity/login" -H 'Content-Type: application/json' \
-     -d "{\"mobileOrEmail\":\"$SUSPEND_EMAIL\",\"password\":\"$MEMBER_PASSWORD\"}")"
+     -d "$(with_captcha "{\"mobileOrEmail\":\"$SUSPEND_EMAIL\",\"password\":\"$MEMBER_PASSWORD\"}")")"
 
 check "reinstating needs no password" 200 \
   "$(status -X PUT "$GATEWAY/v1/identity/admins/$SUSPEND_USER_ID/status" \
@@ -2984,7 +2975,7 @@ check "reinstating needs no password" 200 \
 
 check "and afterwards they can sign in again" 200 \
   "$(status -X POST "$GATEWAY/v1/identity/login" -H 'Content-Type: application/json' \
-     -d "{\"mobileOrEmail\":\"$SUSPEND_EMAIL\",\"password\":\"$MEMBER_PASSWORD\"}")"
+     -d "$(with_captcha "{\"mobileOrEmail\":\"$SUSPEND_EMAIL\",\"password\":\"$MEMBER_PASSWORD\"}")")"
 
 check "an administrator cannot suspend their own account" 409 \
   "$(status -X PUT "$GATEWAY/v1/identity/admins/$INVITED_ID/status" \
@@ -3124,8 +3115,7 @@ check "granting the member the PathshalaTeacher role" 200 \
      -H 'Content-Type: application/json' -H "Authorization: Bearer $ADMIN_TOKEN" \
      -H "$ADMIN_TENANT_HEADER" -d '{"granted":true}')"
 
-TEACHER_TOKEN=$(curl -s -X POST "$GATEWAY/v1/identity/login" -H 'Content-Type: application/json' \
-  -d "{\"mobileOrEmail\":\"$MEMBER\",\"password\":\"$MEMBER_PASSWORD\"}" | json_field accessToken)
+TEACHER_TOKEN=$(sign_in "{\"mobileOrEmail\":\"$MEMBER\",\"password\":\"$MEMBER_PASSWORD\"}" | json_field accessToken)
 
 if [ -n "$TEACHER_TOKEN" ]; then
   echo "  ok    and a fresh token carries the teacher permission"

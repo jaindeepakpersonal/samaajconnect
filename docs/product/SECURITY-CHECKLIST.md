@@ -137,7 +137,12 @@ exactly these two rather than growing a third without a paragraph here first.
 
 | Request | Why it cannot require a token |
 |---|---|
-| `LoginCommand` | Issuing the token is what it does |
+| `LoginCommand` | Issuing the token is what it does. Step one of two since 2026-09-27: a CAPTCHA and the password, then - on a device the account does not trust - a code instead of a session |
+| `IssueCaptchaCommand` | The CAPTCHA on the sign-in form is solved before anybody has signed in. Self-hosted: a PNG this service draws, its answer kept only as a hash, single use, five minutes |
+| `VerifySignInCodeCommand` | The second factor. It takes the challenge a correct password earned a moment ago, so it cannot be reached without the first; a wrong code counts against the account's login lockout |
+| `ResendSignInCodeCommand` | A new code for a sign-in waiting on one. Answers the same whether or not the challenge exists, and never extends it |
+| `RequestPasswordResetCommand` | Somebody who has forgotten their password has no way to sign in. Answers the same whether or not the account exists |
+| `RedeemPasswordResetCommand` | Same; redeems into a new password, never a session - the next step is signing in, two factors and all |
 | `RefreshSessionCommand` | The refresh token *is* the credential presented |
 | `SignOutCommand` | Ends a session that may already be unusable |
 | `RegisterMemberCommand` | No account exists yet. Takes a **slug**, resolved server-side, never a tenant id |
@@ -153,6 +158,8 @@ exactly these two rather than growing a third without a paragraph here first.
 | `GetCityByIdQuery` (master-data) | Same reasoning |
 | `ListLocalitiesQuery` (master-data) | Same, for the Locality ("locations master") dropdown |
 | `GetLocalityByIdQuery` (master-data) | Same reasoning |
+| `ListStatesQuery` (master-data) | Same, for the State step of an address |
+| `GetStateByIdQuery` (master-data) | Same reasoning |
 | `ListGautrasQuery` (master-data) | Same, for the Gautra dropdown — resolved from the gateway's `X-Tenant-Id` header alone, exactly like every other anonymous, tenant-aware request, since the person has already picked their Samaaj from the directory but holds no token yet |
 | `GetGautraByIdQuery` (master-data) | Same reasoning |
 
@@ -172,6 +179,8 @@ checking no endpoint file mentions the type.
 | `EraseMemberDataCommand` | member-family | `identity.user.erased.v1` |
 | `CompleteChildConversionCommand` | member-family | The account-created event that follows an approved conversion |
 | `CreateAccountForConvertedChildCommand` | identity-tenant | An approved adult-child conversion |
+| `EraseBusinessesDataCommand` | businesses | `identity.user.erased.v1` |
+| `EraseMatrimonyDataCommand` | matrimony | `identity.user.erased.v1` |
 
 ## Permission key naming convention
 

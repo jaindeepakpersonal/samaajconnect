@@ -30,7 +30,7 @@ public sealed class PlatformBootstrapTests(IdentityTenantApiFactory factory)
 
         response.EnsureSuccessStatusCode();
 
-        return await response.Content.ReadFromJsonAsync<JsonElement>();
+        return (await response.Content.ReadFromJsonAsync<JsonElement>()).GetProperty("session");
     }
 
     private static HttpClient Authorized(HttpClient client, string token)

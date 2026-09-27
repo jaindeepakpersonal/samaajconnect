@@ -22,6 +22,9 @@ a `Tenant`'s own `Id` **is** the tenant id every other service references.
 | `RefreshToken` | built | A session step. Hashed, single-use, rotating. Deliberately not tenant-scoped. |
 | `TenantLogo` | built | A Samaaj mark the platform hosts. Not tenant-scoped, for the reason `Tenant` is not. |
 | `TenantSecurityPolicy` | built | A Samaaj's own overrides to the platform's password/OTP/lockout/session constants. Sparse — no row means no overrides, not zero. |
+| `LoginChallenge` | built | Owned by `User`: a sign-in held open between a correct password and its code. Hashed, and as short-lived as the code. |
+| `TrustedDevice` | built | A browser excused the sign-in code for 30 days. Hashed token, revoked with the account's sessions. Not tenant-scoped, like `RefreshToken`. |
+| `CaptchaChallenge` | built | One sign-in CAPTCHA: its answer hashed with its id, single use, five minutes. Not tenant-scoped - it is answered before anyone has said who they are. |
 
 `Tenant` deliberately does not implement `ITenantScopedEntity`. Applying the
 global query filter to it would make the gateway's own lookups impossible,
@@ -33,9 +36,10 @@ since those happen *before* a tenant is established.
 |---|---|---|
 | `CreateTenantCommand` | `SuperAdmin` + `Tenant.Manage` | built |
 | `RegisterMemberCommand` | anonymous | built |
-| `LoginCommand` | anonymous | built |
-| `RequestLoginOtpCommand` | anonymous | built |
-| `LoginWithOtpCommand` | anonymous | built |
+| `LoginCommand` | anonymous | built. Step one: CAPTCHA and password; a code follows on an untrusted device |
+| `IssueCaptchaCommand` | anonymous | built |
+| `VerifySignInCodeCommand` | anonymous (the challenge is the credential) | built |
+| `ResendSignInCodeCommand` | anonymous (same) | built |
 | `ChangeTenantStatusCommand` | `SuperAdmin` + `Tenant.Manage` | built |
 | `CreateAccountForConvertedChildCommand` | `[InternalRequest]` | built |
 | `IssueActivationCodeCommand` | `SamaajAdmin` + `AdminUsers.Manage` | built |
@@ -100,7 +104,7 @@ tenant is reported as 404 rather than as a distinct state, for the same reason.
 | `UserRoleRevokedDomainEvent` | `identity.user.role-revoked.v1` | `User.RevokeRole` |
 | `SessionRevokedDomainEvent` | `identity.session.revoked.v1` | `User.RecordSessionRevoked` |
 | `PasswordChangedDomainEvent` | `identity.user.password-changed.v1` | `User.ChangePassword` |
-| `LoginOtpRequestedDomainEvent` | `identity.login-otp.requested.v1` | `User.RequestLoginOtp` |
+| `LoginOtpRequestedDomainEvent` | `identity.login-otp.requested.v1` | `User.BeginSecondFactor` and `.ResendSecondFactor` - the sign-in code |
 | `PasswordResetRequestedDomainEvent` | `identity.password-reset.requested.v1` | `User.RequestPasswordReset` |
 | `PasswordResetDomainEvent` | `identity.password-reset.completed.v1` | `User.ResetPassword` |
 | (no aggregate) | `identity.member-data.exported.v1` | `DataExportRecorder` |
@@ -131,9 +135,10 @@ offsets for messages it did nothing with.
 | GET | `/v1/identity/tenants/modules` | anonymous |
 | PUT | `/v1/identity/tenants/{id}/modules` | `SuperAdmin` + `Tenant.Manage` |
 | POST | `/v1/identity/register` | anonymous |
+| POST | `/v1/identity/captcha` | anonymous |
 | POST | `/v1/identity/login` | anonymous |
-| POST | `/v1/identity/otp/request` | anonymous |
-| POST | `/v1/identity/otp/login` | anonymous |
+| POST | `/v1/identity/login/verify` | anonymous |
+| POST | `/v1/identity/login/resend` | anonymous |
 | POST | `/v1/identity/token/refresh` | anonymous |
 | POST | `/v1/identity/logout` | anonymous |
 | GET | `/v1/identity/me` | any authenticated role |
@@ -248,28 +253,66 @@ directory. The slug is resolved server-side against the tenant table, and a
 request arriving with a resolved tenant that disagrees is rejected. This is not
 the "client-supplied TenantId" that SECURITY-CHECKLIST.md forbids.
 
-**OTP sign-in exists now, and closed a second gap along with the one it was
-built for.** This paragraph used to say OTP verification was deferred because
-gating login behind a code nobody could send would make the path untestable -
-true when written, and false since the notification pipeline landed.
-Registration still creates an active account with `IsContactVerified = false`
-and publishes `UserRegistered` with no way to prove the contact address, but
-`LoginWithOtpCommand`'s success path calls `User.CompleteOtpSignIn()`, which
-marks it verified the first time a member actually signs in with a code -
-the same assurance redeeming an activation code already gives, applied to an
-address nobody handed the member out of band.
+## Signing in: a CAPTCHA, a password, and a code
 
-**A wrong OTP counts against the same lockout a wrong password does, on
-purpose.** `LoginOtp` (`Domain/Users/LoginOtp.cs`) has no attempt counter of
-its own, unlike `ActivationCode`. SECURITY-CHECKLIST.md says to read "any OTP
-endpoint" as "any endpoint that checks a credential" - and an OTP-issuing
-account is already `Active` with a login lockout to share, unlike a
-`PendingActivation` account redeeming an activation code, which has neither.
-`LoginWithOtpCommandHandler` mirrors `LoginCommandHandler` almost exactly:
-same `IFailedLoginRecorder`, same `Auth.InvalidCredentials` for a wrong code
-or an unknown account alike, same `Auth.LockedOut`. A member who signed in
-with a code should not be able to tell, from the outside, that a different
-check ran.
+Since 2026-09-27, confirmed with the user: two factors for **everyone**, a
+trusted device excused the second for 30 days, and a self-hosted CAPTCHA on
+the password step.
+
+```
+POST /captcha            -> { captchaId, imagePng }
+POST /login              { identifier, password, captchaId, captchaAnswer, deviceToken? }
+   trusted device        -> { codeRequired: false, session }
+   anywhere else         -> { codeRequired: true, challengeToken, codeSentTo }   (a code is sent)
+POST /login/verify       { challengeToken, code, trustDevice }
+                         -> { session, deviceToken? }
+POST /login/resend       { challengeToken }   at most every 30 seconds
+```
+
+**The CAPTCHA is checked first, before any account is read**, so a script that
+cannot read the picture learns nothing, not even a lookup's timing. It is this
+service's own (`CaptchaRenderer` draws a PNG with a bitmap font - no graphics
+library, no third party learning who signs in), single use, and **spent
+whether the answer was right or not, on its own connection**
+(`ICaptchaStore.TryRedeemAsync`, one conditional UPDATE): the
+`IFailedLoginRecorder` shape again, because a wrong password rolls the
+request back, and a CAPTCHA handed back by that rollback could be replayed
+for unlimited password guesses. `SignInSecurityTests` proves the replay fails.
+
+**The code is a second factor, not a way around the first.** A correct
+password on an untrusted device issues a `LoginChallenge` (256 bits, hashed)
+and a `LoginOtp`, and sends the code through
+`identity.login-otp.requested.v1`, the pipeline passwordless sign-in used.
+`VerifySignInCodeCommand` takes the challenge and the code and no identifier,
+so it cannot be reached without the password step. A wrong code counts against
+the same login lockout a wrong password does (SECURITY-CHECKLIST.md: "any OTP
+endpoint" is "any endpoint that checks a credential"), and an unknown challenge,
+an expired one and a wrong code are one answer. Succeeding verifies the contact
+address, which is still the only way `IsContactVerified` becomes true for a
+registered member.
+
+**Passwordless code sign-in was retired the same day** - its two commands and
+the `/otp/request` and `/otp/login` routes are gone (confirmed with the user). With two factors required of everybody, a code alone was the one way in
+that skipped the password.
+
+**A trusted device skips the code, never the password.** `TrustedDevice` is a
+256-bit token, hashed like a refresh token, that the browser keeps in
+`localStorage` (libs/shared's `DeviceTrustStore`) - longer-lived than the
+session on purpose, and safe to be because it opens nothing without the
+password. `ISessionService.EndAllForUserAsync` revokes every device with the
+sessions, so changing or resetting a password, signing out everywhere and
+erasure all make every browser ask for a code again.
+
+**`SignInSecurityOptions` can switch either guard off**, for the integration
+tests that sign in to exercise something else (`GuardedIdentityTenantApiFactory`
+turns both back on for the tests about them); the host warns at start-up when
+either is off. `RevealSecretsInLogs` writes each CAPTCHA answer and code to
+this service's log - set only in docker-compose, which has no SMS or email
+provider and whose smoke run signs in by reading them (`scripts/lib/sign-in.sh`).
+
+**The one typed value that meets `HashDeterministic` is the CAPTCHA answer,
+knowingly** - see `CaptchaChallenge`'s remarks: hashed with its own id, good
+for five minutes and one try, it is worth nothing to reverse.
 
 **The code is the one thing this service ever puts in a Kafka payload that
 is not already meant to be read by anyone who can reach the topic.** Every
@@ -290,9 +333,8 @@ the response.** `RedeemPasswordResetCommand` mirrors
 `ActivateAccountCommand`'s own choice: proving you hold a contact address a
 code was sent to is weaker proof than a real password, so the next step is
 signing in normally, not skipping it. It also needs no `ITenantRepository` at
-all, unlike `LoginWithOtpCommand` - it is not issuing a session, only
-checking a code exists and matches, so there is no Samaaj to be a member of
-yet to check.
+all - it is not issuing a session, only checking a code exists and matches,
+so there is no Samaaj to be a member of yet to check.
 
 **`ResetPassword` and `ChangePassword` are two events, not one with a
 flag.** Both replace `PasswordHash`; the difference is what proved the

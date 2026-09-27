@@ -64,6 +64,9 @@ public sealed class User : AggregateRoot, ITenantScopedEntity
     /// <summary>Present only while a requested sign-in code has not yet been used or expired.</summary>
     public LoginOtp? LoginOtp { get; private set; }
 
+    /// <summary>The sign-in waiting for its code, if one is. See <see cref="LoginChallenge"/>.</summary>
+    public LoginChallenge? LoginChallenge { get; private set; }
+
     /// <summary>Present only while a requested password reset code has not yet been used or expired.</summary>
     public PasswordResetCode? PasswordResetCode { get; private set; }
 
@@ -341,7 +344,7 @@ public sealed class User : AggregateRoot, ITenantScopedEntity
     /// <summary>
     /// Attaches a freshly issued password reset code, replacing any earlier
     /// one, and announces it - the same shape as
-    /// <see cref="RequestLoginOtp"/>, for the same reason: the notification
+    /// <see cref="BeginSecondFactor"/>, for the same reason: the notification
     /// pipeline is the only route this code has to whoever asked for it.
     /// </summary>
     public void RequestPasswordReset(PasswordResetCode code, string plaintext, DateTimeOffset now)
@@ -372,10 +375,10 @@ public sealed class User : AggregateRoot, ITenantScopedEntity
     }
 
     /// <summary>
-    /// Attaches a freshly issued sign-in code, replacing any earlier one, and
-    /// announces it. Requesting a second code while one is already outstanding
-    /// is normal - codes expire, and messages get lost - so the newer one
-    /// simply wins.
+    /// A correct password on a device that is not trusted: holds the sign-in
+    /// open behind a challenge, and sends a code to the account's contact
+    /// address. Replaces any earlier challenge and code - asking again is
+    /// normal, since codes expire and messages get lost.
     /// </summary>
     /// <remarks>
     /// Raises the event itself, unlike <see cref="AttachActivationCode"/>: an
@@ -384,27 +387,51 @@ public sealed class User : AggregateRoot, ITenantScopedEntity
     /// member except the notification pipeline - Raise is how the plaintext
     /// gets there at all.
     /// </remarks>
-    public void RequestLoginOtp(LoginOtp otp, string plaintext, DateTimeOffset now)
+    public void BeginSecondFactor(LoginChallenge challenge, LoginOtp otp, string plaintext, DateTimeOffset now)
     {
+        LoginChallenge = challenge;
         LoginOtp = otp;
 
         Raise(new LoginOtpRequestedDomainEvent(Id, TenantId, plaintext, MobileOrEmail, now));
     }
 
     /// <summary>
-    /// Completes a sign-in by code: spends the code and, if this is the first
-    /// time the member has proven they hold their own contact address, marks
-    /// it verified.
+    /// Sends a fresh code for the challenge already open. False when there is
+    /// no usable challenge, or the last code went out less than
+    /// <see cref="ResendInterval"/> ago - a button pressed twice is not two messages.
+    /// </summary>
+    public bool ResendSecondFactor(LoginOtp otp, string plaintext, DateTimeOffset now)
+    {
+        if (LoginChallenge is not { } challenge || !challenge.IsUsable(now)
+            || (LoginOtp is { } previous && now - previous.IssuedAt < ResendInterval))
+        {
+            return false;
+        }
+
+        LoginOtp = otp;
+
+        Raise(new LoginOtpRequestedDomainEvent(Id, TenantId, plaintext, MobileOrEmail, now));
+
+        return true;
+    }
+
+    /// <summary>How soon another code may be sent for one challenge.</summary>
+    public static readonly TimeSpan ResendInterval = TimeSpan.FromSeconds(30);
+
+    /// <summary>
+    /// Completes a sign-in by its code: spends the code and the challenge and,
+    /// if this is the first time the member has proven they hold their own
+    /// contact address, marks it verified.
     /// </summary>
     /// <remarks>
     /// Raises nothing itself - the caller still calls
     /// <see cref="RecordSuccessfulLogin"/> right after, which raises
-    /// <see cref="UserLoggedInDomainEvent"/> regardless of which credential
-    /// got them there.
+    /// <see cref="UserLoggedInDomainEvent"/>.
     /// </remarks>
-    public void CompleteOtpSignIn()
+    public void CompleteSecondFactor()
     {
         LoginOtp = null;
+        LoginChallenge = null;
 
         if (!IsContactVerified)
         {

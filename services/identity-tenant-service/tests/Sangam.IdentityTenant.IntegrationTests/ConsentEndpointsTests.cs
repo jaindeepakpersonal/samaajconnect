@@ -70,7 +70,7 @@ public sealed class ConsentEndpointsTests(IdentityTenantApiFactory factory)
             password = Password,
         });
 
-        var token = (await login.Content.ReadFromJsonAsync<JsonElement>())
+        var token = (await login.Content.ReadFromJsonAsync<JsonElement>()).GetProperty("session")
             .GetProperty("accessToken").GetString()!;
 
         var client = factory.CreateClient();

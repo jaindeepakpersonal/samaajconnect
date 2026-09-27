@@ -29,6 +29,23 @@ builder.Services.AddSwaggerGen(swagger =>
 
 var app = builder.Build();
 
+// Sign-in guards are on unless configuration says otherwise, and saying
+// otherwise is loud - see SignInSecurityOptions.
+var signIn = app.Services.GetRequiredService<Sangam.IdentityTenant.Application.Abstractions.SignInSecurityOptions>();
+
+if (!signIn.CaptchaRequired || !signIn.TwoFactorRequired)
+{
+    app.Logger.LogWarning(
+        "Sign-in guards are reduced: CAPTCHA {Captcha}, two-factor {TwoFactor}. Never in production.",
+        signIn.CaptchaRequired ? "on" : "OFF", signIn.TwoFactorRequired ? "on" : "OFF");
+}
+
+if (signIn.RevealSecretsInLogs)
+{
+    app.Logger.LogWarning(
+        "SignInSecurity:RevealSecretsInLogs is on: CAPTCHA answers and sign-in codes are written to this log. Local development only.");
+}
+
 if (app.Environment.IsDevelopment())
 {
     app.UseSwagger();

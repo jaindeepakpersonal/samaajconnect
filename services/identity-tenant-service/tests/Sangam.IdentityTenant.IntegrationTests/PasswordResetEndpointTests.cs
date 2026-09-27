@@ -57,7 +57,7 @@ public sealed class PasswordResetEndpointTests(IdentityTenantApiFactory factory)
 
         login.EnsureSuccessStatusCode();
 
-        var body = await login.Content.ReadFromJsonAsync<JsonElement>();
+        var body = (await login.Content.ReadFromJsonAsync<JsonElement>()).GetProperty("session");
 
         return body.GetProperty("refreshToken").GetString()!;
     }

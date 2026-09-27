@@ -394,10 +394,11 @@ partition behind one malformed identifier.
 **The welcome message is not contact verification.** `identity.user.registered.v1`
 now sends a welcome to the identifier the member registered with. Nothing checks
 that it arrived or that whoever reads it is the person who registered, so
-`User.IsContactVerified` stays false. OTP sign-in is what actually verifies it
+`User.IsContactVerified` stays false. The sign-in code is what actually verifies it
 now - `identity.login-otp.requested.v1` is the channel, and identity-tenant-service's
-own `LoginWithOtpCommandHandler` is the thing itself, the moment a code is
-successfully redeemed.
+own `VerifySignInCodeCommandHandler` is the thing itself, the moment a code is
+successfully redeemed. Since 2026-09-27 that code is the second factor of every
+sign-in on an untrusted device, not a passwordless alternative.
 
 **`identity.login-otp.requested.v1` is the one event whose `Notification`
 carries a secret rather than a description of one.** Every other descriptor's

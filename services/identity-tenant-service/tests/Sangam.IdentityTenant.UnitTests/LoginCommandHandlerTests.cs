@@ -6,6 +6,7 @@ using Sangam.IdentityTenant.Application.Users.Commands.Login;
 using Sangam.IdentityTenant.Domain.Authorization;
 using Sangam.IdentityTenant.Domain.Tenants;
 using Sangam.IdentityTenant.Domain.Users;
+using Microsoft.Extensions.Logging.Abstractions;
 using Xunit;
 
 namespace Sangam.IdentityTenant.UnitTests;
@@ -22,7 +23,17 @@ public sealed class LoginCommandHandlerTests
     private readonly ISessionService _sessions = Substitute.For<ISessionService>();
     private readonly IUnitOfWork _unitOfWork = Substitute.For<IUnitOfWork>();
     private readonly IDateTimeProvider _clock = Substitute.For<IDateTimeProvider>();
-    private readonly LoginCommandHandler _handler;
+    private readonly ICaptchaStore _captchas = Substitute.For<ICaptchaStore>();
+    private readonly ITrustedDeviceRepository _devices = Substitute.For<ITrustedDeviceRepository>();
+    private readonly ISecurityPolicyResolver _policy = Substitute.For<ISecurityPolicyResolver>();
+
+    /// <summary>
+    /// Both guards off for the password-path tests that were here first; the
+    /// guard tests below switch them on. See SignInSecurityOptions.
+    /// </summary>
+    private readonly SignInSecurityOptions _options = new() { CaptchaRequired = false, TwoFactorRequired = false };
+
+    private LoginCommandHandler _handler;
 
     private readonly Tenant _tenant;
     private readonly User _user;
@@ -51,14 +62,24 @@ public sealed class LoginCommandHandlerTests
         _sessions.BeginAsync(Arg.Any<Guid>(), Arg.Any<Guid>(), Arg.Any<CancellationToken>()).Returns(
             new IssuedSession(_user.Id, _tenant.Id, Guid.NewGuid(), "refresh-token", Now.AddDays(14)));
 
-        _handler = new LoginCommandHandler(
-            _users, _tenants, _passwordHasher, _failedLogins, _tokenIssuer, _sessions,
-            _unitOfWork, _clock);
+        _passwordHasher.Hash(Arg.Any<string>()).Returns(call => $"hash({call.Arg<string>()})");
+        _passwordHasher.HashDeterministic(Arg.Any<string>()).Returns(call => $"det({call.Arg<string>()})");
+        _policy.ResolveAsync(Arg.Any<Guid>(), Arg.Any<CancellationToken>()).Returns(new ResolvedSecurityPolicy(10, LoginOtp.Lifetime, User.MaxFailedAttempts, User.LockoutDuration, TimeSpan.FromDays(14)));
+
+        _handler = Handler();
     }
 
-    private Task<Result<Application.Users.LoginResponse>> Login(
-        string identifier = "Ravi@Example.com", string password = "right") =>
-        _handler.Handle(new LoginCommand(identifier, password), CancellationToken.None);
+    private LoginCommandHandler Handler() => new(
+        _users, _tenants, _passwordHasher, _failedLogins, _captchas, _devices, _tokenIssuer, _sessions,
+        _unitOfWork, _clock, _policy, _options, NullLogger<LoginCommandHandler>.Instance);
+
+    private Task<Result<SignInResponse>> Login(
+        string identifier = "Ravi@Example.com",
+        string password = "right",
+        Guid? captchaId = null,
+        string? captchaAnswer = null,
+        string? deviceToken = null) =>
+        _handler.Handle(new LoginCommand(identifier, password, captchaId, captchaAnswer, deviceToken), CancellationToken.None);
 
     [Fact]
     public async Task A_correct_password_returns_a_token_and_the_Samaaj_to_redirect_to()
@@ -66,9 +87,9 @@ public sealed class LoginCommandHandlerTests
         var result = await Login();
 
         result.IsSuccess.Should().BeTrue();
-        result.Value.AccessToken.Should().Be("signed-token");
-        result.Value.TenantSlug.Should().Be("mumbai");
-        result.Value.Roles.Should().ContainSingle().Which.Should().Be("Member");
+        result.Value.Session!.AccessToken.Should().Be("signed-token");
+        result.Value.Session.TenantSlug.Should().Be("mumbai");
+        result.Value.Session.Roles.Should().ContainSingle().Which.Should().Be("Member");
     }
 
     [Fact]
@@ -154,5 +175,67 @@ public sealed class LoginCommandHandlerTests
         _tokenIssuer.DidNotReceive().Issue(
             Arg.Any<Guid>(), Arg.Any<Guid>(), Arg.Any<string>(),
             Arg.Any<IReadOnlyCollection<string>>(), Arg.Any<IReadOnlyCollection<string>>());
+    }
+
+    // ---- The guards ----------------------------------------------------------------
+
+    [Fact]
+    public async Task With_two_factor_on_a_correct_password_sends_a_code_and_signs_nobody_in()
+    {
+        _options.TwoFactorRequired = true;
+        _user.ClearDomainEvents();
+
+        var result = await Login();
+
+        result.IsSuccess.Should().BeTrue();
+        result.Value.CodeRequired.Should().BeTrue();
+        result.Value.Session.Should().BeNull();
+        result.Value.ChallengeToken.Should().NotBeNullOrEmpty();
+        result.Value.CodeSentTo.Should().Be("ra***@example.com");
+
+        _user.LoginChallenge!.Hash.Should().Be($"det({result.Value.ChallengeToken})");
+        _user.DomainEvents.Should().ContainSingle(e => e is LoginOtpRequestedDomainEvent);
+        _user.LastLoginAt.Should().BeNull("a sign-in waiting on its code has not happened yet");
+        _tokenIssuer.DidNotReceive().Issue(
+            Arg.Any<Guid>(), Arg.Any<Guid>(), Arg.Any<string>(),
+            Arg.Any<IReadOnlyCollection<string>>(), Arg.Any<IReadOnlyCollection<string>>());
+    }
+
+    [Fact]
+    public async Task A_device_this_account_trusts_skips_the_code_but_not_the_password()
+    {
+        _options.TwoFactorRequired = true;
+        var (device, token) = TrustedDevice.Issue(_user.Id, _passwordHasher.HashDeterministic, Now);
+        _devices.FindUsableAsync(_user.Id, $"det({token})", Arg.Any<CancellationToken>()).Returns(device);
+
+        var trusted = await Login(deviceToken: token);
+
+        trusted.Value.CodeRequired.Should().BeFalse();
+        trusted.Value.Session!.AccessToken.Should().Be("signed-token");
+        device.LastUsedAt.Should().Be(Now);
+
+        (await Login(password: "wrong", deviceToken: token)).Error.Code.Should().Be("Auth.InvalidCredentials");
+    }
+
+    [Fact]
+    public async Task An_unknown_device_token_still_gets_a_code()
+    {
+        _options.TwoFactorRequired = true;
+
+        (await Login(deviceToken: "somebody-elses")).Value.CodeRequired.Should().BeTrue();
+    }
+
+    [Fact]
+    public async Task With_the_CAPTCHA_on_a_missing_or_wrong_answer_is_refused_before_any_account_is_read()
+    {
+        _options.CaptchaRequired = true;
+        var captchaId = Guid.NewGuid();
+        _captchas.TryRedeemAsync(captchaId, "AB3CD", Arg.Any<CancellationToken>()).Returns(true);
+
+        (await Login()).Error.Code.Should().Be("Auth.CaptchaFailed");
+        (await Login(captchaId: captchaId, captchaAnswer: "WRONG")).Error.Code.Should().Be("Auth.CaptchaFailed");
+        await _users.DidNotReceive().FindForLoginAsync(Arg.Any<string>(), Arg.Any<CancellationToken>());
+
+        (await Login(captchaId: captchaId, captchaAnswer: "AB3CD")).IsSuccess.Should().BeTrue();
     }
 }

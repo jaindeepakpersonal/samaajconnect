@@ -25,10 +25,11 @@ enforced by `TenantAuthorizationBehavior`, not just UI hiding.
 | PUT | `/tenants/{id}/security-policy` | SuperAdmin, SamaajAdmin (own Samaaj) | Replace those overrides, whole. A null field clears that override back to the platform default |
 | POST | `/register` | Anonymous | Member registration into one Samaaj |
 | POST | `/token/refresh` | Anonymous | Exchange a refresh token for a new access token and the next refresh token. Single-use: presenting one twice ends the whole session |
-| POST | `/login` | Anonymous | Common login → returns tenant-scoped JWT |
-| POST | `/otp/request` | Anonymous | Sends a one-time sign-in code. Answers the same way whether or not the identifier belongs to a real, active account |
-| POST | `/otp/login` | Anonymous | Sign in with the code instead of a password. Same response shape as `/login`; a wrong code, an unknown account and an expired code are all the same **401** (`Auth.InvalidCredentials`), and count toward the same lockout a wrong password does |
-| POST | `/password-reset/request` | Anonymous | Sends a password reset code. Same anti-enumeration answer as `/otp/request` |
+| POST | `/captcha` | Anonymous | A sign-in CAPTCHA: `{ captchaId, imagePng (base64), expiresAt }`. Single use, five minutes, drawn by this service |
+| POST | `/login` | Anonymous | Step one: `{ mobileOrEmail, password, captchaId, captchaAnswer, deviceToken? }`. A missing or wrong CAPTCHA is **401** `Auth.CaptchaFailed`, checked before any account is read. On a trusted device answers `{ codeRequired: false, session }` (the tenant-scoped JWT and refresh token); anywhere else sends a 6-digit code and answers `{ codeRequired: true, challengeToken, codeSentTo (masked), challengeExpiresAt }` |
+| POST | `/login/verify` | Anonymous | Step two: `{ challengeToken, code, trustDevice }` → `{ session, deviceToken?, deviceTrustedUntil? }`. A wrong code, an unknown or expired challenge are one **401** `Auth.InvalidCode`, and count toward the same lockout a wrong password does. `trustDevice` skips step two for 30 days on this browser |
+| POST | `/login/resend` | Anonymous | `{ challengeToken }` - a new code, at most every 30 seconds; never extends the challenge. Answers the same either way |
+| POST | `/password-reset/request` | Anonymous | Sends a password reset code. Answers the same whether or not the account exists |
 | POST | `/password-reset/redeem` | Anonymous | Redeem the code and set a new password. **No token** — sign in normally next, the same choice `/activations/redeem` makes |
 | GET | `/activations/pending` | SamaajAdmin | Accounts awaiting activation |
 | POST | `/activations/{userId}/code` | SamaajAdmin | Mint a one-time activation code (returned once) |

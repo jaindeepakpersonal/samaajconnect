@@ -12,4 +12,8 @@
     <ProjectReference Include="..\Sangam.IdentityTenant.Domain\Sangam.IdentityTenant.Domain.csproj" />
   </ItemGroup>
 
+  <ItemGroup>
+    <InternalsVisibleTo Include="Sangam.IdentityTenant.UnitTests" />
+  </ItemGroup>
+
 </Project>

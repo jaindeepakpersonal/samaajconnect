@@ -43,7 +43,7 @@ public sealed class AuthEndpointsTests(IdentityTenantApiFactory factory)
         var response = await LoginAsync("ravi@example.com", Password);
         response.EnsureSuccessStatusCode();
 
-        var body = await response.Content.ReadFromJsonAsync<JsonElement>();
+        var body = (await response.Content.ReadFromJsonAsync<JsonElement>()).GetProperty("session");
 
         return body.GetProperty("accessToken").GetString()!;
     }
@@ -137,7 +137,7 @@ public sealed class AuthEndpointsTests(IdentityTenantApiFactory factory)
 
         response.StatusCode.Should().Be(HttpStatusCode.OK);
 
-        var body = await response.Content.ReadFromJsonAsync<JsonElement>();
+        var body = (await response.Content.ReadFromJsonAsync<JsonElement>()).GetProperty("session");
 
         body.GetProperty("accessToken").GetString().Should().NotBeNullOrWhiteSpace();
         body.GetProperty("tenantSlug").GetString().Should().Be(tenant.Slug);

@@ -8,7 +8,7 @@ before translating another screen.
 
 | Screen | Route | Wireframe section | Status |
 |---|---|---|---|
-| Login | `/login` | `#login` | built, including OTP sign-in as an alternative to a password |
+| Login | `/login` | `#login` | built. A CAPTCHA and the password, then the 6-digit code on a browser the account does not trust (trust it for 30 days) - see below |
 | Register | `/register` | `#register` | built |
 | Home (Timeline) | `/timeline` | `#timeline` | built - the landing page, labelled "Home" in the sidebar; `/home` redirects here (see below) |
 | Events | `/events` | `#events` | built |
@@ -289,10 +289,22 @@ by reading the catalogue, and the other two only by opening the screen against a
 running stack. **When a screen compares against a name the backend produced,
 check the enum, and open the page.**
 
+**Signing in is two steps since 2026-09-27, and the code-only tab is gone.**
+Two factors are required of everybody (the user's decision): the password with
+a CAPTCHA drawn by identity-tenant-service, then - on a browser the account
+does not trust - the 6-digit code sent to the member's own mobile or email,
+with a box to trust this browser for 30 days. The OTP tab below signed in with
+the code alone, which with two factors required was the one way in that
+skipped the password, so it was removed (confirmed with the user); the code
+field the wireframe drew is the second step now. `SignInFlow` in libs/shared
+holds the steps for both portals and this screen draws them. The trusted-device
+token lives in `localStorage`, unlike the session: it excuses the code and
+nothing else. The history of the OTP tab is kept below as it was.
+
 **Screens with no endpoint are disabled and say why — until the endpoint
 lands, and then they are wired, not faked a moment sooner.** The OTP tab was
-the first of the login screen's two stubs to close: `RequestLoginOtpCommand`
-and `LoginWithOtpCommand` landed, and a member picks a Samaaj-wide login
+the first of the login screen's two stubs to close: the passwordless code
+commands landed, and a member picks a Samaaj-wide login
 identifier, gets a real 6-digit code delivered through the same notification
 pipeline the welcome message already uses, and the code signs them in
 exactly like a password would - same `LoginResponse`, same lockout, same one

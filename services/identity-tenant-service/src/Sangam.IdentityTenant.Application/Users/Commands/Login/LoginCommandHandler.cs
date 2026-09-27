@@ -1,7 +1,7 @@
 using MediatR;
+using Microsoft.Extensions.Logging;
 using Sangam.IdentityTenant.Application.Abstractions;
 using Sangam.IdentityTenant.Application.Common;
-using Sangam.IdentityTenant.Domain.Tenants;
 using Sangam.IdentityTenant.Domain.Users;
 
 namespace Sangam.IdentityTenant.Application.Users.Commands.Login;
@@ -11,24 +11,34 @@ public sealed class LoginCommandHandler(
     ITenantRepository tenants,
     IPasswordHasher passwordHasher,
     IFailedLoginRecorder failedLoginRecorder,
+    ICaptchaStore captchas,
+    ITrustedDeviceRepository trustedDevices,
     ITokenIssuer tokenIssuer,
     ISessionService sessions,
     IUnitOfWork unitOfWork,
-    IDateTimeProvider clock)
-    : IRequestHandler<LoginCommand, Result<LoginResponse>>
+    IDateTimeProvider clock,
+    ISecurityPolicyResolver securityPolicy,
+    SignInSecurityOptions options,
+    ILogger<LoginCommandHandler> logger)
+    : IRequestHandler<LoginCommand, Result<SignInResponse>>
 {
-    /// <summary>
-    /// One message for "no such account" and for "wrong password". Telling the
-    /// two apart hands an attacker a free account-enumeration oracle.
-    /// </summary>
-    private static Result<LoginResponse> InvalidCredentials() =>
-        Result.Failure<LoginResponse>(
-            Error.Unauthorized("Auth.InvalidCredentials", "Incorrect mobile/email or password."));
-
-    public async Task<Result<LoginResponse>> Handle(
+    public async Task<Result<SignInResponse>> Handle(
         LoginCommand command,
         CancellationToken cancellationToken)
     {
+        // The CAPTCHA first, before any account is looked up: a script that
+        // cannot read the picture learns nothing - not even how long a lookup
+        // took - and every attempt costs it a solve. Spent whether right or
+        // wrong, on its own connection (ICaptchaStore.TryRedeemAsync).
+        if (options.CaptchaRequired
+            && (command.CaptchaId is not { } captchaId
+                || command.CaptchaAnswer is not { } answer
+                || !await captchas.TryRedeemAsync(captchaId, answer, cancellationToken)))
+        {
+            return Result.Failure<SignInResponse>(Error.Unauthorized(
+                "Auth.CaptchaFailed", "The characters did not match the picture. Try the new one."));
+        }
+
         var now = clock.UtcNow;
         var identifier = User.NormalizeIdentifier(command.MobileOrEmail);
 
@@ -36,7 +46,7 @@ public sealed class LoginCommandHandler(
 
         if (user is null)
         {
-            return InvalidCredentials();
+            return Result.Failure<SignInResponse>(SignInSteps.InvalidCredentials());
         }
 
         if (user.IsLockedOut(now))
@@ -45,9 +55,7 @@ public sealed class LoginCommandHandler(
             // a locked-out member who is told nothing will keep guessing and
             // extend their own lockout, and an attacker who has already
             // triggered a lockout has learned as much from the timing anyway.
-            return Result.Failure<LoginResponse>(Error.Forbidden(
-                "Auth.LockedOut",
-                "Too many failed attempts. Try again in a few minutes."));
+            return Result.Failure<SignInResponse>(SignInSteps.LockedOut());
         }
 
         if (!passwordHasher.Verify(command.Password, user.PasswordHash))
@@ -56,55 +64,49 @@ public sealed class LoginCommandHandler(
             // return a failure, and the transaction around it will roll back.
             await failedLoginRecorder.RecordAsync(user.Id, cancellationToken);
 
-            return InvalidCredentials();
+            return Result.Failure<SignInResponse>(SignInSteps.InvalidCredentials());
         }
 
-        if (user.Status != UserStatus.Active)
+        var (refusal, tenant) = await SignInSteps.CheckAccountAsync(user, tenants, cancellationToken);
+
+        if (refusal is not null)
         {
-            return Result.Failure<LoginResponse>(
-                Error.Forbidden("Auth.AccountSuspended", "This account has been suspended."));
+            return Result.Failure<SignInResponse>(refusal);
         }
 
-        // A Super Admin belongs to the platform, not to a Samaaj, so there is no
-        // tenant to check the status of and no subdomain to redirect to.
-        Tenant? tenant = null;
+        // A device this account trusts skips the code - never the password.
+        var trusted = command.DeviceToken is { Length: > 0 } deviceToken
+            ? await trustedDevices.FindUsableAsync(user.Id, passwordHasher.HashDeterministic(deviceToken), cancellationToken)
+            : null;
 
-        if (!user.IsPlatformAdministrator)
+        if (!options.TwoFactorRequired || trusted is not null)
         {
-            tenant = await tenants.GetByIdAsync(user.TenantId, cancellationToken);
+            trusted?.MarkUsed(now);
 
-            if (tenant is null || tenant.Status != TenantStatus.Active)
-            {
-                return Result.Failure<LoginResponse>(Error.Forbidden(
-                    "Auth.SamaajUnavailable",
-                    "Your Samaaj is not currently active. Please contact your Samaaj administrator."));
-            }
+            var session = await SignInSteps.BeginSessionAsync(
+                user, tenant, users, tokenIssuer, sessions, unitOfWork, now, cancellationToken);
+
+            return Result.Success(SignInResponse.SignedIn(session));
         }
 
-        var authorization = await users.GetAuthorizationAsync(user.Id, user.TenantId, cancellationToken);
+        // Everywhere else: hold the sign-in open, and send a code.
+        var policy = await securityPolicy.ResolveAsync(user.TenantId, cancellationToken);
+        var (challenge, challengeToken) = LoginChallenge.Issue(passwordHasher.HashDeterministic, now, policy.OtpLifetime);
+        var (otp, code) = LoginOtp.Issue(passwordHasher.Hash, now, policy.OtpLifetime);
 
-        user.RecordSuccessfulLogin(now);
-
-        // Begun before the save, so the session row and the recorded login
-        // commit together. A login that succeeded without leaving a session
-        // would hand out an access token nothing could ever renew.
-        var session = await sessions.BeginAsync(user.Id, user.TenantId, cancellationToken);
+        user.BeginSecondFactor(challenge, otp, code, now);
 
         await unitOfWork.SaveChangesAsync(cancellationToken);
 
-        var token = tokenIssuer.Issue(
-            user.Id, user.TenantId, user.MobileOrEmail, authorization.Roles, authorization.Permissions,
-            authorization.AreaLocalityId);
+        if (options.RevealSecretsInLogs)
+        {
+            // Local compose only - see SignInSecurityOptions.
+            logger.LogWarning(
+                "Sign-in code {SignInCode} for {MobileOrEmail} (revealed: SignInSecurity:RevealSecretsInLogs)",
+                code, user.MobileOrEmail);
+        }
 
-        return Result.Success(new LoginResponse(
-            token.Token,
-            token.ExpiresAt,
-            session.RefreshToken,
-            session.ExpiresAt,
-            user.Id,
-            user.TenantId,
-            tenant?.Slug ?? string.Empty,
-            user.FullName,
-            authorization.Roles));
+        return Result.Success(SignInResponse.CodeSent(
+            challengeToken, SignInSteps.MaskContact(user.MobileOrEmail), challenge.ExpiresAt));
     }
 }

@@ -46,6 +46,13 @@ public static class DependencyInjection
         services.AddScoped<IDataExportRecorder, DataExportRecorder>();
         services.AddScoped<IRefreshTokenRepository, RefreshTokenRepository>();
         services.AddScoped<ISessionService, SessionService>();
+        services.AddScoped<ITrustedDeviceRepository, TrustedDeviceRepository>();
+        services.AddScoped<ICaptchaStore, CaptchaStore>();
+        services.AddSingleton<ICaptchaRenderer, CaptchaRenderer>();
+
+        // Read when first asked for, so a host's (or a test's) configuration is final by then.
+        services.AddSingleton(sp => sp.GetRequiredService<IConfiguration>()
+            .GetSection(SignInSecurityOptions.SectionName).Get<SignInSecurityOptions>() ?? new SignInSecurityOptions());
         services.AddScoped<IFailedActivationRecorder, FailedActivationRecorder>();
 
         // Bound and validated here rather than in Api: this service issues

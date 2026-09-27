@@ -255,7 +255,7 @@ public sealed class RoleMatrixEditingTests(IdentityTenantApiFactory factory)
 
         login.StatusCode.Should().Be(HttpStatusCode.OK);
 
-        var token = (await login.Content.ReadFromJsonAsync<JsonElement>())
+        var token = (await login.Content.ReadFromJsonAsync<JsonElement>()).GetProperty("session")
             .GetProperty("accessToken").GetString()!;
 
         var client = factory.CreateClient();

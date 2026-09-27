@@ -70,7 +70,7 @@ public sealed class SessionEndpointsTests(IdentityTenantApiFactory factory)
 
         login.StatusCode.Should().Be(HttpStatusCode.OK);
 
-        var body = await login.Content.ReadFromJsonAsync<JsonElement>();
+        var body = (await login.Content.ReadFromJsonAsync<JsonElement>()).GetProperty("session");
 
         return new Signed(
             body.GetProperty("accessToken").GetString()!,

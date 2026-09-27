@@ -977,6 +977,39 @@ namespace Sangam.IdentityTenant.Infrastructure.Persistence.Migrations
                     b.ToTable("tenant_security_policies", (string)null);
                 });
 
+            modelBuilder.Entity("Sangam.IdentityTenant.Domain.Users.CaptchaChallenge", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<string>("AnswerHash")
+                        .IsRequired()
+                        .HasMaxLength(512)
+                        .HasColumnType("character varying(512)")
+                        .HasColumnName("answer_hash");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at");
+
+                    b.Property<DateTimeOffset>("ExpiresAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("expires_at");
+
+                    b.Property<DateTimeOffset?>("UsedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("used_at");
+
+                    b.HasKey("Id")
+                        .HasName("pk_captcha_challenges");
+
+                    b.HasIndex("ExpiresAt")
+                        .HasDatabaseName("ix_captcha_challenges_expires_at");
+
+                    b.ToTable("captcha_challenges", (string)null);
+                });
+
             modelBuilder.Entity("Sangam.IdentityTenant.Domain.Users.RefreshToken", b =>
                 {
                     b.Property<Guid>("Id")
@@ -1036,6 +1069,51 @@ namespace Sangam.IdentityTenant.Infrastructure.Persistence.Migrations
                         .HasDatabaseName("ix_refresh_tokens_user_id_revoked_at");
 
                     b.ToTable("refresh_tokens", (string)null);
+                });
+
+            modelBuilder.Entity("Sangam.IdentityTenant.Domain.Users.TrustedDevice", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at");
+
+                    b.Property<DateTimeOffset>("ExpiresAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("expires_at");
+
+                    b.Property<DateTimeOffset?>("LastUsedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("last_used_at");
+
+                    b.Property<DateTimeOffset?>("RevokedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("revoked_at");
+
+                    b.Property<string>("TokenHash")
+                        .IsRequired()
+                        .HasMaxLength(512)
+                        .HasColumnType("character varying(512)")
+                        .HasColumnName("token_hash");
+
+                    b.Property<Guid>("UserId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("user_id");
+
+                    b.HasKey("Id")
+                        .HasName("pk_trusted_devices");
+
+                    b.HasIndex("TokenHash")
+                        .IsUnique()
+                        .HasDatabaseName("ix_trusted_devices_token_hash");
+
+                    b.HasIndex("UserId", "RevokedAt")
+                        .HasDatabaseName("ix_trusted_devices_user_id_revoked_at");
+
+                    b.ToTable("trusted_devices", (string)null);
                 });
 
             modelBuilder.Entity("Sangam.IdentityTenant.Domain.Users.User", b =>
@@ -1211,6 +1289,16 @@ namespace Sangam.IdentityTenant.Infrastructure.Persistence.Migrations
                         .HasConstraintName("fk_user_roles_users_user_id");
                 });
 
+            modelBuilder.Entity("Sangam.IdentityTenant.Domain.Users.TrustedDevice", b =>
+                {
+                    b.HasOne("Sangam.IdentityTenant.Domain.Users.User", null)
+                        .WithMany()
+                        .HasForeignKey("UserId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired()
+                        .HasConstraintName("fk_trusted_devices_users_user_id");
+                });
+
             modelBuilder.Entity("Sangam.IdentityTenant.Domain.Users.User", b =>
                 {
                     b.OwnsOne("Sangam.IdentityTenant.Domain.Users.ActivationCode", "ActivationCode", b1 =>
@@ -1242,6 +1330,34 @@ namespace Sangam.IdentityTenant.Infrastructure.Persistence.Migrations
                                 .HasColumnName("activation_code_issued_by");
 
                             b1.HasKey("UserId");
+
+                            b1.ToTable("users");
+
+                            b1.WithOwner()
+                                .HasForeignKey("UserId")
+                                .HasConstraintName("fk_users_users_id");
+                        });
+
+                    b.OwnsOne("Sangam.IdentityTenant.Domain.Users.LoginChallenge", "LoginChallenge", b1 =>
+                        {
+                            b1.Property<Guid>("UserId")
+                                .HasColumnType("uuid")
+                                .HasColumnName("id");
+
+                            b1.Property<DateTimeOffset>("ExpiresAt")
+                                .HasColumnType("timestamp with time zone")
+                                .HasColumnName("login_challenge_expires_at");
+
+                            b1.Property<string>("Hash")
+                                .IsRequired()
+                                .HasMaxLength(512)
+                                .HasColumnType("character varying(512)")
+                                .HasColumnName("login_challenge_hash");
+
+                            b1.HasKey("UserId");
+
+                            b1.HasIndex("Hash")
+                                .HasDatabaseName("ix_users_login_challenge_hash");
 
                             b1.ToTable("users");
 
@@ -1309,6 +1425,8 @@ namespace Sangam.IdentityTenant.Infrastructure.Persistence.Migrations
                         });
 
                     b.Navigation("ActivationCode");
+
+                    b.Navigation("LoginChallenge");
 
                     b.Navigation("LoginOtp");
 

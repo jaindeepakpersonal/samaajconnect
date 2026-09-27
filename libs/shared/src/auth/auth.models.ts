@@ -1,4 +1,29 @@
-/** Mirrors LoginResponse from identity-tenant-service. */
+/** Mirrors `CaptchaResponse`: shown as `data:image/png;base64,{imagePng}`. Single use, five minutes. */
+export interface Captcha {
+  readonly captchaId: string;
+  readonly imagePng: string;
+  readonly expiresAt: string;
+}
+
+/**
+ * Mirrors `SignInResponse`: either signed in (`session`), or waiting for the
+ * code sent to `codeSentTo`, to be verified with `challengeToken`.
+ */
+export interface SignInResult {
+  readonly codeRequired: boolean;
+  readonly session: LoginResult | null;
+  readonly challengeToken: string | null;
+
+  /** The address the code went to, masked: "ra***@example.com". */
+  readonly codeSentTo: string | null;
+  readonly challengeExpiresAt: string | null;
+
+  /** Set when this device was just trusted - `DeviceTrustStore` keeps it. */
+  readonly deviceToken: string | null;
+  readonly deviceTrustedUntil: string | null;
+}
+
+/** Mirrors LoginResponse from identity-tenant-service: an open session. */
 export interface LoginResult {
   readonly accessToken: string;
   readonly expiresAt: string;

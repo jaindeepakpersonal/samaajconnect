@@ -10,6 +10,8 @@ export * from './auth/auth.interceptor';
 export * from './auth/auth.models';
 export * from './auth/auth.service';
 export * from './auth/token.store';
+export * from './auth/device-trust.store';
+export * from './auth/sign-in-flow';
 export * from './media/authed-image.directive';
 export * from './money/money';
 export * from './paging/paginate';

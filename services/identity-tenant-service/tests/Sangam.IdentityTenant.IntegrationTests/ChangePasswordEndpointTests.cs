@@ -65,7 +65,7 @@ public sealed class ChangePasswordEndpointTests(IdentityTenantApiFactory factory
 
         login.EnsureSuccessStatusCode();
 
-        var body = await login.Content.ReadFromJsonAsync<JsonElement>();
+        var body = (await login.Content.ReadFromJsonAsync<JsonElement>()).GetProperty("session");
 
         return new Signed(
             body.GetProperty("accessToken").GetString()!,

@@ -195,9 +195,12 @@ control() {
   esac
 }
 
+# Signing in takes a CAPTCHA and a code now - see lib/sign-in.sh.
+# shellcheck source=lib/sign-in.sh
+source "$(dirname "$0")/lib/sign-in.sh"
+
 login() {
-  curl -s -X POST "$GATEWAY/v1/identity/login" -H 'Content-Type: application/json' \
-    -d "{\"mobileOrEmail\":\"$1\",\"password\":\"$2\"}" | json_field accessToken
+  sign_in "{\"mobileOrEmail\":\"$1\",\"password\":\"$2\"}" | json_field accessToken
 }
 
 register_member() {

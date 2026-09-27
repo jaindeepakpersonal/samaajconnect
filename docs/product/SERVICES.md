@@ -19,7 +19,8 @@ and expose its endpoints behind the gateway at the route prefix shown.
 - **Owns:** Tenant, User, Role, Permission, RolePermission, UserRole
   (see `DATA-MODEL.md` §2)
 - **Key commands:** `CreateTenantCommand`, `ActivateTenantCommand`,
-  `RegisterMemberCommand`, `LoginCommand`, `AssignRoleCommand`
+  `RegisterMemberCommand`, `LoginCommand` (CAPTCHA and password), `VerifySignInCodeCommand`
+  (the second factor), `IssueCaptchaCommand`, `AssignRoleCommand`
 - **Key queries:** `GetTenantBySlugQuery`, `GetCurrentUserQuery`,
   `ListTenantsQuery` (Super Admin only)
 - **Events published:** `TenantCreated`, `TenantStatusChanged`,

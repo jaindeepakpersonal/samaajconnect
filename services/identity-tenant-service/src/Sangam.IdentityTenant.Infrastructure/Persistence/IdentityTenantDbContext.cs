@@ -30,6 +30,10 @@ public sealed class IdentityTenantDbContext(
 
     public DbSet<RefreshToken> RefreshTokens => Set<RefreshToken>();
 
+    public DbSet<TrustedDevice> TrustedDevices => Set<TrustedDevice>();
+
+    public DbSet<CaptchaChallenge> CaptchaChallenges => Set<CaptchaChallenge>();
+
     public DbSet<Role> Roles => Set<Role>();
 
     public DbSet<Permission> Permissions => Set<Permission>();

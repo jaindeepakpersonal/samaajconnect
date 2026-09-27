@@ -40,8 +40,19 @@ version of the plan; the reasoning behind the ordering lives in
   card at the top - with every post and comment showing its author's photo
   (initials when there is none to show).
 
-  Still to come from the same request: OTP two-factor sign-in with a
-  self-hosted CAPTCHA, and a security hardening pass.
+  And **sign-in takes two factors for everyone**: a self-hosted CAPTCHA
+  (identity-tenant-service draws the PNG; single use, spent on its own
+  connection so a failed password cannot hand it back) with the password,
+  then a 6-digit code on a browser the account does not trust, which can be
+  trusted for 30 days - revoked with the account's sessions. Passwordless
+  code sign-in was retired (the user's call), since a code alone would skip
+  the password. Both portals share `SignInFlow` in libs/shared; the smoke
+  run and the isolation probe sign in through scripts/lib/sign-in.sh, reading
+  the CAPTCHA answer and the code from the identity log that compose alone
+  reveals. The security checklist's anonymous and internal lists were brought
+  up to date, closing two of security-invariants' four standing failures.
+
+  Still to come from the same request: a security hardening pass.
 - **Previously:** 2026-09-20 - **a new module, trust-service: locality-wise
   Trust management, phase 1 (roster only).** One Trust per `(Samaaj,
   Locality)`, with `TrustMember` as its own aggregate so a roster change

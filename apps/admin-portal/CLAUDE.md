@@ -9,7 +9,7 @@ screen. The spec is `docs/product/wireframes/admin-panel-wireframes.html`.
 
 | Screen | Route | Wireframe section | Status |
 |---|---|---|---|
-| Sign in | `/login` | — (the wireframe has none) | built |
+| Sign in | `/login` | — (the wireframe has none) | built. A CAPTCHA and the password, then a 6-digit code on an untrusted browser (trust it for 30 days) - `SignInFlow` in libs/shared, shared with the member portal |
 | Dashboard | `/dashboard` | `#dashboard` | built — see below |
 | Samaaj / Tenants | `/tenants` | `#tenants` | built. Status, modules, logo, and the DPDP s.13 grievance contact |
 | Create Samaaj | `/tenants/new` | `#createtenant` | built |

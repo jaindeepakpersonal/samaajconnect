@@ -3,20 +3,23 @@ import { Injectable, computed, inject, signal } from '@angular/core';
 import { Observable, catchError, of, shareReplay, tap } from 'rxjs';
 import {
   ActivationResult,
+  Captcha,
   ChangePasswordResult,
   ConsentNotice,
   CurrentUser,
-  LoginResult,
   RegisterRequest,
   RegisterResult,
+  SignInResult,
   TenantSummary,
 } from './auth.models';
+import { DeviceTrustStore } from './device-trust.store';
 import { TokenStore } from './token.store';
 
 @Injectable({ providedIn: 'root' })
 export class AuthService {
   private readonly http = inject(HttpClient);
   private readonly tokens = inject(TokenStore);
+  private readonly deviceTrust = inject(DeviceTrustStore);
 
   private readonly currentUser = signal<CurrentUser | null>(null);
 
@@ -26,26 +29,50 @@ export class AuthService {
   readonly isSignedIn = computed(() => this.tokens.token() !== null);
   readonly roles = computed(() => this.currentUser()?.roles ?? []);
 
-  login(mobileOrEmail: string, password: string): Observable<LoginResult> {
-    return this.http
-      .post<LoginResult>('/v1/identity/login', { mobileOrEmail, password })
-      .pipe(tap((result) => this.tokens.set(result.accessToken, result.refreshToken)));
+  /** A fresh CAPTCHA for the sign-in form. Each is good for one attempt. */
+  captcha(): Observable<Captcha> {
+    return this.http.post<Captcha>('/v1/identity/captcha', {});
   }
 
   /**
-   * Asks for a one-time sign-in code. Answers the same way whether or not the
-   * identifier belongs to a real, active account - there is nothing in the
-   * response to branch on, deliberately.
+   * Signing in, step one: the CAPTCHA and the password, with this browser's
+   * device token if it has one. On a trusted device that is the whole sign-in;
+   * anywhere else the answer is `codeRequired` and a challenge for
+   * `verifySignInCode`, and nothing is stored yet.
    */
-  requestLoginOtp(mobileOrEmail: string): Observable<void> {
-    return this.http.post<void>('/v1/identity/otp/request', { mobileOrEmail });
+  login(mobileOrEmail: string, password: string, captchaId: string, captchaAnswer: string): Observable<SignInResult> {
+    return this.http
+      .post<SignInResult>('/v1/identity/login', {
+        mobileOrEmail,
+        password,
+        captchaId,
+        captchaAnswer,
+        deviceToken: this.deviceTrust.get(),
+      })
+      .pipe(tap((result) => this.keep(result)));
   }
 
-  /** Signs in with a one-time code instead of a password. Same shape as `login()`. */
-  loginWithOtp(mobileOrEmail: string, code: string): Observable<LoginResult> {
+  /** Step two: the code that was sent, and whether to trust this device for thirty days. */
+  verifySignInCode(challengeToken: string, code: string, trustDevice: boolean): Observable<SignInResult> {
     return this.http
-      .post<LoginResult>('/v1/identity/otp/login', { mobileOrEmail, code })
-      .pipe(tap((result) => this.tokens.set(result.accessToken, result.refreshToken)));
+      .post<SignInResult>('/v1/identity/login/verify', { challengeToken, code, trustDevice })
+      .pipe(tap((result) => this.keep(result)));
+  }
+
+  /** Sends a new code for a waiting sign-in, at most every thirty seconds. Answers the same either way. */
+  resendSignInCode(challengeToken: string): Observable<void> {
+    return this.http.post<void>('/v1/identity/login/resend', { challengeToken });
+  }
+
+  /** A session when there is one, and the device token when one was issued. */
+  private keep(result: SignInResult): void {
+    if (result.session) {
+      this.tokens.set(result.session.accessToken, result.session.refreshToken);
+    }
+
+    if (result.deviceToken) {
+      this.deviceTrust.set(result.deviceToken);
+    }
   }
 
   register(request: RegisterRequest): Observable<RegisterResult> {

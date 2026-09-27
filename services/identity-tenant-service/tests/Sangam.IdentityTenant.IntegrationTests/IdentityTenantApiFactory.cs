@@ -24,7 +24,7 @@ namespace Sangam.IdentityTenant.IntegrationTests;
 /// the tenant query filter depend on is genuine, because those two are exactly
 /// where mocks hide bugs (CLAUDE.md section 9).
 /// </summary>
-public sealed class IdentityTenantApiFactory : WebApplicationFactory<Program>, IAsyncLifetime
+public class IdentityTenantApiFactory : WebApplicationFactory<Program>, IAsyncLifetime
 {
     public const string SigningKey = "integration-test-signing-key-at-least-32-chars";
 
@@ -40,6 +40,14 @@ public sealed class IdentityTenantApiFactory : WebApplicationFactory<Program>, I
         .Build();
 
     public RecordingEventPublisher Publisher { get; } = new();
+
+    /// <summary>
+    /// Whether sign-in asks for a CAPTCHA and a code. Off here, so a test that
+    /// signs in to exercise something else signs in with a password;
+    /// <see cref="GuardedIdentityTenantApiFactory"/> turns both on for the tests
+    /// about them.
+    /// </summary>
+    protected virtual bool SignInGuards => false;
 
     public async Task InitializeAsync() => await _postgres.StartAsync();
 
@@ -64,6 +72,8 @@ public sealed class IdentityTenantApiFactory : WebApplicationFactory<Program>, I
                 ["Bootstrap:SuperAdminIdentifier"] = BootstrapIdentifier,
                 ["Bootstrap:SuperAdminPassword"] = BootstrapPassword,
                 ["Bootstrap:SuperAdminName"] = "Platform Super Admin",
+                ["SignInSecurity:CaptchaRequired"] = SignInGuards.ToString(),
+                ["SignInSecurity:TwoFactorRequired"] = SignInGuards.ToString(),
             });
         });
 
@@ -249,4 +259,10 @@ public sealed class IdentityTenantApiFactory : WebApplicationFactory<Program>, I
 
         return new JwtSecurityTokenHandler().WriteToken(token);
     }
+}
+
+/// <summary>The host with sign-in's CAPTCHA and second factor both on, as production runs it.</summary>
+public sealed class GuardedIdentityTenantApiFactory : IdentityTenantApiFactory
+{
+    protected override bool SignInGuards => true;
 }

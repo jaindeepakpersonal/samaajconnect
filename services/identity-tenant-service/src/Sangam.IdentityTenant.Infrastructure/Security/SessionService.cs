@@ -14,6 +14,7 @@ namespace Sangam.IdentityTenant.Infrastructure.Security;
 /// </summary>
 public sealed class SessionService(
     IRefreshTokenRepository tokens,
+    ITrustedDeviceRepository trustedDevices,
     IUserRepository users,
     ITenantRepository tenants,
     IPasswordHasher hasher,
@@ -140,6 +141,14 @@ public sealed class SessionService(
         foreach (var token in live)
         {
             token.Revoke(reason, now);
+        }
+
+        // Every device the account trusted asks for a code again: a password
+        // changed or reset, signing out everywhere and erasure all mean the
+        // devices that knew the old state should not be excused the new one.
+        foreach (var device in await trustedDevices.ListLiveForUserAsync(userId, cancellationToken))
+        {
+            device.Revoke(now);
         }
 
         return live.Count;

@@ -21,6 +21,8 @@ What is here now:
 | `auth/auth.models.ts` | The shapes identity-tenant-service answers with |
 | `auth/auth.service.ts` | Sign in, sign out, and who the current user is |
 | `auth/token.store.ts` | The session, in `sessionStorage` |
+| `auth/device-trust.store.ts` | The 30-day trusted-device token, in `localStorage` - it excuses the sign-in code, never the password |
+| `auth/sign-in-flow.ts` | The two-step sign-in both portals run (CAPTCHA and password, then the code), without markup - see below |
 | `media/authed-image.directive.ts` | Puts a platform-hosted image into an `<img>`, fetched with the caller's token |
 | `money/money.ts` | Paise ↔ rupees, and how long a Boli has left |
 | `paging/paginate.ts` | Slices an already-fetched array into a page of `DEFAULT_PAGE_SIZE` (20), clamped into range |
@@ -93,6 +95,20 @@ cannot compile a template. The first version used a host component and every tes
 failed with NG0303, which reads like a directive-scope problem and is really a
 "you are in the wrong test runner" problem. Setting the input by hand calls
 exactly the setter Angular would.
+
+**`SignInFlow` is logic without a template, on purpose.** Both portals sign in
+the same way and the rules are easy to get subtly wrong twice - a CAPTCHA is
+single use, so every attempt fetches a fresh one, right or wrong; a trusted
+device's token is sent with the password and kept when issued; nothing is
+stored until there is a session. This library's specs cannot compile a
+template, so the steps live here, tested (`sign-in-flow.spec.ts`), and each
+app draws its own few lines of form. Provide it per component - it holds one
+sign-in's state.
+
+**The device token is the one thing here in `localStorage`.** A trust that
+ended with the tab would ask for a code every visit, which is what a member
+ticked a box to stop. It can outlive the session because it is worth so much
+less: it skips the code, and the password is still asked every time.
 
 **The tenant interceptor attaches no tenant**, and the name is a leftover from
 the subdomain design that root `CLAUDE.md` §6 supersedes. It rewrites relative

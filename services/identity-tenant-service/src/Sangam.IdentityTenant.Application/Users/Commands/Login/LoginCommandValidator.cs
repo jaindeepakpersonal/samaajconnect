@@ -17,5 +17,10 @@ public sealed class LoginCommandValidator : AbstractValidator<LoginCommand>
         RuleFor(x => x.Password)
             .NotEmpty()
             .MaximumLength(256);
+
+        // Whether a CAPTCHA is required is the handler's to say (it may be
+        // switched off); here only that what arrives is not absurd.
+        RuleFor(x => x.CaptchaAnswer).MaximumLength(20);
+        RuleFor(x => x.DeviceToken).MaximumLength(100);
     }
 }

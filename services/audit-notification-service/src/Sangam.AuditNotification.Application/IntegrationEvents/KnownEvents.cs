@@ -147,7 +147,10 @@ public static class KnownEvents
                 return new NotificationSpec(
                     recipientId,
                     "Your sign-in code",
-                    $"Your one-time code is {code.GetString()}. It expires in 10 minutes.",
+                    // Since 2026-09-27 a code goes out only after the password was
+                    // typed correctly, so an unexpected one means somebody else has it.
+                    $"Your one-time code is {code.GetString()}. It expires in 10 minutes. "
+                    + "If you did not just sign in, someone knows your password - change it now.",
                     Destination: payload.TryGetProperty("mobileOrEmail", out var contact)
                         ? contact.GetString()
                         : null);

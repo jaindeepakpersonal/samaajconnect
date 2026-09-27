@@ -51,6 +51,14 @@ public sealed class UserConfiguration : IEntityTypeConfiguration<User>
             otp.Property(c => c.ExpiresAt).HasColumnName("login_otp_expires_at");
         });
 
+        // The sign-in waiting for its code. Found by hash, so indexed.
+        builder.OwnsOne(u => u.LoginChallenge, challenge =>
+        {
+            challenge.Property(c => c.Hash).HasColumnName("login_challenge_hash").HasMaxLength(512);
+            challenge.Property(c => c.ExpiresAt).HasColumnName("login_challenge_expires_at");
+            challenge.HasIndex(c => c.Hash);
+        });
+
         builder.OwnsOne(u => u.PasswordResetCode, code =>
         {
             code.Property(c => c.Hash).HasColumnName("password_reset_code_hash").HasMaxLength(512);

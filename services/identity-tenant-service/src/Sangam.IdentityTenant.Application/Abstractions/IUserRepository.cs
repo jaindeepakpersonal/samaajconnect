@@ -18,6 +18,12 @@ public interface IUserRepository
     /// </remarks>
     Task<User?> FindForLoginAsync(string mobileOrEmail, CancellationToken cancellationToken = default);
 
+    /// <summary>
+    /// The account whose sign-in is waiting under this challenge hash, past the
+    /// tenant filter for the reason FindForLoginAsync is: nobody has signed in yet.
+    /// </summary>
+    Task<User?> FindByLoginChallengeAsync(string challengeHash, CancellationToken cancellationToken = default);
+
     Task<User?> GetByIdAsync(Guid id, CancellationToken cancellationToken = default);
 
     /// <summary>

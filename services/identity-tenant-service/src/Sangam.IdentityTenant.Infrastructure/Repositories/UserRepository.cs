@@ -16,6 +16,11 @@ public sealed class UserRepository(IdentityTenantDbContext dbContext) : IUserRep
             .IgnoreQueryFilters()
             .FirstOrDefaultAsync(u => u.MobileOrEmail == mobileOrEmail, cancellationToken);
 
+    public Task<User?> FindByLoginChallengeAsync(string challengeHash, CancellationToken cancellationToken = default) =>
+        dbContext.Users
+            .IgnoreQueryFilters()
+            .FirstOrDefaultAsync(u => u.LoginChallenge != null && u.LoginChallenge.Hash == challengeHash, cancellationToken);
+
     /// <summary>
     /// Tenant-filtered, with the role grants loaded.
     /// </summary>
