@@ -26,3 +26,13 @@ public sealed record TrustStatusChangedDomainEvent(
 {
     public string Topic => "trust.trust.status-changed.v1";
 }
+
+/// <summary>A Trust's name was corrected. Ids and who, not the name.</summary>
+public sealed record TrustRenamedDomainEvent(
+    Guid TrustId,
+    Guid TenantId,
+    Guid RenamedBy,
+    DateTimeOffset OccurredAt) : IDomainEvent
+{
+    public string Topic => "trust.trust.renamed.v1";
+}

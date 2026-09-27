@@ -322,6 +322,7 @@ the resource under it, the same shape as `/v1/pathshala/pathshalas`.
 |---|---|---|---|
 | GET | `/occasions` | `Members.Read` | Occasions, newest first. `?localityId=` narrows to one locality |
 | POST | `/occasions` | `Boli.Manage` | Create occasion. Optional `localityId` - null runs it Samaaj-wide |
+| PATCH | `/occasions/{id}` | `Boli.Manage` | Correct title, description, date and locality. 409 once the occasion is closed |
 | GET | `/occasions/{id}` | `Members.Read` | Types and the Boli under it |
 | POST | `/occasions/{id}/boli-types` | `Boli.Manage` | Define Boli type. One name per occasion |
 | POST | `/occasions/{id}/status` | `Boli.Manage` | Activate or close. Never backwards |
@@ -494,8 +495,9 @@ does need a genuine organiser-vs-participant split.
 
 | Method | Path | Roles | Purpose |
 |---|---|---|---|
-| GET | `/` | `Members.Read` | This Samaaj's competitions, each with the caller's own registration status |
-| POST | `/` | `Competition.Manage` | Set a competition up. Starts `Draft` |
+| GET | `/` | `Members.Read` | This Samaaj's competitions, each with the caller's own registration status. `?localityId=` narrows to one locality |
+| POST | `/` | `Competition.Manage` | Set a competition up. Starts `Draft`. Optional `localityId` |
+| PATCH | `/{id}` | `Competition.Manage` | Correct the details, locality included. Draft or taking registrations only; 409 after |
 | GET | `/{id}` | `Members.Read` | Rounds, registration count, judges, and the currently-registered member ids an organiser picks entries from |
 | POST | `/{id}/status` | `Competition.Manage` | Strictly forward: Draft → RegistrationOpen → RegistrationClosed → InProgress → Closed |
 | POST | `/{id}/registrations` | `Members.Read` | Register the caller. Only while registration is open. A repeat registration is success with `registered: false` |
@@ -553,6 +555,7 @@ the Trust's locality opens against its winner. Amounts are integer paise.
 |---|---|---|---|
 | GET | `/trusts` | `Members.Read` | This Samaaj's Trusts, newest first. `?localityId=` narrows to one locality |
 | POST | `/trusts` | `Trust.Manage` | Set a Trust up for a locality. Exactly one per (Samaaj, Locality); a second attempt is a 409 |
+| PATCH | `/trusts/{id}` | `Trust.Manage` | Correct the name. The locality is not editable - it is what a published Boli is matched on |
 | GET | `/trusts/{id}` | `Members.Read` | One Trust |
 | POST | `/trusts/{id}/status` | `Trust.Manage` | Active or Inactive. Setting the status it already has is success and changes nothing |
 | GET | `/trusts/{id}/members` | `Members.Read` | The Trust's roster, active members first |

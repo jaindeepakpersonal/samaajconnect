@@ -58,6 +58,26 @@ public static class BoliEndpoints
             .ProducesProblem(StatusCodes.Status401Unauthorized)
             .ProducesProblem(StatusCodes.Status403Forbidden);
 
+        group.MapPatch("/occasions/{id:guid}", async (
+                Guid id, CreateOccasionRequest request, ISender sender, CancellationToken cancellationToken) =>
+            {
+                var result = await sender.Send(
+                    new UpdateOccasionCommand(
+                        id, request.Title, request.Description, request.OccasionDate, request.LocalityId),
+                    cancellationToken);
+
+                return result.ToApiResult();
+            })
+            .RequireAuthorization()
+            .WithName("UpdateOccasion")
+            .WithSummary("Correct an occasion's details. 409 once it is closed.")
+            .Produces<OccasionResponse>()
+            .ProducesValidationProblem()
+            .ProducesProblem(StatusCodes.Status401Unauthorized)
+            .ProducesProblem(StatusCodes.Status403Forbidden)
+            .ProducesProblem(StatusCodes.Status404NotFound)
+            .ProducesProblem(StatusCodes.Status409Conflict);
+
         group.MapGet("/occasions/{id:guid}", async (
                 Guid id, ISender sender, CancellationToken cancellationToken) =>
             {

@@ -45,6 +45,10 @@ namespace Sangam.Competition.Infrastructure.Migrations
                         .HasColumnType("character varying(2000)")
                         .HasColumnName("description");
 
+                    b.Property<Guid?>("LocalityId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("locality_id");
+
                     b.Property<DateTimeOffset>("RegistrationEndAt")
                         .HasColumnType("timestamp with time zone")
                         .HasColumnName("registration_end_at");
@@ -71,6 +75,9 @@ namespace Sangam.Competition.Infrastructure.Migrations
 
                     b.HasKey("Id")
                         .HasName("pk_competitions");
+
+                    b.HasIndex("TenantId", "LocalityId")
+                        .HasDatabaseName("ix_competitions_tenant_id_locality_id");
 
                     b.HasIndex("TenantId", "Status")
                         .HasDatabaseName("ix_competitions_tenant_id_status");

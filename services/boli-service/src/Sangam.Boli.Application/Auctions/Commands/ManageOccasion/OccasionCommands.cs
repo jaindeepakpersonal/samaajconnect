@@ -7,6 +7,68 @@ using Sangam.Boli.Domain.Auctions;
 
 namespace Sangam.Boli.Application.Auctions.Commands.ManageOccasion;
 
+// ---- Correct an occasion ------------------------------------------------------
+
+/// <summary>
+/// Corrects an occasion's title, description, date and locality - the admin
+/// panel's edit popup. Refused (409) once the occasion is closed.
+/// </summary>
+[RequiresPermission(PermissionKeys.BoliManage)]
+public sealed record UpdateOccasionCommand(
+    Guid OccasionId, string Title, string? Description, DateOnly OccasionDate, Guid? LocalityId)
+    : ICommand<OccasionResponse>;
+
+public sealed class UpdateOccasionCommandValidator : AbstractValidator<UpdateOccasionCommand>
+{
+    public UpdateOccasionCommandValidator()
+    {
+        RuleFor(x => x.OccasionId).NotEmpty();
+        RuleFor(x => x.Title).NotEmpty().MaximumLength(200);
+        RuleFor(x => x.Description).MaximumLength(2000);
+        RuleFor(x => x.OccasionDate).NotEqual(default(DateOnly));
+    }
+}
+
+public sealed class UpdateOccasionCommandHandler(
+    IOccasionRepository occasions,
+    IBoliRepository boli,
+    IUnitOfWork unitOfWork,
+    ICurrentUser currentUser,
+    IDateTimeProvider clock)
+    : IRequestHandler<UpdateOccasionCommand, Result<OccasionResponse>>
+{
+    public async Task<Result<OccasionResponse>> Handle(
+        UpdateOccasionCommand command, CancellationToken cancellationToken)
+    {
+        if (currentUser.UserId is not { } actorId)
+        {
+            return Result.Failure<OccasionResponse>(
+                Error.Unauthorized("Auth.Required", "Authentication is required for this request."));
+        }
+
+        var occasion = await occasions.GetByIdAsync(command.OccasionId, cancellationToken);
+
+        if (occasion is null)
+        {
+            return Result.Failure<OccasionResponse>(
+                Error.NotFound("Occasion.NotFound", "No such occasion in this Samaaj."));
+        }
+
+        if (!occasion.Update(
+                command.Title, command.Description, command.OccasionDate, command.LocalityId, actorId, clock.UtcNow))
+        {
+            return Result.Failure<OccasionResponse>(Error.Conflict(
+                "Occasion.Closed", "This occasion is closed and its results announced, so it can no longer be edited."));
+        }
+
+        await unitOfWork.SaveChangesAsync(cancellationToken);
+
+        var lots = await boli.ListForOccasionAsync(occasion.Id, cancellationToken);
+
+        return Result.Success(BoliMappings.ToResponse(occasion, boliCount: lots.Count));
+    }
+}
+
 // ---- Create an occasion ------------------------------------------------------
 
 /// <summary>

@@ -87,6 +87,7 @@ function occasion(id: string): Occasion {
     status: 'Upcoming',
     typeCount: 1,
     boliCount: 1,
+    localityId: null,
   };
 }
 

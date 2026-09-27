@@ -522,6 +522,9 @@ export interface Occasion {
   readonly status: OccasionStatus;
   readonly typeCount: number;
   readonly boliCount: number;
+
+  /** Null for a Samaaj-wide occasion. */
+  readonly localityId: string | null;
 }
 
 /** Mirrors `BoliTypeResponse`. Nobody bids on a type; it is a label reused. */
@@ -1324,6 +1327,16 @@ export type CompetitionStatus =
 export type RoundStatus = 'Open' | 'Closed';
 
 /** Mirrors `CompetitionResponse`. */
+/** What creating or correcting a competition sends. */
+export interface CompetitionInput {
+  readonly title: string;
+  readonly description: string | null;
+  readonly competitionTypeId: string | null;
+  readonly localityId: string | null;
+  readonly registrationStartAt: string;
+  readonly registrationEndAt: string;
+}
+
 export interface Competition {
   readonly id: string;
   readonly title: string;
@@ -1332,6 +1345,9 @@ export interface Competition {
   readonly registrationStartAt: string;
   readonly registrationEndAt: string;
   readonly status: CompetitionStatus;
+
+  /** Null for the whole Samaaj. */
+  readonly localityId: string | null;
 
   /** Right now: the status says so *and* the clock agrees. */
   readonly acceptsRegistrations: boolean;

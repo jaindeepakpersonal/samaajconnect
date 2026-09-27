@@ -17,7 +17,10 @@ public sealed record CompetitionResponse(
     /// <summary>Null when this caller has never registered.</summary>
     string? MyRegistrationStatus,
     bool IsJudge,
-    DateTimeOffset CreatedAt);
+    DateTimeOffset CreatedAt,
+
+    /// <summary>Null for the whole Samaaj.</summary>
+    Guid? LocalityId);
 
 public sealed record JudgeResponse(Guid Id, Guid MemberId, DateTimeOffset AssignedAt);
 

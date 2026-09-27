@@ -4,6 +4,7 @@ import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { ActivatedRoute, provideRouter } from '@angular/router';
 import { API_CONFIG } from '@samaajconnect/shared';
 import { CompetitionDetailComponent } from './competition-detail.component';
+import { CompetitionDialogComponent } from './competition-dialog.component';
 import { CompetitionListComponent } from './competition-list.component';
 import { Competition, CompetitionDetail, Round } from '../../core/admin.models';
 
@@ -23,6 +24,7 @@ function competition(overrides: Partial<Competition> = {}): Competition {
     myRegistrationStatus: null,
     isJudge: false,
     createdAt: '2026-07-01T00:00:00Z',
+    localityId: null,
     ...overrides,
   };
 }
@@ -82,15 +84,31 @@ describe('CompetitionListComponent', () => {
 
   const text = () => fixture.nativeElement.textContent as string;
 
+  const click = { currentTarget: null } as unknown as MouseEvent;
+
+  function settleLocalities() {
+    http.expectOne((r) => r.url === '/v1/master-data/localities')
+      .flush([{ id: 'loc1', cityId: 'udr', name: 'Hiran Magri', isActive: true }]);
+    http.expectOne((r) => r.url === '/v1/master-data/cities')
+      .flush([{ id: 'udr', countryId: 'in', stateId: null, name: 'Udaipur', isActive: true }]);
+  }
+
   function load(competitions: Competition[] = []) {
     fixture.detectChanges();
     http.expectOne('/v1/competitions').flush(competitions);
+    settleLocalities();
     fixture.detectChanges();
+  }
+
+  function dialog(): CompetitionDialogComponent {
+    return fixture.debugElement.query((el) => el.componentInstance instanceof CompetitionDialogComponent)
+      .componentInstance as CompetitionDialogComponent;
   }
 
   it('reads a 404 as the module being off', () => {
     fixture.detectChanges();
     http.expectOne('/v1/competitions').flush({}, { status: 404, statusText: 'Not Found' });
+    settleLocalities();
     fixture.detectChanges();
 
     expect(text()).toContain('does not run the competitions module');
@@ -100,33 +118,88 @@ describe('CompetitionListComponent', () => {
   it('refuses a registration window that closes before it opens', () => {
     load();
 
-    component.title = 'Rangoli Contest 2026';
-    component.registrationStartAt = '2026-08-20T00:00';
-    component.registrationEndAt = '2026-08-01T00:00';
+    component.openCreate(click);
+    fixture.detectChanges();
 
-    expect(component.windowInvalid()).toBe(true);
-    expect(component.canCreate()).toBe(false);
+    const form = dialog();
+    form.title = 'Rangoli Contest 2026';
+    form.registrationStartAt = '2026-08-20T00:00';
+    form.registrationEndAt = '2026-08-01T00:00';
 
-    component.create();
+    expect(form.windowInvalid()).toBe(true);
+    expect(form.canSave()).toBe(false);
+
+    form.save();
     http.expectNone('/v1/competitions');
   });
 
-  it('accepts a valid registration window and creates as a draft', () => {
+  it('sets a competition up in a popup, as a draft, for a locality or the whole Samaaj', () => {
     load();
 
-    component.title = 'Rangoli Contest 2026';
-    component.registrationStartAt = '2026-08-01T00:00';
-    component.registrationEndAt = '2026-08-20T00:00';
+    component.openCreate(click);
+    fixture.detectChanges();
 
-    expect(component.windowInvalid()).toBe(false);
+    const form = dialog();
+    form.title = 'Rangoli Contest 2026';
+    form.registrationStartAt = '2026-08-01T00:00';
+    form.registrationEndAt = '2026-08-20T00:00';
+    form.localityId = 'loc1';
+    form.save();
 
-    component.create();
+    const call = http.expectOne('/v1/competitions');
+    const body = call.request.body as Record<string, unknown>;
 
-    const body = http.expectOne('/v1/competitions').request.body as Record<string, unknown>;
-
+    expect(call.request.method).toBe('POST');
     expect(body['title']).toBe('Rangoli Contest 2026');
     expect(body['description']).toBeNull();
-    expect(body['competitionTypeId']).toBeNull();
+    expect(body['localityId']).toBe('loc1');
+
+    call.flush(competition());
+    http.expectOne('/v1/competitions').flush([competition({ localityId: 'loc1' })]);
+    fixture.detectChanges();
+
+    expect(text()).toContain('created as a draft');
+    expect(text()).toContain('Hiran Magri, Udaipur');
+  });
+
+  it('offers Edit only while the competition may still be corrected', () => {
+    load([
+      competition({ id: 'draft', status: 'Draft' }),
+      competition({ id: 'open', status: 'RegistrationOpen' }),
+      competition({ id: 'closed', status: 'RegistrationClosed' }),
+    ]);
+
+    const edits = [...(fixture.nativeElement as HTMLElement).querySelectorAll('button')]
+      .filter((b) => b.textContent?.trim() === 'Edit');
+
+    expect(edits).toHaveLength(2);
+  });
+
+  it('corrects a competition in the same popup, starting from what it holds', () => {
+    load([competition({ status: 'RegistrationOpen', description: 'Theme: Diwali' })]);
+
+    component.openEdit(competition({ status: 'RegistrationOpen', description: 'Theme: Diwali' }), click);
+    fixture.detectChanges();
+
+    const form = dialog();
+
+    expect(form.title).toBe('Rangoli Contest 2026');
+    expect(form.description).toBe('Theme: Diwali');
+    expect(form.registrationStartAt).toMatch(/^2026-0[78]-\d\dT\d\d:\d\d$/);
+
+    form.title = 'Rangoli Contest 2026 - Diwali';
+    form.save();
+
+    const call = http.expectOne(`/v1/competitions/${COMPETITION_ID}`);
+
+    expect(call.request.method).toBe('PATCH');
+    expect((call.request.body as Record<string, unknown>)['title']).toBe('Rangoli Contest 2026 - Diwali');
+
+    call.flush(competition());
+    http.expectOne('/v1/competitions').flush([competition()]);
+    fixture.detectChanges();
+
+    expect(text()).toContain('is saved');
   });
 
   it('says which competitions are actually open, not just what their status says', () => {

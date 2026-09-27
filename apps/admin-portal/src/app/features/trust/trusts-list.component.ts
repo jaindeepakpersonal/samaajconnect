@@ -1,39 +1,44 @@
-import { Component, OnInit, computed, inject, signal } from '@angular/core';
-import { FormsModule } from '@angular/forms';
+import { Component, OnInit, inject, signal } from '@angular/core';
 import { RouterLink } from '@angular/router';
 import { describeError } from '@samaajconnect/shared';
 import { AdminApi } from '../../core/admin-api';
 import { AdminScope } from '../../core/admin-scope';
-import { City, Locality, LookupItem, State, Trust, TrustStatus } from '../../core/admin.models';
+import { Trust, TrustStatus } from '../../core/admin.models';
 import { isNotFound } from '../../core/http-status';
+import { LocalityOptions } from '../../core/locality-options';
+import { TrustDialogComponent } from './trust-dialog.component';
 
 /**
- * A Samaaj's local Trusts — one per locality — and setting a new one up.
+ * A Samaaj's local Trusts - one per locality - set up and corrected in a
+ * popup, the way Events are.
  *
- * No wireframe covers this: it is a new module, with no wireframe equivalent.
+ * No wireframe covers this: it is a new module.
  *
  * **Exactly one Trust per locality, enforced by the service, not this
- * screen.** `CreateTrustCommand` refuses a second Trust on a locality
- * already claimed with a 409 - this form does not try to pre-check that, it
- * just shows the service's own refusal.
+ * screen.** `CreateTrustCommand` refuses a second Trust on a locality already
+ * claimed with a 409 - the dialog shows the service's own refusal rather than
+ * pre-checking.
  *
- * **The locality picker is the Pathshala create form's own Country -> State
- * -> City -> Locality cascade**, copied rather than reinvented, with one
- * difference: a Pathshala's address is optional, a Trust's locality is not,
- * so the create button stays disabled until one is actually chosen.
- *
- * **Membership, positions and elections live on the detail screen.** This
- * one is the directory and the on/off switch.
+ * **Membership, positions, elections and the money live on the detail
+ * screen.** This one is the directory, the popup, and the on/off switch.
  */
 @Component({
   selector: 'app-trusts-list',
-  imports: [FormsModule, RouterLink],
+  imports: [RouterLink, TrustDialogComponent],
   template: `
-    <h1 class="title">Trusts</h1>
-    <p class="sub">
-      A Samaaj's local Trust, one per locality. Set one up, and manage its roster and
-      elections from its own page.
-    </p>
+    <div class="head">
+      <div>
+        <h1 class="title">Trusts</h1>
+        <p class="sub">
+          A Samaaj's local Trust, one per locality. Run its roster, elections and money from
+          its own page.
+        </p>
+      </div>
+
+      @if (!moduleOff() && !loading()) {
+        <button class="btn" type="button" (click)="openCreate($event)">Set up a Trust</button>
+      }
+    </div>
 
     @if (error(); as message) {
       <p class="notice error" role="alert">{{ message }}</p>
@@ -55,7 +60,7 @@ import { isNotFound } from '../../core/http-status';
         <h2>Trusts</h2>
 
         @if (trusts().length === 0) {
-          <p class="empty">None yet.</p>
+          <p class="empty">None yet. Set one up for a locality to start its roster.</p>
         } @else {
           <div class="table-wrap">
             <table>
@@ -67,13 +72,16 @@ import { isNotFound } from '../../core/http-status';
                 @for (trust of trusts(); track trust.id) {
                   <tr>
                     <td><a [routerLink]="['/trust', trust.id]"><b>{{ trust.name }}</b></a></td>
-                    <td>{{ localityName(trust.localityId) }}</td>
+                    <td>{{ localities.label(trust.localityId) }}</td>
                     <td>
                       <span class="pill" [class.warn]="trust.status === 'Inactive'">
                         {{ trust.status }}
                       </span>
                     </td>
-                    <td>
+                    <td class="row-actions">
+                      <button class="btn small alt" type="button" (click)="openEdit(trust, $event)">
+                        Edit
+                      </button>
                       @if (trust.status === 'Active') {
                         <button class="btn small alt" type="button" [disabled]="busy()"
                           (click)="setStatus(trust, 'Inactive')">
@@ -93,83 +101,25 @@ import { isNotFound } from '../../core/http-status';
           </div>
         }
       </div>
+    }
 
-      <div class="card spaced">
-        <h2>Set up a Trust</h2>
-
-        <form (ngSubmit)="create()">
-          <div class="form-grid">
-            <div class="field">
-              <label for="trust-name">Name</label>
-              <input id="trust-name" class="input" name="name" [(ngModel)]="name"
-                maxlength="200" placeholder="Hiran Magri Samaaj Trust" />
-            </div>
-
-            <div class="field">
-              <label for="trust-country">Country</label>
-              <select id="trust-country" class="input" name="country"
-                [ngModel]="countryId()" (ngModelChange)="onCountryChange($event)">
-                <option value="">Choose…</option>
-                @for (country of countries(); track country.id) {
-                  <option [value]="country.id">{{ country.label }}</option>
-                }
-              </select>
-            </div>
-
-            @if (countryId() !== '') {
-              <div class="field">
-                <label for="trust-state">State</label>
-                <select id="trust-state" class="input" name="state"
-                  [ngModel]="stateId()" (ngModelChange)="onStateChange($event)">
-                  <option value="">Not specified</option>
-                  @for (state of states(); track state.id) {
-                    <option [value]="state.id">{{ state.name }}</option>
-                  }
-                </select>
-              </div>
-
-              <div class="field">
-                <label for="trust-city">City/Village</label>
-                <select id="trust-city" class="input" name="city"
-                  [ngModel]="cityId()" (ngModelChange)="onCityChange($event)">
-                  <option value="">Choose…</option>
-                  @for (city of cities(); track city.id) {
-                    <option [value]="city.id">{{ city.name }}</option>
-                  }
-                </select>
-              </div>
-            }
-
-            @if (cityId() !== '') {
-              <div class="field">
-                <label for="trust-locality">Locality</label>
-                <select id="trust-locality" class="input" name="locality" [(ngModel)]="localityId">
-                  <option value="">Choose…</option>
-                  @for (locality of localities(); track locality.id) {
-                    <option [value]="locality.id">{{ locality.name }}</option>
-                  }
-                </select>
-              </div>
-            }
-
-            <p class="small span-all">
-              A locality can hold exactly one Trust. Creating a second one for the same
-              locality is refused.
-            </p>
-
-            <div class="span-all">
-              <button class="btn" type="submit" [disabled]="busy() || !canCreate()">
-                Create Trust
-              </button>
-            </div>
-          </div>
-        </form>
-      </div>
+    @if (dialogOpen()) {
+      <app-trust-dialog [trust]="editing()" (saved)="onSaved($event)" (closed)="closeDialog()" />
     }
   `,
   styles: `
-    .spaced {
-      margin-top: var(--space-4);
+    .head {
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-start;
+      gap: var(--space-3);
+      flex-wrap: wrap;
+    }
+
+    .row-actions {
+      display: flex;
+      gap: var(--space-2);
+      flex-wrap: wrap;
     }
   `,
 })
@@ -177,6 +127,7 @@ export class TrustsListComponent implements OnInit {
   private readonly api = inject(AdminApi);
 
   readonly scope = inject(AdminScope);
+  readonly localities = inject(LocalityOptions);
 
   readonly trusts = signal<readonly Trust[]>([]);
   readonly loading = signal(true);
@@ -185,93 +136,64 @@ export class TrustsListComponent implements OnInit {
   readonly error = signal<string | null>(null);
   readonly done = signal<string | null>(null);
 
-  name = '';
-
-  // ---- Locality: Country -> State -> City -> Locality ----------------------
-
-  readonly countries = signal<readonly LookupItem[]>([]);
-  readonly countryId = signal('');
-  readonly states = signal<readonly State[]>([]);
-  readonly stateId = signal('');
-  readonly cities = signal<readonly City[]>([]);
-  readonly cityId = signal('');
-  readonly localities = signal<readonly Locality[]>([]);
-  localityId = '';
-
-  private readonly localityNames = computed(
-    () => new Map(this.localities().map((l) => [l.id, l.name])),
-  );
+  readonly dialogOpen = signal(false);
+  readonly editing = signal<Trust | null>(null);
+  private dialogTrigger: HTMLElement | null = null;
 
   ngOnInit(): void {
+    this.localities.load();
     this.load();
-    this.api.listLookupItems('Country', false).subscribe({
-      next: (found) => this.countries.set(found),
-      error: () => this.countries.set([]),
-    });
   }
 
-  canCreate(): boolean {
-    return this.name.trim().length > 0 && this.localityId.length > 0;
+  openCreate(event: MouseEvent): void {
+    this.editing.set(null);
+    this.openDialog(event);
   }
 
-  /**
-   * A best-effort label. This screen only ever holds the localities under
-   * whichever city was last chosen in the create form, so an existing
-   * Trust's own locality falls back to its raw id rather than an incorrect
-   * name from a different city's list.
-   */
-  localityName(localityId: string): string {
-    return this.localityNames().get(localityId) ?? localityId;
+  openEdit(trust: Trust, event: MouseEvent): void {
+    this.editing.set(trust);
+    this.openDialog(event);
   }
 
-  onCountryChange(countryId: string): void {
-    this.countryId.set(countryId);
-    this.stateId.set('');
-    this.cityId.set('');
-    this.localityId = '';
-    this.states.set([]);
-    this.cities.set([]);
-    this.localities.set([]);
+  onSaved(message: string): void {
+    this.closeDialog();
+    this.done.set(message);
+    this.load();
+  }
 
-    if (countryId === '') {
-      return;
+  closeDialog(): void {
+    this.dialogOpen.set(false);
+
+    const trigger = this.dialogTrigger;
+    this.dialogTrigger = null;
+
+    if (trigger) {
+      setTimeout(() => trigger.focus());
     }
+  }
 
-    this.api.listStates(countryId).subscribe({
-      next: (found) => this.states.set(found),
-      error: () => this.states.set([]),
-    });
-    this.api.listCities(countryId).subscribe({
-      next: (found) => this.cities.set(found),
-      error: () => this.cities.set([]),
+  setStatus(trust: Trust, status: TrustStatus): void {
+    this.busy.set(true);
+    this.error.set(null);
+    this.done.set(null);
+
+    this.api.changeTrustStatus(trust.id, status).subscribe({
+      next: () => {
+        this.done.set(status === 'Inactive' ? `${trust.name} is deactivated.` : `${trust.name} is active again.`);
+        this.busy.set(false);
+        this.load();
+      },
+      error: (failure: unknown) => {
+        this.error.set(describeError(failure));
+        this.busy.set(false);
+      },
     });
   }
 
-  onStateChange(stateId: string): void {
-    this.stateId.set(stateId);
-    this.cityId.set('');
-    this.localityId = '';
-    this.localities.set([]);
-
-    this.api.listCities(this.countryId(), stateId || null).subscribe({
-      next: (found) => this.cities.set(found),
-      error: () => this.cities.set([]),
-    });
-  }
-
-  onCityChange(cityId: string): void {
-    this.cityId.set(cityId);
-    this.localityId = '';
-    this.localities.set([]);
-
-    if (cityId === '') {
-      return;
-    }
-
-    this.api.listLocalities(cityId).subscribe({
-      next: (found) => this.localities.set(found),
-      error: () => this.localities.set([]),
-    });
+  private openDialog(event: MouseEvent): void {
+    this.dialogTrigger = event.currentTarget as HTMLElement;
+    this.done.set(null);
+    this.dialogOpen.set(true);
   }
 
   private load(): void {
@@ -291,46 +213,6 @@ export class TrustsListComponent implements OnInit {
         }
 
         this.loading.set(false);
-      },
-    });
-  }
-
-  create(): void {
-    if (!this.canCreate()) {
-      return;
-    }
-
-    const name = this.name.trim();
-    const localityId = this.localityId;
-
-    this.act(this.api.createTrust(localityId, name), `${name} created.`, () => {
-      this.name = '';
-      this.localityId = '';
-    });
-  }
-
-  setStatus(trust: Trust, status: TrustStatus): void {
-    this.act(
-      this.api.changeTrustStatus(trust.id, status),
-      status === 'Inactive' ? `${trust.name} is deactivated.` : `${trust.name} is active again.`,
-    );
-  }
-
-  private act(work: { subscribe: (o: object) => void }, message: string, reset?: () => void): void {
-    this.busy.set(true);
-    this.error.set(null);
-    this.done.set(null);
-
-    work.subscribe({
-      next: () => {
-        this.done.set(message);
-        this.busy.set(false);
-        reset?.();
-        this.load();
-      },
-      error: (failure: unknown) => {
-        this.error.set(describeError(failure));
-        this.busy.set(false);
       },
     });
   }

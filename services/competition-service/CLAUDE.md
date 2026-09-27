@@ -42,7 +42,8 @@ already has (an organiser permission, not a new platform role).
 
 | Command | Permission | Notes |
 |---|---|---|
-| `CreateCompetitionCommand` | `Competition.Manage` | Starts `Draft` |
+| `CreateCompetitionCommand` | `Competition.Manage` | Starts `Draft`. Optional `LocalityId` |
+| `UpdateCompetitionCommand` | `Competition.Manage` | Corrects the details, locality included. Draft or `RegistrationOpen` only; 409 after, when members have signed up to them |
 | `MoveCompetitionCommand` | `Competition.Manage` | Strictly forward: Draft → RegistrationOpen → RegistrationClosed → InProgress → Closed |
 | `RegisterForCompetitionCommand` | `Members.Read` | Only while registration is open. A repeat registration is a no-op reported as success |
 | `WithdrawRegistrationCommand` | `Members.Read`, own registration only | |
@@ -61,7 +62,7 @@ already take.
 
 | Query | Permission | Notes |
 |---|---|---|
-| `ListCompetitionsQuery` | `Members.Read` | This Samaaj's competitions, each with the caller's own registration status |
+| `ListCompetitionsQuery` | `Members.Read` | This Samaaj's competitions, each with the caller's own registration status. `?localityId=` narrows to one locality |
 | `GetCompetitionQuery` | `Members.Read` | Rounds, registration count, judges, and whether the caller may manage it |
 | `GetRoundQuery` | `Members.Read` | A round's entries. Marks are visible only to the organiser or an assigned judge - never to an ordinary member, before or after publication |
 | `GetRoundResultQuery` | `Members.Read` | The published ranking. 404 until a result exists |
@@ -69,6 +70,7 @@ already take.
 ## Events published
 
 - `CompetitionStatusChangedDomainEvent`
+- `CompetitionUpdatedDomainEvent` — `competition.competition.updated.v1` (ids and who)
 - `CompetitionRegistrationCreatedDomainEvent`
 - `RoundClosedDomainEvent`
 - `RoundResultsPublishedDomainEvent`
@@ -126,6 +128,14 @@ celebrity-voting-service's own results query makes for its tally.
 is a fresh `Guid.NewGuid()` from its own factory or constructor. This
 repository has hit the EF default several times already in other services;
 see their own `CLAUDE.md`s.
+
+## Locality
+
+Added 2026-09-27. A competition may name the locality it is held for
+(`LocalityId`, a loose reference into master-data-service's Locality, like an
+event's), or none for the whole Samaaj. It bounds nobody - every member may
+register for any competition - and exists for the admin panel's locality
+filter (`GET /v1/competitions?localityId=`).
 
 ## Dependencies
 

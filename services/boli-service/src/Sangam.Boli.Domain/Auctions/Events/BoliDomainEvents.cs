@@ -82,3 +82,13 @@ public sealed record BoliExtendedDomainEvent(
 {
     public string Topic => "boli.extended.v1";
 }
+
+/// <summary>An occasion's details were corrected. Ids and who; the details are on the occasion.</summary>
+public sealed record OccasionUpdatedDomainEvent(
+    Guid OccasionId,
+    Guid TenantId,
+    Guid UpdatedBy,
+    DateTimeOffset OccurredAt) : IDomainEvent
+{
+    public string Topic => "boli.occasion.updated.v1";
+}

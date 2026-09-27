@@ -1,12 +1,13 @@
 import { DatePipe } from '@angular/common';
 import { Component, OnInit, inject, signal } from '@angular/core';
-import { FormsModule } from '@angular/forms';
 import { RouterLink } from '@angular/router';
 import { describeError, formatRupees } from '@samaajconnect/shared';
 import { AdminApi } from '../../core/admin-api';
 import { AdminScope } from '../../core/admin-scope';
 import { isForbidden, isNotFound } from '../../core/http-status';
 import { Occasion, PendingResult } from '../../core/admin.models';
+import { LocalityOptions } from '../../core/locality-options';
+import { OccasionDialogComponent } from './occasion-dialog.component';
 
 /**
  * Auctions / Boli — the occasions, and the results waiting to be announced.
@@ -34,10 +35,18 @@ import { Occasion, PendingResult } from '../../core/admin.models';
  */
 @Component({
   selector: 'app-boli-list',
-  imports: [FormsModule, DatePipe, RouterLink],
+  imports: [DatePipe, RouterLink, OccasionDialogComponent],
   template: `
-    <h1 class="title">Auctions / Boli</h1>
-    <p class="sub">Occasion → Boli type → bids → result → publish.</p>
+    <div class="head">
+      <div>
+        <h1 class="title">Auctions / Boli</h1>
+        <p class="sub">Occasion → Boli type → bids → result → publish.</p>
+      </div>
+
+      @if (!moduleOff() && !loading()) {
+        <button class="btn" type="button" (click)="openCreate($event)">Announce an occasion</button>
+      }
+    </div>
 
     @if (error(); as message) {
       <p class="notice error" role="alert">{{ message }}</p>
@@ -148,7 +157,7 @@ import { Occasion, PendingResult } from '../../core/admin.models';
             <table>
               <caption class="sr-only">Boli occasions</caption>
               <thead>
-                <tr><th>Occasion</th><th>Date</th><th>Status</th><th>Types</th><th>Boli</th></tr>
+                <tr><th>Occasion</th><th>Locality</th><th>Date</th><th>Status</th><th>Types</th><th>Boli</th><th></th></tr>
               </thead>
               <tbody>
                 @for (occasion of occasions(); track occasion.id) {
@@ -156,10 +165,18 @@ import { Occasion, PendingResult } from '../../core/admin.models';
                     <td>
                       <a [routerLink]="['/boli', occasion.id]"><b>{{ occasion.title }}</b></a>
                     </td>
+                    <td>{{ localities.label(occasion.localityId) }}</td>
                     <td>{{ occasion.occasionDate }}</td>
                     <td>{{ occasion.status }}</td>
                     <td>{{ occasion.typeCount }}</td>
                     <td>{{ occasion.boliCount }}</td>
+                    <td>
+                      @if (occasion.status !== 'Closed') {
+                        <button class="btn small alt" type="button" (click)="openEdit(occasion, $event)">
+                          Edit
+                        </button>
+                      }
+                    </td>
                   </tr>
                 }
               </tbody>
@@ -167,31 +184,22 @@ import { Occasion, PendingResult } from '../../core/admin.models';
           </div>
         }
 
-        <form (ngSubmit)="create()">
-          <h3 class="section-heading">Announce an occasion</h3>
-
-          <label for="occasion-title">Title</label>
-          <input id="occasion-title" class="input" name="title" [(ngModel)]="title"
-            maxlength="200" placeholder="Paryushan 2026" />
-
-          <label for="occasion-description">Description</label>
-          <input id="occasion-description" class="input" name="description"
-            [(ngModel)]="description" maxlength="500" />
-
-          <label for="occasion-date">Date</label>
-          <input id="occasion-date" class="input inline" type="date" name="occasionDate"
-            [(ngModel)]="occasionDate" />
-
-          <p class="small">It starts Upcoming. Nothing under it takes bids until you make it active.</p>
-
-          <button class="btn" type="submit" [disabled]="busy() || !canCreate()">
-            Announce occasion
-          </button>
-        </form>
       </div>
+    }
+
+    @if (dialogOpen()) {
+      <app-occasion-dialog [occasion]="editing()" (saved)="onSaved($event)" (closed)="closeDialog()" />
     }
   `,
   styles: `
+    .head {
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-start;
+      gap: var(--space-3);
+      flex-wrap: wrap;
+    }
+
     .spaced {
       margin-top: var(--space-4);
     }
@@ -241,19 +249,51 @@ export class BoliListComponent implements OnInit {
    */
   readonly pendingUnavailable = signal(false);
 
-  title = '';
-  description = '';
-  occasionDate = '';
+  readonly localities = inject(LocalityOptions);
+
+  readonly dialogOpen = signal(false);
+  readonly editing = signal<Occasion | null>(null);
+  private dialogTrigger: HTMLElement | null = null;
+
+  openCreate(event: MouseEvent): void {
+    this.editing.set(null);
+    this.openDialog(event);
+  }
+
+  openEdit(occasion: Occasion, event: MouseEvent): void {
+    this.editing.set(occasion);
+    this.openDialog(event);
+  }
+
+  onSaved(message: string): void {
+    this.closeDialog();
+    this.done.set(message);
+    this.load();
+  }
+
+  closeDialog(): void {
+    this.dialogOpen.set(false);
+
+    const trigger = this.dialogTrigger;
+    this.dialogTrigger = null;
+
+    if (trigger) {
+      setTimeout(() => trigger.focus());
+    }
+  }
+
+  private openDialog(event: MouseEvent): void {
+    this.dialogTrigger = event.currentTarget as HTMLElement;
+    this.done.set(null);
+    this.dialogOpen.set(true);
+  }
 
   /** Paise to rupees, via the one place this repo converts money. */
   rupees = formatRupees;
 
   ngOnInit(): void {
+    this.localities.load();
     this.load();
-  }
-
-  canCreate(): boolean {
-    return this.title.trim().length > 0 && this.occasionDate.length > 0;
   }
 
   private load(): void {
@@ -299,24 +339,6 @@ export class BoliListComponent implements OnInit {
     });
   }
 
-  create(): void {
-    if (!this.canCreate()) {
-      return;
-    }
-
-    const title = this.title.trim();
-
-    this.act(
-      this.api.createOccasion(title, blankToNull(this.description), this.occasionDate),
-      `${title} announced.`,
-      () => {
-        this.title = '';
-        this.description = '';
-        this.occasionDate = '';
-      },
-    );
-  }
-
   publish(result: PendingResult): void {
     this.confirming.set(null);
 
@@ -346,8 +368,3 @@ export class BoliListComponent implements OnInit {
   }
 }
 
-function blankToNull(value: string): string | null {
-  const trimmed = value.trim();
-
-  return trimmed.length === 0 ? null : trimmed;
-}

@@ -548,6 +548,13 @@ public static class KnownEvents
             EntityName: "Occasion",
             EntityIdProperty: "occasionId"),
 
+        // Corrections name who made them; the details stay on the occasion.
+        ["boli.occasion.updated.v1"] = new(
+            Action: "OccasionUpdated",
+            EntityName: "Occasion",
+            EntityIdProperty: "occasionId",
+            ActorIdProperty: "updatedBy"),
+
         ["boli.closed.v1"] = new(
             Action: "BoliClosed",
             EntityName: "Boli",
@@ -928,6 +935,12 @@ public static class KnownEvents
             EntityIdProperty: "competitionId",
             BeforeProperties: ["previousStatus"]),
 
+        ["competition.competition.updated.v1"] = new(
+            Action: "CompetitionUpdated",
+            EntityName: "Competition",
+            EntityIdProperty: "competitionId",
+            ActorIdProperty: "updatedBy"),
+
         ["competition.registration.created.v1"] = new(
             Action: "RegistrationCreated",
             EntityName: "CompetitionRegistration",
@@ -979,6 +992,12 @@ public static class KnownEvents
             EntityName: "Trust",
             EntityIdProperty: "trustId",
             BeforeProperties: ["previousStatus"]),
+
+        ["trust.trust.renamed.v1"] = new(
+            Action: "TrustRenamed",
+            EntityName: "Trust",
+            EntityIdProperty: "trustId",
+            ActorIdProperty: "renamedBy"),
 
         ["trust.member.added.v1"] = new(
             Action: "MemberAdded",

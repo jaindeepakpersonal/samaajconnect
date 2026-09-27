@@ -8,6 +8,7 @@ using Sangam.Trust.Application.Members.Queries;
 using Sangam.Trust.Application.Trusts;
 using Sangam.Trust.Application.Trusts.Commands.ChangeTrustStatus;
 using Sangam.Trust.Application.Trusts.Commands.CreateTrust;
+using Sangam.Trust.Application.Trusts.Commands.RenameTrust;
 using Sangam.Trust.Application.Trusts.Queries;
 
 namespace Sangam.Trust.Api.Endpoints;
@@ -89,6 +90,25 @@ public static class TrustEndpoints
             .RequireAuthorization()
             .WithName("ChangeTrustStatus")
             .WithSummary("Activate or deactivate a Trust.")
+            .Produces<TrustResponse>()
+            .ProducesValidationProblem()
+            .ProducesProblem(StatusCodes.Status401Unauthorized)
+            .ProducesProblem(StatusCodes.Status403Forbidden)
+            .ProducesProblem(StatusCodes.Status404NotFound);
+
+        group.MapPatch("/trusts/{id:guid}", async (
+                Guid id,
+                RenameTrustRequest request,
+                ISender sender,
+                CancellationToken cancellationToken) =>
+            {
+                var result = await sender.Send(new RenameTrustCommand(id, request.Name), cancellationToken);
+
+                return result.ToApiResult();
+            })
+            .RequireAuthorization()
+            .WithName("RenameTrust")
+            .WithSummary("Correct a Trust's name. Its locality stays - see RenameTrustCommand.")
             .Produces<TrustResponse>()
             .ProducesValidationProblem()
             .ProducesProblem(StatusCodes.Status401Unauthorized)
@@ -183,6 +203,8 @@ public static class TrustEndpoints
 
     /// <summary>Active or Inactive.</summary>
     public sealed record ChangeStatusRequest(string Status);
+
+    public sealed record RenameTrustRequest(string Name);
 
     /// <summary>MemberId is a string, not Guid: see AddTrustMemberCommand's own remarks.</summary>
     public sealed record AddMemberRequest(string MemberId, string? PositionTitle);

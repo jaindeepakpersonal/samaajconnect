@@ -54,3 +54,13 @@ public sealed record RoundResultsPublishedDomainEvent(
 {
     public string Topic => "competition.round.results-published.v1";
 }
+
+/// <summary>A competition's details were corrected. Ids and who; the details are on the competition.</summary>
+public sealed record CompetitionUpdatedDomainEvent(
+    Guid CompetitionId,
+    Guid TenantId,
+    Guid UpdatedBy,
+    DateTimeOffset OccurredAt) : IDomainEvent
+{
+    public string Topic => "competition.competition.updated.v1";
+}

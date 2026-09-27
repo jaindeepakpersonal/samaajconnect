@@ -9,7 +9,7 @@ import { AdminScope } from '../../core/admin-scope';
 import { AreaScope } from '../../core/area-scope';
 import { PathshalaDetail } from '../../core/admin.models';
 import { isNotFound } from '../../core/http-status';
-import { blankToNull } from './modal-keys';
+import { blankToNull } from '../../core/modal-keys';
 import { PathshalaAnnouncementsComponent } from './pathshala-announcements.component';
 import { PathshalaDonationsComponent } from './pathshala-donations.component';
 import { PathshalaRecordsComponent } from './pathshala-records.component';

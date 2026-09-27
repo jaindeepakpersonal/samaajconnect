@@ -237,6 +237,57 @@ public sealed class BoliLifecycleTests(BoliApiFactory factory)
     }
 
     [Fact]
+    public async Task An_occasion_is_corrected_until_it_closes_and_not_after()
+    {
+        var manager = Manager();
+        var locality = Guid.NewGuid();
+
+        var occasion = await (await manager.PostAsJsonAsync("/v1/boli/occasions", new
+        {
+            title = "Paryushan 2026",
+            description = (string?)null,
+            occasionDate = "2026-09-10",
+        })).Content.ReadFromJsonAsync<OccasionResponse>();
+
+        var updated = await manager.PatchAsJsonAsync($"/v1/boli/occasions/{occasion!.Id}", new
+        {
+            title = "Paryushan Mahaparva 2026",
+            description = "Eight days",
+            occasionDate = "2026-09-12",
+            localityId = locality,
+        });
+
+        updated.StatusCode.Should().Be(HttpStatusCode.OK);
+        var corrected = await updated.Content.ReadFromJsonAsync<OccasionResponse>();
+        corrected!.Title.Should().Be("Paryushan Mahaparva 2026");
+
+        var outbox = await factory.WithDbContextAsync(db =>
+            db.OutboxMessages.IgnoreQueryFilters().Where(m => m.Topic == "boli.occasion.updated.v1").CountAsync());
+        outbox.Should().Be(1);
+
+        (await manager.PostAsJsonAsync($"/v1/boli/occasions/{occasion.Id}/status", new { status = "Closed" }))
+            .StatusCode.Should().Be(HttpStatusCode.OK);
+
+        (await manager.PatchAsJsonAsync($"/v1/boli/occasions/{occasion.Id}", new
+            {
+                title = "Too late",
+                description = (string?)null,
+                occasionDate = "2026-09-12",
+                localityId = (Guid?)null,
+            }))
+            .StatusCode.Should().Be(HttpStatusCode.Conflict);
+
+        (await Member(Guid.NewGuid()).PatchAsJsonAsync($"/v1/boli/occasions/{occasion.Id}", new
+            {
+                title = "Mine",
+                description = (string?)null,
+                occasionDate = "2026-09-12",
+                localityId = (Guid?)null,
+            }))
+            .StatusCode.Should().Be(HttpStatusCode.Forbidden);
+    }
+
+    [Fact]
     public async Task A_member_cannot_run_a_Boli()
     {
         var response = await Member(Guid.NewGuid()).PostAsJsonAsync("/v1/boli/occasions", new

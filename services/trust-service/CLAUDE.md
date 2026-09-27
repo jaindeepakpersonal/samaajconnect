@@ -38,6 +38,7 @@ no referential integrity across the service boundary — the same convention
 |---|---|---|
 | `CreateTrustCommand` | `Trust.Manage` | Refuses a duplicate `(TenantId, LocalityId)` — a 409, backed by a real unique index, not just the handler's own read |
 | `ChangeTrustStatusCommand` | `Trust.Manage` | Active/Inactive. Setting the status it already has is success and changes nothing |
+| `RenameTrustCommand` | `Trust.Manage` | Corrects the name. The locality is not editable: it is what a published Boli is matched on |
 | `AddTrustMemberCommand` | `Trust.Manage` | Adding somebody already active is a no-op reported as success. Adding somebody previously removed reactivates their old row rather than inserting a second one |
 | `UpdateTrustMemberCommand` | `Trust.Manage` | Changes an active trustee's position title. 409 on a removed member |
 | `RemoveTrustMemberCommand` | `Trust.Manage` | Soft: sets `Status = Removed`. Removing somebody already removed is a no-op reported as success |
@@ -73,6 +74,7 @@ no referential integrity across the service boundary — the same convention
 
 - `TrustCreatedDomainEvent` — `trust.trust.created.v1`
 - `TrustStatusChangedDomainEvent` — `trust.trust.status-changed.v1`
+- `TrustRenamedDomainEvent` — `trust.trust.renamed.v1` (ids and who, not the name)
 - `TrustMemberAddedDomainEvent` — `trust.member.added.v1` (also raised on reactivation)
 - `TrustMemberUpdatedDomainEvent` — `trust.member.updated.v1` (also raised when publishing an election installs or clears a position)
 - `TrustMemberRemovedDomainEvent` — `trust.member.removed.v1`

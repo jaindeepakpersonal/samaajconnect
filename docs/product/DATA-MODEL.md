@@ -435,6 +435,10 @@ average are. A leaf service: it consumes nothing and holds no copy of
 another service's data, so account erasure touches nothing here beyond
 what the platform's own tenant isolation already scopes away.
 
+A competition carries an optional `LocalityId` (2026-09-27), a loose reference
+into master-data-service's Locality - null for the whole Samaaj. It bounds
+nobody; it is what the admin panel's locality filter reads.
+
 ## 16. Samaaj Panch
 
 **PanchElection** — `Id, TenantId, Title, Description (nullable),

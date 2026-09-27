@@ -19,6 +19,7 @@ public sealed class CompetitionConfiguration : IEntityTypeConfiguration<Competit
         builder.Property(c => c.Status).HasConversion<string>().HasMaxLength(30);
 
         builder.HasIndex(c => new { c.TenantId, c.Status });
+        builder.HasIndex(c => new { c.TenantId, c.LocalityId });
 
         builder.HasMany(c => c.Registrations)
             .WithOne()

@@ -34,6 +34,14 @@ public sealed class Competition : AggregateRoot, ITenantScopedEntity
     /// <summary>A master-data-service LookupItem id, Category = CompetitionType. Stored and never validated cross-service, the same stance every id like this already takes.</summary>
     public Guid? CompetitionTypeId { get; private set; }
 
+    /// <summary>
+    /// The locality it is held for, or null for the whole Samaaj. A loose
+    /// reference into master-data-service's Locality, like an event's; it is
+    /// what the admin panel's locality filter reads, and bounds nobody -
+    /// every member may take part in any competition.
+    /// </summary>
+    public Guid? LocalityId { get; private set; }
+
     public DateTimeOffset RegistrationStartAt { get; private set; }
     public DateTimeOffset RegistrationEndAt { get; private set; }
 
@@ -55,7 +63,8 @@ public sealed class Competition : AggregateRoot, ITenantScopedEntity
         DateTimeOffset registrationStartAt,
         DateTimeOffset registrationEndAt,
         Guid createdByMemberId,
-        DateTimeOffset now)
+        DateTimeOffset now,
+        Guid? localityId = null)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(title);
 
@@ -66,6 +75,7 @@ public sealed class Competition : AggregateRoot, ITenantScopedEntity
             Title = title.Trim(),
             Description = string.IsNullOrWhiteSpace(description) ? null : description.Trim(),
             CompetitionTypeId = competitionTypeId,
+            LocalityId = localityId,
             RegistrationStartAt = registrationStartAt,
             RegistrationEndAt = registrationEndAt,
             Status = CompetitionStatus.Draft,
@@ -75,6 +85,41 @@ public sealed class Competition : AggregateRoot, ITenantScopedEntity
     }
 
     /// <summary>Whether registration is open right now: the status says so, and the clock agrees.</summary>
+    /// <summary>
+    /// Corrects the details. Only before registration closes: once it has,
+    /// members have registered against these windows and the rounds are being
+    /// run, and a moved window would change the terms after the fact. False
+    /// when the competition has gone past that point.
+    /// </summary>
+    public bool Update(
+        string title,
+        string? description,
+        Guid? competitionTypeId,
+        Guid? localityId,
+        DateTimeOffset registrationStartAt,
+        DateTimeOffset registrationEndAt,
+        Guid updatedBy,
+        DateTimeOffset now)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(title);
+
+        if (Status is not (CompetitionStatus.Draft or CompetitionStatus.RegistrationOpen))
+        {
+            return false;
+        }
+
+        Title = title.Trim();
+        Description = string.IsNullOrWhiteSpace(description) ? null : description.Trim();
+        CompetitionTypeId = competitionTypeId;
+        LocalityId = localityId;
+        RegistrationStartAt = registrationStartAt;
+        RegistrationEndAt = registrationEndAt;
+
+        Raise(new CompetitionUpdatedDomainEvent(Id, TenantId, updatedBy, now));
+
+        return true;
+    }
+
     public bool AcceptsRegistrations(DateTimeOffset now) =>
         Status == CompetitionStatus.RegistrationOpen
         && now >= RegistrationStartAt

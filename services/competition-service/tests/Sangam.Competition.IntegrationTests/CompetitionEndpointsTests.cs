@@ -72,6 +72,51 @@ public sealed class CompetitionEndpointsTests(CompetitionApiFactory factory)
     }
 
     [Fact]
+    public async Task A_competition_is_corrected_until_registration_closes_and_not_after()
+    {
+        var organiser = Organiser();
+        var id = await CreateOpenCompetitionAsync(organiser);
+        var locality = Guid.NewGuid();
+
+        var body = new
+        {
+            title = "Rangoli Contest 2026",
+            description = "Now with a theme",
+            competitionTypeId = (string?)null,
+            registrationStartAt = DateTimeOffset.UtcNow.AddMinutes(-5),
+            registrationEndAt = DateTimeOffset.UtcNow.AddDays(10),
+            localityId = locality.ToString(),
+        };
+
+        var updated = await organiser.PatchAsJsonAsync($"/v1/competitions/{id}", body);
+
+        updated.StatusCode.Should().Be(HttpStatusCode.OK);
+        var competition = await updated.Content.ReadFromJsonAsync<JsonElement>();
+        competition.GetProperty("title").GetString().Should().Be("Rangoli Contest 2026");
+        competition.GetProperty("localityId").GetGuid().Should().Be(locality);
+
+        (await organiser.GetFromJsonAsync<JsonElement>($"/v1/competitions?localityId={locality}"))
+            .EnumerateArray().Select(c => c.GetProperty("id").GetGuid()).Should().Equal(id);
+        (await organiser.GetFromJsonAsync<JsonElement>($"/v1/competitions?localityId={Guid.NewGuid()}"))
+            .GetArrayLength().Should().Be(0);
+
+        (await organiser.PostAsJsonAsync($"/v1/competitions/{id}/status", new { status = "RegistrationClosed" }))
+            .StatusCode.Should().Be(HttpStatusCode.OK);
+
+        (await organiser.PatchAsJsonAsync($"/v1/competitions/{id}", body))
+            .StatusCode.Should().Be(HttpStatusCode.Conflict, "members have signed up to these details");
+    }
+
+    [Fact]
+    public async Task A_member_cannot_edit_a_competition()
+    {
+        var id = await CreateOpenCompetitionAsync(Organiser());
+
+        (await Member(Guid.NewGuid()).PatchAsJsonAsync($"/v1/competitions/{id}", CreateCompetitionBody("Mine")))
+            .StatusCode.Should().Be(HttpStatusCode.Forbidden);
+    }
+
+    [Fact]
     public async Task Status_moves_are_strictly_forward()
     {
         var organiser = Organiser();

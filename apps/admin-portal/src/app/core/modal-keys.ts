@@ -3,8 +3,8 @@
  * modal every screen here shares (`.modal-backdrop`/`.modal-dialog`). Bind it
  * to the dialog element's `(keydown)`.
  *
- * Shared by the Pathshala tabs because three of them open a dialog; the other
- * screens that predate this keep their own copy of the same few lines.
+ * Shared by every dialog written since the Pathshala tabs; the screens that
+ * predate it keep their own copy of the same few lines.
  */
 export function modalKeydown(event: KeyboardEvent, close: () => void): void {
   if (event.key === 'Escape') {

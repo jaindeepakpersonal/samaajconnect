@@ -4,6 +4,7 @@ import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { provideRouter } from '@angular/router';
 import { API_CONFIG } from '@samaajconnect/shared';
 import { Trust } from '../../core/admin.models';
+import { TrustDialogComponent } from './trust-dialog.component';
 import { TrustsListComponent } from './trusts-list.component';
 
 function trust(overrides: Partial<Trust> = {}): Trust {
@@ -17,9 +18,17 @@ function trust(overrides: Partial<Trust> = {}): Trust {
   };
 }
 
+const LOCALITIES = [
+  { id: 'loc1', cityId: 'udr', name: 'Hiran Magri', isActive: true },
+  { id: 'loc9', cityId: 'udr', name: 'Surajpole', isActive: true },
+];
+const CITIES = [{ id: 'udr', countryId: 'in', stateId: null, name: 'Udaipur', isActive: true }];
+
 describe('TrustsListComponent', () => {
   let fixture: ComponentFixture<TrustsListComponent>;
   let http: HttpTestingController;
+
+  const click = { currentTarget: null } as unknown as MouseEvent;
 
   beforeEach(() => {
     TestBed.configureTestingModule({
@@ -40,21 +49,27 @@ describe('TrustsListComponent', () => {
 
   const text = () => fixture.nativeElement.textContent as string;
 
+  function settleLocalities() {
+    http.expectOne((r) => r.url === '/v1/master-data/localities').flush(LOCALITIES);
+    http.expectOne((r) => r.url === '/v1/master-data/cities').flush(CITIES);
+  }
+
   function load(trusts: Trust[] = []) {
     fixture.detectChanges();
     http.expectOne('/v1/trust/trusts').flush(trusts);
-    http.expectOne('/v1/master-data/lookup-items?category=Country&includeInactive=false').flush(
-      [],
-    );
+    settleLocalities();
     fixture.detectChanges();
+  }
+
+  function dialog(): TrustDialogComponent {
+    return fixture.debugElement.query((el) => el.componentInstance instanceof TrustDialogComponent)
+      .componentInstance as TrustDialogComponent;
   }
 
   it('reads a 404 as the module being off', () => {
     fixture.detectChanges();
     http.expectOne('/v1/trust/trusts').flush({}, { status: 404, statusText: 'Not Found' });
-    http.expectOne('/v1/master-data/lookup-items?category=Country&includeInactive=false').flush(
-      [],
-    );
+    settleLocalities();
     fixture.detectChanges();
 
     expect(text()).toContain('does not run the Trust module');
@@ -67,44 +82,105 @@ describe('TrustsListComponent', () => {
     expect(text()).toContain('None yet');
   });
 
-  it('lists a Trust with its status', () => {
+  it('names each Trust’s locality rather than printing its id', () => {
     load([trust()]);
 
     expect(text()).toContain('Hiran Magri Samaaj Trust');
-    expect(text()).toContain('Active');
+    expect(text()).toContain('Hiran Magri, Udaipur');
+    expect(text()).not.toContain('loc1');
   });
 
-  it('disables Create until a name and a locality are both chosen', () => {
+  it('sets a Trust up in a popup, needing a name and a locality', () => {
     load([]);
 
-    const component = fixture.componentInstance;
+    fixture.componentInstance.openCreate(click);
+    fixture.detectChanges();
 
-    expect(component.canCreate()).toBe(false);
+    expect(fixture.nativeElement.querySelector('[role="dialog"]')).not.toBeNull();
 
-    component.name = 'New Trust';
-    expect(component.canCreate()).toBe(false);
+    const form = dialog();
 
-    component.localityId = 'loc9';
-    expect(component.canCreate()).toBe(true);
-  });
+    expect(form.canSave()).toBe(false);
+    form.name = 'Surajpole Samaaj Trust';
+    expect(form.canSave()).toBe(false);
+    form.localityId = 'loc9';
+    expect(form.canSave()).toBe(true);
 
-  it('creates a Trust and reports it', () => {
-    load([]);
+    form.save();
 
-    const component = fixture.componentInstance;
+    const call = http.expectOne('/v1/trust/trusts');
 
-    component.name = 'Surajpole Samaaj Trust';
-    component.localityId = 'loc9';
-    component.create();
+    expect(call.request.method).toBe('POST');
+    expect(call.request.body).toEqual({ localityId: 'loc9', name: 'Surajpole Samaaj Trust' });
 
-    http
-      .expectOne('/v1/trust/trusts')
-      .flush(trust({ id: 't2', name: 'Surajpole Samaaj Trust', localityId: 'loc9' }));
-
+    call.flush(trust({ id: 't2', name: 'Surajpole Samaaj Trust', localityId: 'loc9' }));
     http.expectOne('/v1/trust/trusts').flush([trust({ id: 't2', localityId: 'loc9' })]);
     fixture.detectChanges();
 
-    expect(text()).toContain('Surajpole Samaaj Trust created.');
+    expect(fixture.nativeElement.querySelector('[role="dialog"]')).toBeNull();
+    expect(text()).toContain('Surajpole Samaaj Trust is set up.');
+  });
+
+  it('corrects a Trust’s name in the same popup, showing but not offering its locality', () => {
+    load([trust()]);
+
+    fixture.componentInstance.openEdit(trust(), click);
+    fixture.detectChanges();
+
+    const form = dialog();
+    const locality = fixture.nativeElement.querySelector('#trust-locality') as HTMLInputElement;
+
+    expect(form.name).toBe('Hiran Magri Samaaj Trust');
+    expect(locality.disabled).toBe(true);
+    expect(locality.value).toBe('Hiran Magri, Udaipur');
+
+    form.name = 'Hiran Magri Jain Samaaj Trust';
+    form.save();
+
+    const call = http.expectOne('/v1/trust/trusts/t1');
+
+    expect(call.request.method).toBe('PATCH');
+    expect(call.request.body).toEqual({ name: 'Hiran Magri Jain Samaaj Trust' });
+
+    call.flush(trust({ name: 'Hiran Magri Jain Samaaj Trust' }));
+    http.expectOne('/v1/trust/trusts').flush([trust({ name: 'Hiran Magri Jain Samaaj Trust' })]);
+    fixture.detectChanges();
+
+    expect(text()).toContain('is saved');
+  });
+
+  it('keeps the popup open, with what was typed, when the service refuses', () => {
+    load([]);
+
+    fixture.componentInstance.openCreate(click);
+    fixture.detectChanges();
+
+    const form = dialog();
+    form.name = 'Second Trust';
+    form.localityId = 'loc1';
+    form.save();
+
+    http.expectOne('/v1/trust/trusts').flush(
+      { title: 'This Samaaj already has a Trust for that locality.' },
+      { status: 409, statusText: 'Conflict' },
+    );
+    fixture.detectChanges();
+
+    expect(fixture.nativeElement.querySelector('[role="dialog"] [role="alert"]')).not.toBeNull();
+    expect(form.name).toBe('Second Trust');
+  });
+
+  it('closes on Escape', () => {
+    load([]);
+
+    fixture.componentInstance.openCreate(click);
+    fixture.detectChanges();
+
+    const box = fixture.nativeElement.querySelector('[role="dialog"]') as HTMLElement;
+    box.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }));
+    fixture.detectChanges();
+
+    expect(fixture.nativeElement.querySelector('[role="dialog"]')).toBeNull();
   });
 
   it('deactivates and reactivates a Trust', () => {

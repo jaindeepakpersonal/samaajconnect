@@ -28,6 +28,7 @@ highest". Read "The guarantee" before changing anything under `Bid`.
 | Command | Permission | Notes |
 |---|---|---|
 | `CreateOccasionCommand` | `Boli.Manage` | Starts `Upcoming`. Takes an optional `LocalityId` |
+| `UpdateOccasionCommand` | `Boli.Manage` | Corrects title, description, date and locality until the occasion closes; 409 after, when results have been announced against it |
 | `DefineBoliTypeCommand` | `Boli.Manage` | One name per occasion, case-insensitively |
 | `MoveOccasionCommand` | `Boli.Manage` | Upcoming → Active → Closed. Never backwards |
 | `OpenBoliCommand` | `Boli.Manage` | Creates it `Scheduled` and starts it. Takes the anti-sniping window |
@@ -52,6 +53,7 @@ highest". Read "The guarantee" before changing anything under `Bid`.
 ## Events published
 
 - `OccasionClosedDomainEvent` — `boli.occasion.closed.v1`
+- `OccasionUpdatedDomainEvent` — `boli.occasion.updated.v1` (ids and who)
 - `BoliClosedDomainEvent` — `boli.closed.v1`
 - `BoliResultPublishedDomainEvent` — `boli.result.published.v1`. Carries the occasion's `LocalityId` (null for a Samaaj-wide occasion), added so trust-service can open what the winner owes against that locality's Trust; additive, so the topic stays v1
 - `BoliExtendedDomainEvent` — `boli.extended.v1`, only when a closing bid moved the window

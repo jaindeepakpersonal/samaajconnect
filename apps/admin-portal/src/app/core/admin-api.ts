@@ -26,6 +26,7 @@ import {
   Panel,
   ClassExam,
   Competition,
+  CompetitionInput,
   CompetitionDetail,
   CompetitionResult,
   CompetitionStatus,
@@ -725,6 +726,11 @@ export class AdminApi {
     return this.http.post<Trust>('/v1/trust/trusts', { localityId, name });
   }
 
+  /** Corrects the name. A Trust's locality is not editable - see RenameTrustCommand. */
+  renameTrust(id: string, name: string): Observable<Trust> {
+    return this.http.patch<Trust>(`/v1/trust/trusts/${id}`, { name });
+  }
+
   getTrust(id: string): Observable<Trust> {
     return this.http.get<Trust>(`/v1/trust/trusts/${id}`);
   }
@@ -1129,12 +1135,30 @@ export class AdminApi {
     return this.http.get<OccasionDetail>(`/v1/boli/occasions/${id}`);
   }
 
+  /** Corrects an occasion. 409 once it is closed. */
+  updateOccasion(
+    id: string,
+    title: string,
+    description: string | null,
+    occasionDate: string,
+    localityId: string | null,
+  ): Observable<Occasion> {
+    return this.http.patch<Occasion>(`/v1/boli/occasions/${id}`, {
+      title,
+      description,
+      occasionDate,
+      localityId,
+    });
+  }
+
   createOccasion(
     title: string,
     description: string | null,
     occasionDate: string,
+    localityId: string | null = null,
   ): Observable<Occasion> {
     return this.http.post<Occasion>('/v1/boli/occasions', {
+      localityId,
       title,
       description,
       occasionDate,
@@ -1538,13 +1562,12 @@ export class AdminApi {
   }
 
   /** Creates a competition. It starts as a draft until registration is opened. */
-  createCompetition(competition: {
-    title: string;
-    description: string | null;
-    competitionTypeId: string | null;
-    registrationStartAt: string;
-    registrationEndAt: string;
-  }): Observable<Competition> {
+  /** Corrects a competition. Draft or taking registrations only; 409 after. */
+  updateCompetition(id: string, competition: CompetitionInput): Observable<Competition> {
+    return this.http.patch<Competition>(`/v1/competitions/${id}`, competition);
+  }
+
+  createCompetition(competition: CompetitionInput): Observable<Competition> {
     return this.http.post<Competition>('/v1/competitions', competition);
   }
 

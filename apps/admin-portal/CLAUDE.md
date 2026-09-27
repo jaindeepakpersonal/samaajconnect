@@ -23,19 +23,19 @@ screen. The spec is `docs/product/wireframes/admin-panel-wireframes.html`.
 | Pathshala detail | `/pathshala/:id` | — | built; no wireframe covers running one. Nine tabs: sessions, classes, teachers, students (with the placement queue), exams, progress report, attendance, donations, announcements |
 | Class detail | `/pathshala/:id/classes/:classId` | — | built. Teachers (picked from the Pathshala's teacher records), timetable, roll, register, exams and results |
 | Notifications | `/notifications` | `#notifications` | built — compose and recent, without the Audience and Channel dropdowns |
-| Auctions / Boli | `/boli` | `#boli` + `#publishboli` | built. Occasions, and the publication queue with its confirmation |
+| Auctions / Boli | `/boli` | `#boli` + `#publishboli` | built. Occasions - announced and corrected (until closed) in a popup, with a locality - and the publication queue with its confirmation |
 | Occasion detail | `/boli/:id` | — | built; no wireframe covers running an auction. Types, opening a Boli, closing, recording |
 | Events | `/events` | `#events` | built. Drafts and published together, create, publish, cancel |
 | Event detail | `/events/:id` | — | built; no wireframe covers one. Who is going, who is waiting, and in what order |
 | Celebrities / Voting | `/voting` | `#celebrity` | built. Campaigns, setting one up, and editing one (a modal, until voting opens) |
 | Campaign detail | `/voting/:id` | — | built; no wireframe covers running one. Stage, ballot, nominations, tally, result |
-| Competitions | `/competitions` | — | built; no wireframe covers this new module. Competitions and setting one up |
+| Competitions | `/competitions` | — | built; no wireframe covers this new module. Competitions; setting one up and correcting one (until registration closes) in a popup, with an optional locality |
 | Competition detail | `/competitions/:id` | — | built; no wireframe covers running one. Stage, judges, rounds, entries, publish results |
 | Samaaj Panch | `/panch` | — | built; no wireframe covers it. The seated Panch with Remove, and the elections list with a create modal |
 | Panch election | `/panch/:id` | — | built. Stage, approving nominations, the tally, publishing (which replaces the Panch) |
 | Volunteer Groups | `/groups` | `#groups` (member-facing) | built. Create (president optional), set a president later, and stand one down |
 | Group roles & elections | `/groups/:id` | — | built; no wireframe covers running one. Define volunteer roles and their seats, assign them, open an election for any role, approve nominations, move its stages, publish - the president or an administrator of the group |
-| Trusts | `/trust` | — | built; no wireframe covers this new module. This Samaaj's locality Trusts, and setting one up |
+| Trusts | `/trust` | — | built; no wireframe covers this new module. This Samaaj's locality Trusts; setting one up and renaming one in a popup |
 | Trust detail | `/trust/:id` | — | built; no wireframe covers running one. Tabs: roster and elections (add/change position/remove; open, approve nominations, move stages, publish), donations (pledge, then collect against a receipt number), expenses (record, approve), collections (what a Boli winner owes; record the payment) |
 | Social Issues | `/issues` | `#issues` | built. The reviewer's approval queue |
 | Members | `/members` | `#members` | built. Search the Samaaj directory and open somebody |
@@ -955,6 +955,16 @@ so a Pathshala they do not teach at reads as "no such Pathshala". The nav is a
 courtesy; pathshala-service enforces it, and forces the staff view for a
 teacher who is not a member. "Create a login" on the Teachers tab makes exactly
 that kind of account, and says so.
+
+**Trusts, competitions and Boli occasions are created and edited in a popup
+(2026-09-27)**, the dialog Events and Pathshalas use, each its own component
+beside its list. Each service gained the update command it lacked: a Trust is
+renamed (its locality stays - it is what a published Boli is matched on), a
+competition is corrected until registration closes, an occasion until it
+closes, and Edit is drawn only while the service would take it. Their
+locality selects and Locality columns read `core/locality-options.ts`, which
+loads every locality once per session as "Name, City" - the same list the
+locality filters use - so no row prints a raw id.
 
 **Pledges are chased from Collections too.** A donor who is a member is picked
 from the directory (the same search as Add a trustee), so the pledge is owed

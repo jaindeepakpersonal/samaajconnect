@@ -20,7 +20,8 @@ internal static class CompetitionMappings
             competition.Registrations.Count(r => r.Status == RegistrationStatus.Registered),
             memberId is { } id ? competition.FindRegistration(id)?.Status.ToString() : null,
             memberId is { } judgeId && competition.IsJudge(judgeId),
-            competition.CreatedAt);
+            competition.CreatedAt,
+            competition.LocalityId);
 
     public static RoundResponse ToResponse(this Round round, int entryCount, bool hasPublishedResult) =>
         new(

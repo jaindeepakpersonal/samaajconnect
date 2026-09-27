@@ -58,6 +58,27 @@ public sealed class Trust : AggregateRoot, ITenantScopedEntity
     /// reported to the caller as success rather than raising a duplicate event
     /// - a repeated click is not a second fact.
     /// </summary>
+    /// <summary>Corrects the name. False when it is already that name.</summary>
+    public bool Rename(string name, Guid renamedBy, DateTimeOffset now)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(name);
+
+        var trimmed = name.Trim();
+
+        if (trimmed == Name)
+        {
+            return false;
+        }
+
+        Name = trimmed;
+
+        // Ids only: the name is on the Trust, and a name in an append-only audit
+        // payload is a name nobody can correct there.
+        Raise(new TrustRenamedDomainEvent(Id, TenantId, renamedBy, now));
+
+        return true;
+    }
+
     public bool ChangeStatus(TrustStatus target, DateTimeOffset now)
     {
         if (Status == target)

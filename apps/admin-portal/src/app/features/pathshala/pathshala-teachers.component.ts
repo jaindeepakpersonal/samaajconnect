@@ -9,7 +9,7 @@ import {
   PathshalaTeacher,
   TeacherInput,
 } from '../../core/admin.models';
-import { blankToNull, modalKeydown } from './modal-keys';
+import { blankToNull, modalKeydown } from '../../core/modal-keys';
 
 /** What pathshala-service accepts for a phone number, character for character. */
 const PHONE = /^\+?[0-9 ()-]{7,20}$/;

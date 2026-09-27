@@ -4,6 +4,7 @@ using Sangam.Competition.Application.Competitions;
 using Sangam.Competition.Application.Competitions.Commands.AssignJudge;
 using Sangam.Competition.Application.Competitions.Commands.CloseRound;
 using Sangam.Competition.Application.Competitions.Commands.CreateCompetition;
+using Sangam.Competition.Application.Competitions.Commands.UpdateCompetition;
 using Sangam.Competition.Application.Competitions.Commands.CreateEntry;
 using Sangam.Competition.Application.Competitions.Commands.CreateRound;
 using Sangam.Competition.Application.Competitions.Commands.MoveCompetition;
@@ -25,9 +26,9 @@ public static class CompetitionEndpoints
     {
         var group = app.MapGroup("/v1/competitions").WithTags("Competitions");
 
-        group.MapGet("/", async (ISender sender, CancellationToken cancellationToken) =>
+        group.MapGet("/", async (Guid? localityId, ISender sender, CancellationToken cancellationToken) =>
             {
-                var result = await sender.Send(new ListCompetitionsQuery(), cancellationToken);
+                var result = await sender.Send(new ListCompetitionsQuery(localityId), cancellationToken);
 
                 return result.ToApiResult();
             })
@@ -45,7 +46,8 @@ public static class CompetitionEndpoints
                     request.Description,
                     request.CompetitionTypeId,
                     request.RegistrationStartAt,
-                    request.RegistrationEndAt);
+                    request.RegistrationEndAt,
+                    request.LocalityId);
 
                 var result = await sender.Send(command, cancellationToken);
 
@@ -59,6 +61,32 @@ public static class CompetitionEndpoints
             .ProducesValidationProblem()
             .ProducesProblem(StatusCodes.Status401Unauthorized)
             .ProducesProblem(StatusCodes.Status403Forbidden);
+
+        group.MapPatch("/{id:guid}", async (
+                Guid id, CreateCompetitionRequest request, ISender sender, CancellationToken cancellationToken) =>
+            {
+                var command = new UpdateCompetitionCommand(
+                    id,
+                    request.Title,
+                    request.Description,
+                    request.CompetitionTypeId,
+                    request.LocalityId,
+                    request.RegistrationStartAt,
+                    request.RegistrationEndAt);
+
+                var result = await sender.Send(command, cancellationToken);
+
+                return result.ToApiResult();
+            })
+            .RequireAuthorization()
+            .WithName("UpdateCompetition")
+            .WithSummary("Correct a competition's details. Draft or taking registrations only; 409 after.")
+            .Produces<CompetitionResponse>()
+            .ProducesValidationProblem()
+            .ProducesProblem(StatusCodes.Status401Unauthorized)
+            .ProducesProblem(StatusCodes.Status403Forbidden)
+            .ProducesProblem(StatusCodes.Status404NotFound)
+            .ProducesProblem(StatusCodes.Status409Conflict);
 
         group.MapGet("/{id:guid}", async (Guid id, ISender sender, CancellationToken cancellationToken) =>
             {
@@ -273,7 +301,8 @@ public static class CompetitionEndpoints
         string? Description,
         string? CompetitionTypeId,
         DateTimeOffset RegistrationStartAt,
-        DateTimeOffset RegistrationEndAt);
+        DateTimeOffset RegistrationEndAt,
+        string? LocalityId = null);
 
     /// <summary>RegistrationOpen, RegistrationClosed, InProgress or Closed.</summary>
     public sealed record MoveRequest(string Status);

@@ -83,6 +83,37 @@ public sealed class BoliOccasion : AggregateRoot, ITenantScopedEntity
     /// about which one a Boli belonged to, and the person reading the result is
     /// the one least able to tell them apart.
     /// </remarks>
+    /// <summary>
+    /// Corrects the occasion's details - until it is closed. The locality may
+    /// move while Bolis are still running, because a result only names its
+    /// occasion's locality when it is announced; once closed, results have
+    /// been announced against this one and it stays as it was.
+    /// </summary>
+    public bool Update(
+        string title,
+        string? description,
+        DateOnly occasionDate,
+        Guid? localityId,
+        Guid updatedBy,
+        DateTimeOffset now)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(title);
+
+        if (Status == OccasionStatus.Closed)
+        {
+            return false;
+        }
+
+        Title = title.Trim();
+        Description = string.IsNullOrWhiteSpace(description) ? null : description.Trim();
+        OccasionDate = occasionDate;
+        LocalityId = localityId;
+
+        Raise(new OccasionUpdatedDomainEvent(Id, TenantId, updatedBy, now));
+
+        return true;
+    }
+
     public BoliType? DefineType(string name, string? description)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(name);

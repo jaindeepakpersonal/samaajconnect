@@ -1,15 +1,18 @@
 import { DatePipe } from '@angular/common';
 import { Component, OnInit, inject, signal } from '@angular/core';
-import { FormsModule } from '@angular/forms';
 import { RouterLink } from '@angular/router';
 import { describeError } from '@samaajconnect/shared';
 import { AdminApi } from '../../core/admin-api';
 import { AdminScope } from '../../core/admin-scope';
 import { Competition } from '../../core/admin.models';
+import { LocalityOptions } from '../../core/locality-options';
+import { CompetitionDialogComponent } from './competition-dialog.component';
 import { isNotFound } from '../../core/http-status';
 
 /**
- * Competitions - the list, and setting one up.
+ * Competitions - the list, and setting one up or correcting one in a popup,
+ * the way Events are. Edit is offered only while competition-service would take
+ * it: a Draft, or while registration is open.
  *
  * No wireframe covers this module; it is new this cycle. Shaped after
  * Celebrities / Voting's own list screen, the closest existing precedent: a
@@ -20,10 +23,18 @@ import { isNotFound } from '../../core/http-status';
  */
 @Component({
   selector: 'app-competition-list',
-  imports: [FormsModule, DatePipe, RouterLink],
+  imports: [DatePipe, RouterLink, CompetitionDialogComponent],
   template: `
-    <h1 class="title">Competitions</h1>
-    <p class="sub">Set a competition up, run its rounds, and publish results.</p>
+    <div class="head">
+      <div>
+        <h1 class="title">Competitions</h1>
+        <p class="sub">Set a competition up, run its rounds, and publish results.</p>
+      </div>
+
+      @if (!moduleOff() && !loading()) {
+        <button class="btn" type="button" (click)="openCreate($event)">Set up a competition</button>
+      }
+    </div>
 
     @if (error(); as message) {
       <p class="notice error" role="alert">{{ message }}</p>
@@ -54,7 +65,7 @@ import { isNotFound } from '../../core/http-status';
               <caption class="sr-only">Competitions</caption>
               <thead>
                 <tr>
-                  <th>Competition</th><th>Registration</th><th>Registered</th><th>Status</th>
+                  <th>Competition</th><th>Locality</th><th>Registration</th><th>Registered</th><th>Status</th><th></th>
                 </tr>
               </thead>
               <tbody>
@@ -65,6 +76,7 @@ import { isNotFound } from '../../core/http-status';
                         <b>{{ competition.title }}</b>
                       </a>
                     </td>
+                    <td>{{ localities.label(competition.localityId) }}</td>
                     <td>
                       {{ competition.registrationStartAt | date: 'd MMM' }} —
                       {{ competition.registrationEndAt | date: 'd MMM y' }}
@@ -77,6 +89,13 @@ import { isNotFound } from '../../core/http-status';
                       <span class="pill" [class.warn]="competition.status === 'Draft'">
                         {{ competition.status }}
                       </span>
+                    </td>
+                    <td>
+                      @if (competition.status === 'Draft' || competition.status === 'RegistrationOpen') {
+                        <button class="btn small alt" type="button" (click)="openEdit(competition, $event)">
+                          Edit
+                        </button>
+                      }
                     </td>
                   </tr>
                 }
@@ -91,55 +110,21 @@ import { isNotFound } from '../../core/http-status';
           </p>
         }
       </div>
+    }
 
-      <!-- Create --------------------------------------------------------- -->
-      <div class="card spaced">
-        <h2>Set up a competition</h2>
-
-        <form (ngSubmit)="create()">
-          <div class="form-grid">
-            <div class="field">
-              <label for="competition-title">Title</label>
-              <input id="competition-title" class="input" name="title" [(ngModel)]="title"
-                maxlength="200" placeholder="Rangoli Contest 2026" />
-            </div>
-
-            <div class="field">
-              <label for="competition-description">Description</label>
-              <input id="competition-description" class="input" name="description"
-                [(ngModel)]="description" maxlength="2000" />
-            </div>
-          </div>
-
-          <h3 class="section-heading">Registration</h3>
-          <div class="form-grid">
-            <div class="field">
-              <label for="reg-start">Open</label>
-              <input id="reg-start" class="input" type="datetime-local" name="registrationStartAt"
-                [(ngModel)]="registrationStartAt" />
-            </div>
-            <div class="field">
-              <label for="reg-end">Close</label>
-              <input id="reg-end" class="input" type="datetime-local" name="registrationEndAt"
-                [(ngModel)]="registrationEndAt"
-                [attr.aria-invalid]="windowInvalid() ? 'true' : null" />
-            </div>
-
-            @if (windowInvalid()) {
-              <p class="notice span-all" role="alert">
-                Registration cannot close before it opens.
-              </p>
-            }
-          </div>
-
-          <button class="btn" type="submit" [disabled]="busy() || !canCreate()">
-            Create as a draft
-          </button>
-        </form>
-      </div>
+    @if (dialogOpen()) {
+      <app-competition-dialog [competition]="editing()" (saved)="onSaved($event)" (closed)="closeDialog()" />
     }
   `,
   styles: `
+    .head {
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-start;
+      gap: var(--space-3);
+      flex-wrap: wrap;
+    }
+
     .spaced {
       margin-top: var(--space-4);
     }
@@ -161,30 +146,48 @@ export class CompetitionListComponent implements OnInit {
   readonly error = signal<string | null>(null);
   readonly done = signal<string | null>(null);
 
-  title = '';
-  description = '';
-  registrationStartAt = '';
-  registrationEndAt = '';
+  readonly localities = inject(LocalityOptions);
 
-  ngOnInit(): void {
+  readonly dialogOpen = signal(false);
+  readonly editing = signal<Competition | null>(null);
+  private dialogTrigger: HTMLElement | null = null;
+
+  openCreate(event: MouseEvent): void {
+    this.editing.set(null);
+    this.openDialog(event);
+  }
+
+  openEdit(competition: Competition, event: MouseEvent): void {
+    this.editing.set(competition);
+    this.openDialog(event);
+  }
+
+  onSaved(message: string): void {
+    this.closeDialog();
+    this.done.set(message);
     this.load();
   }
 
-  windowInvalid(): boolean {
-    if (!this.registrationStartAt || !this.registrationEndAt) {
-      return false;
-    }
+  closeDialog(): void {
+    this.dialogOpen.set(false);
 
-    return new Date(this.registrationEndAt) <= new Date(this.registrationStartAt);
+    const trigger = this.dialogTrigger;
+    this.dialogTrigger = null;
+
+    if (trigger) {
+      setTimeout(() => trigger.focus());
+    }
   }
 
-  canCreate(): boolean {
-    return (
-      this.title.trim().length > 0 &&
-      this.registrationStartAt.length > 0 &&
-      this.registrationEndAt.length > 0 &&
-      !this.windowInvalid()
-    );
+  private openDialog(event: MouseEvent): void {
+    this.dialogTrigger = event.currentTarget as HTMLElement;
+    this.done.set(null);
+    this.dialogOpen.set(true);
+  }
+
+  ngOnInit(): void {
+    this.localities.load();
+    this.load();
   }
 
   private load(): void {
@@ -207,46 +210,5 @@ export class CompetitionListComponent implements OnInit {
       },
     });
   }
-
-  create(): void {
-    if (!this.canCreate()) {
-      return;
-    }
-
-    const title = this.title.trim();
-
-    this.busy.set(true);
-    this.error.set(null);
-    this.done.set(null);
-
-    this.api
-      .createCompetition({
-        title,
-        description: blankToNull(this.description),
-        competitionTypeId: null,
-        registrationStartAt: new Date(this.registrationStartAt).toISOString(),
-        registrationEndAt: new Date(this.registrationEndAt).toISOString(),
-      })
-      .subscribe({
-        next: () => {
-          this.done.set(`${title} created as a draft. Registration is not open yet.`);
-          this.busy.set(false);
-          this.title = '';
-          this.description = '';
-          this.registrationStartAt = '';
-          this.registrationEndAt = '';
-          this.load();
-        },
-        error: (failure: unknown) => {
-          this.error.set(describeError(failure));
-          this.busy.set(false);
-        },
-      });
-  }
 }
 
-function blankToNull(value: string): string | null {
-  const trimmed = value.trim();
-
-  return trimmed.length === 0 ? null : trimmed;
-}

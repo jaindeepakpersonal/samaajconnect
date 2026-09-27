@@ -62,6 +62,28 @@ public sealed class TrustEndpointsTests(TrustApiFactory factory)
     }
 
     [Fact]
+    public async Task A_trust_is_renamed_by_an_administrator_and_not_by_a_member()
+    {
+        var trustId = await CreateTrustAsync(name: "Hiran Magri Trst");
+
+        var renamed = await Admin().PatchAsJsonAsync($"/v1/trust/trusts/{trustId}", new { name = "Hiran Magri Trust" });
+
+        renamed.StatusCode.Should().Be(HttpStatusCode.OK);
+        (await renamed.Content.ReadFromJsonAsync<JsonElement>()).GetProperty("name").GetString()
+            .Should().Be("Hiran Magri Trust");
+
+        var events = await factory.WithDbContextAsync(db =>
+            db.OutboxMessages.Where(m => m.Topic == "trust.trust.renamed.v1").CountAsync());
+        events.Should().Be(1);
+
+        (await Member().PatchAsJsonAsync($"/v1/trust/trusts/{trustId}", new { name = "Mine" }))
+            .StatusCode.Should().Be(HttpStatusCode.Forbidden);
+
+        (await Admin(OtherTenantId).PatchAsJsonAsync($"/v1/trust/trusts/{trustId}", new { name = "Theirs" }))
+            .StatusCode.Should().Be(HttpStatusCode.NotFound);
+    }
+
+    [Fact]
     public async Task A_second_trust_for_the_same_locality_is_refused()
     {
         var localityId = Guid.NewGuid();

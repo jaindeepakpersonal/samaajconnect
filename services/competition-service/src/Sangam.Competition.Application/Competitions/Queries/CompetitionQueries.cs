@@ -8,7 +8,8 @@ namespace Sangam.Competition.Application.Competitions.Queries;
 
 /// <summary>This Samaaj's competitions, newest first, each with the caller's own registration status.</summary>
 [RequiresPermission(PermissionKeys.MembersRead)]
-public sealed record ListCompetitionsQuery : IQuery<IReadOnlyList<CompetitionResponse>>;
+/// <remarks><paramref name="LocalityId"/> narrows to one locality's competitions - the admin panel's filter.</remarks>
+public sealed record ListCompetitionsQuery(Guid? LocalityId = null) : IQuery<IReadOnlyList<CompetitionResponse>>;
 
 public sealed class ListCompetitionsQueryHandler(
     ICompetitionRepository competitions, ICurrentUser currentUser)
@@ -18,6 +19,11 @@ public sealed class ListCompetitionsQueryHandler(
         ListCompetitionsQuery query, CancellationToken cancellationToken)
     {
         var found = await competitions.ListAsync(cancellationToken);
+
+        if (query.LocalityId is { } localityId)
+        {
+            found = [.. found.Where(c => c.LocalityId == localityId)];
+        }
 
         return Result.Success<IReadOnlyList<CompetitionResponse>>(
             [.. found.Select(c => c.ToResponse(currentUser.UserId))]);

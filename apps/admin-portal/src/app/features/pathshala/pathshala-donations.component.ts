@@ -4,7 +4,7 @@ import { FormsModule } from '@angular/forms';
 import { describeError, formatRupees, parseRupees } from '@samaajconnect/shared';
 import { AdminApi } from '../../core/admin-api';
 import { DonationLedger, DonationMode, PathshalaDonation } from '../../core/admin.models';
-import { blankToNull } from './modal-keys';
+import { blankToNull } from '../../core/modal-keys';
 
 /**
  * The Pathshala's own donation ledger: gifts made to this Pathshala, recorded

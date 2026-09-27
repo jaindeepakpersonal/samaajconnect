@@ -3,7 +3,9 @@ import { HttpTestingController, provideHttpClientTesting } from '@angular/common
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { ActivatedRoute, provideRouter } from '@angular/router';
 import { API_CONFIG } from '@samaajconnect/shared';
+import { LocalityOptions } from '../../core/locality-options';
 import { BoliListComponent } from './boli-list.component';
+import { OccasionDialogComponent } from './occasion-dialog.component';
 import { OccasionDetailComponent } from './occasion-detail.component';
 import { Boli, Occasion, OccasionDetail, PendingResult } from '../../core/admin.models';
 
@@ -18,6 +20,7 @@ function occasion(overrides: Partial<Occasion> = {}): Occasion {
     status: 'Upcoming',
     typeCount: 1,
     boliCount: 2,
+    localityId: null,
     ...overrides,
   };
 }
@@ -83,6 +86,14 @@ describe('BoliListComponent', () => {
         provideHttpClient(),
         provideHttpClientTesting(),
         { provide: API_CONFIG, useValue: { gatewayUrl: '' } },
+        {
+          provide: LocalityOptions,
+          useValue: {
+            load: () => undefined,
+            options: () => [{ id: 'loc1', label: 'Hiran Magri, Udaipur' }],
+            label: (id: string | null) => (id === 'loc1' ? 'Hiran Magri, Udaipur' : 'Whole Samaaj'),
+          },
+        },
       ],
     });
 
@@ -224,27 +235,44 @@ describe('BoliListComponent', () => {
     expect(JSON.stringify(component.pending())).not.toContain('winningMemberId');
   });
 
+  const click = { currentTarget: null } as unknown as MouseEvent;
+
+  function dialog(): OccasionDialogComponent {
+    return fixture.debugElement.query((el) => el.componentInstance instanceof OccasionDialogComponent)
+      .componentInstance as OccasionDialogComponent;
+  }
+
   it('will not announce an occasion without a title and a date', () => {
     load();
 
-    component.title = 'Paryushan 2026';
-    component.occasionDate = '';
-    component.create();
+    component.openCreate(click);
+    fixture.detectChanges();
+
+    const form = dialog();
+    form.title = 'Paryushan 2026';
+    form.occasionDate = '';
+    form.save();
 
     http.expectNone('/v1/boli/occasions');
   });
 
-  it('announces an occasion, sending no description rather than an empty one', () => {
+  it('announces an occasion in a popup, sending no description rather than an empty one', () => {
     load();
 
-    component.title = ' Paryushan 2026 ';
-    component.description = '   ';
-    component.occasionDate = '2026-09-10';
-    component.create();
+    component.openCreate(click);
+    fixture.detectChanges();
+
+    const form = dialog();
+    form.title = ' Paryushan 2026 ';
+    form.description = '   ';
+    form.occasionDate = '2026-09-10';
+    form.localityId = 'loc1';
+    form.save();
 
     const call = http.expectOne('/v1/boli/occasions');
 
     expect(call.request.body).toEqual({
+      localityId: 'loc1',
       title: 'Paryushan 2026',
       description: null,
       occasionDate: '2026-09-10',
@@ -252,6 +280,44 @@ describe('BoliListComponent', () => {
 
     call.flush(occasion());
     reload();
+
+    expect(fixture.nativeElement.querySelector('[role="dialog"]')).toBeNull();
+    expect(text()).toContain('Paryushan 2026 announced.');
+  });
+
+  it('corrects an occasion in the same popup, and offers no Edit once it is closed', () => {
+    load([occasion({ localityId: 'loc1' }), occasion({ id: 'o2', title: 'Old', status: 'Closed' })]);
+
+    const edits = [...(fixture.nativeElement as HTMLElement).querySelectorAll('button')]
+      .filter((b) => b.textContent?.trim() === 'Edit');
+
+    expect(edits).toHaveLength(1);
+    expect(text()).toContain('Hiran Magri, Udaipur');
+
+    component.openEdit(occasion({ localityId: 'loc1' }), click);
+    fixture.detectChanges();
+
+    const form = dialog();
+
+    expect(form.localityId).toBe('loc1');
+
+    form.occasionDate = '2026-09-12';
+    form.save();
+
+    const call = http.expectOne(`/v1/boli/occasions/${OCCASION_ID}`);
+
+    expect(call.request.method).toBe('PATCH');
+    expect(call.request.body).toEqual({
+      title: 'Paryushan 2026',
+      description: null,
+      occasionDate: '2026-09-12',
+      localityId: 'loc1',
+    });
+
+    call.flush(occasion());
+    reload();
+
+    expect(text()).toContain('is saved');
   });
 
   function reload() {
