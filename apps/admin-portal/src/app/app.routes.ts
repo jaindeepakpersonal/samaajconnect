@@ -220,6 +220,12 @@ export const routes: Routes = [
           import('./features/issues/issue-queue.component').then((m) => m.IssueQueueComponent),
       },
       {
+        path: 'families',
+        title: 'Families & Children - samaajconnect admin',
+        loadComponent: () =>
+          import('./features/families/family-list.component').then((m) => m.FamilyListComponent),
+      },
+      {
         path: 'members',
         title: 'Members - samaajconnect admin',
         loadComponent: () =>

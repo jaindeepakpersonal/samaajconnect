@@ -7,6 +7,7 @@ import { AreaScope } from '../../core/area-scope';
 import { isNotFound } from '../../core/http-status';
 import { Pathshala } from '../../core/admin.models';
 import { PathshalaDialogComponent } from './pathshala-dialog.component';
+import { ALL_LOCALITIES, LocalityFilterComponent, matchesLocality } from '../../core/locality-filter.component';
 
 /**
  * Jain Pathshala, from the admin wireframe's `#pathshala` screen: every
@@ -30,7 +31,7 @@ import { PathshalaDialogComponent } from './pathshala-dialog.component';
  */
 @Component({
   selector: 'app-pathshala-list',
-  imports: [RouterLink, PathshalaDialogComponent],
+  imports: [LocalityFilterComponent, RouterLink, PathshalaDialogComponent],
   template: `
     <div class="section-head">
       <div>
@@ -68,8 +69,14 @@ import { PathshalaDialogComponent } from './pathshala-dialog.component';
         }
       </p>
     } @else {
+      <app-locality-filter [(value)]="localityFilter" inputId="pathshalas-locality" />
+
+      @if (pathshalas().length > 0 && shownPathshalas().length === 0) {
+        <p class="empty">Nothing here for that locality.</p>
+      }
+
       <div class="grid">
-        @for (item of pathshalas(); track item.id) {
+        @for (item of shownPathshalas(); track item.id) {
           <div class="card">
             <h2>{{ item.name }}</h2>
 
@@ -186,6 +193,13 @@ export class PathshalaListComponent implements OnInit {
   readonly scope = inject(AdminScope);
 
   readonly pathshalas = signal<readonly Pathshala[]>([]);
+
+  /** The Locality filter - see LocalityFilterComponent. */
+  readonly localityFilter = signal(ALL_LOCALITIES);
+
+  readonly shownPathshalas = computed(() =>
+    this.pathshalas().filter((item) => matchesLocality(this.localityFilter(), item.address?.localityId)),
+  );
   readonly loading = signal(true);
   readonly busy = signal(false);
   readonly moduleOff = signal(false);

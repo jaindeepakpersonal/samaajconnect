@@ -28,9 +28,17 @@ version of the plan; the reasoning behind the ordering lives in
   for Trusts, competitions and Boli occasions (competitions gained an
   optional locality).
 
-  Still to come from the same request: locality filters across the admin
-  modules, the member's own photo and author photos on Timeline, OTP two-
-  factor sign-in with a self-hosted CAPTCHA, and a security hardening pass.
+  Then, the same day: **a Locality filter on every admin module list** -
+  groups, events, issues, Trusts, Pathshalas, Boli occasions, competitions
+  (narrowing the loaded rows through one shared control) - and **a new
+  Families & Children screen** backed by member-family-service's new
+  `ListFamiliesQuery` (`GET /v1/families`): households with members and
+  minor children, found by where their members live, administrators only and
+  an Area Admin only for their own locality.
+
+  Still to come from the same request: the member's own photo and author
+  photos on Timeline, OTP two-factor sign-in with a self-hosted CAPTCHA, and a
+  security hardening pass.
 - **Previously:** 2026-09-20 - **a new module, trust-service: locality-wise
   Trust management, phase 1 (roster only).** One Trust per `(Samaaj,
   Locality)`, with `TrustMember` as its own aggregate so a roster change

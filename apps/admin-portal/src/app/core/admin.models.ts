@@ -1167,6 +1167,9 @@ export interface SocialIssue {
   readonly description: string;
   readonly category: string;
   readonly locality: string | null;
+
+  /** The master-data locality it concerns, or null (older issues carry the text only). */
+  readonly localityId: string | null;
   readonly submittedByMemberId: string;
   readonly status: IssueStatus;
   readonly isMine: boolean;
@@ -1455,4 +1458,33 @@ export interface CompetitionResult {
   readonly ranking: readonly CompetitionResultEntry[];
   readonly publishedBy: string;
   readonly publishedAt: string;
+}
+
+// ---- Families & Children -------------------------------------------------------
+
+/** Mirrors member-family-service's `FamilyOverviewResponse`: one household, for administrators. */
+export interface FamilyOverview {
+  readonly id: string;
+  readonly familyCode: string;
+  readonly headMemberId: string | null;
+  readonly createdAt: string;
+  readonly members: readonly FamilyOverviewMember[];
+  readonly children: readonly FamilyOverviewChild[];
+}
+
+/** An active member of the household; `localityId` is their permanent address's. */
+export interface FamilyOverviewMember {
+  readonly memberId: string;
+  readonly fullName: string;
+  readonly relationship: string;
+  readonly isHead: boolean;
+  readonly localityId: string | null;
+}
+
+/** A minor child's record - an age, never a date of birth. */
+export interface FamilyOverviewChild {
+  readonly id: string;
+  readonly fullName: string;
+  readonly age: number;
+  readonly gender: string;
 }

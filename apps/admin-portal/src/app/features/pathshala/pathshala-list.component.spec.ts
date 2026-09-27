@@ -6,6 +6,7 @@ import { API_CONFIG, AuthService } from '@samaajconnect/shared';
 import { PathshalaListComponent } from './pathshala-list.component';
 import { AdminScope } from '../../core/admin-scope';
 import { Pathshala } from '../../core/admin.models';
+import { LocalityOptions } from '../../core/locality-options';
 
 function pathshala(overrides: Partial<Pathshala> = {}): Pathshala {
   return {
@@ -41,6 +42,14 @@ function configure(
       provideHttpClient(),
       provideHttpClientTesting(),
       { provide: API_CONFIG, useValue: { gatewayUrl: '' } },
+      {
+        provide: LocalityOptions,
+        useValue: {
+          load: () => undefined,
+          options: () => [{ id: 'loc1', label: 'Hiran Magri, Udaipur' }],
+          label: (id: string | null) => (id === 'loc1' ? 'Hiran Magri, Udaipur' : 'Whole Samaaj'),
+        },
+      },
       {
         provide: AuthService,
         useValue: { roles: () => roles, user: () => ({ roles, permissions, areaLocalityId }) },

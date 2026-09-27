@@ -33,6 +33,7 @@ public static class DependencyInjection
         services.AddScoped<IUnitOfWork, UnitOfWork>();
         services.AddScoped<IMemberProfileRepository, MemberProfileRepository>();
         services.AddScoped<IFamilyRepository, FamilyRepository>();
+        services.AddScoped<IFamilyDirectory, FamilyDirectory>();
         services.AddScoped<IChildRepository, ChildRepository>();
         services.AddScoped<IImageStore, ImageStore>();
         services.AddScoped<IChildConversionRepository, ChildConversionRepository>();

@@ -332,7 +332,7 @@ const NAV: readonly NavGroup[] = [
       // untrue about their own platform - and the member portal has screens for
       // all of them. What is missing here is the administrative view.
       { label: 'Members', route: '/members', forAreaAdmin: true },
-      { label: 'Families & Children', route: '/conversions' },
+      { label: 'Families & Children', route: '/families', forAreaAdmin: true },
       { label: 'Timeline / Moderation', route: '/moderation' },
       { label: 'Volunteer Groups', route: '/groups', forAreaAdmin: true },
       { label: 'Events', route: '/events', forAreaAdmin: true },

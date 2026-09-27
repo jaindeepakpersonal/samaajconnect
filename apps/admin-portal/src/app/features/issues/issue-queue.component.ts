@@ -1,11 +1,12 @@
 import { DatePipe } from '@angular/common';
-import { Component, OnInit, inject, signal } from '@angular/core';
+import { Component, computed, OnInit, inject, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { describeError } from '@samaajconnect/shared';
 import { AdminApi } from '../../core/admin-api';
 import { AdminScope } from '../../core/admin-scope';
 import { IssueReviewAccess, IssueStatus, SocialIssue } from '../../core/admin.models';
 import { isNotFound } from '../../core/http-status';
+import { ALL_LOCALITIES, LocalityFilterComponent, matchesLocality } from '../../core/locality-filter.component';
 
 /**
  * Social issues — what the Samaaj Panch has to decide about.
@@ -38,7 +39,7 @@ import { isNotFound } from '../../core/http-status';
  */
 @Component({
   selector: 'app-issue-queue',
-  imports: [FormsModule, DatePipe],
+  imports: [LocalityFilterComponent, FormsModule, DatePipe],
   template: `
     <h1 class="title">Social issues</h1>
     <p class="sub">What the Samaaj Panch has to decide about, oldest first.</p>
@@ -68,12 +69,18 @@ import { isNotFound } from '../../core/http-status';
         }
       }
 
+      <app-locality-filter [(value)]="localityFilter" inputId="issues-locality" />
+
+      @if (issues().length > 0 && shownIssues().length === 0) {
+        <p class="empty">Nothing here for that locality.</p>
+      }
+
       @if (issues().length === 0) {
         <p class="empty">
           Nothing waiting. Issues appear here when a member submits one.
         </p>
       } @else {
-        @for (issue of issues(); track issue.id) {
+        @for (issue of shownIssues(); track issue.id) {
           <div class="card spaced">
             <h2>{{ issue.title }}</h2>
             <p class="sub">
@@ -148,6 +155,13 @@ export class IssueQueueComponent implements OnInit {
   readonly scope = inject(AdminScope);
 
   readonly issues = signal<readonly SocialIssue[]>([]);
+
+  /** The Locality filter - see LocalityFilterComponent. */
+  readonly localityFilter = signal(ALL_LOCALITIES);
+
+  readonly shownIssues = computed(() =>
+    this.issues().filter((issue) => matchesLocality(this.localityFilter(), issue.localityId)),
+  );
   readonly access = signal<IssueReviewAccess | null>(null);
   readonly loading = signal(true);
   readonly busy = signal(false);

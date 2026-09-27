@@ -6,6 +6,7 @@ import { API_CONFIG, AuthService } from '@samaajconnect/shared';
 import { EventDetailComponent } from './event-detail.component';
 import { EventsListComponent } from './events-list.component';
 import { Attendee, OrganizerGroup, SamaajEvent } from '../../core/admin.models';
+import { LocalityOptions } from '../../core/locality-options';
 
 const EVENT_ID = 'e1';
 
@@ -77,6 +78,14 @@ describe('EventsListComponent', () => {
         provideHttpClient(),
         provideHttpClientTesting(),
         { provide: API_CONFIG, useValue: { gatewayUrl: '' } },
+        {
+          provide: LocalityOptions,
+          useValue: {
+            load: () => undefined,
+            options: () => [{ id: 'loc1', label: 'Hiran Magri, Udaipur' }],
+            label: (id: string | null) => (id === 'loc1' ? 'Hiran Magri, Udaipur' : 'Whole Samaaj'),
+          },
+        },
       ],
     });
 
@@ -387,6 +396,14 @@ describe('EventDetailComponent', () => {
         provideHttpClient(),
         provideHttpClientTesting(),
         { provide: API_CONFIG, useValue: { gatewayUrl: '' } },
+        {
+          provide: LocalityOptions,
+          useValue: {
+            load: () => undefined,
+            options: () => [{ id: 'loc1', label: 'Hiran Magri, Udaipur' }],
+            label: (id: string | null) => (id === 'loc1' ? 'Hiran Magri, Udaipur' : 'Whole Samaaj'),
+          },
+        },
         {
           provide: ActivatedRoute,
           useValue: { snapshot: { paramMap: { get: () => EVENT_ID } } },

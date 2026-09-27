@@ -23,6 +23,7 @@ import {
   ElectionInput,
   ElectionResult,
   ElectionStatus,
+  FamilyOverview,
   Panel,
   ClassExam,
   Competition,
@@ -359,6 +360,21 @@ export class AdminApi {
    * on it. Both follow from the same decision, that correcting somebody's
    * details is administrative work.
    */
+  /**
+   * This Samaaj's households with their members and minor children, newest
+   * first. A locality narrows to households with a member living there; an
+   * Area Admin must name their own (anything else is a 403).
+   */
+  listFamilies(localityId: string | null, skip = 0, take = 20): Observable<Paged<FamilyOverview>> {
+    let params = new HttpParams().set('skip', skip).set('take', take);
+
+    if (localityId) {
+      params = params.set('localityId', localityId);
+    }
+
+    return this.http.get<Paged<FamilyOverview>>('/v1/families', { params });
+  }
+
   searchMembers(
     term: string | null,
     localityId: string | null,

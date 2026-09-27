@@ -8,8 +8,8 @@ import { ConversionRequest } from '../../core/admin.models';
 
 /**
  * Adult Child Conversion Queue, from the admin wireframe's `#conversionqueue`
- * screen. Reached from the nav's "Families & Children", which is the only part
- * of that section with a backend today.
+ * screen. Reached from the Families & Children screen, which lists the
+ * households these children belong to.
  *
  * Adult-child conversion was decided as admin-approved rather than
  * self-service: creating a platform login is not something a household should

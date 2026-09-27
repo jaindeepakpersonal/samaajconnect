@@ -45,6 +45,7 @@ and expose its endpoints behind the gateway at the route prefix shown.
   `RequestJoinFamilyCommand`, `CreateChildProfileCommand`,
   `RequestChildConversionCommand`, `ApproveChildConversionCommand`
 - **Key queries:** `SearchMembersQuery` (tenant-scoped directory),
+  `ListFamiliesQuery` (administrators: households by where their members live),
   `GetFamilyQuery`, `ListEligibleConversionsQuery`
 - **Events published:** `MemberProfileUpdated`, `FamilyCreated`,
   `ChildConversionApproved` *(triggers `identity-tenant-service` to

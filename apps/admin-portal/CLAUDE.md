@@ -16,6 +16,7 @@ screen. The spec is `docs/product/wireframes/admin-panel-wireframes.html`.
 | Admin Users & Roles | `/admins` | `#admins` | built. Roles, re-issuing a one-time activation code, and suspending or reinstating an account |
 | Invite Admin | `/admins/invite` | `#inviteadmin` | built |
 | Role & Permission Matrix | `/roles` | `#rolematrix` | built, editable per Samaaj |
+| Families & Children | `/families` | — | built; no wireframe screen lists households. Each household with its members (where they live, who is head) and minor children as ages, filtered by locality, paged; links to the conversion queue |
 | Adult Child Conversion Queue | `/conversions` | `#conversionqueue` | built |
 | Audit Logs | `/audit` | `#audit` | built |
 | Timeline / Moderation | `/moderation` | `#content` | built |
@@ -924,6 +925,22 @@ its address's, so one created before localities mattered stays the Samaaj
 Admin's until somebody gives it one with Edit details (below).
 Social issues are filtered by the service itself: the approval queue simply
 returns only the Area Admin's locality's issues.
+
+**Every module list has a Locality filter (2026-09-27)** - Volunteer Groups,
+Events, Social Issues, Trusts, Jain Pathshala, Auctions / Boli, Competitions,
+and Families & Children. `core/locality-filter.component.ts` is the one
+control: All localities, the whole Samaaj only (rows with no locality), or one
+locality, from `LocalityOptions`. On the first seven it narrows the rows the
+screen already loaded - each list is small, loaded whole, and names its
+locality on every row, so filtering in the page costs no request and cannot
+disagree with what it filters. Families & Children is the exception: it is
+paged, and a household has no locality of its own - it is found by where its
+members live - so member-family-service does the filtering (`GET
+/v1/families?localityId=`) and "the whole Samaaj only" is not offered. An Area
+Admin's filter there is fixed to their locality, the Members screen's rule,
+because the service refuses them any other. "Families & Children" in the nav
+used to open the conversion queue, the only part of that section with a
+backend; it opens the household list now, which links to the queue.
 
 **Trusts shipped with no admin screen at all until now**, the same shape of gap
 as every other case in this file: `trust-service` (roster CRUD, then

@@ -5,6 +5,7 @@ import { provideRouter } from '@angular/router';
 import { API_CONFIG, AuthService } from '@samaajconnect/shared';
 import { GroupsListComponent } from './groups-list.component';
 import { VolunteerGroup } from '../../core/admin.models';
+import { LocalityOptions } from '../../core/locality-options';
 
 function group(overrides: Partial<VolunteerGroup> = {}): VolunteerGroup {
   return {
@@ -38,6 +39,14 @@ describe('GroupsListComponent', () => {
         provideHttpClient(),
         provideHttpClientTesting(),
         { provide: API_CONFIG, useValue: { gatewayUrl: '' } },
+        {
+          provide: LocalityOptions,
+          useValue: {
+            load: () => undefined,
+            options: () => [{ id: 'loc1', label: 'Hiran Magri, Udaipur' }],
+            label: (id: string | null) => (id === 'loc1' ? 'Hiran Magri, Udaipur' : 'Whole Samaaj'),
+          },
+        },
       ],
     });
 

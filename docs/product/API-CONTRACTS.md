@@ -94,6 +94,7 @@ enforced by `TenantAuthorizationBehavior`, not just UI hiding.
 | GET | `/children/{id}/photo` | The child's household | |
 | DELETE | `/children/{id}/photo` | The child's household | Idempotent |
 | POST | `/families` | Member | Create family, become its **family admin** |
+| GET | `/families` | SamaajAdmin / SuperAdmin / AreaAdmin + `Members.Write` | Households with their active members and minor children (an age, not a date of birth), newest first, `?skip=&take=` paged as `{ items, hasMore }`. `?localityId=` keeps households with an active member whose permanent address is there. **403** to an Area Admin naming any locality but their own, or none |
 | PUT | `/families/mine/head` | Family admin | Name the household's **family head** (its eldest member, a label that grants nothing) from its active members, or clear it with an empty id. **403** to anybody but the family admin, **409** if the person is not an active member |
 | POST | `/families/join-requests` | Member | Request to join via family code |
 | DELETE | `/families/join-requests/mine` | Member | Take back a request nobody has decided. No id: a member has at most one. Idempotent, but **409** if the family admin accepted in the meantime — you are in that household now |

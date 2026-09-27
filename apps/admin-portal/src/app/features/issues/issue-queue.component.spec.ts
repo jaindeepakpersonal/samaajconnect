@@ -5,6 +5,7 @@ import { provideRouter } from '@angular/router';
 import { API_CONFIG } from '@samaajconnect/shared';
 import { IssueQueueComponent } from './issue-queue.component';
 import { IssueReviewAccess, SocialIssue } from '../../core/admin.models';
+import { LocalityOptions } from '../../core/locality-options';
 
 function issue(overrides: Partial<SocialIssue> = {}): SocialIssue {
   return {
@@ -13,6 +14,7 @@ function issue(overrides: Partial<SocialIssue> = {}): SocialIssue {
     description: 'Three have been dark since the monsoon.',
     category: 'Infrastructure',
     locality: 'Hiran Magri',
+    localityId: 'loc1',
     submittedByMemberId: 'm1',
     status: 'Submitted',
     isMine: false,
@@ -43,6 +45,14 @@ describe('IssueQueueComponent', () => {
         provideHttpClient(),
         provideHttpClientTesting(),
         { provide: API_CONFIG, useValue: { gatewayUrl: '' } },
+        {
+          provide: LocalityOptions,
+          useValue: {
+            load: () => undefined,
+            options: () => [{ id: 'loc1', label: 'Hiran Magri, Udaipur' }],
+            label: (id: string | null) => (id === 'loc1' ? 'Hiran Magri, Udaipur' : 'Whole Samaaj'),
+          },
+        },
       ],
     });
 

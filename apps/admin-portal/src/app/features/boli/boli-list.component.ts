@@ -1,5 +1,5 @@
 import { DatePipe } from '@angular/common';
-import { Component, OnInit, inject, signal } from '@angular/core';
+import { Component, computed, OnInit, inject, signal } from '@angular/core';
 import { RouterLink } from '@angular/router';
 import { describeError, formatRupees } from '@samaajconnect/shared';
 import { AdminApi } from '../../core/admin-api';
@@ -8,6 +8,7 @@ import { isForbidden, isNotFound } from '../../core/http-status';
 import { Occasion, PendingResult } from '../../core/admin.models';
 import { LocalityOptions } from '../../core/locality-options';
 import { OccasionDialogComponent } from './occasion-dialog.component';
+import { ALL_LOCALITIES, LocalityFilterComponent, matchesLocality } from '../../core/locality-filter.component';
 
 /**
  * Auctions / Boli — the occasions, and the results waiting to be announced.
@@ -35,7 +36,7 @@ import { OccasionDialogComponent } from './occasion-dialog.component';
  */
 @Component({
   selector: 'app-boli-list',
-  imports: [DatePipe, RouterLink, OccasionDialogComponent],
+  imports: [LocalityFilterComponent, DatePipe, RouterLink, OccasionDialogComponent],
   template: `
     <div class="head">
       <div>
@@ -147,6 +148,12 @@ import { OccasionDialogComponent } from './occasion-dialog.component';
       <div class="card spaced">
         <h2>Occasions</h2>
 
+        <app-locality-filter [(value)]="localityFilter" inputId="occasions-locality" />
+
+        @if (occasions().length > 0 && shownOccasions().length === 0) {
+          <p class="empty">Nothing here for that locality.</p>
+        }
+
         @if (occasions().length === 0) {
           <p class="empty">
             No occasions yet. An occasion is the event the Boli belong to — Paryushan, a temple
@@ -160,7 +167,7 @@ import { OccasionDialogComponent } from './occasion-dialog.component';
                 <tr><th>Occasion</th><th>Locality</th><th>Date</th><th>Status</th><th>Types</th><th>Boli</th><th></th></tr>
               </thead>
               <tbody>
-                @for (occasion of occasions(); track occasion.id) {
+                @for (occasion of shownOccasions(); track occasion.id) {
                   <tr>
                     <td>
                       <a [routerLink]="['/boli', occasion.id]"><b>{{ occasion.title }}</b></a>
@@ -222,6 +229,13 @@ export class BoliListComponent implements OnInit {
   readonly scope = inject(AdminScope);
 
   readonly occasions = signal<readonly Occasion[]>([]);
+
+  /** The Locality filter - see LocalityFilterComponent. */
+  readonly localityFilter = signal(ALL_LOCALITIES);
+
+  readonly shownOccasions = computed(() =>
+    this.occasions().filter((occasion) => matchesLocality(this.localityFilter(), occasion.localityId)),
+  );
   readonly pending = signal<readonly PendingResult[]>([]);
   readonly loading = signal(true);
   readonly busy = signal(false);

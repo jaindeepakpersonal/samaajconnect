@@ -16,6 +16,7 @@ import { AdminScope } from '../../core/admin-scope';
 import { AreaScope, labelLocalities } from '../../core/area-scope';
 import { VolunteerGroup } from '../../core/admin.models';
 import { isNotFound } from '../../core/http-status';
+import { ALL_LOCALITIES, LocalityFilterComponent, matchesLocality } from '../../core/locality-filter.component';
 
 /**
  * Volunteer groups — creating them, correcting them, and standing them down.
@@ -52,7 +53,7 @@ import { isNotFound } from '../../core/http-status';
  */
 @Component({
   selector: 'app-groups-list',
-  imports: [FormsModule, RouterLink],
+  imports: [LocalityFilterComponent, FormsModule, RouterLink],
   template: `
     <div class="section-head">
       <div>
@@ -83,6 +84,12 @@ import { isNotFound } from '../../core/http-status';
       <div class="card">
         <h2>Groups</h2>
 
+        <app-locality-filter [(value)]="localityFilter" inputId="groups-locality" />
+
+        @if (groups().length > 0 && shownGroups().length === 0) {
+          <p class="empty">Nothing here for that locality.</p>
+        }
+
         @if (groups().length === 0) {
           <p class="empty">
             None yet. A group starts with a name and, usually, a president to run it.
@@ -98,7 +105,7 @@ import { isNotFound } from '../../core/http-status';
                 </tr>
               </thead>
               <tbody>
-                @for (group of groups(); track group.id) {
+                @for (group of shownGroups(); track group.id) {
                   <tr>
                     <td>
                       <a [routerLink]="['/groups', group.id]"><b>{{ group.name }}</b></a>
@@ -339,6 +346,13 @@ export class GroupsListComponent implements OnInit {
   @ViewChild('firstField') private readonly firstFieldRef?: ElementRef<HTMLInputElement>;
 
   readonly groups = signal<readonly VolunteerGroup[]>([]);
+
+  /** The Locality filter - see LocalityFilterComponent. */
+  readonly localityFilter = signal(ALL_LOCALITIES);
+
+  readonly shownGroups = computed(() =>
+    this.groups().filter((group) => matchesLocality(this.localityFilter(), group.localityId)),
+  );
   readonly localityOptions = signal<readonly { id: string; label: string }[]>([]);
   readonly members = signal<readonly { id: string; fullName: string }[]>([]);
   readonly loading = signal(true);

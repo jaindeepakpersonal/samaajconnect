@@ -17,6 +17,7 @@ import { AdminScope } from '../../core/admin-scope';
 import { AreaScope, labelLocalities } from '../../core/area-scope';
 import { LookupItem, OrganizerGroup, OrganizerType, SamaajEvent } from '../../core/admin.models';
 import { isNotFound } from '../../core/http-status';
+import { ALL_LOCALITIES, LocalityFilterComponent, matchesLocality } from '../../core/locality-filter.component';
 
 /**
  * Events — creating them, editing them, publishing them, calling them off.
@@ -56,7 +57,7 @@ import { isNotFound } from '../../core/http-status';
  */
 @Component({
   selector: 'app-events-list',
-  imports: [FormsModule, DatePipe, RouterLink],
+  imports: [LocalityFilterComponent, FormsModule, DatePipe, RouterLink],
   template: `
     <h1 class="title">Events</h1>
     <p class="sub">Create, publish and monitor Samaaj and group events.</p>
@@ -91,6 +92,12 @@ import { isNotFound } from '../../core/http-status';
           Show events that have already happened
         </label>
 
+        <app-locality-filter [(value)]="localityFilter" inputId="events-locality" />
+
+        @if (events().length > 0 && shownEvents().length === 0) {
+          <p class="empty">Nothing here for that locality.</p>
+        }
+
         @if (events().length === 0) {
           <p class="empty">
             Nothing yet. An event starts as a draft and tells the Samaaj nothing until you
@@ -107,7 +114,7 @@ import { isNotFound } from '../../core/http-status';
                 </tr>
               </thead>
               <tbody>
-                @for (event of events(); track event.id) {
+                @for (event of shownEvents(); track event.id) {
                   <tr>
                     <td>
                       <a [routerLink]="['/events', event.id]"><b>{{ event.title }}</b></a>
@@ -359,6 +366,13 @@ export class EventsListComponent implements OnInit {
   @ViewChild('firstField') private readonly firstFieldRef?: ElementRef<HTMLInputElement>;
 
   readonly events = signal<readonly SamaajEvent[]>([]);
+
+  /** The Locality filter - see LocalityFilterComponent. */
+  readonly localityFilter = signal(ALL_LOCALITIES);
+
+  readonly shownEvents = computed(() =>
+    this.events().filter((event) => matchesLocality(this.localityFilter(), event.localityId)),
+  );
   readonly groups = signal<readonly OrganizerGroup[]>([]);
   readonly eventTypes = signal<readonly LookupItem[]>([]);
   readonly localityOptions = signal<readonly { id: string; label: string }[]>([]);

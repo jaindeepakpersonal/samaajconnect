@@ -1,4 +1,4 @@
-import { Component, OnInit, inject, signal } from '@angular/core';
+import { Component, computed, OnInit, inject, signal } from '@angular/core';
 import { RouterLink } from '@angular/router';
 import { describeError } from '@samaajconnect/shared';
 import { AdminApi } from '../../core/admin-api';
@@ -7,6 +7,7 @@ import { Trust, TrustStatus } from '../../core/admin.models';
 import { isNotFound } from '../../core/http-status';
 import { LocalityOptions } from '../../core/locality-options';
 import { TrustDialogComponent } from './trust-dialog.component';
+import { ALL_LOCALITIES, LocalityFilterComponent, matchesLocality } from '../../core/locality-filter.component';
 
 /**
  * A Samaaj's local Trusts - one per locality - set up and corrected in a
@@ -24,7 +25,7 @@ import { TrustDialogComponent } from './trust-dialog.component';
  */
 @Component({
   selector: 'app-trusts-list',
-  imports: [RouterLink, TrustDialogComponent],
+  imports: [LocalityFilterComponent, RouterLink, TrustDialogComponent],
   template: `
     <div class="head">
       <div>
@@ -59,6 +60,12 @@ import { TrustDialogComponent } from './trust-dialog.component';
       <div class="card">
         <h2>Trusts</h2>
 
+        <app-locality-filter [(value)]="localityFilter" inputId="trusts-locality" />
+
+        @if (trusts().length > 0 && shownTrusts().length === 0) {
+          <p class="empty">Nothing here for that locality.</p>
+        }
+
         @if (trusts().length === 0) {
           <p class="empty">None yet. Set one up for a locality to start its roster.</p>
         } @else {
@@ -69,7 +76,7 @@ import { TrustDialogComponent } from './trust-dialog.component';
                 <tr><th>Name</th><th>Locality</th><th>Status</th><th></th></tr>
               </thead>
               <tbody>
-                @for (trust of trusts(); track trust.id) {
+                @for (trust of shownTrusts(); track trust.id) {
                   <tr>
                     <td><a [routerLink]="['/trust', trust.id]"><b>{{ trust.name }}</b></a></td>
                     <td>{{ localities.label(trust.localityId) }}</td>
@@ -130,6 +137,13 @@ export class TrustsListComponent implements OnInit {
   readonly localities = inject(LocalityOptions);
 
   readonly trusts = signal<readonly Trust[]>([]);
+
+  /** The Locality filter - see LocalityFilterComponent. */
+  readonly localityFilter = signal(ALL_LOCALITIES);
+
+  readonly shownTrusts = computed(() =>
+    this.trusts().filter((trust) => matchesLocality(this.localityFilter(), trust.localityId)),
+  );
   readonly loading = signal(true);
   readonly busy = signal(false);
   readonly moduleOff = signal(false);

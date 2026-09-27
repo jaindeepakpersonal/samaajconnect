@@ -7,7 +7,9 @@ using Sangam.MemberFamily.Application.Families.Commands.LeaveFamily;
 using Sangam.MemberFamily.Application.Families.Commands.RequestJoinFamily;
 using Sangam.MemberFamily.Application.Families.Commands.SetFamilyHead;
 using Sangam.MemberFamily.Application.Families.Commands.WithdrawJoinRequest;
+using Sangam.MemberFamily.Application.Common;
 using Sangam.MemberFamily.Application.Families.Queries.GetMyFamily;
+using Sangam.MemberFamily.Application.Families.Queries.ListFamilies;
 
 namespace Sangam.MemberFamily.Api.Endpoints;
 
@@ -28,6 +30,24 @@ public static class FamilyEndpoints
             .WithSummary("Create a household with you as its family admin.")
             .Produces<FamilyResponse>(StatusCodes.Status201Created)
             .ProducesProblem(StatusCodes.Status409Conflict);
+
+        group.MapGet("/", async (
+                Guid? localityId,
+                int? skip,
+                int? take,
+                ISender sender,
+                CancellationToken cancellationToken) =>
+            {
+                var result = await sender.Send(
+                    new ListFamiliesQuery(localityId, skip ?? 0, take ?? 20), cancellationToken);
+
+                return result.ToApiResult();
+            })
+            .WithName("ListFamilies")
+            .WithSummary("Administrators: this Samaaj's households with members and children. ?localityId= narrows to households with a member living there.")
+            .Produces<PagedResult<FamilyOverviewResponse>>()
+            .ProducesValidationProblem()
+            .ProducesProblem(StatusCodes.Status403Forbidden);
 
         group.MapGet("/mine", async (ISender sender, CancellationToken cancellationToken) =>
             {

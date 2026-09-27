@@ -61,6 +61,7 @@ worked example of a cross-service flow with no synchronous call.
 | `GetMemberPhotoQuery` | `Members.Read` | built |
 | `GetChildPhotoQuery` | `Members.Read`, then the child's household | built |
 | `GetRegistrationSummaryQuery` | `SamaajAdmin`/`SuperAdmin` + `Members.Read` | built |
+| `ListFamiliesQuery` | `SamaajAdmin`/`SuperAdmin`/`AreaAdmin` + `Members.Write`; an Area Admin only for their own locality | built. Households with members and minor children, `?localityId=` by where members live |
 
 ## Events published
 
@@ -97,6 +98,7 @@ here, which looks exactly like a broker problem and is not one.
 | PATCH | `/v1/members/{id}` | self only |
 | PATCH | `/v1/members/{id}/details` | `SamaajAdmin` + `Members.Write`, never self |
 | POST | `/v1/families` | any member |
+| GET | `/v1/families` | `SamaajAdmin`/`SuperAdmin`/`AreaAdmin` + `Members.Write`; an Area Admin must name their own locality |
 | GET | `/v1/families/mine` | any member |
 | POST | `/v1/families/join-requests` | any member |
 | DELETE | `/v1/families/join-requests/mine` | any member, their own request |
@@ -141,6 +143,23 @@ admin account also holds; `CorrectMemberDetailsCommand`'s role list has no
 `Member` in it, so it names `AreaAdmin` explicitly. A member whose permanent
 address has no locality set is outside every Area Admin's scope, and only a
 Samaaj Admin can reach them.
+
+**Administrators list households, and a household is in a locality when a
+member of it lives there (2026-09-27).** `ListFamiliesQuery` answers the
+admin panel's Families & Children screen: a page of families, each with its
+active members (name, relationship, head, permanent-address locality) and its
+minor children. A family has no locality of its own - it would be one more
+field to keep in step with its members' addresses - so the filter matches any
+household with an active member whose permanent address is there, and a family
+split across two localities is found from either. It reads past directory
+privacy (unlisted members, children by name), so it is gated like
+`CorrectMemberDetailsCommand`: `Members.Write` and an administrator role, and
+an Area Admin asking for anything but their own locality - the whole Samaaj
+included - is refused with 403 rather than quietly narrowed. A child appears as
+an age, never a date of birth. `IFamilyDirectory` does the reading, and never
+queries `FamilyMembers` directly: a member row has no tenant of its own and so
+no query filter, and is reached only through its family, which does.
+`FamilyListTests` holds all of it.
 
 **A household has an admin and, separately, a head - added 2026-09-19, and until
 then the code said "head" for what is really the admin.** The person who sets a

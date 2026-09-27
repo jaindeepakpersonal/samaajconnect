@@ -76,6 +76,26 @@ describe('TrustsListComponent', () => {
     expect(fixture.nativeElement.querySelector('[role="alert"]')).toBeNull();
   });
 
+  it('narrows the list to a locality, or to the whole Samaaj, from the Locality filter', () => {
+    load([trust(), trust({ id: 't2', localityId: 'loc9', name: 'Surajpole Trust' })]);
+
+    const rows = () => [...(fixture.nativeElement as HTMLElement).querySelectorAll('tbody tr')].map((r) =>
+      r.querySelector('b')?.textContent,
+    );
+
+    expect(rows()).toEqual(['Hiran Magri Samaaj Trust', 'Surajpole Trust']);
+
+    fixture.componentInstance.localityFilter.set('loc9');
+    fixture.detectChanges();
+    expect(rows()).toEqual(['Surajpole Trust']);
+
+    // A Trust always has a locality, so the whole-Samaaj view is empty, and says so.
+    fixture.componentInstance.localityFilter.set('whole-samaaj');
+    fixture.detectChanges();
+    expect(rows()).toEqual([]);
+    expect(text()).toContain('Nothing here for that locality');
+  });
+
   it('says when there are none yet', () => {
     load([]);
 

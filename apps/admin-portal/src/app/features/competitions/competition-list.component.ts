@@ -1,5 +1,5 @@
 import { DatePipe } from '@angular/common';
-import { Component, OnInit, inject, signal } from '@angular/core';
+import { Component, computed, OnInit, inject, signal } from '@angular/core';
 import { RouterLink } from '@angular/router';
 import { describeError } from '@samaajconnect/shared';
 import { AdminApi } from '../../core/admin-api';
@@ -8,6 +8,7 @@ import { Competition } from '../../core/admin.models';
 import { LocalityOptions } from '../../core/locality-options';
 import { CompetitionDialogComponent } from './competition-dialog.component';
 import { isNotFound } from '../../core/http-status';
+import { ALL_LOCALITIES, LocalityFilterComponent, matchesLocality } from '../../core/locality-filter.component';
 
 /**
  * Competitions - the list, and setting one up or correcting one in a popup,
@@ -23,7 +24,7 @@ import { isNotFound } from '../../core/http-status';
  */
 @Component({
   selector: 'app-competition-list',
-  imports: [DatePipe, RouterLink, CompetitionDialogComponent],
+  imports: [LocalityFilterComponent, DatePipe, RouterLink, CompetitionDialogComponent],
   template: `
     <div class="head">
       <div>
@@ -55,6 +56,12 @@ import { isNotFound } from '../../core/http-status';
       <div class="card">
         <h2>Competitions</h2>
 
+        <app-locality-filter [(value)]="localityFilter" inputId="competitions-locality" />
+
+        @if (competitions().length > 0 && shownCompetitions().length === 0) {
+          <p class="empty">Nothing here for that locality.</p>
+        }
+
         @if (competitions().length === 0) {
           <p class="empty">
             None yet. A competition starts as a draft with registration not yet open.
@@ -69,7 +76,7 @@ import { isNotFound } from '../../core/http-status';
                 </tr>
               </thead>
               <tbody>
-                @for (competition of competitions(); track competition.id) {
+                @for (competition of shownCompetitions(); track competition.id) {
                   <tr>
                     <td>
                       <a [routerLink]="['/competitions', competition.id]">
@@ -140,6 +147,13 @@ export class CompetitionListComponent implements OnInit {
   readonly scope = inject(AdminScope);
 
   readonly competitions = signal<readonly Competition[]>([]);
+
+  /** The Locality filter - see LocalityFilterComponent. */
+  readonly localityFilter = signal(ALL_LOCALITIES);
+
+  readonly shownCompetitions = computed(() =>
+    this.competitions().filter((competition) => matchesLocality(this.localityFilter(), competition.localityId)),
+  );
   readonly loading = signal(true);
   readonly busy = signal(false);
   readonly moduleOff = signal(false);
