@@ -396,12 +396,23 @@ export class AdminApi {
 
   // ---- Pathshala ---------------------------------------------------------
 
-  listPathshalas(): Observable<Pathshala[]> {
-    return this.http.get<Pathshala[]>('/v1/pathshala/pathshalas');
+  /**
+   * `staffed` narrows to the Pathshalas the caller works at - what a teacher
+   * sees. The service forces it for a teacher from outside the Samaaj anyway.
+   */
+  listPathshalas(staffed = false): Observable<Pathshala[]> {
+    return this.http.get<Pathshala[]>(
+      '/v1/pathshala/pathshalas',
+      staffed ? { params: { staffed: true } } : {},
+    );
   }
 
-  pathshala(id: string): Observable<PathshalaDetail> {
-    return this.http.get<PathshalaDetail>(`/v1/pathshala/pathshalas/${id}`);
+  /** `asStaff` answers 404 unless the caller works at this Pathshala. */
+  pathshala(id: string, asStaff = false): Observable<PathshalaDetail> {
+    return this.http.get<PathshalaDetail>(
+      `/v1/pathshala/pathshalas/${id}`,
+      asStaff ? { params: { asStaff: true } } : {},
+    );
   }
 
   /**

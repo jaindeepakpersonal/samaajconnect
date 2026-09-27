@@ -947,6 +947,15 @@ an amount falls due only when a Boli in the Trust's locality has its result
 announced, owed by the winner, and the tab records how it was paid. Names
 (donors, approvers, payers) come from the page's one directory call.
 
+**A teacher sees Jain Pathshala and nothing else (2026-09-27)**, and lands on
+it after signing in - a member who teaches as much as a teacher from outside
+the Samaaj. The Pathshala list asks for `?staffed=true` and the Pathshala and
+class pages ask `?asStaff=true` whenever the caller lacks `Pathshala.Manage`,
+so a Pathshala they do not teach at reads as "no such Pathshala". The nav is a
+courtesy; pathshala-service enforces it, and forces the staff view for a
+teacher who is not a member. "Create a login" on the Teachers tab makes exactly
+that kind of account, and says so.
+
 **Pledges are chased from Collections too.** A donor who is a member is picked
 from the directory (the same search as Add a trustee), so the pledge is owed
 by their account; one with no account is typed by name, and Collections shows

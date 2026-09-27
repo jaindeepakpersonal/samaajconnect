@@ -93,6 +93,20 @@ public static class AuthorizationCatalog
         /// organiser-permission shape as <c>Panch.Manage</c>.
         /// </summary>
         public static readonly Guid TrustManage = new("b0000000-0000-0000-0000-000000000021");
+
+        /// <summary>
+        /// Teach at a Pathshala: read and work in the Pathshalas this account
+        /// teaches at, and nothing else on the platform. pathshala-service
+        /// decides which Pathshalas against its own teacher records.
+        /// </summary>
+        /// <remarks>
+        /// The teacher role held Members.Read until 2026-09-27, which is every
+        /// member-facing read on the platform - so a teacher from outside the
+        /// Samaaj, whose account exists only to teach, could read the member
+        /// directory. This is the narrower key. A teacher who is also a member
+        /// still has Members.Read, from the Member role.
+        /// </remarks>
+        public static readonly Guid PathshalaTeach = new("b0000000-0000-0000-0000-000000000022");
     }
 
     public static IReadOnlyList<Role> Roles { get; } =
@@ -138,6 +152,7 @@ public static class AuthorizationCatalog
         new(PermissionIds.CompetitionManage, "Competition.Manage"),
         new(PermissionIds.PanchManage, "Panch.Manage"),
         new(PermissionIds.TrustManage, "Trust.Manage"),
+        new(PermissionIds.PathshalaTeach, "Pathshala.Teach"),
     ];
 
     /// <summary>
@@ -229,7 +244,8 @@ public static class AuthorizationCatalog
         new(RoleIds.VolunteerGroupPresident, PermissionIds.VolunteerGroupsLead),
         new(RoleIds.VolunteerGroupPresident, PermissionIds.EventsPublish),
 
-        new(RoleIds.PathshalaTeacher, PermissionIds.MembersRead),
+        // Not Members.Read - see PermissionIds.PathshalaTeach.
+        new(RoleIds.PathshalaTeacher, PermissionIds.PathshalaTeach),
         new(RoleIds.PathshalaTeacher, PermissionIds.PathshalaAttendanceWrite),
         new(RoleIds.PathshalaTeacher, PermissionIds.PathshalaExamsWrite),
 

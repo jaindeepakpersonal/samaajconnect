@@ -104,13 +104,13 @@ describe('PathshalaDetailComponent', () => {
     fixture = TestBed.createComponent(PathshalaDetailComponent);
     component = fixture.componentInstance;
     fixture.detectChanges();
-    http.expectOne(`/v1/pathshala/pathshalas/${PATHSHALA_ID}`).flush(school);
+    http.expectOne((r) => r.url === `/v1/pathshala/pathshalas/${PATHSHALA_ID}`).flush(school);
     fixture.detectChanges();
   }
 
   /** Answers the re-read every action fires. */
   function reload(school: PathshalaDetail = detail()) {
-    http.expectOne(`/v1/pathshala/pathshalas/${PATHSHALA_ID}`).flush(school);
+    http.expectOne((r) => r.url === `/v1/pathshala/pathshalas/${PATHSHALA_ID}`).flush(school);
     fixture.detectChanges();
   }
 
@@ -152,6 +152,33 @@ describe('PathshalaDetailComponent', () => {
     openTab('Classes');
 
     expect(text()).not.toContain('Add a class');
+  });
+
+  it('asks as staff for a teacher, so a Pathshala they do not teach at is not found', () => {
+    signIn(['PathshalaTeacher'], ['Pathshala.Teach']);
+    fixture = TestBed.createComponent(PathshalaDetailComponent);
+    fixture.detectChanges();
+
+    const call = http.expectOne((r) => r.url === `/v1/pathshala/pathshalas/${PATHSHALA_ID}`);
+
+    expect(call.request.params.get('asStaff')).toBe('true');
+
+    call.flush({}, { status: 404, statusText: 'Not Found' });
+    fixture.detectChanges();
+
+    expect(text()).toContain('No such Pathshala');
+  });
+
+  it('does not ask as staff for somebody who runs Pathshalas', () => {
+    asAdmin();
+    fixture = TestBed.createComponent(PathshalaDetailComponent);
+    fixture.detectChanges();
+
+    const call = http.expectOne((r) => r.url === `/v1/pathshala/pathshalas/${PATHSHALA_ID}`);
+
+    expect(call.request.params.has('asStaff')).toBe(false);
+
+    call.flush(detail());
   });
 
   it('shows an Area Admin a Pathshala elsewhere without any tabs', () => {
@@ -282,7 +309,7 @@ describe('PathshalaDetailComponent', () => {
     fixture = TestBed.createComponent(PathshalaDetailComponent);
     fixture.detectChanges();
     http
-      .expectOne(`/v1/pathshala/pathshalas/${PATHSHALA_ID}`)
+      .expectOne((r) => r.url === `/v1/pathshala/pathshalas/${PATHSHALA_ID}`)
       .flush({}, { status: 404, statusText: 'Not Found' });
     fixture.detectChanges();
 

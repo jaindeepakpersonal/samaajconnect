@@ -158,6 +158,9 @@ public sealed class UserRepository(IdentityTenantDbContext dbContext) : IUserRep
             // whichever account is found, never supplied.
             .IgnoreQueryFilters()
             .Include(u => u.ActivationCode)
+            // Activate() reads the grants to decide whether this account is a
+            // member, whose activation registers a member profile.
+            .Include(u => u.Roles)
             .FirstOrDefaultAsync(
                 u => u.MobileOrEmail == mobileOrEmail && u.Status == UserStatus.PendingActivation,
                 cancellationToken);

@@ -286,7 +286,9 @@ export class PathshalaListComponent implements OnInit {
       return;
     }
 
-    this.api.listPathshalas().subscribe({
+    // Somebody who does not run Pathshalas is here to teach: they see the
+    // ones they teach at, not the Samaaj's directory.
+    this.api.listPathshalas(!this.managesPathshalas()).subscribe({
       next: (found) => {
         this.pathshalas.set(found);
         this.loading.set(false);

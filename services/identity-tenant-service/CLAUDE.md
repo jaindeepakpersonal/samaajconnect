@@ -733,6 +733,20 @@ never the member: an Area Admin browses, registers, applies and votes across
 the whole Samaaj like anybody else, and only the admin powers stop at their
 locality.
 
+**A Pathshala teacher need not be a member of the Samaaj (2026-09-27).** An
+invitation for the `PathshalaTeacher` role and nothing else creates an
+account with no `Member` role - somebody from outside the Samaaj who signs in
+only to teach. Every other invitation is an administrator, who is a member of
+the Samaaj they run, and keeps `Member`. Two things follow. The teacher role
+carries `Pathshala.Teach` instead of `Members.Read`, so such an account reads
+nothing member-facing anywhere on the platform (a member who teaches still has
+`Members.Read`, from `Member`). And activating it raises no
+`identity.user.registered.v1`: member-family-service answers that event by
+creating a member profile, which would put a non-member into the member
+directory. `User.IsMember` decides, which is why `FindPendingActivationAsync`
+now loads the role grants. Existing teacher accounts were left as they were:
+both on the development stack had member profiles.
+
 **An identifier already on the platform is refused without saying where.**
 `MobileOrEmail` is unique platform-wide, so the existing account may be in
 another Samaaj; naming it would confirm an identifier is on the platform to

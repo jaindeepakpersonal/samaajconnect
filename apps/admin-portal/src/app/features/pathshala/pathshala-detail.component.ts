@@ -393,7 +393,11 @@ export class PathshalaDetailComponent implements OnInit {
   }
 
   load(): void {
-    this.api.pathshala(this.id).subscribe({
+    // A teacher asks as staff, so one they do not teach at is "no such
+    // Pathshala" rather than a page of tabs that all answer 404.
+    const asStaff = !(this.auth.user()?.permissions.includes('Pathshala.Manage') ?? false);
+
+    this.api.pathshala(this.id, asStaff).subscribe({
       next: (found) => {
         this.pathshala.set(found);
         this.loading.set(false);

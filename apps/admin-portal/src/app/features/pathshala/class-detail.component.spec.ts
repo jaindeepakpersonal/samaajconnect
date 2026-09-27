@@ -118,7 +118,7 @@ describe('ClassDetailComponent', () => {
     teachers: PathshalaTeacher[] = [],
   ) {
     fixture.detectChanges();
-    http.expectOne(`/v1/pathshala/pathshalas/${PATHSHALA_ID}`).flush(school);
+    http.expectOne((r) => r.url === `/v1/pathshala/pathshalas/${PATHSHALA_ID}`).flush(school);
 
     if (school.classes.some((c) => c.id === CLASS_ID)) {
       http.expectOne(`/v1/pathshala/classes/${CLASS_ID}/exams`).flush(exams);
@@ -137,6 +137,19 @@ describe('ClassDetailComponent', () => {
 
     fixture.detectChanges();
   }
+
+  it('asks for the Pathshala as staff when the caller does not run it - a teacher', () => {
+    fixture.detectChanges();
+
+    const call = http.expectOne((r) => r.url === `/v1/pathshala/pathshalas/${PATHSHALA_ID}`);
+
+    expect(call.request.params.get('asStaff')).toBe('true');
+
+    call.flush({}, { status: 404, statusText: 'Not Found' });
+    fixture.detectChanges();
+
+    expect(text()).toContain('No such class');
+  });
 
   it('explains a class that is not in this Pathshala rather than showing an error', () => {
     load(detail({ classes: [] }));
@@ -371,7 +384,7 @@ describe('ClassDetailComponent', () => {
 
   /** Answers the re-read every action fires. */
   function reload() {
-    http.expectOne(`/v1/pathshala/pathshalas/${PATHSHALA_ID}`).flush(detail());
+    http.expectOne((r) => r.url === `/v1/pathshala/pathshalas/${PATHSHALA_ID}`).flush(detail());
     http.expectOne(`/v1/pathshala/classes/${CLASS_ID}/exams`).flush([]);
     http.expectOne(`/v1/pathshala/pathshalas/${PATHSHALA_ID}/teachers`).flush([]);
     http.expectOne(`/v1/pathshala/classes/${CLASS_ID}/roll`).flush([]);

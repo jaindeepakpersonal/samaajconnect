@@ -247,29 +247,29 @@ reviews" in `services/social-issues-service/CLAUDE.md`.
 
 | Method | Path | Permission | Purpose |
 |---|---|---|---|
-| GET | `/pathshalas` | `Members.Read` | This Samaaj's Pathshalas, with class and teacher counts |
+| GET | `/pathshalas` | `Members.Read` or `Pathshala.Teach` | This Samaaj's Pathshalas, with class and teacher counts. `?staffed=true` narrows to the ones the caller works at; always so for a caller without `Members.Read` - a teacher from outside the Samaaj |
 | GET | `/attendance-summary` | `Pathshala.Manage` | Present/absent/excused across every class this Samaaj runs, for the admin Reports & Analytics screen. **403** to an Area Admin; every other `Pathshala.Manage` route below answers them **404** for a Pathshala outside their locality or with no address |
 | POST | `/pathshalas` | SuperAdmin **role** + `Pathshala.Manage` | Create the master record |
-| GET | `/pathshalas/{id}` | `Members.Read` | Sessions and classes |
+| GET | `/pathshalas/{id}` | `Members.Read` or `Pathshala.Teach` | Sessions and classes. `?asStaff=true` is 404 unless the caller works here; always so for a caller without `Members.Read` |
 | PATCH | `/pathshalas/{id}` | `Pathshala.Manage` | Correct the name, address and contact person, replacing all three. An Area Admin's blank locality is filled with theirs; naming another is **403** |
 | POST | `/pathshalas/{id}/sessions` | `Pathshala.Manage` | Open an academic session; it becomes current |
 | DELETE | `/pathshalas/{id}` | `Pathshala.Manage` | Stop the Pathshala operating |
 | POST | `/pathshalas/{id}/classes` | `Pathshala.Manage` | Add a class to a session |
 | POST | `/classes/{id}/schedule` | `Pathshala.Manage` | Add a weekly slot; overlaps refused |
 | POST | `/classes/{id}/teachers` | `Pathshala.Manage` | `{teacherId, assign}` - assign or remove one of the Pathshala's teacher records |
-| GET | `/pathshalas/{id}/teachers` | `Members.Read` + staff of it | Teachers with contact details. A teacher need not be a member; `userId` is their login, if any |
+| GET | `/pathshalas/{id}/teachers` | `Members.Read` or `Pathshala.Teach` + staff of it | Teachers with contact details. A teacher need not be a member; `userId` is their login, if any |
 | POST | `/pathshalas/{id}/teachers` | `Pathshala.Manage` | `{fullName, phone, email, qualification, userId}`. **409** if that login is already a teacher here |
 | PATCH | `/pathshalas/{id}/teachers/{teacherId}` | `Pathshala.Manage` | Correct details or the linked login |
 | DELETE | `/pathshalas/{id}/teachers/{teacherId}` | `Pathshala.Manage` | Remove; takes them off every class |
-| GET | `/pathshalas/{id}/students` | `Members.Read` + staff | Placed children (a teacher: their classes only), and waiting requests (administrators only), with the contact name and phone the parent gave |
-| GET | `/pathshalas/{id}/progress` | `Members.Read` + staff | Every placed child's attendance and exam average, as percentages |
-| GET | `/pathshalas/{id}/attendance` | `Members.Read` + staff | Per class: days marked and the tally |
-| GET | `/pathshalas/{id}/exams` | `Members.Read` + staff | Every exam, with results recorded and the average |
+| GET | `/pathshalas/{id}/students` | `Members.Read` or `Pathshala.Teach` + staff | Placed children (a teacher: their classes only), and waiting requests (administrators only), with the contact name and phone the parent gave |
+| GET | `/pathshalas/{id}/progress` | `Members.Read` or `Pathshala.Teach` + staff | Every placed child's attendance and exam average, as percentages |
+| GET | `/pathshalas/{id}/attendance` | `Members.Read` or `Pathshala.Teach` + staff | Per class: days marked and the tally |
+| GET | `/pathshalas/{id}/exams` | `Members.Read` or `Pathshala.Teach` + staff | Every exam, with results recorded and the average |
 | GET | `/pathshalas/{id}/donations` | `Pathshala.Manage` | The ledger and its total, voided entries out of it |
 | POST | `/pathshalas/{id}/donations` | `Pathshala.Manage` | `{donorName, donorMemberId, amount (paise), donatedOn, mode, purpose}` - issues the next receipt number |
 | POST | `/donations/{id}/void` | `Pathshala.Manage` | `{reason}` - out of the totals, never deleted |
-| GET | `/pathshalas/{id}/announcements` | `Members.Read` + staff | What it has sent |
-| POST | `/pathshalas/{id}/announcements` | `Members.Read` + a teacher of it or somebody who runs it | `{title, body}` to the parents of every child with a place or a request; each gets an in-app notification. **409** with nobody to send to |
+| GET | `/pathshalas/{id}/announcements` | `Members.Read` or `Pathshala.Teach` + staff | What it has sent |
+| POST | `/pathshalas/{id}/announcements` | `Members.Read` or `Pathshala.Teach` + a teacher of it or somebody who runs it | `{title, body}` to the parents of every child with a place or a request; each gets an in-app notification. **409** with nobody to send to |
 | GET | `/announcements` | `Members.Read` | Announcements from every Pathshala where the caller has a child with a place or a request |
 | GET | `/classes/{id}/roll` | `Members.Read` + teaches this class | Who is on the roll |
 | POST | `/classes/{id}/attendance` | `Pathshala.Attendance.Write` + teaches this class | Mark the whole register for one date |

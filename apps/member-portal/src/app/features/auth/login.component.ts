@@ -1,7 +1,7 @@
 import { Component, inject, signal } from '@angular/core';
 import { FormBuilder, ReactiveFormsModule, Validators } from '@angular/forms';
 import { ActivatedRoute, Router, RouterLink } from '@angular/router';
-import { AuthService, describeError } from '@samaajconnect/shared';
+import { AuthService, describeError, LoginResult } from '@samaajconnect/shared';
 
 type SignInMethod = 'password' | 'otp';
 
@@ -267,9 +267,9 @@ export class LoginComponent {
     const { mobileOrEmail, password } = this.form.getRawValue();
 
     this.auth.login(mobileOrEmail, password).subscribe({
-      next: () => {
+      next: (result) => {
         this.busy.set(false);
-        this.goHome();
+        this.landOrRefuse(result);
       },
       error: (failure: unknown) => {
         this.busy.set(false);
@@ -290,9 +290,9 @@ export class LoginComponent {
     this.error.set(null);
 
     this.auth.loginWithOtp(identifier, this.otpCode()).subscribe({
-      next: () => {
+      next: (result) => {
         this.busy.set(false);
-        this.goHome();
+        this.landOrRefuse(result);
       },
       error: (failure: unknown) => {
         this.busy.set(false);
@@ -310,6 +310,26 @@ export class LoginComponent {
    * already on the sidebar, so the landing page itself carries something to
    * read instead of a second copy of the nav.
    */
+  /**
+   * A Pathshala teacher from outside the Samaaj has an account only to teach:
+   * the teacher role and not the Member role. There is nothing for them here,
+   * and every member-facing read refuses them server-side (their account does
+   * not hold Members.Read), so they are signed out again and pointed at the
+   * admin panel rather than shown a portal of errors.
+   */
+  private landOrRefuse(result: LoginResult): void {
+    if (result.roles.includes('PathshalaTeacher') && !result.roles.includes('Member')) {
+      this.auth.signOut().subscribe();
+      this.error.set(
+        'This account is for teaching at a Pathshala, and teachers sign in to the admin panel. ' +
+          'The member portal is for members of the Samaaj.',
+      );
+      return;
+    }
+
+    this.goHome();
+  }
+
   private goHome(): void {
     void this.router.navigateByUrl(
       this.route.snapshot.queryParamMap.get('returnUrl') ?? '/timeline');

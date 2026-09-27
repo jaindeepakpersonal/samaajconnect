@@ -73,11 +73,17 @@ public sealed class InviteAdminCommandHandler(
             .Select(name => AuthorizationCatalog.FindRoleByName(name)!.Id)
             .ToList();
 
+        // Invited to teach and nothing else: somebody from outside the
+        // Samaaj, with an account that exists only for the admin panel's
+        // Pathshala screens. Every other invitation is an administrator, who
+        // is a member of the Samaaj they run.
+        var teacherOnly = roleIds.Count > 0 && roleIds.All(id => id == AuthorizationCatalog.RoleIds.PathshalaTeacher);
+
         var invited = User.Invite(
             tenantId,
             identifier,
             command.FullName,
-            AuthorizationCatalog.RoleIds.Member,
+            teacherOnly ? null : AuthorizationCatalog.RoleIds.Member,
             roleIds,
             adminId,
             clock.UtcNow,

@@ -205,7 +205,7 @@ public sealed class User : AggregateRoot, ITenantScopedEntity
         Guid tenantId,
         string mobileOrEmail,
         string fullName,
-        Guid memberRoleId,
+        Guid? memberRoleId,
         IEnumerable<Guid> roleIds,
         Guid invitedBy,
         DateTimeOffset createdAt,
@@ -227,7 +227,12 @@ public sealed class User : AggregateRoot, ITenantScopedEntity
             CreatedAt = createdAt,
         };
 
-        user._roles.Add(new UserRole(user.Id, memberRoleId, tenantId, localityId: null, createdAt));
+        // Null for an account that is not a member of the Samaaj at all - a
+        // Pathshala teacher from outside it, who signs in only to teach.
+        if (memberRoleId is { } member)
+        {
+            user._roles.Add(new UserRole(user.Id, member, tenantId, localityId: null, createdAt));
+        }
 
         foreach (var roleId in roleIds.Distinct().Where(id => id != memberRoleId))
         {
@@ -293,11 +298,23 @@ public sealed class User : AggregateRoot, ITenantScopedEntity
         {
             Raise(new UserActivatedFromChildDomainEvent(Id, TenantId, childProfileId, MobileOrEmail, now));
         }
-        else
+        else if (IsMember)
         {
             Raise(new UserRegisteredDomainEvent(Id, TenantId, MobileOrEmail, FullName, now));
         }
+
+        // An account with no Member role - a Pathshala teacher from outside the
+        // Samaaj - raises no registration: member-family-service would answer
+        // it by creating a member profile, putting somebody who is not a member
+        // into the directory. Their invitation is already on the audit trail.
     }
+
+    /// <summary>
+    /// Whether this account belongs to the Samaaj as a member. False only for
+    /// an account invited to teach at a Pathshala and nothing else.
+    /// </summary>
+    /// <remarks>Reads the role grants, so the caller must have loaded them.</remarks>
+    public bool IsMember => _roles.Any(r => r.RoleId == AuthorizationCatalog.RoleIds.Member);
 
     /// <summary>
     /// Replaces the password on an already-active account, at the member's own

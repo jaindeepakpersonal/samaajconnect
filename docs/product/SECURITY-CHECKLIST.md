@@ -195,6 +195,7 @@ existing platform (`Pathshala.Attendance.Write`, `Issue.Approve`):
 | `Pathshala.Manage` | Super Admin: create Pathshala master record |
 | `Pathshala.Attendance.Write` | Teacher: mark attendance |
 | `Pathshala.Exams.Write` | Teacher: record results |
+| `Pathshala.Teach` | Teacher: read and work in the Pathshalas they teach at. The teacher role holds this instead of `Members.Read`, so a teacher from outside the Samaaj (no Member role) reads nothing member-facing; pathshala-service decides which Pathshalas |
 | `Boli.Manage` | Occasion/type/open/close |
 | `Boli.PublishResults` | Publish (irreversible without correction flow) |
 | `Audit.Read` | View audit log |

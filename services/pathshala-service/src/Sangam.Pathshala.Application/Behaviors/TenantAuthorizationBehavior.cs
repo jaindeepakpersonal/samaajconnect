@@ -66,7 +66,7 @@ public sealed class TenantAuthorizationBehavior<TRequest, TResponse>(
             type.GetCustomAttribute<AllowAnonymousRequestAttribute>() is not null
                 || type.GetCustomAttribute<InternalRequestAttribute>() is not null,
             type.GetCustomAttribute<RequiresRolesAttribute>()?.Roles ?? [],
-            type.GetCustomAttribute<RequiresPermissionAttribute>()?.PermissionKey));
+            type.GetCustomAttribute<RequiresPermissionAttribute>()?.PermissionKeys ?? []));
 
         if (policy.AllowAnonymous)
         {
@@ -80,7 +80,7 @@ public sealed class TenantAuthorizationBehavior<TRequest, TResponse>(
         }
 
         // Fail closed: an unannotated request is a mistake, not a public endpoint.
-        if (policy.Roles.Length == 0 && policy.PermissionKey is null)
+        if (policy.Roles.Length == 0 && policy.PermissionKeys.Length == 0)
         {
             logger.LogError(
                 "{Request} declares no authorization policy. Annotate it with "
@@ -96,7 +96,7 @@ public sealed class TenantAuthorizationBehavior<TRequest, TResponse>(
             return Task.FromResult(Denied(policy));
         }
 
-        if (policy.PermissionKey is not null && !currentUser.HasPermission(policy.PermissionKey))
+        if (policy.PermissionKeys.Length > 0 && !policy.PermissionKeys.Any(currentUser.HasPermission))
         {
             return Task.FromResult(Denied(policy));
         }
@@ -107,15 +107,15 @@ public sealed class TenantAuthorizationBehavior<TRequest, TResponse>(
     private TResponse Denied(RequestPolicy policy)
     {
         logger.LogWarning(
-            "Authorization denied for {Request}: user {UserId} lacks roles [{Roles}] / permission {Permission}",
+            "Authorization denied for {Request}: user {UserId} lacks roles [{Roles}] / any of permissions [{Permissions}]",
             typeof(TRequest).Name,
             currentUser.UserId,
             string.Join(", ", policy.Roles),
-            policy.PermissionKey);
+            string.Join(", ", policy.PermissionKeys));
 
         return ResultFactory.Failure<TResponse>(
             Error.Forbidden("Auth.Forbidden", "You are not allowed to perform this action."));
     }
 
-    private sealed record RequestPolicy(bool AllowAnonymous, string[] Roles, string? PermissionKey);
+    private sealed record RequestPolicy(bool AllowAnonymous, string[] Roles, string[] PermissionKeys);
 }

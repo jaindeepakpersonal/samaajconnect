@@ -40,7 +40,7 @@ Two entities in DATA-MODEL.md §9 are deliberately absent. See "Decisions".
 | `RemoveTeacherCommand` | `Pathshala.Manage` | Takes them off every class; the registers they marked are kept |
 | `RecordDonationCommand` | `Pathshala.Manage` | Issues the next receipt number |
 | `VoidDonationCommand` | `Pathshala.Manage` | Out of the totals, with a reason. Never a delete |
-| `SendAnnouncementCommand` | `Members.Read` + a teacher of it or somebody who runs it | To the parents of every child with a place or a request |
+| `SendAnnouncementCommand` | `Members.Read` or `Pathshala.Teach` + a teacher of it or somebody who runs it | To the parents of every child with a place or a request |
 | `OpenSessionCommand` | `Pathshala.Manage` | Makes the new session current |
 | `CreateClassCommand` | `Pathshala.Manage` | |
 | `AddClassSlotCommand` | `Pathshala.Manage` | Refuses an overlap |
@@ -58,25 +58,25 @@ Two entities in DATA-MODEL.md §9 are deliberately absent. See "Decisions".
 
 | Query | Policy | Notes |
 |---|---|---|
-| `ListPathshalasQuery` | `Members.Read` | Counts, not rosters |
-| `GetPathshalaQuery` | `Members.Read` | Sessions and classes |
+| `ListPathshalasQuery` | `Members.Read` or `Pathshala.Teach` | Counts, not rosters. `staffed` narrows to the Pathshalas the caller works at; forced for a caller without `Members.Read` |
+| `GetPathshalaQuery` | `Members.Read` or `Pathshala.Teach` | Sessions and classes. `asStaff` answers "not found" unless the caller works here; forced for a caller without `Members.Read` |
 | `ListEnrolmentRequestsQuery` | `Pathshala.Manage` | The placement queue |
 | `GetAttendanceSummaryQuery` | `Pathshala.Manage` | Tenant-wide, unlike every other tally here |
-| `GetClassRollQuery` | `Members.Read` + teaching this class | A list of somebody's children |
-| `GetClassRegisterQuery` | `Members.Read` + teaching this class | One date's marks, so amending is not a guess |
-| `ListClassExamsQuery` | `Pathshala.Exams.Write` + teaching this class | The class's exams with their marks |
+| `GetClassRollQuery` | `Members.Read` or `Pathshala.Teach` + teaching this class | A list of somebody's children |
+| `GetClassRegisterQuery` | `Members.Read` or `Pathshala.Teach` + teaching this class | One date's marks, so amending is not a guess |
+| `ListClassExamsQuery` | `Members.Read` or `Pathshala.Teach` + teaching this class | The class's exams with their marks |
 | `ListMyEnrolmentsQuery` | `Members.Read` | What this member asked for, or holds |
 | `GetMyClassQuery` | `Members.Read` + owns this enrolment | |
 | `GetMyAttendanceQuery` | `Members.Read` + owns this enrolment | |
 | `GetMyExamsQuery` | `Members.Read` + owns this enrolment | |
 | `GetMyProgressQuery` | `Members.Read` + owns this enrolment | Computed, not stored |
-| `ListTeachersQuery` | `Members.Read` + a teacher of it or somebody who runs it | With contact details |
-| `ListStudentsQuery` | `Members.Read` + staff | Placed children in the caller's classes, and (for administrators) waiting requests, with the parent's contact |
-| `GetProgressReportQuery` | `Members.Read` + staff | Every placed child's attendance and exam average |
-| `GetAttendanceOverviewQuery` | `Members.Read` + staff | Per class: days marked and the tally |
-| `ListPathshalaExamsQuery` | `Members.Read` + staff | Every exam, with how far marking has got |
+| `ListTeachersQuery` | `Members.Read` or `Pathshala.Teach` + a teacher of it or somebody who runs it | With contact details |
+| `ListStudentsQuery` | `Members.Read` or `Pathshala.Teach` + staff | Placed children in the caller's classes, and (for administrators) waiting requests, with the parent's contact |
+| `GetProgressReportQuery` | `Members.Read` or `Pathshala.Teach` + staff | Every placed child's attendance and exam average |
+| `GetAttendanceOverviewQuery` | `Members.Read` or `Pathshala.Teach` + staff | Per class: days marked and the tally |
+| `ListPathshalaExamsQuery` | `Members.Read` or `Pathshala.Teach` + staff | Every exam, with how far marking has got |
 | `ListDonationsQuery` | `Pathshala.Manage` | The ledger and its total |
-| `ListAnnouncementsQuery` | `Members.Read` + staff | What this Pathshala has sent |
+| `ListAnnouncementsQuery` | `Members.Read` or `Pathshala.Teach` + staff | What this Pathshala has sent |
 | `ListMyAnnouncementsQuery` | `Members.Read` | From every Pathshala where the caller has a child with a place or a request |
 
 ## Events published
@@ -159,6 +159,24 @@ that exists is the Samaaj's to put right. An Area Admin may correct their own
 locality's Pathshala and not move it out: a blank locality is filled with
 theirs, because clearing it would hand the Pathshala to the Samaaj Admin, and
 naming another answers 403 - events-service's rule for an event.
+
+## A teacher who is not a member
+
+Added 2026-09-27. A teacher from outside the Samaaj has an account holding the
+`PathshalaTeacher` role and no `Member` role, so it carries `Pathshala.Teach`
+and not `Members.Read` (identity-tenant-service's catalogue). Every read a
+teacher needs - the Pathshala and its tabs, a class's roll, register and exams,
+sending an announcement - declares
+`[RequiresPermission(MembersRead, PathshalaTeach)]`, either key opening the
+door and `PathshalaAccess` still deciding which Pathshala. Everything a parent
+does - asking for a place, their own child's records, their announcements - is
+`Members.Read` alone, so such a teacher is refused it.
+
+`PathshalaAccess.IsOutsider` is "no `Members.Read`". For an outsider the list is
+always the Pathshalas they work at and any other Pathshala is "not found" - not
+even the directory card a member reads. A member who teaches keeps the
+directory, and the admin panel asks for the staff view (`?staffed=true`,
+`?asStaff=true`) whenever the caller does not hold `Pathshala.Manage`.
 
 ## Teachers, the staff tabs, donations and announcements
 

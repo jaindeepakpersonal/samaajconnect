@@ -35,7 +35,7 @@ public sealed record AnnouncementResponse(
 /// Pathshala, or somebody who runs it (an Area Admin for their own locality's).
 /// Anybody else is answered "not found".
 /// </remarks>
-[RequiresPermission(PermissionKeys.MembersRead)]
+[RequiresPermission(PermissionKeys.MembersRead, PermissionKeys.PathshalaTeach)]
 public sealed record SendAnnouncementCommand(Guid PathshalaId, string Title, string Body)
     : ICommand<AnnouncementResponse>;
 
@@ -110,7 +110,7 @@ public sealed class SendAnnouncementCommandHandler(
 // ---- Read, as staff ----------------------------------------------------------
 
 /// <summary>What this Pathshala has sent, newest first - for its administrators and teachers.</summary>
-[RequiresPermission(PermissionKeys.MembersRead)]
+[RequiresPermission(PermissionKeys.MembersRead, PermissionKeys.PathshalaTeach)]
 public sealed record ListAnnouncementsQuery(Guid PathshalaId) : IQuery<IReadOnlyList<AnnouncementResponse>>;
 
 public sealed class ListAnnouncementsQueryHandler(

@@ -20,7 +20,7 @@ namespace Sangam.Pathshala.Application.Pathshalas.Queries;
 /// this day yet" is a normal state of a register, not a missing resource.
 /// </para>
 /// </remarks>
-[RequiresPermission(PermissionKeys.MembersRead)]
+[RequiresPermission(PermissionKeys.MembersRead, PermissionKeys.PathshalaTeach)]
 public sealed record GetClassRegisterQuery(Guid ClassId, DateOnly ClassDate)
     : IQuery<IReadOnlyList<RegisterEntryResponse>>;
 
@@ -82,7 +82,7 @@ public sealed class GetClassRegisterQueryHandler(
 /// how a correct mark gets replaced by a guess.
 /// </para>
 /// </remarks>
-[RequiresPermission(PermissionKeys.MembersRead)]
+[RequiresPermission(PermissionKeys.MembersRead, PermissionKeys.PathshalaTeach)]
 public sealed record ListClassExamsQuery(Guid ClassId)
     : IQuery<IReadOnlyList<ClassExamResponse>>;
 

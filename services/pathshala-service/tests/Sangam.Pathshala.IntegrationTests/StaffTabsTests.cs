@@ -38,10 +38,13 @@ public sealed class StaffTabsTests(PathshalaApiFactory factory)
     private HttpClient Admin() => factory.CreateClientAs(
         AdminId, TenantId, [Roles.SamaajAdmin], [PermissionKeys.MembersRead, PermissionKeys.PathshalaManage]);
 
-    /// <summary>A teacher account that is not a Samaaj member - the PathshalaTeacher role only.</summary>
+    /// <summary>
+    /// A teacher account that is not a Samaaj member - the PathshalaTeacher role
+    /// only, and so Pathshala.Teach rather than Members.Read.
+    /// </summary>
     private HttpClient Teacher(Guid? login = null) => factory.CreateClientAs(
         login ?? TeacherLogin, TenantId, [Roles.PathshalaTeacher],
-        [PermissionKeys.MembersRead, PermissionKeys.PathshalaAttendanceWrite, PermissionKeys.PathshalaExamsWrite]);
+        [PermissionKeys.PathshalaTeach, PermissionKeys.PathshalaAttendanceWrite, PermissionKeys.PathshalaExamsWrite]);
 
     private HttpClient Member(Guid? id = null) => factory.CreateClientAs(
         id ?? ParentId, TenantId, [Roles.Member], [PermissionKeys.MembersRead]);

@@ -17,9 +17,14 @@ public sealed class RequiresRolesAttribute(params string[] roles) : Attribute
 
 /// <summary>Declares which permission key a command or query requires.</summary>
 [AttributeUsage(AttributeTargets.Class, AllowMultiple = false, Inherited = true)]
-public sealed class RequiresPermissionAttribute(string permissionKey) : Attribute
+public sealed class RequiresPermissionAttribute(string permissionKey, params string[] alternatives) : Attribute
 {
-    public string PermissionKey { get; } = permissionKey;
+    /// <summary>
+    /// Any one of these opens the door; a handler's own data check still decides
+    /// which records. Alternatives exist for a read two kinds of account reach -
+    /// see pathshala-service's Pathshala.Teach.
+    /// </summary>
+    public string[] PermissionKeys { get; } = [permissionKey, .. alternatives];
 }
 
 /// <summary>

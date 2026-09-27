@@ -17,6 +17,9 @@ interface NavItem {
 
   /** Shown to an Area Admin, who manages one locality's members and nothing else. */
   readonly forAreaAdmin?: true;
+
+  /** Shown to a teacher, whose only screens are the Pathshalas they teach. */
+  readonly forTeacher?: true;
 }
 
 interface NavGroup {
@@ -199,6 +202,18 @@ export class ShellComponent implements OnInit {
     this.auth.roles().includes('AreaAdmin'),
   );
 
+  /**
+   * A teacher and nothing more - a member who teaches, or somebody from outside
+   * the Samaaj whose account exists only to teach. Either way their screens are
+   * the Pathshalas they teach, and every other screen would answer 403. A
+   * courtesy, like the Area Admin's: pathshala-service decides which Pathshalas.
+   */
+  readonly isTeacher = computed(
+    () =>
+      this.auth.roles().includes('PathshalaTeacher') &&
+      this.auth.roles().every((role) => role === 'PathshalaTeacher' || role === 'Member'),
+  );
+
   readonly areaLocalityName = signal<string | null>(null);
 
   readonly visibleNav = computed(() =>
@@ -207,7 +222,9 @@ export class ShellComponent implements OnInit {
       items: group.items.filter((item) =>
         this.isAreaAdmin()
           ? item.forAreaAdmin === true
-          : item.roles === undefined || this.auth.hasAnyRole(...item.roles),
+          : this.isTeacher()
+            ? item.forTeacher === true
+            : item.roles === undefined || this.auth.hasAnyRole(...item.roles),
       ),
     })).filter((group) => group.items.length > 0),
   );
@@ -327,7 +344,7 @@ const NAV: readonly NavGroup[] = [
   },
   {
     heading: 'Education',
-    items: [{ label: 'Jain Pathshala', route: '/pathshala', forAreaAdmin: true }],
+    items: [{ label: 'Jain Pathshala', route: '/pathshala', forAreaAdmin: true, forTeacher: true }],
   },
   {
     heading: 'Boli',

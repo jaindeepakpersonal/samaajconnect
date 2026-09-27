@@ -302,8 +302,10 @@ const PHONE = /^\+?[0-9 ()-]{7,20}$/;
                 <input id="login-identifier" class="input" name="identifier" [(ngModel)]="identifier"
                   maxlength="200" />
                 <p class="small">
-                  A new account holding only the Pathshala Teacher role. They set their own
-                  password with the activation code shown next.
+                  For a teacher who is not a member of the Samaaj: an account holding only the
+                  Pathshala Teacher role. It signs in to this admin panel, sees only the Pathshalas
+                  they teach, and cannot use the member portal. They set their password with the
+                  activation code shown next.
                 </p>
                 <div class="actions">
                   <button class="btn" type="submit" [disabled]="busy() || !identifier.trim()">

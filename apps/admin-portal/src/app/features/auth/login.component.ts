@@ -140,10 +140,15 @@ export class AdminLoginComponent {
         }
 
         // An Area Admin manages one locality's members and nothing else, so
-        // the dashboard's Samaaj-wide tiles are not theirs to read.
-        const home = result.roles.every((role) => role === 'AreaAdmin' || role === 'Member')
+        // the dashboard's Samaaj-wide tiles are not theirs to read. A teacher
+        // - a member who teaches, or somebody from outside the Samaaj - has
+        // only the Pathshalas they teach.
+        const only = (...allowed: string[]) => result.roles.every((role) => allowed.includes(role));
+        const home = only('AreaAdmin', 'Member')
           ? '/members'
-          : '/dashboard';
+          : only('PathshalaTeacher', 'Member')
+            ? '/pathshala'
+            : '/dashboard';
 
         void this.router.navigateByUrl(
           this.route.snapshot.queryParamMap.get('returnUrl') ?? home,

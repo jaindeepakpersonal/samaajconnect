@@ -73,7 +73,7 @@ describe('PathshalaListComponent', () => {
 
   function load(list: Pathshala[] = []) {
     fixture.detectChanges();
-    http.expectOne('/v1/pathshala/pathshalas').flush(list);
+    http.expectOne((r) => r.url === '/v1/pathshala/pathshalas').flush(list);
     fixture.detectChanges();
   }
 
@@ -147,6 +147,30 @@ describe('PathshalaListComponent', () => {
     expect(text()).toContain('Edit Shri Mahavir Jain Pathshala');
   });
 
+  it('shows a teacher only the Pathshalas they teach at', () => {
+    configure(['PathshalaTeacher'], 't1', ['Pathshala.Teach', 'Pathshala.Attendance.Write']);
+    build();
+    fixture.detectChanges();
+
+    const call = http.expectOne((r) => r.url === '/v1/pathshala/pathshalas');
+
+    expect(call.request.params.get('staffed')).toBe('true');
+
+    call.flush([pathshala()]);
+  });
+
+  it('shows somebody who runs Pathshalas the whole directory', () => {
+    configure(['SamaajAdmin'], 't1');
+    build();
+    fixture.detectChanges();
+
+    const call = http.expectOne((r) => r.url === '/v1/pathshala/pathshalas');
+
+    expect(call.request.params.has('staffed')).toBe(false);
+
+    call.flush([]);
+  });
+
   it('gives somebody without Pathshala.Manage neither control', () => {
     configure(['Member', 'PathshalaTeacher'], 't1', ['Members.Read', 'Pathshala.Attendance.Write']);
     build();
@@ -201,7 +225,7 @@ describe('PathshalaListComponent', () => {
 
     expect(call.request.method).toBe('DELETE');
     call.flush(pathshala({ status: 'Inactive' }));
-    http.expectOne('/v1/pathshala/pathshalas').flush([pathshala({ status: 'Inactive' })]);
+    http.expectOne((r) => r.url === '/v1/pathshala/pathshalas').flush([pathshala({ status: 'Inactive' })]);
     fixture.detectChanges();
 
     expect(text()).toContain('has been stood down');
@@ -213,7 +237,7 @@ describe('PathshalaListComponent', () => {
     configure(['SamaajAdmin'], 't1');
     build();
     fixture.detectChanges();
-    http.expectOne('/v1/pathshala/pathshalas').flush({}, { status: 404, statusText: 'Not Found' });
+    http.expectOne((r) => r.url === '/v1/pathshala/pathshalas').flush({}, { status: 404, statusText: 'Not Found' });
     fixture.detectChanges();
 
     expect(text()).toContain('does not run the Pathshala module');

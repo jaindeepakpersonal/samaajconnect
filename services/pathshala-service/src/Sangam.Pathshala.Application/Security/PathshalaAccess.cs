@@ -109,6 +109,15 @@ public static class PathshalaAccess
     /// classes this caller may see", so they share this one answer rather than
     /// four copies of "administrator, or teacher of which classes?".
     /// </remarks>
+    /// <summary>
+    /// A caller who is not a member of the Samaaj: a Pathshala teacher from
+    /// outside it, whose account holds Pathshala.Teach and not Members.Read.
+    /// They see the Pathshalas they teach and nothing else - never the
+    /// directory a member browses.
+    /// </summary>
+    public static bool IsOutsider(ICurrentUser currentUser) =>
+        !currentUser.HasPermission(PermissionKeys.MembersRead);
+
     public static StaffScope? StaffScopeOf(
         ICurrentUser currentUser, IAreaScope area, Domain.Pathshalas.Pathshala pathshala)
     {

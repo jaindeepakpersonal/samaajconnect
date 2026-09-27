@@ -751,6 +751,13 @@ it: the pill rendered in the wrong colour, which is exactly the kind of thing
 nobody notices. Every one of those pill variants sets a text colour as well as a
 background, so a state is never carried by hue alone.
 
+**A Pathshala teacher who is not a member is turned away at sign-in
+(2026-09-27)** - password or OTP - and signed out again, with a sentence
+pointing at the admin panel. The account holds the teacher role and not the
+Member role, so every member-facing read already refuses it server-side
+(no `Members.Read`); refusing the session here is what saves them a portal full
+of errors. A member who also teaches signs in as normal.
+
 **After signing in the portal simply navigates to Timeline.** The wireframe
 sent a member to their Samaaj's subdomain; there is no subdomain now, so there
 is nowhere else to go but the one screen with something on it to read.

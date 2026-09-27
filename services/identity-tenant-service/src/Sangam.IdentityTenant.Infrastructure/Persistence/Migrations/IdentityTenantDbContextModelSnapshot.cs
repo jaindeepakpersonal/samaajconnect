@@ -179,6 +179,11 @@ namespace Sangam.IdentityTenant.Infrastructure.Persistence.Migrations
                         {
                             Id = new Guid("b0000000-0000-0000-0000-000000000021"),
                             Key = "Trust.Manage"
+                        },
+                        new
+                        {
+                            Id = new Guid("b0000000-0000-0000-0000-000000000022"),
+                            Key = "Pathshala.Teach"
                         });
                 });
 
@@ -413,6 +418,11 @@ namespace Sangam.IdentityTenant.Infrastructure.Persistence.Migrations
                         },
                         new
                         {
+                            RoleId = new Guid("a0000000-0000-0000-0000-000000000001"),
+                            PermissionId = new Guid("b0000000-0000-0000-0000-000000000022")
+                        },
+                        new
+                        {
                             RoleId = new Guid("a0000000-0000-0000-0000-000000000002"),
                             PermissionId = new Guid("b0000000-0000-0000-0000-000000000002")
                         },
@@ -589,7 +599,7 @@ namespace Sangam.IdentityTenant.Infrastructure.Persistence.Migrations
                         new
                         {
                             RoleId = new Guid("a0000000-0000-0000-0000-000000000006"),
-                            PermissionId = new Guid("b0000000-0000-0000-0000-000000000003")
+                            PermissionId = new Guid("b0000000-0000-0000-0000-000000000022")
                         },
                         new
                         {

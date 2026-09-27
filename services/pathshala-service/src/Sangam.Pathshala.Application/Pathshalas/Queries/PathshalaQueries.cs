@@ -7,10 +7,20 @@ using Sangam.Pathshala.Domain.Enrolments;
 namespace Sangam.Pathshala.Application.Pathshalas.Queries;
 
 /// <summary>The Samaaj's Pathshalas, as the directory card shows them.</summary>
-[RequiresPermission(PermissionKeys.MembersRead)]
-public sealed record ListPathshalasQuery : IQuery<IReadOnlyList<PathshalaResponse>>;
+/// <remarks>
+/// <paramref name="StaffedOnly"/> narrows the list to the Pathshalas the caller
+/// works at - every one they run, or the ones they teach - which is what the
+/// admin panel shows a teacher. It is not optional for a caller who is not a
+/// member of the Samaaj (no Members.Read): a teacher from outside it sees the
+/// Pathshalas they teach and no others.
+/// </remarks>
+[RequiresPermission(PermissionKeys.MembersRead, PermissionKeys.PathshalaTeach)]
+public sealed record ListPathshalasQuery(bool StaffedOnly = false) : IQuery<IReadOnlyList<PathshalaResponse>>;
 
-public sealed class ListPathshalasQueryHandler(IPathshalaRepository pathshalas)
+public sealed class ListPathshalasQueryHandler(
+    IPathshalaRepository pathshalas,
+    ICurrentUser currentUser,
+    IAreaScope areaScope)
     : IRequestHandler<ListPathshalasQuery, Result<IReadOnlyList<PathshalaResponse>>>
 {
     public async Task<Result<IReadOnlyList<PathshalaResponse>>> Handle(
@@ -18,19 +28,31 @@ public sealed class ListPathshalasQueryHandler(IPathshalaRepository pathshalas)
     {
         var found = await pathshalas.ListAsync(cancellationToken);
 
+        if (query.StaffedOnly || PathshalaAccess.IsOutsider(currentUser))
+        {
+            found = [.. found.Where(p => PathshalaAccess.StaffScopeOf(currentUser, areaScope, p) is not null)];
+        }
+
         return Result.Success<IReadOnlyList<PathshalaResponse>>(
             [.. found.Select(p => p.ToResponse())]);
     }
 }
 
 /// <summary>One Pathshala with its sessions and classes.</summary>
-[RequiresPermission(PermissionKeys.MembersRead)]
-public sealed record GetPathshalaQuery(Guid PathshalaId) : IQuery<PathshalaDetailResponse>;
+[RequiresPermission(PermissionKeys.MembersRead, PermissionKeys.PathshalaTeach)]
+/// <remarks>
+/// <paramref name="AsStaff"/> answers "not found" unless the caller works at
+/// this Pathshala, the admin panel's view for a teacher. Like the list, it is
+/// not optional for a caller who is not a member of the Samaaj.
+/// </remarks>
+public sealed record GetPathshalaQuery(Guid PathshalaId, bool AsStaff = false) : IQuery<PathshalaDetailResponse>;
 
 public sealed class GetPathshalaQueryHandler(
     IPathshalaRepository pathshalas,
     IEnrolmentRepository enrolments,
-    ITenantContext tenantContext)
+    ITenantContext tenantContext,
+    ICurrentUser currentUser,
+    IAreaScope areaScope)
     : IRequestHandler<GetPathshalaQuery, Result<PathshalaDetailResponse>>
 {
     public async Task<Result<PathshalaDetailResponse>> Handle(
@@ -39,6 +61,12 @@ public sealed class GetPathshalaQueryHandler(
         var pathshala = await pathshalas.GetByIdAsync(query.PathshalaId, cancellationToken);
 
         if (!pathshala.IsInTenant(tenantContext.TenantId))
+        {
+            return Result.Failure<PathshalaDetailResponse>(PathshalaAccess.NoSuchPathshala);
+        }
+
+        if ((query.AsStaff || PathshalaAccess.IsOutsider(currentUser))
+            && PathshalaAccess.StaffScopeOf(currentUser, areaScope, pathshala!) is null)
         {
             return Result.Failure<PathshalaDetailResponse>(PathshalaAccess.NoSuchPathshala);
         }
@@ -102,7 +130,7 @@ public sealed class ListEnrolmentRequestsQueryHandler(
 /// Enrolment ids and child profile ids, which is what the register submission
 /// needs. Names come from member-family-service, as everywhere else here.
 /// </remarks>
-[RequiresPermission(PermissionKeys.MembersRead)]
+[RequiresPermission(PermissionKeys.MembersRead, PermissionKeys.PathshalaTeach)]
 public sealed record GetClassRollQuery(Guid ClassId) : IQuery<IReadOnlyList<EnrolmentResponse>>;
 
 public sealed class GetClassRollQueryHandler(

@@ -858,6 +858,75 @@ public sealed class AdminEndpointsTests(IdentityTenantApiFactory factory)
     }
 
     [Fact]
+    public async Task A_teacher_from_outside_the_Samaaj_is_not_made_a_member_and_reads_nothing_members_read()
+    {
+        const string identifier = "visiting-teacher@example.com";
+
+        var invited = await InviteAsync(SamaajAdmin(), identifier, [Roles.PathshalaTeacher]);
+        invited.StatusCode.Should().Be(HttpStatusCode.Created);
+
+        var code = (await invited.Content.ReadFromJsonAsync<JsonElement>())
+            .GetProperty("activationCode").GetString();
+
+        (await factory.CreateClient().PostAsJsonAsync("/v1/identity/activations/redeem", new
+        {
+            mobileOrEmail = identifier,
+            code,
+            password = RealPassword,
+        })).StatusCode.Should().Be(HttpStatusCode.OK);
+
+        var (_, me) = await SignInAsync(identifier, RealPassword);
+
+        me.GetProperty("roles").EnumerateArray().Select(r => r.GetString())
+            .Should().Equal(Roles.PathshalaTeacher);
+
+        var permissions = me.GetProperty("permissions").EnumerateArray().Select(p => p.GetString()).ToList();
+        permissions.Should().Contain("Pathshala.Teach");
+        permissions.Should().NotContain(
+            "Members.Read", "every member-facing read on the platform is gated on it");
+
+        // Activating registers a member profile for everybody else; for them it
+        // would put a non-member into the member directory.
+        var registered = await factory.WithDbContextAsync(db =>
+            db.OutboxMessages.AsNoTracking()
+                .Where(m => m.Topic == "identity.user.registered.v1")
+                .Select(m => m.Payload)
+                .ToListAsync());
+
+        registered.Count(p => p.Contains(identifier)).Should().Be(0);
+    }
+
+    [Fact]
+    public async Task An_invited_administrator_is_still_a_member_whose_activation_registers_them()
+    {
+        const string identifier = "moderator@example.com";
+
+        var invited = await InviteAsync(SamaajAdmin(), identifier, [Roles.ContentModerator]);
+        var code = (await invited.Content.ReadFromJsonAsync<JsonElement>())
+            .GetProperty("activationCode").GetString();
+
+        await factory.CreateClient().PostAsJsonAsync("/v1/identity/activations/redeem", new
+        {
+            mobileOrEmail = identifier,
+            code,
+            password = RealPassword,
+        });
+
+        var (_, me) = await SignInAsync(identifier, RealPassword);
+
+        me.GetProperty("roles").EnumerateArray().Select(r => r.GetString())
+            .Should().Contain(Roles.Member);
+
+        var registered = await factory.WithDbContextAsync(db =>
+            db.OutboxMessages.AsNoTracking()
+                .Where(m => m.Topic == "identity.user.registered.v1")
+                .Select(m => m.Payload)
+                .ToListAsync());
+
+        registered.Count(p => p.Contains(identifier)).Should().Be(1);
+    }
+
+    [Fact]
     public async Task An_ordinary_SamaajAdmin_s_token_carries_no_locality_claim_at_all()
     {
         await RealAdminIdAsync("plain-admin@example.com");

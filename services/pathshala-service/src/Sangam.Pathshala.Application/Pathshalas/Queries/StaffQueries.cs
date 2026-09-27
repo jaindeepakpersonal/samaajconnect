@@ -51,7 +51,7 @@ internal static class StaffReads
 /// A Pathshala's teachers with their contact details. Its administrators and its
 /// teachers read it - colleagues need to reach each other - and nobody else.
 /// </summary>
-[RequiresPermission(PermissionKeys.MembersRead)]
+[RequiresPermission(PermissionKeys.MembersRead, PermissionKeys.PathshalaTeach)]
 public sealed record ListTeachersQuery(Guid PathshalaId) : IQuery<IReadOnlyList<TeacherResponse>>;
 
 public sealed class ListTeachersQueryHandler(
@@ -86,7 +86,7 @@ public sealed class ListTeachersQueryHandler(
 /// contact the parent gave. A teacher sees the children placed in their own
 /// classes; the waiting requests are the administrators'.
 /// </summary>
-[RequiresPermission(PermissionKeys.MembersRead)]
+[RequiresPermission(PermissionKeys.MembersRead, PermissionKeys.PathshalaTeach)]
 public sealed record ListStudentsQuery(Guid PathshalaId) : IQuery<IReadOnlyList<StudentResponse>>;
 
 public sealed class ListStudentsQueryHandler(
@@ -146,7 +146,7 @@ public sealed class ListStudentsQueryHandler(
 /// Every placed child's attendance and exam average - the parent's own progress
 /// view, for a whole Pathshala, in two GROUP BYs rather than a query per child.
 /// </summary>
-[RequiresPermission(PermissionKeys.MembersRead)]
+[RequiresPermission(PermissionKeys.MembersRead, PermissionKeys.PathshalaTeach)]
 public sealed record GetProgressReportQuery(Guid PathshalaId) : IQuery<IReadOnlyList<ProgressRowResponse>>;
 
 public sealed class GetProgressReportQueryHandler(
@@ -212,7 +212,7 @@ public sealed class GetProgressReportQueryHandler(
 // ---- Attendance --------------------------------------------------------------
 
 /// <summary>Per class: how many days the register was marked, and how it stands.</summary>
-[RequiresPermission(PermissionKeys.MembersRead)]
+[RequiresPermission(PermissionKeys.MembersRead, PermissionKeys.PathshalaTeach)]
 public sealed record GetAttendanceOverviewQuery(Guid PathshalaId) : IQuery<IReadOnlyList<ClassAttendanceResponse>>;
 
 public sealed class GetAttendanceOverviewQueryHandler(
@@ -265,7 +265,7 @@ public sealed class GetAttendanceOverviewQueryHandler(
 // ---- Exams -------------------------------------------------------------------
 
 /// <summary>Every exam across the classes the caller may see, newest first, with how far marking has got.</summary>
-[RequiresPermission(PermissionKeys.MembersRead)]
+[RequiresPermission(PermissionKeys.MembersRead, PermissionKeys.PathshalaTeach)]
 public sealed record ListPathshalaExamsQuery(Guid PathshalaId) : IQuery<IReadOnlyList<ExamOverviewResponse>>;
 
 public sealed class ListPathshalaExamsQueryHandler(

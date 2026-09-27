@@ -31,9 +31,9 @@ public static class PathshalaEndpoints
 
     private static void MapPathshalas(RouteGroupBuilder group)
     {
-        group.MapGet("/pathshalas", async (ISender sender, CancellationToken cancellationToken) =>
+        group.MapGet("/pathshalas", async (bool? staffed, ISender sender, CancellationToken cancellationToken) =>
             {
-                var result = await sender.Send(new ListPathshalasQuery(), cancellationToken);
+                var result = await sender.Send(new ListPathshalasQuery(staffed ?? false), cancellationToken);
 
                 return result.ToApiResult();
             })
@@ -70,9 +70,9 @@ public static class PathshalaEndpoints
             .ProducesProblem(StatusCodes.Status403Forbidden);
 
         group.MapGet("/pathshalas/{id:guid}", async (
-                Guid id, ISender sender, CancellationToken cancellationToken) =>
+                Guid id, bool? asStaff, ISender sender, CancellationToken cancellationToken) =>
             {
-                var result = await sender.Send(new GetPathshalaQuery(id), cancellationToken);
+                var result = await sender.Send(new GetPathshalaQuery(id, asStaff ?? false), cancellationToken);
 
                 return result.ToApiResult();
             })

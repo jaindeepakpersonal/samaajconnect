@@ -15,11 +15,21 @@ public sealed class RequiresRolesAttribute(params string[] roles) : Attribute
     public string[] Roles { get; } = roles;
 }
 
-/// <summary>Declares which permission key a command or query requires.</summary>
+/// <summary>
+/// Declares which permission key a command or query requires - or, with
+/// alternatives, any one of several.
+/// </summary>
+/// <remarks>
+/// Alternatives exist for one case: a Pathshala's staff screens are reached
+/// both by a Samaaj member (Members.Read - an administrator, or a member who
+/// teaches) and by a teacher from outside the Samaaj, whose account holds
+/// Pathshala.Teach and nothing member-facing. Either key only opens the door;
+/// the handler's data check (PathshalaAccess) still decides which Pathshala.
+/// </remarks>
 [AttributeUsage(AttributeTargets.Class, AllowMultiple = false, Inherited = true)]
-public sealed class RequiresPermissionAttribute(string permissionKey) : Attribute
+public sealed class RequiresPermissionAttribute(string permissionKey, params string[] alternatives) : Attribute
 {
-    public string PermissionKey { get; } = permissionKey;
+    public string[] PermissionKeys { get; } = [permissionKey, .. alternatives];
 }
 
 /// <summary>

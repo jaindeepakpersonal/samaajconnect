@@ -52,4 +52,12 @@ public static class PermissionKeys
     /// member holds it.
     /// </summary>
     public const string MembersRead = "Members.Read";
+
+    /// <summary>
+    /// Teach at a Pathshala. The teacher role's key since 2026-09-27, in place
+    /// of Members.Read: a teacher from outside the Samaaj holds this and
+    /// nothing member-facing, so the staff reads accept either key and the
+    /// data check decides which Pathshala (only the ones they teach).
+    /// </summary>
+    public const string PathshalaTeach = "Pathshala.Teach";
 }

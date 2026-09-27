@@ -141,6 +141,84 @@ describe('LoginComponent', () => {
     expect(navigate).toHaveBeenCalledWith('/timeline');
   });
 
+  it('turns away a Pathshala teacher who is not a member, and signs them out again', () => {
+    setup();
+
+    const router = TestBed.inject(Router);
+    const navigate = vi.spyOn(router, 'navigateByUrl').mockResolvedValue(true);
+
+    component.form.setValue({ mobileOrEmail: 'teacher@example.com', password: 'a-long-password' });
+    component.submit();
+
+    http.expectOne('/v1/identity/login').flush({
+      accessToken: 't',
+      expiresAt: new Date().toISOString(),
+      refreshToken: 'r',
+      refreshTokenExpiresAt: new Date().toISOString(),
+      userId: 'u9',
+      tenantId: 't1',
+      tenantSlug: 'mahavir-samaj',
+      fullName: 'Pt. Ramesh Shastri',
+      roles: ['PathshalaTeacher'],
+    });
+
+    // The refresh token is spent server-side, not just forgotten.
+    http.expectOne('/v1/identity/logout').flush(null);
+    fixture.detectChanges();
+
+    expect(navigate).not.toHaveBeenCalled();
+    expect(TestBed.inject(TokenStore).token()).toBeNull();
+    expect(text()).toContain('teachers sign in to the admin panel');
+  });
+
+  it('turns them away on the OTP path too', () => {
+    setup();
+    switchToOtp();
+
+    component.form.controls.mobileOrEmail.setValue('teacher@example.com');
+    component.sendOtp();
+    http.expectOne('/v1/identity/otp/request').flush(null);
+
+    component.otpCode.set('123456');
+    component.submit();
+
+    http.expectOne('/v1/identity/otp/login').flush({
+      accessToken: 't',
+      expiresAt: new Date().toISOString(),
+      userId: 'u9',
+      tenantId: 't1',
+      tenantSlug: 'mahavir-samaj',
+      fullName: 'Pt. Ramesh Shastri',
+      roles: ['PathshalaTeacher'],
+    });
+    fixture.detectChanges();
+
+    expect(TestBed.inject(TokenStore).token()).toBeNull();
+    expect(component.error()).toContain('teachers sign in to the admin panel');
+  });
+
+  it('lets a member who also teaches in', async () => {
+    setup();
+
+    const router = TestBed.inject(Router);
+    const navigate = vi.spyOn(router, 'navigateByUrl').mockResolvedValue(true);
+
+    component.form.setValue({ mobileOrEmail: 'kavita@example.com', password: 'a-long-password' });
+    component.submit();
+
+    http.expectOne('/v1/identity/login').flush({
+      accessToken: 't',
+      expiresAt: new Date().toISOString(),
+      userId: 'u2',
+      tenantId: 't1',
+      tenantSlug: 'mahavir-samaj',
+      fullName: 'Smt. Kavita Jain',
+      roles: ['Member', 'PathshalaTeacher'],
+    });
+
+    expect(navigate).toHaveBeenCalledWith('/timeline');
+  });
+
   it('tells the member their session ended when redirected by the interceptor', () => {
     setup({ expired: 'true' });
 

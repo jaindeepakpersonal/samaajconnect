@@ -1,7 +1,7 @@
 import { Component, OnInit, computed, inject, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { ActivatedRoute, RouterLink } from '@angular/router';
-import { describeError } from '@samaajconnect/shared';
+import { AuthService, describeError } from '@samaajconnect/shared';
 import { AdminApi } from '../../core/admin-api';
 import { AdminScope } from '../../core/admin-scope';
 import { AreaScope } from '../../core/area-scope';
@@ -418,6 +418,7 @@ type Mark = AttendanceStatus | '';
 })
 export class ClassDetailComponent implements OnInit {
   private readonly api = inject(AdminApi);
+  private readonly auth = inject(AuthService);
   private readonly route = inject(ActivatedRoute);
 
   readonly scope = inject(AdminScope);
@@ -546,7 +547,9 @@ export class ClassDetailComponent implements OnInit {
     this.loading.set(true);
     this.error.set(null);
 
-    this.api.pathshala(this.pathshalaId).subscribe({
+    const asStaff = !(this.auth.user()?.permissions.includes('Pathshala.Manage') ?? false);
+
+    this.api.pathshala(this.pathshalaId, asStaff).subscribe({
       next: (school) => {
         // An Area Admin runs only their own locality's Pathshalas; anything
         // else answers 404 from every call below, so it reads as not found.
