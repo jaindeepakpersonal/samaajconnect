@@ -61,7 +61,7 @@ public sealed class RedisTenantCache(IConnectionMultiplexer redis, ILogger<Redis
 
             return value == NegativeCacheMarker
                 ? new CachedTenantLookup(false, null)
-                : new CachedTenantLookup(true, JsonSerializer.Deserialize<ResolvedTenant>(value!, JsonOptions));
+                : new CachedTenantLookup(true, JsonSerializer.Deserialize<ResolvedTenant>(((string)value)!, JsonOptions));
         }
         catch (Exception exception)
         {
