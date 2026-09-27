@@ -259,7 +259,7 @@ public sealed class Boli : AggregateRoot, ITenantScopedEntity
     /// Handing them in keeps the event complete without pretending the Boli holds
     /// its own result.
     /// </remarks>
-    public bool MarkPublished(Guid winningMemberId, long amount, DateTimeOffset now)
+    public bool MarkPublished(Guid winningMemberId, long amount, DateTimeOffset now, Guid? localityId = null)
     {
         if (Status != BoliStatus.Closed)
         {
@@ -269,7 +269,7 @@ public sealed class Boli : AggregateRoot, ITenantScopedEntity
         Status = BoliStatus.ResultPublished;
 
         Raise(new BoliResultPublishedDomainEvent(
-            Id, TenantId, OccasionId, winningMemberId, amount, now));
+            Id, TenantId, OccasionId, winningMemberId, amount, now, localityId));
 
         return true;
     }

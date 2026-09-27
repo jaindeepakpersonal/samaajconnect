@@ -36,7 +36,7 @@ public sealed class BoliLifecycleTests(BoliApiFactory factory)
     private HttpClient Member(Guid memberId) => factory.CreateClientAs(
         memberId, Tenant, [Roles.Member], [PermissionKeys.MembersRead]);
 
-    private async Task<Guid> OpenBoliAsync()
+    private async Task<Guid> OpenBoliAsync(Guid? localityId = null)
     {
         var manager = Manager();
         var now = factory.Clock.UtcNow;
@@ -46,6 +46,7 @@ public sealed class BoliLifecycleTests(BoliApiFactory factory)
             title = "Paryushan 2026",
             description = (string?)null,
             occasionDate = "2026-09-10",
+            localityId,
         })).Content.ReadFromJsonAsync<OccasionResponse>();
 
         var type = await (await manager.PostAsJsonAsync(
@@ -209,6 +210,30 @@ public sealed class BoliLifecycleTests(BoliApiFactory factory)
             db.OutboxMessages.IgnoreQueryFilters().Select(m => m.Topic).ToListAsync());
 
         topics.Should().Contain("boli.closed.v1");
+    }
+
+    [Fact]
+    public async Task A_published_result_names_its_occasion_locality_for_the_Trust_that_collects_it()
+    {
+        // trust-service opens the winner's amount due against the Trust for
+        // this locality; without it on the event it would never know which.
+        var localityId = Guid.NewGuid();
+        var boliId = await OpenBoliAsync(localityId);
+        var manager = Manager();
+
+        await Member(Guid.NewGuid())
+            .PostAsJsonAsync($"/v1/boli/boli/{boliId}/bids", new { amount = 2_000_00L });
+        await manager.PostAsync($"/v1/boli/boli/{boliId}/close", null);
+        await manager.PostAsync($"/v1/boli/boli/{boliId}/result", null);
+        await manager.PostAsync($"/v1/boli/boli/{boliId}/result/publish", null);
+
+        var payload = await factory.WithDbContextAsync(db => db.OutboxMessages
+            .IgnoreQueryFilters()
+            .Where(m => m.Topic == "boli.result.published.v1")
+            .Select(m => m.Payload)
+            .SingleAsync());
+
+        payload.Should().Contain(localityId.ToString());
     }
 
     [Fact]

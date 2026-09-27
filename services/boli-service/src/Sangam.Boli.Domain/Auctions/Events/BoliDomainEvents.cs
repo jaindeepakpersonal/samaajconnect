@@ -48,7 +48,14 @@ public sealed record BoliResultPublishedDomainEvent(
     Guid OccasionId,
     Guid WinningMemberId,
     long Amount,
-    DateTimeOffset OccurredAt) : IDomainEvent
+    DateTimeOffset OccurredAt,
+
+    /// <summary>
+    /// The occasion's locality, or null for a Samaaj-wide one. Added so
+    /// trust-service can open the amount due against that locality's Trust;
+    /// additive, so the topic stays v1.
+    /// </summary>
+    Guid? LocalityId = null) : IDomainEvent
 {
     public string Topic => "boli.result.published.v1";
 }

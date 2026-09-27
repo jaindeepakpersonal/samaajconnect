@@ -53,7 +53,7 @@ highest". Read "The guarantee" before changing anything under `Bid`.
 
 - `OccasionClosedDomainEvent` — `boli.occasion.closed.v1`
 - `BoliClosedDomainEvent` — `boli.closed.v1`
-- `BoliResultPublishedDomainEvent` — `boli.result.published.v1`
+- `BoliResultPublishedDomainEvent` — `boli.result.published.v1`. Carries the occasion's `LocalityId` (null for a Samaaj-wide occasion), added so trust-service can open what the winner owes against that locality's Trust; additive, so the topic stays v1
 - `BoliExtendedDomainEvent` — `boli.extended.v1`, only when a closing bid moved the window
 
 ## Events consumed

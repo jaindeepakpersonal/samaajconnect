@@ -272,6 +272,7 @@ public sealed class PublishResultCommandValidator : AbstractValidator<PublishRes
 
 public sealed class PublishResultCommandHandler(
     IBoliRepository boli,
+    IOccasionRepository occasions,
     IUnitOfWork unitOfWork,
     ICurrentUser currentUser,
     ITenantContext tenantContext,
@@ -310,8 +311,12 @@ public sealed class PublishResultCommandHandler(
             return Result.Success(BoliMappings.ToResponse(result, lot, actorId));
         }
 
+        // The locality travels with the event so the locality's Trust can
+        // open what the winner owes (trust-service's consumer).
+        var occasion = await occasions.GetByIdAsync(lot.OccasionId, cancellationToken);
+
         result.Publish(actorId, clock.UtcNow);
-        lot.MarkPublished(result.WinningMemberId, result.Amount, clock.UtcNow);
+        lot.MarkPublished(result.WinningMemberId, result.Amount, clock.UtcNow, occasion?.LocalityId);
 
         await unitOfWork.SaveChangesAsync(cancellationToken);
 
