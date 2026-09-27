@@ -140,6 +140,10 @@ exactly these two rather than growing a third without a paragraph here first.
 | `LoginCommand` | Issuing the token is what it does |
 | `RefreshSessionCommand` | The refresh token *is* the credential presented |
 | `SignOutCommand` | Ends a session that may already be unusable |
+| `RequestLoginOtpCommand` | Asking for a sign-in code is how a person without their password signs in. Answers identically whether or not the identifier is a real account, so it is no enumeration oracle |
+| `LoginWithOtpCommand` | The one-time code *is* the credential presented — the same shape as `LoginCommand` |
+| `RequestPasswordResetCommand` | The person has lost the password they would sign in with. Answers identically for unknown identifiers, like `RequestLoginOtpCommand` |
+| `RedeemPasswordResetCommand` | The reset code is the credential. Issues no token — the next step is an ordinary sign-in, as with `ActivateAccountCommand` |
 | `RegisterMemberCommand` | No account exists yet. Takes a **slug**, resolved server-side, never a tenant id |
 | `ActivateAccountCommand` | Redeeming a first password: the person has no way to sign in yet |
 | `GetConsentNoticeQuery` | DPDP s.5 requires the notice at or before the point of consent, which is registration |
@@ -170,6 +174,8 @@ checking no endpoint file mentions the type.
 | `ConsumeIntegrationEventCommand` | pathshala, social-issues, timeline | Each service's own consumer |
 | `CreateProfileForNewUserCommand` | member-family | `identity.user.registered.v1` |
 | `EraseMemberDataCommand` | member-family | `identity.user.erased.v1` |
+| `EraseMatrimonyDataCommand` | matrimony | `identity.user.erased.v1` |
+| `EraseBusinessesDataCommand` | businesses | `identity.user.erased.v1` |
 | `CompleteChildConversionCommand` | member-family | The account-created event that follows an approved conversion |
 | `CreateAccountForConvertedChildCommand` | identity-tenant | An approved adult-child conversion |
 
@@ -181,6 +187,7 @@ existing platform (`Pathshala.Attendance.Write`, `Issue.Approve`):
 | Key | Grants |
 |---|---|
 | `Tenant.Manage` | Create/activate/deactivate tenants |
+| `Tenant.ManageSecurityPolicy` | Read and set a Samaaj's own security policy. Held by `SamaajAdmin` |
 | `AdminUsers.Manage` | Create/invite admins, assign roles |
 | `Roles.Manage` | Edit the role/permission matrix for a Samaaj. A Samaaj administrator cannot have this one taken away — that is the lock-out floor, enforced in the service and drawn as a fixed tick rather than a checkbox in the admin panel |
 | `Members.Read` / `Members.Write` | Directory search / correcting somebody's factual details. `Members.Write` **cannot** change what a member shares or whether they are listed — those travel only on the member's own self-service update, and the correction endpoint carries no such field to send. Until 2026-09-04 the only route open to this permission required them, and no read available to an administrator returned them |

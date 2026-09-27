@@ -65,7 +65,10 @@ END {
   for (i = 1; i <= n; i++) {
     if (line[i] !~ /(public|internal) +(sealed +)?record +[A-Za-z0-9_]+/) { continue }
     decl = line[i]
-    for (j = i + 1; j <= n && j <= i + 12; j++) {
+    # A declaration that ends on its own line ends there. Without this, a
+    # one-line record such as PlaceOrderItem read on into the next record's
+    # declaration and was taken for PlaceOrderCommand.
+    for (j = i + 1; line[i] !~ /(\{|;) *$/ && j <= n && j <= i + 12; j++) {
       decl = decl " " line[j]
       if (line[j] ~ /(\{|;) *$/) { break }
     }
