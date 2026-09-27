@@ -9,7 +9,7 @@ using Sangam.Competition.Infrastructure.Persistence;
 
 #nullable disable
 
-namespace Sangam.Competition.Infrastructure.Persistence.Migrations
+namespace Sangam.Competition.Infrastructure.Migrations
 {
     [DbContext(typeof(CompetitionDbContext))]
     [Migration("20260927112158_CompetitionLocality")]

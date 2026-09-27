@@ -3,7 +3,7 @@ using Microsoft.EntityFrameworkCore.Migrations;
 
 #nullable disable
 
-namespace Sangam.Competition.Infrastructure.Persistence.Migrations
+namespace Sangam.Competition.Infrastructure.Migrations
 {
     /// <inheritdoc />
     public partial class CompetitionLocality : Migration
