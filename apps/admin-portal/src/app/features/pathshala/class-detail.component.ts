@@ -10,6 +10,7 @@ import {
   ClassExam,
   Enrolment,
   PathshalaClass,
+  PathshalaTeacher,
   RegisterEntry,
 } from '../../core/admin.models';
 import { isNotFound } from '../../core/http-status';
@@ -48,7 +49,7 @@ type Mark = AttendanceStatus | '';
   selector: 'app-class-detail',
   imports: [FormsModule, RouterLink],
   template: `
-    <p><a class="btn link" [routerLink]="['/pathshala', pathshalaId]">← Back to the Pathshala</a></p>
+    <p><a class="btn link" [routerLink]="['/pathshala', pathshalaId]" [queryParams]="{ tab: 'classes' }">← Back to the Pathshala</a></p>
 
     @if (error(); as message) {
       <p class="notice error" role="alert">{{ message }}</p>
@@ -73,16 +74,16 @@ type Mark = AttendanceStatus | '';
       <div class="card spaced">
         <h2>Teachers</h2>
 
-        @if (subject.teacherMemberIds.length === 0) {
+        @if (subject.teacherIds.length === 0) {
           <p class="empty">
             Nobody teaches this class yet. Until somebody does, no register can be marked and no
             exam can be set — teaching this class is part of the permission, not just holding it.
           </p>
         } @else {
           <ul class="plain">
-            @for (teacherId of subject.teacherMemberIds; track teacherId) {
+            @for (teacherId of subject.teacherIds; track teacherId) {
               <li class="row-actions">
-                <span>{{ memberName(teacherId) }}</span>
+                <span>{{ teacherName(teacherId) }}</span>
                 <button
                   class="btn small"
                   type="button"
@@ -99,11 +100,18 @@ type Mark = AttendanceStatus | '';
         <form (ngSubmit)="setTeacher(chosenTeacher, true)">
           <h3 class="section-heading">Assign a teacher</h3>
 
-          <label for="teacher">Member</label>
+          @if (teachers().length === 0) {
+            <p class="small">
+              This Pathshala has no teachers yet. Add them on its Teachers tab first - a teacher
+              need not be a member of the Samaaj.
+            </p>
+          }
+
+          <label for="teacher">Teacher</label>
           <select id="teacher" class="input" name="teacher" [(ngModel)]="chosenTeacher">
-            <option value="">Choose a member…</option>
-            @for (member of assignable(); track member.id) {
-              <option [value]="member.id">{{ member.fullName }}</option>
+            <option value="">Choose a teacher…</option>
+            @for (teacher of assignable(); track teacher.id) {
+              <option [value]="teacher.id">{{ teacher.fullName }}</option>
             }
           </select>
 
@@ -426,9 +434,14 @@ export class ClassDetailComponent implements OnInit {
   readonly done = signal<string | null>(null);
   readonly registerDate = signal(today());
 
-  /** Child id → name, and member id → name. Two directories, two calls. */
+  /** Child id → name, resolved from member-family for the roll on screen. */
   private readonly childNames = signal<ReadonlyMap<string, string>>(new Map());
-  private readonly memberNames = signal<ReadonlyMap<string, string>>(new Map());
+
+  /**
+   * The Pathshala's own teacher records. A class names its teachers by record
+   * id rather than member id, because a teacher need not be a member at all.
+   */
+  readonly teachers = signal<readonly PathshalaTeacher[]>([]);
 
   /** Enrolment id → the mark the form holds. `''` means not marked. */
   marks: Record<string, Mark> = {};
@@ -455,13 +468,11 @@ export class ClassDetailComponent implements OnInit {
   examDate = '';
   examMax: number | null = null;
 
-  /** Members not already teaching this class. */
+  /** The Pathshala's teachers not already teaching this class. */
   readonly assignable = computed(() => {
-    const already = new Set(this.klass()?.teacherMemberIds ?? []);
+    const already = new Set(this.klass()?.teacherIds ?? []);
 
-    return [...this.memberNames()]
-      .filter(([id]) => !already.has(id))
-      .map(([id, fullName]) => ({ id, fullName }));
+    return this.teachers().filter((t) => !already.has(t.id));
   });
 
   /** How many of the roll already have a mark for the chosen date. */
@@ -483,8 +494,8 @@ export class ClassDetailComponent implements OnInit {
     return this.childNames().get(childProfileId) ?? 'A child';
   }
 
-  memberName(memberId: string): string {
-    return this.memberNames().get(memberId) ?? 'A member';
+  teacherName(teacherId: string): string {
+    return this.teachers().find((t) => t.id === teacherId)?.fullName ?? 'A teacher';
   }
 
   canAddSlot(): boolean {
@@ -550,7 +561,7 @@ export class ClassDetailComponent implements OnInit {
         if (found) {
           this.loadRoll();
           this.loadExams();
-          this.loadMembers();
+          this.loadTeachers();
         }
       },
       error: (failure: unknown) => {
@@ -648,22 +659,22 @@ export class ClassDetailComponent implements OnInit {
     });
   }
 
-  private loadMembers(): void {
-    this.api.listMembers().subscribe({
-      next: (found) => this.memberNames.set(new Map(found.map((m) => [m.id, m.fullName]))),
-      error: () => this.memberNames.set(new Map()),
+  private loadTeachers(): void {
+    this.api.pathshalaTeachers(this.pathshalaId).subscribe({
+      next: (found) => this.teachers.set(found),
+      error: () => this.teachers.set([]),
     });
   }
 
-  setTeacher(teacherMemberId: string, assign: boolean): void {
-    if (teacherMemberId.length === 0) {
+  setTeacher(teacherId: string, assign: boolean): void {
+    if (teacherId.length === 0) {
       return;
     }
 
-    const who = this.memberName(teacherMemberId);
+    const who = this.teacherName(teacherId);
 
     this.act(
-      this.api.assignTeacher(this.classId, teacherMemberId, assign),
+      this.api.assignTeacher(this.classId, teacherId, assign),
       assign ? `${who} now teaches this class.` : `${who} no longer teaches this class.`,
       () => (this.chosenTeacher = ''),
     );

@@ -4,7 +4,13 @@ import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { ActivatedRoute, provideRouter } from '@angular/router';
 import { API_CONFIG } from '@samaajconnect/shared';
 import { ClassDetailComponent } from './class-detail.component';
-import { ClassExam, Enrolment, PathshalaDetail, RegisterEntry } from '../../core/admin.models';
+import {
+  ClassExam,
+  Enrolment,
+  PathshalaDetail,
+  PathshalaTeacher,
+  RegisterEntry,
+} from '../../core/admin.models';
 
 const PATHSHALA_ID = 'p1';
 const CLASS_ID = 'c1';
@@ -28,7 +34,7 @@ function detail(overrides: Partial<PathshalaDetail> = {}): PathshalaDetail {
         name: 'Class 8 — Jain Studies',
         roomLabel: 'Room 2',
         schedule: [],
-        teacherMemberIds: [],
+        teacherIds: [],
         studentCount: 2,
       },
     ],
@@ -48,6 +54,20 @@ function student(id: string, childProfileId: string): Enrolment {
     status: 'Active',
     requestedAt: '2026-09-01T10:00:00Z',
     enrolledAt: '2026-09-01T11:00:00Z',
+  };
+}
+
+function teacher(id: string, fullName: string): PathshalaTeacher {
+  return {
+    id,
+    fullName,
+    phone: null,
+    email: null,
+    qualification: null,
+    userId: null,
+    hasLogin: false,
+    classIds: [],
+    addedAt: '2026-09-01T10:00:00Z',
   };
 }
 
@@ -95,14 +115,14 @@ describe('ClassDetailComponent', () => {
     register: RegisterEntry[] = [],
     exams: ClassExam[] = [],
     names: { id: string; fullName: string }[] = [],
-    members: { id: string; fullName: string }[] = [],
+    teachers: PathshalaTeacher[] = [],
   ) {
     fixture.detectChanges();
     http.expectOne(`/v1/pathshala/pathshalas/${PATHSHALA_ID}`).flush(school);
 
     if (school.classes.some((c) => c.id === CLASS_ID)) {
       http.expectOne(`/v1/pathshala/classes/${CLASS_ID}/exams`).flush(exams);
-      http.expectOne('/v1/members?take=100').flush({ items: members, hasMore: false });
+      http.expectOne(`/v1/pathshala/pathshalas/${PATHSHALA_ID}/teachers`).flush(teachers);
       http.expectOne(`/v1/pathshala/classes/${CLASS_ID}/roll`).flush(roll);
 
       if (roll.length > 0) {
@@ -314,28 +334,29 @@ describe('ClassDetailComponent', () => {
     expect(text()).toContain('Their record is kept');
   });
 
-  it('assigns a teacher and offers only members who are not already teaching it', () => {
+  it('assigns a teacher record and offers only teachers not already teaching it', () => {
     load(
       detail({
-        classes: [{ ...detail().classes[0]!, teacherMemberIds: ['m1'] }],
+        classes: [{ ...detail().classes[0]!, teacherIds: ['t1'] }],
       }),
       [],
       [],
       [],
       [],
       [
-        { id: 'm1', fullName: 'Smt. Kavita Jain' },
-        { id: 'm2', fullName: 'Shri Rajesh Jain' },
+        teacher('t1', 'Smt. Kavita Jain'),
+        teacher('t2', 'Shri Rajesh Jain'),
       ],
     );
 
-    expect(component.assignable().map((m) => m.id)).toEqual(['m2']);
+    expect(component.assignable().map((t) => t.id)).toEqual(['t2']);
+    expect(text()).toContain('Smt. Kavita Jain');
 
-    component.setTeacher('m2', true);
+    component.setTeacher('t2', true);
 
     const call = http.expectOne(`/v1/pathshala/classes/${CLASS_ID}/teachers`);
 
-    expect(call.request.body).toEqual({ teacherMemberId: 'm2', assign: true });
+    expect(call.request.body).toEqual({ teacherId: 't2', assign: true });
 
     call.flush({});
     reload();
@@ -352,7 +373,7 @@ describe('ClassDetailComponent', () => {
   function reload() {
     http.expectOne(`/v1/pathshala/pathshalas/${PATHSHALA_ID}`).flush(detail());
     http.expectOne(`/v1/pathshala/classes/${CLASS_ID}/exams`).flush([]);
-    http.expectOne('/v1/members?take=100').flush({ items: [], hasMore: false });
+    http.expectOne(`/v1/pathshala/pathshalas/${PATHSHALA_ID}/teachers`).flush([]);
     http.expectOne(`/v1/pathshala/classes/${CLASS_ID}/roll`).flush([]);
     http.expectOne(`/v1/pathshala/classes/${CLASS_ID}/register?date=${date()}`).flush([]);
     fixture.detectChanges();

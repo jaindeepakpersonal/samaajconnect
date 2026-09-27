@@ -13,9 +13,11 @@ import {
   MyExam,
   MyProgress,
   Pathshala,
+  PathshalaAnnouncement,
 } from './pathshala.models';
 
 const ENROLMENTS = '/v1/pathshala/enrollments';
+const ANNOUNCEMENTS = '/v1/pathshala/announcements';
 const PATHSHALAS = '/v1/pathshala/pathshalas';
 const CHILDREN = '/v1/children';
 
@@ -79,7 +81,7 @@ function myClass(overrides: Partial<MyClass> = {}): MyClass {
     roomLabel: 'Room 2',
     sessionLabel: '2026-27',
     schedule: [{ dayOfWeek: 'Sunday', startTime: '10:00:00', endTime: '11:30:00' }],
-    teacherMemberIds: ['t1'],
+    teacherNames: ['Smt. Kavita Jain'],
     classmateCount: 24,
     ...overrides,
   };
@@ -151,12 +153,14 @@ describe('PathshalaListComponent', () => {
     pathshalas?: Pathshala[];
     enrolments?: Enrolment[];
     children?: Child[];
+    announcements?: PathshalaAnnouncement[];
   }): void {
     fixture.detectChanges();
 
     http.expectOne(PATHSHALAS).flush(options.pathshalas ?? [pathshala()]);
     http.expectOne(ENROLMENTS).flush(options.enrolments ?? []);
     http.expectOne(CHILDREN).flush(options.children ?? [child()]);
+    http.expectOne(ANNOUNCEMENTS).flush(options.announcements ?? []);
 
     fixture.detectChanges();
   }
@@ -276,18 +280,36 @@ describe('PathshalaListComponent', () => {
     expect(button.getAttribute('title')).toContain('no session open');
   });
 
-  it('asks for a place and says the Pathshala decides the class', () => {
-    load({});
+  /** Picks a child the way the select does, which is what fetches the profile. */
+  function pickChild(me: { fullName: string; mobile: string | null } | null) {
+    component.chooseChild('p1', 'child1');
 
-    component.chosenChild['p1'] = 'child1';
+    const profile = http.expectOne('/v1/members/me');
+
+    if (me === null) {
+      profile.flush(null, { status: 404, statusText: 'Not Found' });
+    } else {
+      profile.flush(me);
+    }
+
     fixture.detectChanges();
+  }
 
+  it('asks for a place with the contact the Pathshala will call, and says it decides the class', () => {
+    load({});
+    pickChild({ fullName: 'Sunita Jain', mobile: '9829012345' });
+
+    component.contactPhone = ' 98290 11111 ';
     component.enrol(pathshala());
 
     const request = http.expectOne(`${PATHSHALAS}/p1/enrollments`);
 
     expect(request.request.method).toBe('POST');
-    expect(request.request.body).toEqual({ childProfileId: 'child1' });
+    expect(request.request.body).toEqual({
+      childProfileId: 'child1',
+      contactName: 'Sunita Jain',
+      contactPhone: '98290 11111',
+    });
 
     request.flush(enrolment({ status: 'Requested', classId: null }));
 
@@ -295,9 +317,81 @@ describe('PathshalaListComponent', () => {
     http.expectOne(PATHSHALAS).flush([pathshala()]);
     http.expectOne(ENROLMENTS).flush([enrolment({ status: 'Requested', classId: null })]);
     http.expectOne(CHILDREN).flush([child()]);
+    http.expectOne(ANNOUNCEMENTS).flush([]);
     fixture.detectChanges();
 
     expect(text()).toContain('The Pathshala places them in a class');
+  });
+
+  it('starts the contact on the member’s own name and mobile, and says who sees it', () => {
+    load({});
+    pickChild({ fullName: 'Sunita Jain', mobile: '9829012345' });
+
+    expect(component.contactName).toBe('Sunita Jain');
+    expect(component.contactPhone).toBe('9829012345');
+    expect(text()).toContain('whatever your directory privacy setting');
+  });
+
+  it('asks for the profile once, however many children are picked', () => {
+    load({});
+    pickChild({ fullName: 'Sunita Jain', mobile: null });
+
+    component.chooseChild('p1', '');
+    component.chooseChild('p1', 'child1');
+
+    // http.verify() in afterEach: no second /members/me.
+    expect(component.contactPhone).toBe('');
+  });
+
+  it('will not ask for a place without a phone the service would accept', () => {
+    load({});
+    pickChild(null);
+
+    component.contactName = 'Sunita Jain';
+
+    for (const phone of ['', 'ring the office', '12']) {
+      component.contactPhone = phone;
+
+      expect(component.canEnrol(pathshala()), phone).toBe(false);
+    }
+
+    component.enrol(pathshala());
+    http.expectNone(`${PATHSHALAS}/p1/enrollments`);
+  });
+
+  it('shows the Pathshala’s messages first, newest as sent', () => {
+    load({
+      announcements: [
+        {
+          id: 'a1',
+          pathshalaId: 'p1',
+          pathshalaName: 'Shri Mahavir Jain Pathshala',
+          title: 'No class this Sunday',
+          body: 'The hall is booked for Paryushan.',
+          sentBy: 'u1',
+          sentAt: '2026-09-20T10:00:00Z',
+          recipientCount: 14,
+        },
+      ],
+    });
+
+    expect(text()).toContain('Messages from the Pathshala');
+    expect(text()).toContain('No class this Sunday');
+    expect(text()).toContain('The hall is booked for Paryushan.');
+  });
+
+  it('says nothing about messages when there are none, and survives failing to read them', () => {
+    fixture.detectChanges();
+
+    http.expectOne(PATHSHALAS).flush([pathshala()]);
+    http.expectOne(ENROLMENTS).flush([]);
+    http.expectOne(CHILDREN).flush([child()]);
+    http.expectOne(ANNOUNCEMENTS).flush(null, { status: 500, statusText: 'Server Error' });
+    fixture.detectChanges();
+
+    expect(component.error()).toBeNull();
+    expect(text()).not.toContain('Messages from the Pathshala');
+    expect(text()).toContain('Shri Mahavir Jain Pathshala');
   });
 
   it('still shows the directory to a member with no family record', () => {
@@ -308,6 +402,7 @@ describe('PathshalaListComponent', () => {
     http.expectOne(PATHSHALAS).flush([pathshala()]);
     http.expectOne(ENROLMENTS).flush([]);
     http.expectOne(CHILDREN).flush(null, { status: 404, statusText: 'Not Found' });
+    http.expectOne(ANNOUNCEMENTS).flush([]);
     fixture.detectChanges();
 
     expect(component.error()).toBeNull();
@@ -408,11 +503,16 @@ describe('EnrolmentComponent', () => {
     expect(text()).toContain('10:00 – 11:30');
   });
 
-  it('counts teachers rather than inventing their names', () => {
-    loadPlaced({ myClass: myClass({ teacherMemberIds: ['t1', 't2'] }) });
+  it('names the class’s teachers, from the class rather than the directory', () => {
+    loadPlaced({ myClass: myClass({ teacherNames: ['Smt. Kavita Jain', 'Pt. Suresh Shastri'] }) });
 
-    expect(text()).toContain('2 teachers');
-    expect(text()).not.toContain('t1');
+    expect(text()).toContain('Teachers: Smt. Kavita Jain, Pt. Suresh Shastri');
+  });
+
+  it('says no teacher has been assigned rather than an empty list', () => {
+    loadPlaced({ myClass: myClass({ teacherNames: [] }) });
+
+    expect(text()).toContain('No teacher has been assigned yet');
   });
 
   it('does not print a nil attendance as zero per cent', () => {

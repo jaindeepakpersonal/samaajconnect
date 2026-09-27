@@ -70,7 +70,11 @@ export interface Enrolment {
   readonly enrolledAt: string | null;
 }
 
-/** The wireframe's "My Class" card. Teachers are ids; the count is what ships. */
+/**
+ * The wireframe's "My Class" card. Teachers arrive by name - a teacher is the
+ * Pathshala's own record, not necessarily a member - and never with their
+ * contact details, which are the Pathshala's staff's to hold.
+ */
 export interface MyClass {
   readonly enrolmentId: string;
   readonly pathshalaId: string;
@@ -80,7 +84,7 @@ export interface MyClass {
   readonly roomLabel: string | null;
   readonly sessionLabel: string;
   readonly schedule: readonly ScheduleSlot[];
-  readonly teacherMemberIds: readonly string[];
+  readonly teacherNames: readonly string[];
 
   /** A count, not a list of other people's children. */
   readonly classmateCount: number;
@@ -160,3 +164,19 @@ export const ExamStatusLabels: Readonly<Record<ExamStatus, string>> = {
   AwaitingResult: 'Awaiting result',
   Completed: 'Completed',
 };
+
+/**
+ * A message a Pathshala sent to the parents of its children - one of this
+ * member's, since the list only carries Pathshalas where they have a child with
+ * a place or a request.
+ */
+export interface PathshalaAnnouncement {
+  readonly id: string;
+  readonly pathshalaId: string;
+  readonly pathshalaName: string;
+  readonly title: string;
+  readonly body: string;
+  readonly sentBy: string;
+  readonly sentAt: string;
+  readonly recipientCount: number;
+}

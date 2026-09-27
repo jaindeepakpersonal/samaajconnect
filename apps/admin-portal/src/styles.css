@@ -466,6 +466,39 @@ tbody tr:last-child td {
   overflow-y: auto;
 }
 
+/* A row of tabs over one panel. Promoted from Master Data's own styles when
+   the Pathshala screen became the second to need it. */
+.tabs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  border-bottom: 1px solid var(--line);
+  margin-bottom: var(--space-4);
+}
+
+.tabs button {
+  border: 0;
+  background: transparent;
+  padding: 10px 16px;
+  font-family: inherit;
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--muted);
+  cursor: pointer;
+  border-bottom: 2px solid transparent;
+  margin-bottom: -1px;
+}
+
+.tabs button.on {
+  color: var(--ink);
+  border-bottom-color: var(--accent);
+  font-weight: 700;
+}
+
+.tabs button:hover:not(.on) {
+  color: var(--ink);
+}
+
 .empty {
   padding: var(--space-5);
   text-align: center;

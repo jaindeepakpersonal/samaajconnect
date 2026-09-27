@@ -4,7 +4,7 @@ import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { ActivatedRoute, provideRouter } from '@angular/router';
 import { API_CONFIG, AuthService } from '@samaajconnect/shared';
 import { PathshalaDetailComponent } from './pathshala-detail.component';
-import { Enrolment, PathshalaDetail } from '../../core/admin.models';
+import { PathshalaDetail } from '../../core/admin.models';
 
 const PATHSHALA_ID = 'p1';
 
@@ -33,26 +33,10 @@ function detail(overrides: Partial<PathshalaDetail> = {}): PathshalaDetail {
         name: 'Class 8 — Jain Studies',
         roomLabel: 'Room 2',
         schedule: [],
-        teacherMemberIds: [],
+        teacherIds: ['t1', 't2'],
         studentCount: 4,
       },
     ],
-    ...overrides,
-  };
-}
-
-function request(overrides: Partial<Enrolment> = {}): Enrolment {
-  return {
-    id: 'e1',
-    pathshalaId: PATHSHALA_ID,
-    childProfileId: 'kid1',
-    classId: null,
-    className: null,
-    sessionId: null,
-    sessionLabel: null,
-    status: 'Requested',
-    requestedAt: '2026-09-01T10:00:00Z',
-    enrolledAt: null,
     ...overrides,
   };
 }
@@ -61,8 +45,11 @@ describe('PathshalaDetailComponent', () => {
   let fixture: ComponentFixture<PathshalaDetailComponent>;
   let component: PathshalaDetailComponent;
   let http: HttpTestingController;
+  let query: Record<string, string>;
 
   beforeEach(() => {
+    query = {};
+
     TestBed.configureTestingModule({
       imports: [PathshalaDetailComponent],
       providers: [
@@ -72,13 +59,16 @@ describe('PathshalaDetailComponent', () => {
         { provide: API_CONFIG, useValue: { gatewayUrl: '' } },
         {
           provide: ActivatedRoute,
-          useValue: { snapshot: { paramMap: { get: () => PATHSHALA_ID } } },
+          useValue: {
+            snapshot: {
+              paramMap: { get: () => PATHSHALA_ID },
+              queryParamMap: { get: (key: string) => query[key] ?? null },
+            },
+          },
         },
       ],
     });
 
-    fixture = TestBed.createComponent(PathshalaDetailComponent);
-    component = fixture.componentInstance;
     http = TestBed.inject(HttpTestingController);
   });
 
@@ -86,164 +76,145 @@ describe('PathshalaDetailComponent', () => {
 
   const text = () => fixture.nativeElement.textContent as string;
 
-  it('shows an Area Admin a Pathshala elsewhere without asking for its placement queue', () => {
+  const tabLabels = () =>
+    [...(fixture.nativeElement as HTMLElement).querySelectorAll('[role="tab"]')].map((t) =>
+      t.textContent?.trim(),
+    );
+
+  function signIn(roles: string[], permissions: string[], areaLocalityId: string | null = null) {
     TestBed.inject(AuthService).ensureCurrentUser().subscribe();
     http.expectOne('/v1/identity/me').flush({
       userId: 'u9',
       tenantId: 't1',
       tenantSlug: 'dasha-nagda',
-      mobileOrEmail: 'area@example.com',
-      fullName: 'Area Admin',
+      mobileOrEmail: 'someone@example.com',
+      fullName: 'Someone',
       status: 'Active',
       isContactVerified: true,
       lastLoginAt: null,
-      roles: ['Member', 'AreaAdmin'],
-      permissions: ['Pathshala.Manage'],
-      areaLocalityId: 'loc-hm',
+      roles,
+      permissions,
+      areaLocalityId,
     });
+  }
 
+  const asAdmin = () => signIn(['Member', 'SamaajAdmin'], ['Members.Read', 'Pathshala.Manage']);
+
+  function load(school: PathshalaDetail = detail()) {
     fixture = TestBed.createComponent(PathshalaDetailComponent);
+    component = fixture.componentInstance;
     fixture.detectChanges();
-    http.expectOne(`/v1/pathshala/pathshalas/${PATHSHALA_ID}`).flush(
+    http.expectOne(`/v1/pathshala/pathshalas/${PATHSHALA_ID}`).flush(school);
+    fixture.detectChanges();
+  }
+
+  /** Answers the re-read every action fires. */
+  function reload(school: PathshalaDetail = detail()) {
+    http.expectOne(`/v1/pathshala/pathshalas/${PATHSHALA_ID}`).flush(school);
+    fixture.detectChanges();
+  }
+
+  function openTab(label: string) {
+    const tab = [...(fixture.nativeElement as HTMLElement).querySelectorAll<HTMLButtonElement>('[role="tab"]')]
+      .find((t) => t.textContent?.trim() === label)!;
+
+    tab.click();
+    fixture.detectChanges();
+  }
+
+  it('offers somebody who runs it all nine tabs', () => {
+    asAdmin();
+    load();
+
+    expect(tabLabels()).toEqual([
+      'Academic sessions',
+      'Classes',
+      'Teachers',
+      'Students',
+      'Exams',
+      'Progress report',
+      'Attendance',
+      'Donations',
+      'Announcements',
+    ]);
+  });
+
+  it('shows a teacher every tab but Donations, and no forms', () => {
+    // Who gave how much is the administrators' to keep, and the service
+    // refuses a teacher the ledger - so the tab is not drawn at all.
+    signIn(['Member', 'PathshalaTeacher'], ['Members.Read', 'Pathshala.Attendance.Write']);
+    load();
+
+    expect(tabLabels()).not.toContain('Donations');
+    expect(tabLabels()).toContain('Announcements');
+    expect(text()).not.toContain('Open a session');
+
+    openTab('Classes');
+
+    expect(text()).not.toContain('Add a class');
+  });
+
+  it('shows an Area Admin a Pathshala elsewhere without any tabs', () => {
+    signIn(['Member', 'AreaAdmin'], ['Pathshala.Manage'], 'loc-hm');
+    load(
       detail({
         address: { line: null, countryId: null, stateId: null, cityId: null, localityId: 'loc-other' },
       }),
     );
-    fixture.detectChanges();
 
-    // http.verify() in afterEach is the other half: no queue request was made.
+    // http.verify() in afterEach is the other half: no tab asked for anything.
     expect(text()).toContain('another locality');
-    expect(text()).not.toContain('Open session');
-    expect(text()).not.toContain('Edit details');
+    expect(tabLabels()).toEqual([]);
   });
 
-  it('lets an Area Admin edit their own Pathshala with the locality fixed', async () => {
-    TestBed.inject(AuthService).ensureCurrentUser().subscribe();
-    http.expectOne('/v1/identity/me').flush({
-      userId: 'u9',
-      tenantId: 't1',
-      tenantSlug: 'dasha-nagda',
-      mobileOrEmail: 'area@example.com',
-      fullName: 'Area Admin',
-      status: 'Active',
-      isContactVerified: true,
-      lastLoginAt: null,
-      roles: ['Member', 'AreaAdmin'],
-      permissions: ['Pathshala.Manage'],
-      areaLocalityId: 'loc-hm',
-    });
-
-    fixture = TestBed.createComponent(PathshalaDetailComponent);
-    component = fixture.componentInstance;
-    const address = { line: null, countryId: 'in', stateId: null, cityId: 'udr', localityId: 'loc-hm' };
-    load(detail({ address }));
-
-    component.openEdit(component.pathshala()!, click);
-    http.expectOne((r) => r.url === '/v1/master-data/lookup-items').flush([]);
-    http.expectOne((r) => r.url === '/v1/master-data/states').flush([]);
-    http.expectOne((r) => r.url === '/v1/master-data/cities').flush([]);
-    http.expectOne((r) => r.url === '/v1/master-data/localities').flush([]);
-    fixture.detectChanges();
-    await fixture.whenStable();
-
-    const locality = fixture.nativeElement.querySelector('#edit-locality') as HTMLSelectElement;
-
-    expect(locality.disabled).toBe(true);
-    expect(text()).toContain('The locality stays yours');
-  });
-
-  function load(
-    school: PathshalaDetail = detail(),
-    requests: Enrolment[] = [],
-    names: { id: string; fullName: string }[] = [],
-  ) {
-    fixture.detectChanges();
-    http.expectOne(`/v1/pathshala/pathshalas/${PATHSHALA_ID}`).flush(school);
-    http.expectOne(`/v1/pathshala/pathshalas/${PATHSHALA_ID}/enrollments/requests`).flush(requests);
-
-    if (requests.length > 0) {
-      const ids = [...new Set(requests.map((r) => r.childProfileId))];
-      http.expectOne(`/v1/children/names?ids=${ids.join(',')}`).flush(names);
-    }
-
-    fixture.detectChanges();
-  }
-
-  it('says nobody is waiting rather than showing an empty table', () => {
+  it('loads a tab only when it is opened', () => {
+    asAdmin();
     load();
 
-    expect(text()).toContain('Nobody is waiting');
+    http.expectNone(`/v1/pathshala/pathshalas/${PATHSHALA_ID}/teachers`);
+
+    openTab('Teachers');
+
+    http.expectOne(`/v1/pathshala/pathshalas/${PATHSHALA_ID}/teachers`).flush([]);
+    fixture.detectChanges();
+
+    expect(text()).toContain('No teachers yet');
   });
 
-  it('puts the child’s name against a request', () => {
-    load(detail(), [request()], [{ id: 'kid1', fullName: 'Diya Jain' }]);
+  it('opens on the tab a class page links back to', () => {
+    query['tab'] = 'classes';
+    asAdmin();
+    load();
 
-    expect(text()).toContain('Diya Jain');
+    expect(text()).toContain('Class 8 — Jain Studies');
+    expect(text()).toContain('Add a class to 2026-27');
   });
 
-  it('says "A child" rather than printing an id it could not resolve', () => {
-    // Names come from a second service. A GUID on screen is no use to somebody
-    // deciding which class to put a child in.
-    load(detail(), [request()], []);
+  it('falls back to the first tab when linked to one the caller cannot see', () => {
+    query['tab'] = 'donations';
+    signIn(['Member', 'PathshalaTeacher'], ['Members.Read']);
+    load();
 
-    expect(text()).toContain('A child');
-    expect(text()).not.toContain('kid1');
+    expect(component.tab()).toBe('sessions');
   });
 
-  it('asks for each child once, however many requests they have', () => {
-    load(
-      detail(),
-      [request({ id: 'e1' }), request({ id: 'e2' })],
-      [{ id: 'kid1', fullName: 'Diya Jain' }],
+  it('counts a class’s teachers from its teacher records', () => {
+    query['tab'] = 'classes';
+    asAdmin();
+    load();
+
+    const cells = [...(fixture.nativeElement as HTMLElement).querySelectorAll('tbody td')].map((td) =>
+      td.textContent?.trim(),
     );
 
-    expect(text()).toContain('Diya Jain');
-  });
-
-  it('will not place a child until a class is chosen', () => {
-    load(detail(), [request()], [{ id: 'kid1', fullName: 'Diya Jain' }]);
-
-    component.place(request(), true);
-
-    http.expectNone('/v1/pathshala/enrollments/e1/placement');
-  });
-
-  it('places a child into the chosen class', () => {
-    load(detail(), [request()], [{ id: 'kid1', fullName: 'Diya Jain' }]);
-
-    component.chosenClass['e1'] = 'c1';
-    component.place(request(), true);
-
-    const call = http.expectOne('/v1/pathshala/enrollments/e1/placement');
-
-    expect(call.request.body).toEqual({ classId: 'c1', place: true });
-
-    call.flush(request({ status: 'Active', classId: 'c1' }));
-    reload();
-
-    expect(text()).toContain('has a place');
-  });
-
-  it('turns a request down without needing a class', () => {
-    // The service takes `place: false` with no class, and the screen must not
-    // insist on one for a decision that does not use it.
-    load(detail(), [request()], [{ id: 'kid1', fullName: 'Diya Jain' }]);
-
-    component.place(request(), false);
-
-    const call = http.expectOne('/v1/pathshala/enrollments/e1/placement');
-
-    expect(call.request.body).toEqual({ classId: null, place: false });
-
-    call.flush(request({ status: 'Withdrawn' }));
-    reload();
-
-    expect(text()).toContain('turned down');
+    expect(cells[cells.length - 1]).toBe('2');
   });
 
   it('offers no class form until a session is open', () => {
     // A class belongs to a session and the service refuses one without it.
     // Offering the form anyway would mean a 404 that reads as a bug.
+    query['tab'] = 'classes';
+    asAdmin();
     load(detail({ sessions: [], classes: [] }));
 
     expect(text()).toContain('Open a session first');
@@ -251,6 +222,7 @@ describe('PathshalaDetailComponent', () => {
   });
 
   it('adds a class to the current session', () => {
+    asAdmin();
     load();
 
     component.className = 'Class 9';
@@ -268,6 +240,7 @@ describe('PathshalaDetailComponent', () => {
   });
 
   it('opens a session only when it has a label and both dates', () => {
+    asAdmin();
     load();
 
     component.sessionLabel = '2027-28';
@@ -279,9 +252,7 @@ describe('PathshalaDetailComponent', () => {
   });
 
   it('re-reads the Pathshala after every action rather than patching the screen', () => {
-    // Placing a child changes a class's student count and empties a queue row;
-    // opening a session changes which one is current. The server is the only
-    // thing that knows all of it at once.
+    asAdmin();
     load();
 
     component.sessionLabel = '2027-28';
@@ -295,7 +266,20 @@ describe('PathshalaDetailComponent', () => {
     expect(text()).toContain('is now the current session');
   });
 
+  it('re-reads the Pathshala when a tab changes what it holds', () => {
+    // Removing a teacher takes them off classes, and placing a child changes a
+    // class's count - both of which the Classes tab shows.
+    asAdmin();
+    load();
+
+    component.load();
+    reload(detail({ classes: [] }));
+
+    expect(component.pathshala()?.classes).toEqual([]);
+  });
+
   it('explains a 404 as no such Pathshala rather than as an error', () => {
+    fixture = TestBed.createComponent(PathshalaDetailComponent);
     fixture.detectChanges();
     http
       .expectOne(`/v1/pathshala/pathshalas/${PATHSHALA_ID}`)
@@ -305,151 +289,4 @@ describe('PathshalaDetailComponent', () => {
     expect(text()).toContain('No such Pathshala');
     expect(fixture.nativeElement.querySelector('[role="alert"]')).toBeNull();
   });
-
-  /** Answers the re-read every action fires. */
-  function reload(school: PathshalaDetail = detail(), requests: Enrolment[] = []) {
-    http.expectOne(`/v1/pathshala/pathshalas/${PATHSHALA_ID}`).flush(school);
-    http.expectOne(`/v1/pathshala/pathshalas/${PATHSHALA_ID}/enrollments/requests`).flush(requests);
-    fixture.detectChanges();
-  }
-
-  // ---- Editing -------------------------------------------------------------
-
-  const click = { currentTarget: null } as unknown as MouseEvent;
-
-  it('opens the edit form on the Pathshala as it is, with each level of the address loaded', () => {
-    const address = {
-      line: 'Hiran Magri',
-      countryId: 'in',
-      stateId: 'rj',
-      cityId: 'udr',
-      localityId: 'loc-hm',
-    };
-    load(detail({ address, contactPerson: 'Smt. Kavita Jain' }));
-
-    component.openEdit(component.pathshala()!, click);
-
-    // A select whose options have not arrived renders blank, which would read
-    // as the address being empty - so every level above a set one is asked for.
-    http.expectOne((r) => r.url === '/v1/master-data/lookup-items').flush([]);
-    http.expectOne((r) => r.url === '/v1/master-data/states').flush([]);
-    http.expectOne((r) => r.url === '/v1/master-data/cities').flush([]);
-    http.expectOne((r) => r.url === '/v1/master-data/localities').flush([]);
-
-    expect(component.editName).toBe('Shri Mahavir Jain Pathshala');
-    expect(component.editLine).toBe('Hiran Magri');
-    expect(component.editContact).toBe('Smt. Kavita Jain');
-    expect(component.cityId()).toBe('udr');
-    expect(component.localityId).toBe('loc-hm');
-  });
-
-  it('saves the whole record and re-reads it', () => {
-    load();
-
-    component.openEdit(component.pathshala()!, click);
-    http.expectOne((r) => r.url === '/v1/master-data/lookup-items').flush([]);
-
-    component.editName = '  Shri Parshwanath Jain Pathshala ';
-    component.editLine = '   ';
-    component.editContact = 'Shri Anil Jain';
-    component.saveEdit();
-
-    const call = http.expectOne(`/v1/pathshala/pathshalas/${PATHSHALA_ID}`);
-
-    expect(call.request.method).toBe('PATCH');
-    expect(call.request.body).toEqual({
-      name: 'Shri Parshwanath Jain Pathshala',
-      addressLine: null,
-      countryId: null,
-      stateId: null,
-      cityId: null,
-      localityId: null,
-      contactPerson: 'Shri Anil Jain',
-    });
-
-    call.flush({});
-    reload();
-
-    expect(component.editing()).toBe(false);
-    expect(text()).toContain('is saved');
-  });
-
-  it('keeps the form open, with what was typed, when a save is refused', () => {
-    load();
-
-    component.openEdit(component.pathshala()!, click);
-    http.expectOne((r) => r.url === '/v1/master-data/lookup-items').flush([]);
-
-    component.editName = 'Something else';
-    component.saveEdit();
-
-    http
-      .expectOne(`/v1/pathshala/pathshalas/${PATHSHALA_ID}`)
-      .flush(
-        { title: 'Pathshala.OutsideLocality', detail: 'No.' },
-        { status: 403, statusText: 'Forbidden' },
-      );
-
-    expect(component.editing()).toBe(true);
-    expect(component.editName).toBe('Something else');
-    expect(component.editError()).not.toBeNull();
-  });
-
-  it('offers to stand a Pathshala down, behind a confirmation', () => {
-    // Records are kept and enrolments stop, and it cannot be undone from this
-    // panel — so the button opens a warning rather than firing.
-    load();
-
-    expect(text()).toContain('Stand down');
-    http.expectNone(`/v1/pathshala/pathshalas/${PATHSHALA_ID}`);
-
-    component.deactivating.set(true);
-    fixture.detectChanges();
-
-    expect(text()).toContain('cannot be undone');
-    expect(text()).toContain('register and exam result is kept');
-  });
-
-  it('keeps the button that opened the confirmation, and announces the panel', () => {
-    // Replacing the trigger destroys the focused element and drops a keyboard
-    // user to the body (WCAG 2.4.3); disabling it does the same.
-    load();
-
-    const trigger = () =>
-      [...fixture.nativeElement.querySelectorAll('button')].find(
-        (b) => (b as HTMLElement).textContent?.trim() === 'Stand down…',
-      ) as HTMLButtonElement | undefined;
-
-    expect(trigger()!.getAttribute('aria-expanded')).toBe('false');
-
-    component.deactivating.set(true);
-    fixture.detectChanges();
-
-    expect(trigger()).toBeTruthy();
-    expect(trigger()!.disabled).toBe(false);
-    expect(trigger()!.getAttribute('aria-expanded')).toBe('true');
-    expect(fixture.nativeElement.querySelector('.notice[role="status"]')).toBeTruthy();
-  });
-
-  it('stands it down once confirmed', () => {
-    load();
-
-    component.deactivate();
-
-    const call = http.expectOne(`/v1/pathshala/pathshalas/${PATHSHALA_ID}`);
-
-    expect(call.request.method).toBe('DELETE');
-
-    call.flush({});
-    reload();
-
-    expect(text()).toContain('Its records are kept');
-  });
-
-  it('offers nothing to stand down on one already stood down', () => {
-    load(detail({ status: 'Inactive' }));
-
-    expect(text()).toContain('has been stood down');
-    expect(text()).not.toContain('Stand down…');
-  });
-}); 
+});

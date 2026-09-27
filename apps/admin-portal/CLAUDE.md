@@ -19,9 +19,9 @@ screen. The spec is `docs/product/wireframes/admin-panel-wireframes.html`.
 | Adult Child Conversion Queue | `/conversions` | `#conversionqueue` | built |
 | Audit Logs | `/audit` | `#audit` | built |
 | Timeline / Moderation | `/moderation` | `#content` | built |
-| Jain Pathshala | `/pathshala` | `#pathshala` | built — the list |
-| Pathshala detail | `/pathshala/:id` | — | built; no wireframe covers running one. Edit details (a modal), sessions, classes and the placement queue |
-| Class detail | `/pathshala/:id/classes/:classId` | — | built. Teachers, timetable, roll, register, exams and results |
+| Jain Pathshala | `/pathshala` | `#pathshala` | built — the list, as tiles with Open, Edit (a modal) and Stand down |
+| Pathshala detail | `/pathshala/:id` | — | built; no wireframe covers running one. Nine tabs: sessions, classes, teachers, students (with the placement queue), exams, progress report, attendance, donations, announcements |
+| Class detail | `/pathshala/:id/classes/:classId` | — | built. Teachers (picked from the Pathshala's teacher records), timetable, roll, register, exams and results |
 | Notifications | `/notifications` | `#notifications` | built — compose and recent, without the Audience and Channel dropdowns |
 | Auctions / Boli | `/boli` | `#boli` + `#publishboli` | built. Occasions, and the publication queue with its confirmation |
 | Occasion detail | `/boli/:id` | — | built; no wireframe covers running an auction. Types, opening a Boli, closing, recording |
@@ -270,11 +270,41 @@ Worth generalising: a control that one role may use is not a control the panel
 should omit. The role matrix screen has always got this right by rendering what
 the server says the caller may do.
 
-**A Pathshala's name, address and contact person are edited from its detail
-screen (2026-09-26), by anybody who runs it.** Creating one stays a Super
-Admin's act; correcting one is `Pathshala.Manage`, because a wrong address is
-the Samaaj's to fix and the address is also what decides which Area Admin runs
-it. "Edit details" opens the modal Events and Groups use, on the same
+**A Pathshala is run from nine tabs (2026-09-27)**, each its own component
+beside `pathshala-detail.component.ts` and each loading when opened, so a
+Pathshala costs one call to open rather than nine. Sessions and classes come
+with the Pathshala; Teachers, Students, Exams, Progress report, Attendance,
+Donations and Announcements read pathshala-service's staff endpoints. Somebody
+who runs it sees the forms; one of its teachers sees the same tabs read-only,
+narrowed by the service to the classes they teach, and can message parents.
+Donations is not drawn for a teacher at all - who gave how much is the
+administrators' to keep, and the service refuses them the ledger. A class page
+links back with `?tab=classes`.
+
+**A teacher is the Pathshala's record, not a member.** The Teachers tab adds,
+edits and removes records with a name, phone, email and qualification; the class
+screen's picker offers those records. A login is optional and is two acts on two
+services - `setRole(PathshalaTeacher)` for an existing member (whose member id
+is their account id), or Invite Admin's endpoint for a new account, and then the
+account id written onto the record. Only a Samaaj Admin or Super Admin may grant
+a role, so only they see "Give a login"; an Area Admin keeps the record and asks.
+A new login's activation code is shown once in the dialog and leaves the DOM
+with it, and it is kept even when linking fails after the account was made - a
+code never shown is an account nobody can activate. Unlinking leaves the role on
+the account, and the dialog says so.
+
+**The placement queue moved onto the Students tab**, beside the placed
+children, each row with the name and phone the parent gave when they asked. It
+reads `GET /pathshalas/{id}/students`, which carries waiting requests for an
+administrator, so `GET /enrollments/requests` has no caller in this app any
+more; it stays for the smoke run. Placing offers only the current session's
+classes. A request made before the form asked for a contact says so.
+
+**Editing and standing a Pathshala down moved from its detail screen to its
+tile in the list (2026-09-26)**, the same place Events and Groups put them.
+Creating one stays a Super Admin's act; correcting one is `Pathshala.Manage`,
+because a wrong address is the Samaaj's to fix and the address is also what
+decides which Area Admin runs it. "Edit" opens the modal Events and Groups use, on the same
 Country -> State -> City -> Locality cascade as the create form, with every
 level above a set one loaded before it is shown - a select whose options have
 not arrived renders blank, which would read as the address being empty. An

@@ -257,9 +257,9 @@ export interface ScheduleSlot {
 }
 
 /**
- * Mirrors `ClassResponse`. `teacherMemberIds` are ids: names live in
- * member-family-service, and the panel resolves them from the directory it
- * already loads rather than asking per row.
+ * Mirrors `ClassResponse`. `teacherIds` are the Pathshala's own teacher
+ * records - resolved against its teachers list, never the member directory,
+ * because a teacher need not be a member.
  */
 export interface PathshalaClass {
   readonly id: string;
@@ -268,8 +268,136 @@ export interface PathshalaClass {
   readonly name: string;
   readonly roomLabel: string | null;
   readonly schedule: readonly ScheduleSlot[];
-  readonly teacherMemberIds: readonly string[];
+  readonly teacherIds: readonly string[];
   readonly studentCount: number;
+}
+
+// ---- The Pathshala tabs ------------------------------------------------------
+
+/** Mirrors `TeacherResponse`. `userId` is their login, when they have one. */
+export interface PathshalaTeacher {
+  readonly id: string;
+  readonly fullName: string;
+  readonly phone: string | null;
+  readonly email: string | null;
+  readonly qualification: string | null;
+  readonly userId: string | null;
+  readonly hasLogin: boolean;
+  readonly classIds: readonly string[];
+  readonly addedAt: string;
+}
+
+/** What adding or correcting a teacher sends. */
+export interface TeacherInput {
+  readonly fullName: string;
+  readonly phone: string | null;
+  readonly email: string | null;
+  readonly qualification: string | null;
+  readonly userId: string | null;
+}
+
+/**
+ * Mirrors `StudentResponse`. The child is a profile id, named through
+ * `/v1/children/names`; the contact is what the parent gave on the request,
+ * and null on requests made before the form asked.
+ */
+export interface PathshalaStudent {
+  readonly enrolmentId: string;
+  readonly childProfileId: string;
+  readonly status: 'Requested' | 'Active' | 'Withdrawn' | 'Declined';
+  readonly classId: string | null;
+  readonly className: string | null;
+  readonly sessionLabel: string | null;
+  readonly parentMemberId: string;
+  readonly contactName: string | null;
+  readonly contactPhone: string | null;
+  readonly requestedAt: string;
+  readonly enrolledAt: string | null;
+}
+
+/** Mirrors `ProgressRowResponse`. Nulls are "nothing to count yet", never zero. */
+export interface ProgressRow {
+  readonly enrolmentId: string;
+  readonly childProfileId: string;
+  readonly classId: string | null;
+  readonly className: string | null;
+  readonly present: number;
+  readonly absent: number;
+  readonly excused: number;
+  readonly attendancePercentage: number | null;
+  readonly examsSat: number;
+  readonly averageScorePercentage: number | null;
+}
+
+/** Mirrors `ClassAttendanceResponse`. */
+export interface ClassAttendance {
+  readonly classId: string;
+  readonly className: string;
+  readonly sessionLabel: string;
+  readonly studentCount: number;
+  readonly daysMarked: number;
+  readonly present: number;
+  readonly absent: number;
+  readonly excused: number;
+  readonly percentage: number | null;
+}
+
+/** Mirrors `ExamOverviewResponse`. */
+export interface ExamOverview {
+  readonly examId: string;
+  readonly classId: string;
+  readonly className: string;
+  readonly title: string;
+  readonly examDate: string;
+  readonly maxScore: number;
+  readonly studentCount: number;
+  readonly resultsRecorded: number;
+  readonly averageScorePercentage: number | null;
+}
+
+export type DonationMode = 'Cash' | 'Upi' | 'Cheque' | 'BankTransfer' | 'Other';
+
+/** Mirrors `DonationResponse`. `amount` is integer paise. */
+export interface PathshalaDonation {
+  readonly id: string;
+  readonly receiptNumber: number;
+  readonly donorName: string;
+  readonly donorMemberId: string | null;
+  readonly amount: number;
+  readonly donatedOn: string;
+  readonly mode: DonationMode;
+  readonly purpose: string | null;
+  readonly recordedBy: string;
+  readonly recordedAt: string;
+  readonly isVoid: boolean;
+  readonly voidReason: string | null;
+}
+
+/** Mirrors `DonationLedgerResponse`. The total leaves voided entries out. */
+export interface DonationLedger {
+  readonly donations: readonly PathshalaDonation[];
+  readonly totalAmount: number;
+}
+
+export interface DonationInput {
+  readonly donorName: string;
+  readonly donorMemberId: string | null;
+  readonly amount: number;
+  readonly donatedOn: string;
+  readonly mode: DonationMode;
+  readonly purpose: string | null;
+}
+
+/** Mirrors `AnnouncementResponse`. */
+export interface PathshalaAnnouncement {
+  readonly id: string;
+  readonly pathshalaId: string;
+  readonly pathshalaName: string;
+  readonly title: string;
+  readonly body: string;
+  readonly sentBy: string;
+  readonly sentAt: string;
+  readonly recipientCount: number;
 }
 
 /** Mirrors `PathshalaResponse` — the directory card, counts rather than rosters. */

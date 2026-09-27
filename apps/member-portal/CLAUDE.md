@@ -655,9 +655,18 @@ rule below — that names the portal cannot resolve are not invented — is abou
 ids belonging to people the reader has no particular claim on, where resolving
 them would be a call per row. A parent's children are one call to
 `/v1/children`, a list they already hold, and "Waiting for a place" against an
-opaque id would be useless to the only person the Pathshala screens are for. The
-teachers on the same screen stay a count, because those are exactly the ids the
-rule is about.
+opaque id would be useless to the only person the Pathshala screens are for.
+The class's teachers are named too, since 2026-09-27 - not by resolving ids, but
+because a teacher became the Pathshala's own record and `my-class` sends their
+names (never their contact details) with the class.
+
+**Asking for a place asks for a name and a phone** - the ones the Pathshala will
+call about the child, which its staff see whatever the member's directory
+privacy setting says. The form says so, and starts on the member's own name and
+mobile from `/v1/members/me`, fetched once and only when a child is picked.
+**Messages a Pathshala sends to parents** head the Pathshala screen when there
+are any (`GET /v1/pathshala/announcements`); failing to read them leaves the
+rest of the screen alone. Each also arrives as an in-app notification.
 
 **A Pathshala tile shows where it is, and it was printing "[object Object]".**
 `address` used to be a string; the service has sent a structured address

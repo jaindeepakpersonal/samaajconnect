@@ -58,3 +58,20 @@
   font-variant-numeric: tabular-nums;
   color: var(--muted);
 }
+
+/* Messages from the Pathshala: newest first, one rule between each. */
+.messages {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.messages li + li {
+  border-top: 1px solid var(--line);
+  margin-top: var(--space-3);
+  padding-top: var(--space-3);
+}
+
+.message-body {
+  white-space: pre-line;
+}

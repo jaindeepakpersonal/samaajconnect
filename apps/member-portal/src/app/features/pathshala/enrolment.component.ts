@@ -102,10 +102,9 @@ import {
                 <p><b>Room</b> {{ room }}</p>
               }
 
-              <!-- The wireframe says "Teacher: Smt. Kavita Jain". Teachers are
-                   member ids here; names live in member-family-service and a
-                   name per teacher would be a call per teacher for somebody
-                   the parent has not asked about. -->
+              <!-- The wireframe's "Teacher: Smt. Kavita Jain", by name: a
+                   teacher is the Pathshala's own record, so the name comes
+                   with the class rather than from the member directory. -->
               <p>{{ teachers(found) }}</p>
               <p>{{ classmates(found) }}</p>
 
@@ -366,13 +365,12 @@ export class EnrolmentComponent implements OnInit {
     }
   }
 
-  /** A count, because the ids behind it are names this app cannot resolve. */
   teachers(found: MyClass): string {
-    const count = found.teacherMemberIds.length;
+    const names = found.teacherNames;
 
-    return count === 0
+    return names.length === 0
       ? 'No teacher has been assigned yet'
-      : `${count} ${count === 1 ? 'teacher' : 'teachers'}`;
+      : `${names.length === 1 ? 'Teacher' : 'Teachers'}: ${names.join(', ')}`;
   }
 
   classmates(found: MyClass): string {

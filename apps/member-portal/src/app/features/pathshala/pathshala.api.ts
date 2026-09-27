@@ -8,6 +8,7 @@ import {
   MyExam,
   MyProgress,
   Pathshala,
+  PathshalaAnnouncement,
 } from './pathshala.models';
 
 /**
@@ -38,12 +39,26 @@ export class PathshalaApi {
   /**
    * Asks for a place. The Pathshala decides which class, which is why this
    * answers with a `Requested` enrolment rather than an enrolled one.
+   *
+   * The contact is the one the Pathshala will call about this child, and it
+   * sees it whatever the parent's directory privacy setting - which is why it
+   * is asked for here, on a form that says so, rather than looked up.
    */
-  enrol(pathshalaId: string, childProfileId: string): Observable<Enrolment> {
+  enrol(
+    pathshalaId: string,
+    childProfileId: string,
+    contactName: string,
+    contactPhone: string,
+  ): Observable<Enrolment> {
     return this.http.post<Enrolment>(
       `/v1/pathshala/pathshalas/${pathshalaId}/enrollments`,
-      { childProfileId },
+      { childProfileId, contactName, contactPhone },
     );
+  }
+
+  /** Messages from every Pathshala where this member has a child, newest first. */
+  announcements(): Observable<PathshalaAnnouncement[]> {
+    return this.http.get<PathshalaAnnouncement[]>('/v1/pathshala/announcements');
   }
 
   /**

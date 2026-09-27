@@ -1,3 +1,4 @@
+import { DatePipe } from '@angular/common';
 import { Component, OnInit, inject, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { RouterLink } from '@angular/router';
@@ -8,7 +9,15 @@ import { MembersApi } from '../members/members.api';
 import { MasterDataApi } from '../members/master-data.api';
 import { Child, City, Locality, LookupItem, State } from '../members/members.models';
 import { PathshalaApi } from './pathshala.api';
-import { Enrolment, EnrolmentStatusLabels, Pathshala } from './pathshala.models';
+import {
+  Enrolment,
+  EnrolmentStatusLabels,
+  Pathshala,
+  PathshalaAnnouncement,
+} from './pathshala.models';
+
+/** What pathshala-service accepts for a phone number, character for character. */
+const PHONE = /^\+?[0-9 ()-]{7,20}$/;
 
 /**
  * Jain Pathshala, from the member-portal wireframe's `#pathshala` screen.
@@ -27,10 +36,20 @@ import { Enrolment, EnrolmentStatusLabels, Pathshala } from './pathshala.models'
  * particular claim on. A parent's own children are one call to `/v1/children`,
  * a list they already have, and "Waiting for a place" against an opaque id
  * would be useless to the one person the screen is for.
+ *
+ * **Asking for a place asks for a name and a phone too**, the one the
+ * Pathshala will call about the child. It sees that number whatever the
+ * member's directory privacy setting says, so the form says so, and it starts
+ * filled from the member's own profile - loaded only once a child is picked,
+ * because most visits are a parent checking on a child, not enrolling one.
+ *
+ * **Messages from the Pathshala come first when there are any**: a teacher
+ * telling parents there is no class on Sunday is the most time-bound thing on
+ * the screen. A failure to read them leaves the rest of the page alone.
  */
 @Component({
   selector: 'app-pathshala-list',
-  imports: [FormsModule, RouterLink],
+  imports: [FormsModule, RouterLink, DatePipe],
   styleUrl: './pathshala.css',
   template: `
     <div class="pathshala-page">
@@ -49,6 +68,25 @@ import { Enrolment, EnrolmentStatusLabels, Pathshala } from './pathshala.models'
           <button class="btn link" type="button" (click)="load()">Try again</button>
         </div>
       } @else {
+        <!-- Messages from the Pathshala ----------------------------------- -->
+        @if (announcements().length > 0) {
+          <h2 class="section-heading">Messages from the Pathshala</h2>
+
+          <div class="card">
+            <ul class="messages">
+              @for (message of announcements(); track message.id) {
+                <li>
+                  <h3>{{ message.title }}</h3>
+                  <p class="small">
+                    {{ message.pathshalaName }} · {{ message.sentAt | date: 'd MMM y, h:mm a' }}
+                  </p>
+                  <p class="message-body">{{ message.body }}</p>
+                </li>
+              }
+            </ul>
+          </div>
+        }
+
         <!-- Places already held ------------------------------------------ -->
         @if (enrolments().length > 0) {
           <h2 class="section-heading">Your children at Pathshala</h2>
@@ -137,7 +175,8 @@ import { Enrolment, EnrolmentStatusLabels, Pathshala } from './pathshala.models'
                       class="input"
                       [id]="'child-' + pathshala.id"
                       [name]="'child-' + pathshala.id"
-                      [(ngModel)]="chosenChild[pathshala.id]"
+                      [ngModel]="chosenChild[pathshala.id]"
+                      (ngModelChange)="chooseChild(pathshala.id, $event)"
                     >
                       <option value="">Choose a child…</option>
                       @for (child of enrollable(); track child.id) {
@@ -145,10 +184,38 @@ import { Enrolment, EnrolmentStatusLabels, Pathshala } from './pathshala.models'
                       }
                     </select>
 
+                    @if (chosenChild[pathshala.id]) {
+                      <label [attr.for]="'contact-name-' + pathshala.id">Your name</label>
+                      <input
+                        class="input"
+                        [id]="'contact-name-' + pathshala.id"
+                        [name]="'contact-name-' + pathshala.id"
+                        [(ngModel)]="contactName"
+                        maxlength="200"
+                      />
+
+                      <label [attr.for]="'contact-phone-' + pathshala.id">
+                        Phone the Pathshala can call
+                      </label>
+                      <input
+                        class="input"
+                        type="tel"
+                        [id]="'contact-phone-' + pathshala.id"
+                        [name]="'contact-phone-' + pathshala.id"
+                        [(ngModel)]="contactPhone"
+                        maxlength="20"
+                        [attr.aria-invalid]="phoneInvalid() ? 'true' : null"
+                      />
+                      <p class="small">
+                        The Pathshala's staff see this name and number, whatever your directory
+                        privacy setting, so they can reach you about your child.
+                      </p>
+                    }
+
                     <button
                       class="btn"
                       type="button"
-                      [disabled]="busy() || !chosenChild[pathshala.id]"
+                      [disabled]="busy() || !canEnrol(pathshala)"
                       (click)="enrol(pathshala)"
                     >
                       {{ busy() ? 'Sending…' : 'Enrol a child' }}
@@ -171,6 +238,7 @@ export class PathshalaListComponent implements OnInit {
   readonly pathshalas = signal<readonly Pathshala[]>([]);
   readonly enrolments = signal<readonly Enrolment[]>([]);
   readonly children = signal<readonly Child[]>([]);
+  readonly announcements = signal<readonly PathshalaAnnouncement[]>([]);
 
   readonly loading = signal(true);
   readonly error = signal<string | null>(null);
@@ -193,6 +261,11 @@ export class PathshalaListComponent implements OnInit {
   /** Which child is picked in each Pathshala's card. */
   chosenChild: Record<string, string> = {};
 
+  /** Who the Pathshala calls. One pair for every card: it is the same parent. */
+  contactName = '';
+  contactPhone = '';
+  private prefilled = false;
+
   ngOnInit(): void {
     this.load();
   }
@@ -209,11 +282,17 @@ export class PathshalaListComponent implements OnInit {
       // than an empty list. That is not a reason to fail the whole screen -
       // they can still read the directory.
       children: this.members.children().pipe(catchError(() => of([] as Child[]))),
+
+      // Messages are a courtesy on this screen, not its point.
+      announcements: this.api
+        .announcements()
+        .pipe(catchError(() => of([] as PathshalaAnnouncement[]))),
     }).subscribe({
-      next: ({ pathshalas, enrolments, children }) => {
+      next: ({ pathshalas, enrolments, children, announcements }) => {
         this.pathshalas.set(pathshalas);
         this.enrolments.set(enrolments);
         this.children.set(children);
+        this.announcements.set(announcements);
 
         // Each card's picker starts on its placeholder option. Without this the
         // model is undefined, which matches no option at all - not even the one
@@ -278,17 +357,56 @@ export class PathshalaListComponent implements OnInit {
     return parts.filter((part): part is string => !!part && part.trim().length > 0).join(', ');
   }
 
+  chooseChild(pathshalaId: string, childId: string): void {
+    this.chosenChild[pathshalaId] = childId;
+
+    if (childId && !this.prefilled) {
+      this.prefillContact();
+    }
+  }
+
+  /**
+   * Starts the contact on the member's own name and mobile, once. A failure
+   * leaves the boxes empty to be typed into, which is all they were before.
+   */
+  private prefillContact(): void {
+    this.prefilled = true;
+
+    this.members.me().subscribe({
+      next: (me) => {
+        this.contactName ||= me.fullName;
+        this.contactPhone ||= me.mobile ?? '';
+      },
+      error: () => undefined,
+    });
+  }
+
+  phoneInvalid(): boolean {
+    const phone = this.contactPhone.trim();
+
+    return phone.length > 0 && !PHONE.test(phone);
+  }
+
+  canEnrol(pathshala: Pathshala): boolean {
+    return (
+      !!this.chosenChild[pathshala.id] &&
+      this.contactName.trim().length > 0 &&
+      this.contactPhone.trim().length > 0 &&
+      !this.phoneInvalid()
+    );
+  }
+
   enrol(pathshala: Pathshala): void {
     const childId = this.chosenChild[pathshala.id];
 
-    if (!childId) {
+    if (!childId || !this.canEnrol(pathshala)) {
       return;
     }
 
     this.busy.set(true);
     this.clear(pathshala.id);
 
-    this.api.enrol(pathshala.id, childId).subscribe({
+    this.api.enrol(pathshala.id, childId, this.contactName.trim(), this.contactPhone.trim()).subscribe({
       next: () => {
         this.busy.set(false);
         this.chosenChild[pathshala.id] = '';

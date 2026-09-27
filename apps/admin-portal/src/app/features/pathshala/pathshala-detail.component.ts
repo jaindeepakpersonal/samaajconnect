@@ -1,45 +1,76 @@
 import { DatePipe } from '@angular/common';
-import { Component, ElementRef, OnInit, ViewChild, computed, inject, signal } from '@angular/core';
+import { Component, OnInit, computed, inject, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { ActivatedRoute, RouterLink } from '@angular/router';
-import { describeError } from '@samaajconnect/shared';
+import { AuthService, describeError } from '@samaajconnect/shared';
+import { Observable } from 'rxjs';
 import { AdminApi } from '../../core/admin-api';
 import { AdminScope } from '../../core/admin-scope';
 import { AreaScope } from '../../core/area-scope';
-import {
-  City,
-  Enrolment,
-  Locality,
-  LookupItem,
-  PathshalaDetail,
-  State,
-} from '../../core/admin.models';
+import { PathshalaDetail } from '../../core/admin.models';
 import { isNotFound } from '../../core/http-status';
+import { blankToNull } from './modal-keys';
+import { PathshalaAnnouncementsComponent } from './pathshala-announcements.component';
+import { PathshalaDonationsComponent } from './pathshala-donations.component';
+import { PathshalaRecordsComponent } from './pathshala-records.component';
+import { PathshalaStudentsComponent } from './pathshala-students.component';
+import { PathshalaTeachersComponent } from './pathshala-teachers.component';
+
+export type PathshalaTab =
+  | 'sessions'
+  | 'classes'
+  | 'teachers'
+  | 'students'
+  | 'exams'
+  | 'progress'
+  | 'attendance'
+  | 'donations'
+  | 'announcements';
+
+const TABS: readonly { value: PathshalaTab; label: string; managersOnly?: true }[] = [
+  { value: 'sessions', label: 'Academic sessions' },
+  { value: 'classes', label: 'Classes' },
+  { value: 'teachers', label: 'Teachers' },
+  { value: 'students', label: 'Students' },
+  { value: 'exams', label: 'Exams' },
+  { value: 'progress', label: 'Progress report' },
+  { value: 'attendance', label: 'Attendance' },
+  { value: 'donations', label: 'Donations', managersOnly: true },
+  { value: 'announcements', label: 'Announcements' },
+];
 
 /**
- * One Pathshala: its sessions, its classes, and the children waiting for a
- * place.
+ * One Pathshala, as tabs: its sessions, classes, teachers, students, exams,
+ * progress, attendance, donations and announcements.
  *
- * **The placement queue is the half that was a dead end.** A parent asks for a
- * place from the member portal, the enrolment lands `Requested`, and until now
- * nothing on the platform could move it — the same shape as timeline moderation
- * before the moderation queue existed.
+ * **Each tab is its own component and loads when it is opened**, so opening a
+ * Pathshala costs one call rather than nine, and a tab always shows what is
+ * true now rather than what was true when the page opened. The sessions and
+ * classes come with the Pathshala itself and live here; the rest are in
+ * `pathshala-*.component.ts` beside this one.
  *
- * **Names come from a second call, on purpose.** pathshala-service stores a
- * child by id and nothing else, so the queue is a list of GUIDs. Rather than
- * have that service reach into member-family per row,
- * `GET /v1/children/names?ids=…` answers for exactly the ids on screen — names
- * only, not the child record, which carries a date of birth and the
- * parental-consent record that a queue printing a name has no business
- * receiving.
+ * **What a tab offers is decided by who is looking, and the service decides
+ * again.** Somebody who runs this Pathshala (`Pathshala.Manage`, and for an
+ * Area Admin only their own locality's) sees the forms; one of its teachers
+ * sees the tabs read-only - narrowed by the service to the classes they teach
+ * - and can message parents. Donations is the administrators' alone, so it is
+ * not drawn for a teacher at all.
  *
- * **A class needs a session, and the screen says so rather than failing.** The
- * service refuses a class with no session; offering the form anyway would mean
- * a 404 that reads as a bug.
+ * **Editing and standing a Pathshala down live on its tile in the list**, the
+ * same place Events and Groups put them; this page is for running it.
  */
 @Component({
   selector: 'app-pathshala-detail',
-  imports: [FormsModule, DatePipe, RouterLink],
+  imports: [
+    FormsModule,
+    DatePipe,
+    RouterLink,
+    PathshalaTeachersComponent,
+    PathshalaStudentsComponent,
+    PathshalaRecordsComponent,
+    PathshalaDonationsComponent,
+    PathshalaAnnouncementsComponent,
+  ],
   template: `
     <p><a class="btn link" routerLink="/pathshala">← All Pathshalas</a></p>
 
@@ -80,610 +111,277 @@ import { isNotFound } from '../../core/http-status';
           administrators.
         </p>
       } @else {
-      <p>
-        <button class="btn alt" type="button" (click)="openEdit(school, $event)">
-          Edit details
-        </button>
-      </p>
-
-      <!-- Sessions ------------------------------------------------------- -->
-      <div class="card">
-        <h2>Academic sessions</h2>
-
-        @if (school.sessions.length === 0) {
-          <p class="empty">None yet. Open one to start creating classes.</p>
-        } @else {
-          <div class="table-wrap">
-            <table>
-              <caption class="sr-only">Academic sessions</caption>
-              <thead>
-                <tr><th>Session</th><th>Runs</th><th></th></tr>
-              </thead>
-              <tbody>
-                @for (session of school.sessions; track session.id) {
-                  <tr>
-                    <td><b>{{ session.label }}</b></td>
-                    <td>
-                      {{ session.startDate | date: 'd MMM y' }} —
-                      {{ session.endDate | date: 'd MMM y' }}
-                    </td>
-                    <td>
-                      @if (session.isCurrent) {
-                        <span class="pill ok">Current</span>
-                      }
-                    </td>
-                  </tr>
-                }
-              </tbody>
-            </table>
-          </div>
-        }
-
-        <form (ngSubmit)="openSession()">
-          <h3 class="section-heading">Open a session</h3>
-          <p class="small">
-            Opening a session makes it the current one. The previous session's classes and
-            records are kept.
-          </p>
-
-          <div class="form-grid">
-            <div class="field">
-              <label for="session-label">Label</label>
-              <input
-                id="session-label"
-                class="input"
-                name="label"
-                [(ngModel)]="sessionLabel"
-                maxlength="40"
-                placeholder="2026-27"
-              />
-            </div>
-
-            <div class="field">
-              <label for="session-start">Starts</label>
-              <input id="session-start" class="input" type="date" name="start"
-                [(ngModel)]="sessionStart" />
-            </div>
-
-            <div class="field">
-              <label for="session-end">Ends</label>
-              <input id="session-end" class="input" type="date" name="end"
-                [(ngModel)]="sessionEnd" />
-            </div>
-          </div>
-
-          <button class="btn" type="submit" [disabled]="busy() || !canOpenSession()">
-            Open session
-          </button>
-        </form>
-      </div>
-
-      <!-- Classes -------------------------------------------------------- -->
-      <div class="card spaced">
-        <h2>Classes</h2>
-
-        @if (school.classes.length === 0) {
-          <p class="empty">No classes yet.</p>
-        } @else {
-          <div class="table-wrap">
-            <table>
-              <caption class="sr-only">Classes in this Pathshala</caption>
-              <thead>
-                <tr><th>Class</th><th>Session</th><th>Room</th><th>Students</th><th>Teachers</th></tr>
-              </thead>
-              <tbody>
-                @for (klass of school.classes; track klass.id) {
-                  <tr>
-                    <td>
-                      <a class="btn link" [routerLink]="['/pathshala', school.id, 'classes', klass.id]">
-                        <b>{{ klass.name }}</b>
-                      </a>
-                    </td>
-                    <td>{{ klass.sessionLabel }}</td>
-                    <td>{{ klass.roomLabel ?? '—' }}</td>
-                    <td>{{ klass.studentCount }}</td>
-                    <td>{{ klass.teacherMemberIds.length }}</td>
-                  </tr>
-                }
-              </tbody>
-            </table>
-          </div>
-        }
-
-        @if (currentSession(); as current) {
-          <form (ngSubmit)="createClass(current.id)">
-            <h3 class="section-heading">Add a class to {{ current.label }}</h3>
-
-            <div class="form-grid">
-              <div class="field">
-                <label for="class-name">Name</label>
-                <input id="class-name" class="input" name="className" [(ngModel)]="className"
-                  maxlength="120" placeholder="Class 8 — Jain Studies" />
-              </div>
-
-              <div class="field">
-                <label for="class-room">Room</label>
-                <input id="class-room" class="input" name="roomLabel" [(ngModel)]="roomLabel"
-                  maxlength="60" placeholder="Room 2" />
-              </div>
-            </div>
-
-            <button class="btn" type="submit" [disabled]="busy() || !className.trim()">
-              Add class
+        <div class="tabs" role="tablist" aria-label="Running this Pathshala">
+          @for (item of tabs(); track item.value) {
+            <button
+              type="button"
+              role="tab"
+              [id]="'tab-' + item.value"
+              [class.on]="tab() === item.value"
+              [attr.aria-selected]="tab() === item.value"
+              aria-controls="pathshala-tab-panel"
+              (click)="selectTab(item.value)"
+            >
+              {{ item.label }}
             </button>
-          </form>
-        } @else {
-          <p class="notice">
-            Open a session first. A class belongs to one, so there is nowhere to put it yet.
-          </p>
-        }
-      </div>
+          }
+        </div>
 
-      <!-- Placement queue ------------------------------------------------ -->
-      <div class="card spaced">
-        <h2>Waiting for a place</h2>
+        <div id="pathshala-tab-panel" role="tabpanel" [attr.aria-labelledby]="'tab-' + tab()">
+          @switch (tab()) {
+            @case ('sessions') {
+              <div class="card">
+                <h2>Academic sessions</h2>
 
-        @if (requests().length === 0) {
-          <p class="empty">
-            Nobody is waiting. Requests appear here when a parent asks for a place.
-          </p>
-        } @else {
-          <p class="small">
-            A parent asked; somebody here decides. Turning a request down does not delete the
-            child's record.
-          </p>
-
-          <div class="table-wrap">
-            <table>
-              <caption class="sr-only">Children waiting for a place</caption>
-              <thead>
-                <tr><th>Child</th><th>Asked</th><th>Class</th><th></th></tr>
-              </thead>
-              <tbody>
-                @for (request of requests(); track request.id) {
-                  <tr>
-                    <td><b>{{ childName(request.childProfileId) }}</b></td>
-                    <td>{{ request.requestedAt | date: 'd MMM y' }}</td>
-                    <td>
-                      @if (school.classes.length === 0) {
-                        <span class="muted">No classes to place into</span>
-                      } @else {
-                        <label class="sr-only" [attr.for]="'class-' + request.id">
-                          Class for {{ childName(request.childProfileId) }}
-                        </label>
-                        <select
-                          class="input inline"
-                          [id]="'class-' + request.id"
-                          [name]="'class-' + request.id"
-                          [(ngModel)]="chosenClass[request.id]"
-                        >
-                          <option value="">Choose a class…</option>
-                          @for (klass of school.classes; track klass.id) {
-                            <option [value]="klass.id">{{ klass.name }}</option>
-                          }
-                        </select>
-                      }
-                    </td>
-                    <td class="row-actions">
-                      <button
-                        class="btn"
-                        type="button"
-                        [disabled]="busy() || !chosenClass[request.id]"
-                        (click)="place(request, true)"
-                      >
-                        Place
-                      </button>
-                      <button
-                        class="btn alt"
-                        type="button"
-                        [disabled]="busy()"
-                        (click)="place(request, false)"
-                      >
-                        Turn down
-                      </button>
-                    </td>
-                  </tr>
+                @if (school.sessions.length === 0) {
+                  <p class="empty">None yet. Open one to start creating classes.</p>
+                } @else {
+                  <div class="table-wrap">
+                    <table>
+                      <caption class="sr-only">Academic sessions</caption>
+                      <thead>
+                        <tr><th>Session</th><th>Runs</th><th></th></tr>
+                      </thead>
+                      <tbody>
+                        @for (session of school.sessions; track session.id) {
+                          <tr>
+                            <td><b>{{ session.label }}</b></td>
+                            <td>
+                              {{ session.startDate | date: 'd MMM y' }} —
+                              {{ session.endDate | date: 'd MMM y' }}
+                            </td>
+                            <td>
+                              @if (session.isCurrent) {
+                                <span class="pill ok">Current</span>
+                              }
+                            </td>
+                          </tr>
+                        }
+                      </tbody>
+                    </table>
+                  </div>
                 }
-              </tbody>
-            </table>
-          </div>
-        }
-      </div>
 
-      <!-- Standing it down ----------------------------------------------- -->
-      @if (school.status === 'Active') {
-        <div class="card spaced">
-          <h2>Stand this Pathshala down</h2>
+                @if (canManage()) {
+                  <form (ngSubmit)="openSession()">
+                    <h3 class="section-heading">Open a session</h3>
+                    <p class="small">
+                      Opening a session makes it the current one. The previous session's classes
+                      and records are kept.
+                    </p>
 
-          <p class="small">
-            Records are kept and enrolments stop. Use this when a Samaaj closes a Pathshala
-            rather than when a session ends — a session ending is just the next one opening.
-          </p>
+                    <div class="form-grid">
+                      <div class="field">
+                        <label for="session-label">Label</label>
+                        <input id="session-label" class="input" name="label"
+                          [(ngModel)]="sessionLabel" maxlength="40" placeholder="2026-27" />
+                      </div>
 
-          <!--
-            The trigger stays, and stays enabled, while the confirmation is
-            open. Replacing or disabling it destroys the focused element and
-            drops a keyboard user to the body (WCAG 2.4.3).
-          -->
-          <button
-            class="btn alt"
-            type="button"
-            [disabled]="busy()"
-            [attr.aria-expanded]="deactivating()"
-            (click)="deactivating.set(true)"
-          >
-            Stand down…
-          </button>
+                      <div class="field">
+                        <label for="session-start">Starts</label>
+                        <input id="session-start" class="input" type="date" name="start"
+                          [(ngModel)]="sessionStart" />
+                      </div>
 
-          @if (deactivating()) {
-            <div class="notice" role="status">
-              <p>
-                <b>{{ school.name }}</b> will stop taking enrolments. Every session, class,
-                register and exam result is kept — a Pathshala that closed still taught the
-                children who attended it, and a Samaaj asked what its attendance was that year
-                has to be able to answer. This cannot be undone from this panel.
-              </p>
-              <div class="row-actions">
-                <button class="btn" type="button" [disabled]="busy()" (click)="deactivate()">
-                  Stand it down
-                </button>
-                <button class="btn alt" type="button" (click)="deactivating.set(false)">
-                  Keep it running
-                </button>
+                      <div class="field">
+                        <label for="session-end">Ends</label>
+                        <input id="session-end" class="input" type="date" name="end"
+                          [(ngModel)]="sessionEnd" />
+                      </div>
+                    </div>
+
+                    <button class="btn" type="submit" [disabled]="busy() || !canOpenSession()">
+                      Open session
+                    </button>
+                  </form>
+                }
               </div>
-            </div>
+            }
+
+            @case ('classes') {
+              <div class="card">
+                <h2>Classes</h2>
+
+                @if (school.classes.length === 0) {
+                  <p class="empty">No classes yet.</p>
+                } @else {
+                  <div class="table-wrap">
+                    <table>
+                      <caption class="sr-only">Classes in this Pathshala</caption>
+                      <thead>
+                        <tr>
+                          <th>Class</th><th>Session</th><th>Room</th><th>Students</th><th>Teachers</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        @for (klass of school.classes; track klass.id) {
+                          <tr>
+                            <td>
+                              <a class="btn link" [routerLink]="['/pathshala', school.id, 'classes', klass.id]">
+                                <b>{{ klass.name }}</b>
+                              </a>
+                            </td>
+                            <td>{{ klass.sessionLabel }}</td>
+                            <td>{{ klass.roomLabel ?? '—' }}</td>
+                            <td>{{ klass.studentCount }}</td>
+                            <td>{{ klass.teacherIds.length }}</td>
+                          </tr>
+                        }
+                      </tbody>
+                    </table>
+                  </div>
+                  <p class="small">
+                    Open a class to assign its teachers, set its timetable, mark the register and
+                    record exams.
+                  </p>
+                }
+
+                @if (canManage()) {
+                  @if (currentSession(); as current) {
+                    <form (ngSubmit)="createClass(current.id)">
+                      <h3 class="section-heading">Add a class to {{ current.label }}</h3>
+
+                      <div class="form-grid">
+                        <div class="field">
+                          <label for="class-name">Name</label>
+                          <input id="class-name" class="input" name="className"
+                            [(ngModel)]="className" maxlength="120"
+                            placeholder="Class 8 — Jain Studies" />
+                        </div>
+
+                        <div class="field">
+                          <label for="class-room">Room</label>
+                          <input id="class-room" class="input" name="roomLabel"
+                            [(ngModel)]="roomLabel" maxlength="60" placeholder="Room 2" />
+                        </div>
+                      </div>
+
+                      <button class="btn" type="submit" [disabled]="busy() || !className.trim()">
+                        Add class
+                      </button>
+                    </form>
+                  } @else {
+                    <p class="notice">
+                      Open a session first. A class belongs to one, so there is nowhere to put it
+                      yet.
+                    </p>
+                  }
+                }
+              </div>
+            }
+
+            @case ('teachers') {
+              <app-pathshala-teachers
+                [pathshalaId]="school.id"
+                [classes]="school.classes"
+                [canManage]="canManage()"
+                (changed)="load()"
+              />
+            }
+
+            @case ('students') {
+              <app-pathshala-students
+                [pathshalaId]="school.id"
+                [classes]="currentClasses()"
+                [canManage]="canManage()"
+                (changed)="load()"
+              />
+            }
+
+            @case ('exams') {
+              <app-pathshala-records [pathshalaId]="school.id" kind="exams" />
+            }
+
+            @case ('progress') {
+              <app-pathshala-records [pathshalaId]="school.id" kind="progress" />
+            }
+
+            @case ('attendance') {
+              <app-pathshala-records [pathshalaId]="school.id" kind="attendance" />
+            }
+
+            @case ('donations') {
+              <app-pathshala-donations [pathshalaId]="school.id" />
+            }
+
+            @case ('announcements') {
+              <app-pathshala-announcements [pathshalaId]="school.id" />
+            }
           }
         </div>
       }
-      }
-    }
-
-    <!-- Edit modal --------------------------------------------------------- -->
-    @if (editing()) {
-      <div class="modal-backdrop" (click)="closeEdit()">
-        <div
-          class="card modal-card modal-dialog"
-          role="dialog"
-          aria-modal="true"
-          aria-labelledby="pathshala-edit-title"
-          (click)="$event.stopPropagation()"
-          (keydown)="onModalKeydown($event)"
-        >
-          <h2 id="pathshala-edit-title">Edit {{ pathshala()?.name }}</h2>
-
-          @if (editError(); as message) {
-            <p class="notice error" role="alert">{{ message }}</p>
-          }
-
-          <form (ngSubmit)="saveEdit()">
-            <label for="edit-name">Name</label>
-            <input id="edit-name" class="input" name="name" [(ngModel)]="editName"
-              maxlength="200" #firstField />
-
-            <label for="edit-address">Address line</label>
-            <input id="edit-address" class="input" name="address" [(ngModel)]="editLine"
-              maxlength="500" placeholder="Building, street" />
-
-            @if (area.localityId()) {
-              <p class="small">
-                The locality stays yours: moving a Pathshala to another is its Samaaj
-                Admin's decision.
-              </p>
-            }
-
-            <label for="edit-country">Country</label>
-            <select id="edit-country" class="input" name="country" [disabled]="!!area.localityId()"
-              [ngModel]="countryId()" (ngModelChange)="onCountryChange($event)">
-              <option value="">Not specified</option>
-              @for (country of countries(); track country.id) {
-                <option [value]="country.id">{{ country.label }}</option>
-              }
-            </select>
-
-            @if (countryId() !== '') {
-              <label for="edit-state">State</label>
-              <select id="edit-state" class="input" name="state" [disabled]="!!area.localityId()"
-                [ngModel]="stateId()" (ngModelChange)="onStateChange($event)">
-                <option value="">Not specified</option>
-                @for (state of states(); track state.id) {
-                  <option [value]="state.id">{{ state.name }}</option>
-                }
-              </select>
-
-              <label for="edit-city">City/Village</label>
-              <select id="edit-city" class="input" name="city" [disabled]="!!area.localityId()"
-                [ngModel]="cityId()" (ngModelChange)="onCityChange($event)">
-                <option value="">Not specified</option>
-                @for (city of cities(); track city.id) {
-                  <option [value]="city.id">{{ city.name }}</option>
-                }
-              </select>
-            }
-
-            @if (cityId() !== '') {
-              <label for="edit-locality">Locality</label>
-              <select id="edit-locality" class="input" name="locality" [disabled]="!!area.localityId()"
-                [(ngModel)]="localityId">
-                <option value="">Not specified</option>
-                @for (locality of localities(); track locality.id) {
-                  <option [value]="locality.id">{{ locality.name }}</option>
-                }
-              </select>
-              <p class="small">
-                The locality decides which Area Admin runs this Pathshala. With none, only the
-                Samaaj Admin does.
-              </p>
-            }
-
-            <label for="edit-contact">Contact person</label>
-            <input id="edit-contact" class="input" name="contactPerson"
-              [(ngModel)]="editContact" maxlength="200" />
-
-            <div class="actions">
-              <button class="btn" type="submit" [disabled]="busy() || !editName.trim()">Save</button>
-              <button class="btn alt" type="button" (click)="closeEdit()">Cancel</button>
-            </div>
-          </form>
-        </div>
-      </div>
     }
   `,
   styles: `
-    .spaced {
-      margin-top: var(--space-4);
-    }
-
     .section-heading {
       margin-top: var(--space-5);
-    }
-
-    .row-actions {
-      display: flex;
-      gap: var(--space-2);
-      flex-wrap: wrap;
     }
   `,
 })
 export class PathshalaDetailComponent implements OnInit {
   private readonly api = inject(AdminApi);
+  private readonly auth = inject(AuthService);
   private readonly route = inject(ActivatedRoute);
 
   readonly scope = inject(AdminScope);
   readonly area = inject(AreaScope);
 
   readonly pathshala = signal<PathshalaDetail | null>(null);
-  readonly requests = signal<readonly Enrolment[]>([]);
   readonly loading = signal(true);
   readonly busy = signal(false);
   readonly notFound = signal(false);
   readonly error = signal<string | null>(null);
   readonly done = signal<string | null>(null);
-
-  /** Child id → name, resolved from member-family for the ids on screen. */
-  private readonly names = signal<ReadonlyMap<string, string>>(new Map());
+  readonly tab = signal<PathshalaTab>('sessions');
 
   readonly currentSession = computed(
     () => this.pathshala()?.sessions.find((s) => s.isCurrent) ?? null,
   );
 
-  /** Whether the stand-down confirmation is showing. It is not reversible here. */
-  readonly deactivating = signal(false);
+  /** A child is placed into this session's classes, so the queue offers only those. */
+  readonly currentClasses = computed(() => {
+    const school = this.pathshala();
+    const current = this.currentSession();
+
+    return school === null || current === null
+      ? []
+      : school.classes.filter((c) => c.sessionId === current.id);
+  });
+
+  /** Runs this Pathshala: the permission, and for an Area Admin their own locality's. */
+  readonly canManage = computed(
+    () =>
+      (this.auth.user()?.permissions.includes('Pathshala.Manage') ?? false) &&
+      this.area.administers(this.pathshala()?.address?.localityId),
+  );
+
+  readonly tabs = computed(() => TABS.filter((t) => !t.managersOnly || this.canManage()));
 
   sessionLabel = '';
   sessionStart = '';
   sessionEnd = '';
   className = '';
   roomLabel = '';
-  chosenClass: Record<string, string> = {};
-
-  // ---- Editing: name, address, contact person ------------------------------
-
-  readonly editing = signal(false);
-  readonly editError = signal<string | null>(null);
-
-  editName = '';
-  editLine = '';
-  editContact = '';
-
-  readonly countries = signal<readonly LookupItem[]>([]);
-  readonly countryId = signal('');
-  readonly states = signal<readonly State[]>([]);
-  readonly stateId = signal('');
-  readonly cities = signal<readonly City[]>([]);
-  readonly cityId = signal('');
-  readonly localities = signal<readonly Locality[]>([]);
-  localityId = '';
-
-  @ViewChild('firstField') private readonly firstFieldRef?: ElementRef<HTMLInputElement>;
-  private editTrigger: HTMLElement | null = null;
 
   private get id(): string {
     return this.route.snapshot.paramMap.get('id') ?? '';
   }
 
-  /**
-   * Opens the form on what the Pathshala holds now, with each level of the
-   * cascade already loaded for the level above it - a select whose options
-   * have not arrived shows nothing, which would read as the address being
-   * blank.
-   */
-  openEdit(school: PathshalaDetail, event: MouseEvent): void {
-    const address = school.address;
-
-    this.editName = school.name;
-    this.editLine = address?.line ?? '';
-    this.editContact = school.contactPerson ?? '';
-    this.countryId.set(address?.countryId ?? '');
-    this.stateId.set(address?.stateId ?? '');
-    this.cityId.set(address?.cityId ?? '');
-    this.localityId = address?.localityId ?? '';
-    this.states.set([]);
-    this.cities.set([]);
-    this.localities.set([]);
-
-    this.api.listLookupItems('Country', false).subscribe({
-      next: (found) => this.countries.set(found),
-      error: () => this.countries.set([]),
-    });
-    this.loadStatesAndCities();
-    this.loadLocalities();
-
-    this.editTrigger = event.currentTarget as HTMLElement;
-    this.editError.set(null);
-    this.done.set(null);
-    this.editing.set(true);
-    setTimeout(() => this.firstFieldRef?.nativeElement.focus());
-  }
-
-  closeEdit(): void {
-    if (!this.editing()) {
-      return;
-    }
-
-    this.editing.set(false);
-
-    const trigger = this.editTrigger;
-    this.editTrigger = null;
-
-    if (trigger) {
-      setTimeout(() => trigger.focus());
-    }
-  }
-
-  onCountryChange(countryId: string): void {
-    this.countryId.set(countryId);
-    this.stateId.set('');
-    this.cityId.set('');
-    this.localityId = '';
-    this.states.set([]);
-    this.cities.set([]);
-    this.localities.set([]);
-    this.loadStatesAndCities();
-  }
-
-  onStateChange(stateId: string): void {
-    this.stateId.set(stateId);
-    this.cityId.set('');
-    this.localityId = '';
-    this.localities.set([]);
-
-    this.api.listCities(this.countryId(), stateId || null).subscribe({
-      next: (found) => this.cities.set(found),
-      error: () => this.cities.set([]),
-    });
-  }
-
-  onCityChange(cityId: string): void {
-    this.cityId.set(cityId);
-    this.localityId = '';
-    this.localities.set([]);
-    this.loadLocalities();
-  }
-
-  private loadStatesAndCities(): void {
-    const countryId = this.countryId();
-
-    if (countryId === '') {
-      return;
-    }
-
-    this.api.listStates(countryId).subscribe({
-      next: (found) => this.states.set(found),
-      error: () => this.states.set([]),
-    });
-    this.api.listCities(countryId, this.stateId() || null).subscribe({
-      next: (found) => this.cities.set(found),
-      error: () => this.cities.set([]),
-    });
-  }
-
-  private loadLocalities(): void {
-    const cityId = this.cityId();
-
-    if (cityId === '') {
-      return;
-    }
-
-    this.api.listLocalities(cityId).subscribe({
-      next: (found) => this.localities.set(found),
-      error: () => this.localities.set([]),
-    });
-  }
-
-  saveEdit(): void {
-    const name = this.editName.trim();
-
-    if (name.length === 0 || this.busy()) {
-      return;
-    }
-
-    this.busy.set(true);
-    this.editError.set(null);
-
-    this.api
-      .updatePathshala(
-        this.id,
-        name,
-        {
-          addressLine: blankToNull(this.editLine),
-          countryId: this.countryId() || null,
-          stateId: this.stateId() || null,
-          cityId: this.cityId() || null,
-          localityId: this.localityId || null,
-        },
-        blankToNull(this.editContact),
-      )
-      .subscribe({
-        next: () => {
-          this.busy.set(false);
-          this.closeEdit();
-          this.done.set(`${name} is saved.`);
-          this.load();
-        },
-        error: (failure: unknown) => {
-          // Kept inside the dialog with the form open, so a refusal does not
-          // cost what was typed.
-          this.editError.set(describeError(failure));
-          this.busy.set(false);
-        },
-      });
-  }
-
-  onModalKeydown(event: KeyboardEvent): void {
-    if (event.key === 'Escape') {
-      event.stopPropagation();
-      this.closeEdit();
-
-      return;
-    }
-
-    if (event.key !== 'Tab') {
-      return;
-    }
-
-    const dialog = event.currentTarget as HTMLElement;
-    const focusable = dialog.querySelectorAll<HTMLElement>(
-      'a[href], button:not([disabled]), input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])',
-    );
-
-    if (focusable.length === 0) {
-      return;
-    }
-
-    const first = focusable[0]!;
-    const last = focusable[focusable.length - 1]!;
-
-    if (event.shiftKey && document.activeElement === first) {
-      event.preventDefault();
-      last.focus();
-    } else if (!event.shiftKey && document.activeElement === last) {
-      event.preventDefault();
-      first.focus();
-    }
-  }
-
   ngOnInit(): void {
+    // A class page links back to its own tab.
+    const asked = this.route.snapshot.queryParamMap?.get('tab');
+
+    if (asked && TABS.some((t) => t.value === asked)) {
+      this.tab.set(asked as PathshalaTab);
+    }
+
     this.load();
+  }
+
+  selectTab(tab: PathshalaTab): void {
+    this.done.set(null);
+    this.error.set(null);
+    this.tab.set(tab);
   }
 
   canOpenSession(): boolean {
@@ -694,26 +392,16 @@ export class PathshalaDetailComponent implements OnInit {
     );
   }
 
-  childName(childProfileId: string): string {
-    // "A child" rather than a GUID. An id on screen is no use to somebody
-    // deciding which class to put them in, and printing one says less than
-    // admitting the name could not be resolved.
-    return this.names().get(childProfileId) ?? 'A child';
-  }
-
-  private load(): void {
-    this.loading.set(true);
-    this.error.set(null);
-
+  load(): void {
     this.api.pathshala(this.id).subscribe({
       next: (found) => {
         this.pathshala.set(found);
         this.loading.set(false);
 
-        // The placement queue answers 404 to an Area Admin for a Pathshala
-        // outside their locality, so it is not asked for.
-        if (this.area.administers(found.address?.localityId)) {
-          this.loadRequests();
+        // Donations is not drawn for somebody who cannot run it, so a link
+        // straight to it lands on the first tab instead of an empty panel.
+        if (!this.tabs().some((t) => t.value === this.tab())) {
+          this.tab.set('sessions');
         }
       },
       error: (failure: unknown) => {
@@ -728,50 +416,16 @@ export class PathshalaDetailComponent implements OnInit {
     });
   }
 
-  private loadRequests(): void {
-    this.api.enrolmentRequests(this.id).subscribe({
-      next: (found) => {
-        this.requests.set(found);
-
-        // Seeded to '' for every row, because an undefined bound to a <select>
-        // matches no option — not even the placeholder — and the control renders
-        // empty rather than showing it.
-        for (const request of found) {
-          this.chosenClass[request.id] ??= '';
-        }
-
-        this.loadNames(found.map((r) => r.childProfileId));
-      },
-      error: (failure: unknown) => this.error.set(describeError(failure)),
-    });
-  }
-
-  /**
-   * Names are a convenience, so a failure here is silent: a queue showing
-   * "A child" is still workable, and one that refused to load is not.
-   */
-  private loadNames(ids: readonly string[]): void {
-    const distinct = [...new Set(ids)];
-
-    if (distinct.length === 0) {
-      this.names.set(new Map());
-      return;
-    }
-
-    this.api.childNames(distinct).subscribe({
-      next: (found) => this.names.set(new Map(found.map((c) => [c.id, c.fullName]))),
-      error: () => this.names.set(new Map()),
-    });
-  }
-
   openSession(): void {
     if (!this.canOpenSession()) {
       return;
     }
 
+    const label = this.sessionLabel.trim();
+
     this.act(
-      this.api.openSession(this.id, this.sessionLabel.trim(), this.sessionStart, this.sessionEnd),
-      `${this.sessionLabel.trim()} is now the current session.`,
+      this.api.openSession(this.id, label, this.sessionStart, this.sessionEnd),
+      `${label} is now the current session.`,
       () => {
         this.sessionLabel = '';
         this.sessionStart = '';
@@ -781,11 +435,11 @@ export class PathshalaDetailComponent implements OnInit {
   }
 
   createClass(sessionId: string): void {
-    if (this.className.trim().length === 0) {
+    const name = this.className.trim();
+
+    if (name.length === 0) {
       return;
     }
-
-    const name = this.className.trim();
 
     this.act(
       this.api.createClass(this.id, sessionId, name, blankToNull(this.roomLabel)),
@@ -797,39 +451,12 @@ export class PathshalaDetailComponent implements OnInit {
     );
   }
 
-  deactivate(): void {
-    const name = this.pathshala()?.name ?? 'The Pathshala';
-
-    this.deactivating.set(false);
-
-    this.act(
-      this.api.deactivatePathshala(this.id),
-      `${name} is stood down. Its records are kept.`,
-    );
-  }
-
-  place(request: Enrolment, place: boolean): void {
-    const classId = place ? (this.chosenClass[request.id] ?? '') : '';
-
-    if (place && classId.length === 0) {
-      return;
-    }
-
-    const who = this.childName(request.childProfileId);
-
-    this.act(
-      this.api.placeStudent(request.id, place ? classId : null, place),
-      place ? `${who} has a place.` : `${who}'s request was turned down.`,
-    );
-  }
-
   /**
-   * Every action re-reads the Pathshala and the queue rather than patching what
-   * is on screen. Placing a child changes a class's student count and takes a
-   * row out of the queue, and opening a session changes which one is current —
-   * the server is the only thing that knows all of that at once.
+   * Every action re-reads the Pathshala rather than patching what is on
+   * screen: opening a session changes which one is current, and the server is
+   * the only thing that knows all of that at once.
    */
-  private act(work: { subscribe: (o: object) => void }, message: string, reset?: () => void): void {
+  private act(work: Observable<unknown>, message: string, reset: () => void): void {
     this.busy.set(true);
     this.error.set(null);
     this.done.set(null);
@@ -838,7 +465,7 @@ export class PathshalaDetailComponent implements OnInit {
       next: () => {
         this.done.set(message);
         this.busy.set(false);
-        reset?.();
+        reset();
         this.load();
       },
       error: (failure: unknown) => {
@@ -847,10 +474,4 @@ export class PathshalaDetailComponent implements OnInit {
       },
     });
   }
-}
-
-function blankToNull(value: string): string | null {
-  const trimmed = value.trim();
-
-  return trimmed.length === 0 ? null : trimmed;
 }

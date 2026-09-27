@@ -106,7 +106,7 @@ function pathshalaDetail(id: string, studentCounts: readonly number[]): Pathshal
       name: `Class ${index}`,
       roomLabel: null,
       schedule: [],
-      teacherMemberIds: [],
+      teacherIds: [],
       studentCount,
     })),
   };

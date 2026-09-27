@@ -36,6 +36,16 @@ import {
   Pathshala,
   PathshalaClass,
   PathshalaDetail,
+  PathshalaTeacher,
+  TeacherInput,
+  PathshalaStudent,
+  ProgressRow,
+  ClassAttendance,
+  ExamOverview,
+  DonationLedger,
+  PathshalaDonation,
+  DonationInput,
+  PathshalaAnnouncement,
   Broadcast,
   BroadcastResult,
   ConversionRequest,
@@ -478,13 +488,6 @@ export class AdminApi {
       name,
       roomLabel,
     });
-  }
-
-  /** Children a parent has asked to enrol, waiting for somebody to place them. */
-  enrolmentRequests(pathshalaId: string): Observable<Enrolment[]> {
-    return this.http.get<Enrolment[]>(
-      `/v1/pathshala/pathshalas/${pathshalaId}/enrollments/requests`,
-    );
   }
 
   /**
@@ -1147,15 +1150,79 @@ export class AdminApi {
     return this.http.get<Enrolment[]>(`/v1/pathshala/classes/${classId}/roll`);
   }
 
-  /** Assigns a teacher to a class, or takes one off it. */
-  assignTeacher(
-    classId: string,
-    teacherMemberId: string,
-    assign: boolean,
-  ): Observable<PathshalaClass> {
+  /** Assigns one of the Pathshala's teacher records to a class, or takes it off. */
+  assignTeacher(classId: string, teacherId: string, assign: boolean): Observable<PathshalaClass> {
     return this.http.post<PathshalaClass>(`/v1/pathshala/classes/${classId}/teachers`, {
-      teacherMemberId,
+      teacherId,
       assign,
+    });
+  }
+
+  // ---- The Pathshala tabs --------------------------------------------------
+
+  /** Its teachers, with contact details. Its administrators and teachers only. */
+  pathshalaTeachers(pathshalaId: string): Observable<PathshalaTeacher[]> {
+    return this.http.get<PathshalaTeacher[]>(`/v1/pathshala/pathshalas/${pathshalaId}/teachers`);
+  }
+
+  /** A teacher need not be a member. `userId` links their login, if any. */
+  addTeacher(pathshalaId: string, teacher: TeacherInput): Observable<PathshalaTeacher> {
+    return this.http.post<PathshalaTeacher>(`/v1/pathshala/pathshalas/${pathshalaId}/teachers`, teacher);
+  }
+
+  updateTeacher(pathshalaId: string, teacherId: string, teacher: TeacherInput): Observable<PathshalaTeacher> {
+    return this.http.patch<PathshalaTeacher>(
+      `/v1/pathshala/pathshalas/${pathshalaId}/teachers/${teacherId}`,
+      teacher,
+    );
+  }
+
+  /** Removes a teacher and takes them off every class. The registers they marked stay. */
+  removeTeacher(pathshalaId: string, teacherId: string): Observable<string> {
+    return this.http.delete<string>(`/v1/pathshala/pathshalas/${pathshalaId}/teachers/${teacherId}`);
+  }
+
+  /** Placed children (a teacher: their classes) and, for administrators, waiting requests. */
+  pathshalaStudents(pathshalaId: string): Observable<PathshalaStudent[]> {
+    return this.http.get<PathshalaStudent[]>(`/v1/pathshala/pathshalas/${pathshalaId}/students`);
+  }
+
+  progressReport(pathshalaId: string): Observable<ProgressRow[]> {
+    return this.http.get<ProgressRow[]>(`/v1/pathshala/pathshalas/${pathshalaId}/progress`);
+  }
+
+  attendanceOverview(pathshalaId: string): Observable<ClassAttendance[]> {
+    return this.http.get<ClassAttendance[]>(`/v1/pathshala/pathshalas/${pathshalaId}/attendance`);
+  }
+
+  pathshalaExams(pathshalaId: string): Observable<ExamOverview[]> {
+    return this.http.get<ExamOverview[]>(`/v1/pathshala/pathshalas/${pathshalaId}/exams`);
+  }
+
+  /** The donation ledger. Administrators only - teachers get a 403. */
+  donations(pathshalaId: string): Observable<DonationLedger> {
+    return this.http.get<DonationLedger>(`/v1/pathshala/pathshalas/${pathshalaId}/donations`);
+  }
+
+  /** Records a donation and issues its receipt number. `amount` is integer paise. */
+  recordDonation(pathshalaId: string, donation: DonationInput): Observable<PathshalaDonation> {
+    return this.http.post<PathshalaDonation>(`/v1/pathshala/pathshalas/${pathshalaId}/donations`, donation);
+  }
+
+  /** Takes a mistaken entry out of the totals. Never a delete. */
+  voidDonation(donationId: string, reason: string): Observable<PathshalaDonation> {
+    return this.http.post<PathshalaDonation>(`/v1/pathshala/donations/${donationId}/void`, { reason });
+  }
+
+  announcements(pathshalaId: string): Observable<PathshalaAnnouncement[]> {
+    return this.http.get<PathshalaAnnouncement[]>(`/v1/pathshala/pathshalas/${pathshalaId}/announcements`);
+  }
+
+  /** To the parents of every child with a place or a request; each gets an in-app notification. */
+  sendAnnouncement(pathshalaId: string, title: string, body: string): Observable<PathshalaAnnouncement> {
+    return this.http.post<PathshalaAnnouncement>(`/v1/pathshala/pathshalas/${pathshalaId}/announcements`, {
+      title,
+      body,
     });
   }
 
