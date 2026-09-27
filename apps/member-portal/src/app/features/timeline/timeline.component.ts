@@ -1,8 +1,11 @@
 import { HttpErrorResponse } from '@angular/common/http';
 import { Component, OnInit, computed, inject, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
-import { AuthService, describeError } from '@samaajconnect/shared';
+import { RouterLink } from '@angular/router';
+import { AuthService, AuthedImageDirective, describeError } from '@samaajconnect/shared';
+import { MasterDataApi } from '../members/master-data.api';
 import { MembersApi } from '../members/members.api';
+import { MyProfile } from '../members/members.models';
 import { TimelineApi } from './timeline.api';
 import { Comment, Post, ReactionType, Reactions } from './timeline.models';
 
@@ -45,10 +48,18 @@ import { Comment, Post, ReactionType, Reactions } from './timeline.models';
  *
  * Reactions and comments are additions, not wireframe elements: the endpoints
  * exist and a timeline with no way to respond is a noticeboard.
+ *
+ * **Faces, since 2026-09-27.** The page opens on the reader's own card - their
+ * photo, name and Gautra, the way a social feed greets its reader - and every
+ * post and comment carries its author's photo. Photos are the platform's own,
+ * fetched with the token through `scAuthedSrc`; a member with none, or one
+ * whose photo is not visible to this reader, gets their initials instead. The
+ * author's photo path comes from the same one `MembersApi.get()` per author
+ * that already resolves their name, so faces cost no lookup names did not.
  */
 @Component({
   selector: 'app-timeline',
-  imports: [FormsModule],
+  imports: [FormsModule, RouterLink, AuthedImageDirective],
   styleUrl: './timeline.css',
   template: `
     <div class="timeline-page">
@@ -58,6 +69,21 @@ import { Comment, Post, ReactionType, Reactions } from './timeline.models';
           <p class="subtitle">Samaaj announcements and approved public member posts.</p>
         </div>
       </header>
+
+      <section class="card me-card" aria-label="You">
+        @if (myPhoto(); as path) {
+          <img class="avatar large" [scAuthedSrc]="path" alt="" />
+        } @else {
+          <span class="avatar large initials" aria-hidden="true">{{ initials(myName()) }}</span>
+        }
+        <div class="me-text">
+          <p class="me-name">{{ myName() }}</p>
+          @if (gautraName(); as gautra) {
+            <p class="small">Gautra: {{ gautra }}</p>
+          }
+          <a class="small" routerLink="/profile">{{ myProfile()?.photoUrl ? 'Edit your profile' : 'Add a photo to your profile' }}</a>
+        </div>
+      </section>
 
       @if (!isContactVerified()) {
         <p class="notice info" role="status">
@@ -146,6 +172,11 @@ import { Comment, Post, ReactionType, Reactions } from './timeline.models';
             @for (post of posts(); track post.id) {
               <article class="post card">
                 <div class="meta">
+                  @if (photoOf(post.authorMemberId); as path) {
+                    <img class="avatar" [scAuthedSrc]="path" alt="" />
+                  } @else {
+                    <span class="avatar initials" aria-hidden="true">{{ initials(authorLabel(post.authorMemberId)) }}</span>
+                  }
                   <span class="author">{{ authorLabel(post.authorMemberId) }}</span>
                   <span class="pill" [class.warn]="isAwaitingReview(post)">{{ label(post) }}</span>
                   <span>{{ when(post.createdAt) }}</span>
@@ -214,6 +245,11 @@ import { Comment, Post, ReactionType, Reactions } from './timeline.models';
                       @for (comment of comments(); track comment.id) {
                         <div class="comment">
                           <div class="meta">
+                            @if (photoOf(comment.authorMemberId); as path) {
+                              <img class="avatar small" [scAuthedSrc]="path" alt="" />
+                            } @else {
+                              <span class="avatar small initials" aria-hidden="true">{{ initials(authorLabel(comment.authorMemberId)) }}</span>
+                            }
                             <span>{{ authorLabel(comment.authorMemberId) }}</span>
                             <span>{{ when(comment.createdAt) }}</span>
                           </div>
@@ -252,11 +288,24 @@ export class TimelineComponent implements OnInit {
   private readonly api = inject(TimelineApi);
   private readonly auth = inject(AuthService);
   private readonly members = inject(MembersApi);
+  private readonly masterData = inject(MasterDataApi);
 
   readonly reactions = Reactions;
 
   /** Resolved author names, keyed by member id. See `resolveNames`. */
   readonly names = signal<Record<string, string>>({});
+
+  /** Authors' photo paths from the same lookups, null for a member with none to show. */
+  readonly photos = signal<Record<string, string | null>>({});
+
+  /** The reader's own profile, for the card at the top. Null until it loads, or if it cannot. */
+  readonly myProfile = signal<MyProfile | null>(null);
+
+  readonly gautraName = signal<string | null>(null);
+
+  readonly myName = computed(() => this.myProfile()?.fullName ?? this.auth.user()?.fullName ?? 'You');
+
+  readonly myPhoto = computed(() => this.myProfile()?.photoUrl ?? null);
 
   readonly posts = signal<readonly Post[]>([]);
   readonly loading = signal(true);
@@ -330,9 +379,54 @@ export class TimelineComponent implements OnInit {
     // and they arrive from /me rather than from the token. Loading the feed
     // first would render the compose box before that is known.
     this.auth.ensureCurrentUser().subscribe({
-      next: () => this.load(),
-      error: () => this.load(),
+      next: () => {
+        this.load();
+        this.loadMe();
+      },
+      error: () => {
+        this.load();
+        this.loadMe();
+      },
     });
+  }
+
+  /**
+   * The reader's own card. A failure leaves the name from `/me` and initials -
+   * the feed does not depend on it. The Gautra's name is one list, asked for
+   * only when the member has picked one.
+   */
+  private loadMe(): void {
+    this.members.me().subscribe({
+      next: (profile) => {
+        this.myProfile.set(profile);
+
+        if (profile.gautraId) {
+          this.masterData.listGautras().subscribe({
+            next: (gautras) => this.gautraName.set(gautras.find((g) => g.id === profile.gautraId)?.name ?? null),
+            error: () => this.gautraName.set(null),
+          });
+        }
+      },
+      error: () => this.myProfile.set(null),
+    });
+  }
+
+  /** The photo path for an author: the reader's own, or what their lookup returned. */
+  photoOf(authorMemberId: string): string | null {
+    if (authorMemberId === this.me()) {
+      return this.myPhoto();
+    }
+
+    return this.photos()[authorMemberId] ?? null;
+  }
+
+  /** "Ravi Shah" -> "RS"; a fallback label like "A member" -> "A". */
+  initials(name: string): string {
+    const parts = name.trim().split(/\s+/).filter((part) => part.length > 0);
+    const first = parts[0]?.[0] ?? '';
+    const last = parts.length > 1 ? (parts[parts.length - 1]?.[0] ?? '') : '';
+
+    return (first + last).toUpperCase() || '?';
   }
 
   load(): void {
@@ -571,7 +665,10 @@ export class TimelineComponent implements OnInit {
 
     for (const id of toResolve) {
       this.members.get(id).subscribe({
-        next: (member) => this.names.update((current) => ({ ...current, [id]: member.fullName })),
+        next: (member) => {
+          this.names.update((current) => ({ ...current, [id]: member.fullName }));
+          this.photos.update((current) => ({ ...current, [id]: member.photoUrl }));
+        },
         error: () => {
           // Left unresolved; authorLabel() falls back to a generic label.
         },

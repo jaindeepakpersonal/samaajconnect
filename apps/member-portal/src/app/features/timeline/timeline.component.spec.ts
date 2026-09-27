@@ -3,7 +3,7 @@ import { HttpTestingController, provideHttpClientTesting } from '@angular/common
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { provideRouter } from '@angular/router';
 import { API_CONFIG, CurrentUser } from '@samaajconnect/shared';
-import { Member } from '../members/members.models';
+import { Member, MyProfile } from '../members/members.models';
 import { TimelineComponent } from './timeline.component';
 import { Post } from './timeline.models';
 
@@ -58,6 +58,30 @@ function apiMember(id: string, fullName = 'Some Member'): Member {
   };
 }
 
+/** The reader's own profile, for the card at the top of the page. */
+function myProfile(overrides: Partial<MyProfile> = {}): MyProfile {
+  return {
+    id: ME,
+    tenantId: 't1',
+    fullName: 'Ravi Shah',
+    photoUrl: null,
+    dateOfBirth: null,
+    gender: 'Male',
+    mobile: null,
+    email: null,
+    gautraId: null,
+    professionId: null,
+    qualificationId: null,
+    permanentAddress: { line: null, cityId: null, localityId: null },
+    temporaryAddress: null,
+    privacy: {} as MyProfile['privacy'],
+    isListedInDirectory: true,
+    createdAt: '2026-09-01T00:00:00Z',
+    updatedAt: null,
+    ...overrides,
+  };
+}
+
 describe('TimelineComponent', () => {
   let fixture: ComponentFixture<TimelineComponent>;
   let component: TimelineComponent;
@@ -88,9 +112,20 @@ describe('TimelineComponent', () => {
    * always falling back to "A member".
    */
   function flushMemberLookups(): void {
-    for (const req of http.match((r) => r.method === 'GET' && r.url.startsWith('/v1/members/'))) {
+    for (const req of http.match(
+      (r) =>
+        r.method === 'GET' &&
+        r.url.startsWith('/v1/members/') &&
+        r.url !== '/v1/members/me' &&
+        !r.url.endsWith('/photo'),
+    )) {
       req.flush(apiMember(req.request.url.split('/').pop()!));
     }
+  }
+
+  /** Answers the reader's own profile, which the card at the top asks for. */
+  function flushMe(overrides: Partial<MyProfile> = {}): void {
+    http.expectOne('/v1/members/me').flush(myProfile(overrides));
   }
 
   /** Answers the calls the screen makes on load: /me, the feed, then any author names it needs. */
@@ -99,6 +134,7 @@ describe('TimelineComponent', () => {
 
     http.expectOne('/v1/identity/me').flush(user);
     http.expectOne('/v1/timeline/posts').flush(posts);
+    flushMe();
     flushMemberLookups();
 
     fixture.detectChanges();
@@ -403,6 +439,7 @@ describe('TimelineComponent', () => {
 
     http.expectOne('/v1/identity/me').flush(member);
     http.expectOne('/v1/timeline/posts').flush({}, { status: 503, statusText: 'Unavailable' });
+    flushMe();
     fixture.detectChanges();
 
     expect(text()).toContain('Try again');
@@ -416,6 +453,7 @@ describe('TimelineComponent', () => {
 
     http.expectOne('/v1/identity/me').flush(member);
     http.expectOne('/v1/timeline/posts').flush({}, { status: 404, statusText: 'Not Found' });
+    flushMe();
     fixture.detectChanges();
 
     expect(text()).toContain('not switched on for your Samaaj');
@@ -438,6 +476,7 @@ describe('TimelineComponent', () => {
 
     http.expectOne('/v1/identity/me').flush(member);
     http.expectOne('/v1/timeline/posts').flush([]);
+    flushMe();
   });
 
   it('still shows the feed when the profile call fails', () => {
@@ -447,10 +486,68 @@ describe('TimelineComponent', () => {
 
     http.expectOne('/v1/identity/me').flush({}, { status: 500, statusText: 'Server Error' });
     http.expectOne('/v1/timeline/posts').flush([post()]);
+    flushMe();
     flushMemberLookups();
     fixture.detectChanges();
 
     expect(text()).toContain('Community blood donation drive');
+  });
+
+  // ---- Faces ------------------------------------------------------------------
+
+  it('opens on the reader: their photo, name and Gautra', () => {
+    URL.createObjectURL = () => 'blob:test';
+    URL.revokeObjectURL = () => undefined;
+
+    fixture.detectChanges();
+    http.expectOne('/v1/identity/me').flush(member);
+    http.expectOne('/v1/timeline/posts').flush([]);
+    flushMe({ photoUrl: `/v1/members/${ME}/photo`, gautraId: 'g2' });
+    http.expectOne((r) => r.url === '/v1/master-data/gautras').flush([
+      { id: 'g1', name: 'Bhandari', isActive: true },
+      { id: 'g2', name: 'Kothari', isActive: true },
+    ]);
+    fixture.detectChanges();
+    http.expectOne(`/v1/members/${ME}/photo`).flush(new Blob(['x']));
+    fixture.detectChanges();
+
+    const card = (fixture.nativeElement as HTMLElement).querySelector('.me-card')!;
+    expect(card.textContent).toContain('Ravi Shah');
+    expect(card.textContent).toContain('Gautra: Kothari');
+    expect(card.querySelector<HTMLImageElement>('img.avatar')?.getAttribute('src')).toBe('blob:test');
+  });
+
+  it('stands initials in for a reader with no photo, and asks for no Gautra list without one', () => {
+    load([]);
+
+    const card = (fixture.nativeElement as HTMLElement).querySelector('.me-card')!;
+    expect(card.querySelector('img')).toBeNull();
+    expect(card.querySelector('.initials')?.textContent?.trim()).toBe('RS');
+    expect(card.textContent).toContain('Add a photo to your profile');
+    http.expectNone((r) => r.url === '/v1/master-data/gautras');
+  });
+
+  it('shows each author with their photo, or their initials, from the lookup that names them', () => {
+    URL.createObjectURL = () => 'blob:test';
+    URL.revokeObjectURL = () => undefined;
+
+    fixture.detectChanges();
+    http.expectOne('/v1/identity/me').flush(member);
+    http.expectOne('/v1/timeline/posts').flush([
+      post({ id: 'p1', authorMemberId: 'a1' }),
+      post({ id: 'p2', authorMemberId: 'a2' }),
+    ]);
+    flushMe();
+    http.expectOne('/v1/members/a1').flush({ ...apiMember('a1', 'Meera Jain'), photoUrl: '/v1/members/a1/photo' });
+    http.expectOne('/v1/members/a2').flush(apiMember('a2', 'Anil Mehta'));
+    fixture.detectChanges();
+    http.expectOne('/v1/members/a1/photo').flush(new Blob(['x']));
+    fixture.detectChanges();
+
+    const posts = [...(fixture.nativeElement as HTMLElement).querySelectorAll('article.post')];
+    expect(posts[0]!.querySelector('img.avatar')).not.toBeNull();
+    expect(posts[1]!.querySelector('img.avatar')).toBeNull();
+    expect(posts[1]!.querySelector('.initials')?.textContent?.trim()).toBe('AM');
   });
 
   it('says the timeline is empty rather than showing nothing at all', () => {

@@ -36,9 +36,12 @@ version of the plan; the reasoning behind the ordering lives in
   minor children, found by where their members live, administrators only and
   an Area Admin only for their own locality.
 
-  Still to come from the same request: the member's own photo and author
-  photos on Timeline, OTP two-factor sign-in with a self-hosted CAPTCHA, and a
-  security hardening pass.
+  And **Timeline opens on the reader** - their photo, name and Gautra in a
+  card at the top - with every post and comment showing its author's photo
+  (initials when there is none to show).
+
+  Still to come from the same request: OTP two-factor sign-in with a
+  self-hosted CAPTCHA, and a security hardening pass.
 - **Previously:** 2026-09-20 - **a new module, trust-service: locality-wise
   Trust management, phase 1 (roster only).** One Trust per `(Samaaj,
   Locality)`, with `TrustMember` as its own aggregate so a roster change

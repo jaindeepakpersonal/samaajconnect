@@ -259,6 +259,18 @@ pattern: one `MembersApi.get()` per distinct `authorMemberId` on screen,
 called from `load()` for the feed and from `toggleComments()` for whichever
 thread is open, never for the whole Samaaj.
 
+**Home opens on the reader's own face, and every post shows its author's
+(2026-09-27).** A card at the top of Timeline carries the member's photo, name
+and Gautra - `/v1/members/me`, plus the Gautra list only when they have picked
+one - with a link to My Profile that says "Add a photo" when there is none.
+Each post and comment has its author's photo beside their name; the path comes
+from the same one `MembersApi.get()` per author that already resolves the
+name, so faces cost no lookup names did not, and `scAuthedSrc` fetches them
+with the token (the service's ETag makes a repeated face a 304). A member with
+no photo, or one this reader may not see, is their initials. The profile card
+failing to load leaves the name from `/me` and initials; the feed never waits
+for it.
+
 **A module key is `ModuleKeys.X`, never a string literal.** Home filtered its
 Events and Volunteer tiles on `Events` and `VolunteerGroups`, neither of which
 is a key the platform has ever had - both features are behind `community`. The
