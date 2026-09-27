@@ -108,24 +108,39 @@ public sealed class TrustEndpointsTests(TrustApiFactory factory)
             .Should().Be("Inactive");
     }
 
+    private async Task<Guid> DefineRoleAsync(Guid trustId, string title, int seats)
+    {
+        var response = await Admin().PostAsJsonAsync($"/v1/trust/trusts/{trustId}/roles", new { title, seats });
+
+        response.StatusCode.Should().Be(HttpStatusCode.Created);
+
+        return (await response.Content.ReadFromJsonAsync<JsonElement>()).GetProperty("id").GetGuid();
+    }
+
+    private async Task<HttpResponseMessage> AddMemberAsync(Guid trustId, Guid memberId, Guid? roleId = null) =>
+        await Admin().PostAsJsonAsync(
+            $"/v1/trust/trusts/{trustId}/members", new { memberId = memberId.ToString(), roleId = roleId?.ToString() });
+
     [Fact]
     public async Task Adding_updating_and_removing_a_member_walks_the_roster()
     {
         var trustId = await CreateTrustAsync();
+        var treasurer = await DefineRoleAsync(trustId, "Treasurer", seats: 1);
         var memberId = Guid.NewGuid();
 
-        var added = await Admin().PostAsJsonAsync(
-            $"/v1/trust/trusts/{trustId}/members", new { memberId = memberId.ToString(), positionTitle = "Trustee" });
+        var added = await AddMemberAsync(trustId, memberId);
         added.StatusCode.Should().Be(HttpStatusCode.OK);
         var addedBody = await added.Content.ReadFromJsonAsync<JsonElement>();
         var trustMemberId = addedBody.GetProperty("id").GetGuid();
         addedBody.GetProperty("status").GetString().Should().Be("Active");
+        addedBody.GetProperty("positionTitle").GetString().Should().Be("Trustee", "Trustee unless given another role");
 
         var updated = await Admin().PutAsJsonAsync(
-            $"/v1/trust/trusts/{trustId}/members/{trustMemberId}/position", new { positionTitle = "Treasurer" });
+            $"/v1/trust/trusts/{trustId}/members/{trustMemberId}/role", new { roleId = treasurer });
         updated.StatusCode.Should().Be(HttpStatusCode.OK);
-        (await updated.Content.ReadFromJsonAsync<JsonElement>()).GetProperty("positionTitle").GetString()
-            .Should().Be("Treasurer");
+        var updatedBody = await updated.Content.ReadFromJsonAsync<JsonElement>();
+        updatedBody.GetProperty("positionTitle").GetString().Should().Be("Treasurer");
+        updatedBody.GetProperty("roleId").GetGuid().Should().Be(treasurer);
 
         var listed = await Member().GetFromJsonAsync<JsonElement>($"/v1/trust/trusts/{trustId}/members");
         listed.EnumerateArray().Should().ContainSingle(m => m.GetProperty("id").GetGuid() == trustMemberId);
@@ -139,10 +154,68 @@ public sealed class TrustEndpointsTests(TrustApiFactory factory)
         (await Admin().DeleteAsync($"/v1/trust/trusts/{trustId}/members/{trustMemberId}"))
             .StatusCode.Should().Be(HttpStatusCode.OK);
 
-        // Updating a removed member's position is refused.
+        // Moving a removed member into a role is refused.
         (await Admin().PutAsJsonAsync(
-                $"/v1/trust/trusts/{trustId}/members/{trustMemberId}/position", new { positionTitle = "X" }))
+                $"/v1/trust/trusts/{trustId}/members/{trustMemberId}/role", new { roleId = treasurer }))
             .StatusCode.Should().Be(HttpStatusCode.Conflict);
+    }
+
+    [Fact]
+    public async Task A_role_takes_no_more_holders_than_it_has_seats()
+    {
+        var trustId = await CreateTrustAsync();
+        var treasurer = await DefineRoleAsync(trustId, "Treasurer", seats: 1);
+
+        (await AddMemberAsync(trustId, Guid.NewGuid(), treasurer)).StatusCode.Should().Be(HttpStatusCode.OK);
+
+        (await AddMemberAsync(trustId, Guid.NewGuid(), treasurer))
+            .StatusCode.Should().Be(HttpStatusCode.Conflict, "the one seat is taken");
+
+        var second = await (await AddMemberAsync(trustId, Guid.NewGuid()))
+            .Content.ReadFromJsonAsync<JsonElement>();
+
+        (await Admin().PutAsJsonAsync(
+                $"/v1/trust/trusts/{trustId}/members/{second.GetProperty("id").GetGuid()}/role",
+                new { roleId = treasurer }))
+            .StatusCode.Should().Be(HttpStatusCode.Conflict);
+
+        // Resizing below the holders is refused; above is fine.
+        (await Admin().PutAsJsonAsync($"/v1/trust/trusts/{trustId}/roles/{treasurer}", new { title = "Treasurer", seats = 2 }))
+            .StatusCode.Should().Be(HttpStatusCode.OK);
+
+        var roles = await Member().GetFromJsonAsync<JsonElement>($"/v1/trust/trusts/{trustId}/roles");
+        var listed = roles.EnumerateArray().ToList();
+        listed[0].GetProperty("title").GetString().Should().Be("Trustee", "Trustee is listed first");
+        listed[0].GetProperty("holders").GetInt32().Should().Be(1);
+        listed[1].GetProperty("seats").GetInt32().Should().Be(2);
+        listed[1].GetProperty("holders").GetInt32().Should().Be(1);
+    }
+
+    [Fact]
+    public async Task Roles_are_managed_by_an_administrator_only()
+    {
+        var trustId = await CreateTrustAsync();
+
+        (await Member().PostAsJsonAsync($"/v1/trust/trusts/{trustId}/roles", new { title = "President", seats = 1 }))
+            .StatusCode.Should().Be(HttpStatusCode.Forbidden);
+
+        var president = await DefineRoleAsync(trustId, "President", seats: 1);
+
+        (await Admin().PostAsJsonAsync($"/v1/trust/trusts/{trustId}/roles", new { title = "president", seats = 1 }))
+            .StatusCode.Should().Be(HttpStatusCode.Conflict, "role titles are unique on a Trust");
+
+        (await Admin().PostAsJsonAsync($"/v1/trust/trusts/{trustId}/roles", new { title = "", seats = 0 }))
+            .StatusCode.Should().Be(HttpStatusCode.BadRequest);
+
+        (await Admin(OtherTenantId).DeleteAsync($"/v1/trust/trusts/{trustId}/roles/{president}"))
+            .StatusCode.Should().Be(HttpStatusCode.NotFound);
+
+        (await Admin().DeleteAsync($"/v1/trust/trusts/{trustId}/roles/{president}"))
+            .StatusCode.Should().Be(HttpStatusCode.OK);
+
+        var events = await factory.WithDbContextAsync(db =>
+            db.OutboxMessages.Where(m => m.Topic.StartsWith("trust.role.")).Select(m => m.Topic).ToListAsync());
+        events.Should().BeEquivalentTo(["trust.role.defined.v1", "trust.role.removed.v1"]);
     }
 
     [Fact]
@@ -151,12 +224,12 @@ public sealed class TrustEndpointsTests(TrustApiFactory factory)
         var trustId = await CreateTrustAsync();
         var memberId = Guid.NewGuid();
 
-        var first = await Admin().PostAsJsonAsync(
-            $"/v1/trust/trusts/{trustId}/members", new { memberId = memberId.ToString(), positionTitle = "Trustee" });
+        var secretary = await DefineRoleAsync(trustId, "Secretary", seats: 1);
+
+        var first = await AddMemberAsync(trustId, memberId);
         var firstId = (await first.Content.ReadFromJsonAsync<JsonElement>()).GetProperty("id").GetGuid();
 
-        var second = await Admin().PostAsJsonAsync(
-            $"/v1/trust/trusts/{trustId}/members", new { memberId = memberId.ToString(), positionTitle = "Secretary" });
+        var second = await AddMemberAsync(trustId, memberId, secretary);
         second.StatusCode.Should().Be(HttpStatusCode.OK);
         var secondBody = await second.Content.ReadFromJsonAsync<JsonElement>();
         secondBody.GetProperty("id").GetGuid().Should().Be(firstId, "the existing active row, unchanged");
@@ -173,14 +246,14 @@ public sealed class TrustEndpointsTests(TrustApiFactory factory)
         var trustId = await CreateTrustAsync();
         var memberId = Guid.NewGuid();
 
-        var added = await Admin().PostAsJsonAsync(
-            $"/v1/trust/trusts/{trustId}/members", new { memberId = memberId.ToString(), positionTitle = "Trustee" });
+        var treasurer = await DefineRoleAsync(trustId, "Treasurer", seats: 1);
+
+        var added = await AddMemberAsync(trustId, memberId);
         var trustMemberId = (await added.Content.ReadFromJsonAsync<JsonElement>()).GetProperty("id").GetGuid();
 
         await Admin().DeleteAsync($"/v1/trust/trusts/{trustId}/members/{trustMemberId}");
 
-        var readded = await Admin().PostAsJsonAsync(
-            $"/v1/trust/trusts/{trustId}/members", new { memberId = memberId.ToString(), positionTitle = "Treasurer" });
+        var readded = await AddMemberAsync(trustId, memberId, treasurer);
         readded.StatusCode.Should().Be(HttpStatusCode.OK);
         var body = await readded.Content.ReadFromJsonAsync<JsonElement>();
         body.GetProperty("id").GetGuid().Should().Be(trustMemberId, "the same row is reactivated, not a new one");

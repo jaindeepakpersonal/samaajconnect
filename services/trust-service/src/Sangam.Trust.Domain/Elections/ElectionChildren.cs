@@ -64,16 +64,26 @@ public sealed class Vote
     public Guid ElectionId { get; private set; }
     public Guid CandidateId { get; private set; }
     public Guid VoterMemberId { get; private set; }
+
+    /// <summary>
+    /// Which of the voter's picks this is, from 1 to the election's seats.
+    /// Unique per (election, voter, choice) and per (election, voter,
+    /// candidate): one ballot per voter and one mark per candidate on it, held
+    /// by the database rather than by a read beforehand.
+    /// </summary>
+    public int Choice { get; private set; }
+
     public DateTimeOffset CreatedAt { get; private set; }
 
     private Vote() { }   // EF Core
 
-    public Vote(Guid electionId, Guid candidateId, Guid voterMemberId, DateTimeOffset now)
+    public Vote(Guid electionId, Guid candidateId, Guid voterMemberId, int choice, DateTimeOffset now)
     {
         Id = Guid.NewGuid();
         ElectionId = electionId;
         CandidateId = candidateId;
         VoterMemberId = voterMemberId;
+        Choice = choice;
         CreatedAt = now;
     }
 }

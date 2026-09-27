@@ -558,18 +558,22 @@ the Trust's locality opens against its winner. Amounts are integer paise.
 | PATCH | `/trusts/{id}` | `Trust.Manage` | Correct the name. The locality is not editable - it is what a published Boli is matched on |
 | GET | `/trusts/{id}` | `Members.Read` | One Trust |
 | POST | `/trusts/{id}/status` | `Trust.Manage` | Active or Inactive. Setting the status it already has is success and changes nothing |
-| GET | `/trusts/{id}/members` | `Members.Read` | The Trust's roster, active members first |
-| POST | `/trusts/{id}/members` | `Trust.Manage` | Add a member. Adding one already active is a no-op reported as success; adding one previously removed reactivates their old row |
-| PUT | `/trusts/{id}/members/{trustMemberId}/position` | `Trust.Manage` | Change an active trustee's position title (free text - grants nothing). 409 on a removed member |
+| GET | `/trusts/{id}/members` | `Members.Read` | The Trust's roster, active members first, each with `roleId` and its title as `positionTitle` |
+| POST | `/trusts/{id}/members` | `Trust.Manage` | Add a member: `{ memberId, roleId? }`, Trustee by default. 409 when the role is full. Adding one already active is a no-op reported as success; adding one previously removed reactivates their old row |
+| PUT | `/trusts/{id}/members/{trustMemberId}/role` | `Trust.Manage` | `{ roleId }` - move an active trustee into a role. 409 on a removed member, and when the role is full |
+| GET | `/trusts/{id}/roles` | `Members.Read` | The Trust's roles, Trustee first: `title`, `kind`, `seats` (null for Trustee), `holders`, `isElected` |
+| POST | `/trusts/{id}/roles` | `Trust.Manage` | `{ title, seats }` (1-50). 409 on a title the Trust already has |
+| PUT | `/trusts/{id}/roles/{roleId}` | `Trust.Manage` | Rename or resize. 409 for Trustee, and below the current holders |
+| DELETE | `/trusts/{id}/roles/{roleId}` | `Trust.Manage` | 409 for Trustee, while anybody holds it, and while an election for it is unpublished |
 | DELETE | `/trusts/{id}/members/{trustMemberId}` | `Trust.Manage` | Take a member off the roster. Removing one already removed is success and changes nothing |
-| GET | `/trusts/{trustId}/elections` | `Members.Read` | This Trust's elections, newest first, with the caller's own vote on each |
-| POST | `/trusts/{trustId}/elections` | `Trust.Manage` | Set an election up for a position. Starts `Draft` |
+| GET | `/trusts/{trustId}/elections` | `Members.Read` | This Trust's elections, newest first, with the caller's own ballot on each (`myVoteCandidateIds`) |
+| POST | `/trusts/{trustId}/elections` | `Trust.Manage` | `{ roleId, nomination/voting windows }` - an election for a role, filling its `seats`. 409 for Trustee and while another for the role is unpublished. Starts `Draft` |
 | GET | `/elections/{id}` | `Members.Read` | One election with its ballot and tally - never hidden |
 | POST | `/elections/{id}/status` | `Trust.Manage` | `NominationsOpen`, `VotingOpen` or `Closed`. Strictly forward; 409 moving to `VotingOpen` on an empty ballot |
 | POST | `/elections/{id}/candidates` | `Members.Read` + active Trust member | Nominate a fellow active member. A repeat nomination is a no-op reported as success |
 | POST | `/elections/{id}/candidates/{candidateId}/decide` | `Trust.Manage` | Approve onto the ballot, or remove before voting opens |
-| POST | `/elections/{id}/votes` | `Members.Read` + active Trust member | Cast this member's one vote. Self-votes and a second vote are both refused/reported without accepting - see the service's own CLAUDE.md |
-| POST | `/elections/{id}/publish` | `Trust.Manage` | Only from `Closed`. Installs the winner's position on their `TrustMember` row, clearing it from any prior holder. Publishing twice changes nothing |
+| POST | `/elections/{id}/votes` | `Members.Read` + active Trust member | `{ candidateIds }` - this member's one ballot, 1..`seats` distinct candidates. Self-votes refused (409); a second ballot is reported as `accepted: false`, carrying the first - see the service's own CLAUDE.md |
+| POST | `/elections/{id}/publish` | `Trust.Manage` | Only from `Closed`. The top `seats` by tally win (`winnerMemberIds`, ranked) and are seated in the role; prior holders who did not win return to Trustee. Publishing twice changes nothing |
 | GET | `/trusts/{id}/donations` | `Trust.Manage` | Donations, newest first. `?status=Pledged\|Collected` |
 | POST | `/trusts/{id}/donations` | `Trust.Manage` | Record a pledge: a member id or a donor name, optional phone, amount, purpose, mode (`Cash`/`Cheque`/`Upi`/`BankTransfer`). No receipt number yet; it opens an amount due, chased like any other |
 | POST | `/donations/{donationId}/collect` | `Trust.Manage` | Mark it collected, issuing the Trust's next receipt number. 409 if already collected |

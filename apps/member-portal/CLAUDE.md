@@ -39,7 +39,7 @@ before translating another screen.
 | Samaaj Panch | `/panch` | — | built; no wireframe covers it. Who sits on the Panch, and the elections |
 | Panch election | `/panch/:id` | — | built. Nominate somebody by name, cast one final ballot of up to ten, read the result |
 | Trusts | `/trust` | — | built; no wireframe covers this new module. Our Samaaj's locality Trusts, read-only, with a "What you owe" card above them when a Boli the member won has fallen due to a Trust |
-| Trust detail | `/trust/:id` | — | built. Roster, and its elections - nominate a fellow trustee, vote, see the result |
+| Trust detail | `/trust/:id` | — | built. Roster with each trustee's role, and its elections - nominate a fellow trustee, cast a ballot of up to the role's seats, see every winner |
 | Pathshala events | — | `#pathevents` | not built — no endpoint exists |
 | Set your password | `/activate` | — | built; no wireframe covers redeeming an activation code, and three admin screens told people to do it here |
 | Forgot password | `/forgot`, `/reset` | `#forgot`, `#otp` | built — redeems into a new password, not a session |
@@ -956,3 +956,8 @@ screen, the same reasoning the group detail screen gives for its own picker
 rather than Celebrities of Samaaj's name search. Self-votes are refused and a
 repeat vote or nomination comes back as success with `accepted`/`nominated:
 false`, matching every other election on this platform.
+
+**A Trust election fills a role's seats (2026-09-27)**, and its ballot is
+Volunteer Groups' copied: one Vote button for a single seat, tick boxes capped
+at the seats and one "Cast my ballot" for more, `myVoteCandidateIds` marking
+every pick and `winnerMemberIds` naming every winner.

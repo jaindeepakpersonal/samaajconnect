@@ -30,11 +30,11 @@ public sealed class TrustMember : AggregateRoot, ITenantScopedEntity
     public Guid MemberId { get; private set; }
 
     /// <summary>
-    /// Free text - "President", "Treasurer" - grants nothing by itself, the
-    /// same stance <c>volunteer-groups-service</c>'s <c>RolePosition</c> takes.
-    /// There is no election yet in this phase, so it is only ever set by hand.
+    /// The role they hold on this Trust - Trustee unless they hold another.
+    /// Replaced free-text PositionTitle on 2026-09-27, so that an election can
+    /// be for a role with seats rather than for a typed name.
     /// </summary>
-    public string? PositionTitle { get; private set; }
+    public Guid RoleId { get; private set; }
 
     public TrustMemberStatus Status { get; private set; }
 
@@ -49,7 +49,7 @@ public sealed class TrustMember : AggregateRoot, ITenantScopedEntity
     private TrustMember() { }   // EF Core
 
     public static TrustMember Create(
-        Guid tenantId, Guid trustId, Guid memberId, string? positionTitle, Guid addedBy, DateTimeOffset now)
+        Guid tenantId, Guid trustId, Guid memberId, Guid roleId, Guid addedBy, DateTimeOffset now)
     {
         var member = new TrustMember
         {
@@ -57,14 +57,14 @@ public sealed class TrustMember : AggregateRoot, ITenantScopedEntity
             TenantId = tenantId,
             TrustId = trustId,
             MemberId = memberId,
-            PositionTitle = Normalize(positionTitle),
+            RoleId = roleId,
             Status = TrustMemberStatus.Active,
             AddedBy = addedBy,
             AddedAt = now,
         };
 
         member.Raise(new TrustMemberAddedDomainEvent(
-            member.Id, tenantId, trustId, memberId, member.PositionTitle, addedBy, now));
+            member.Id, tenantId, trustId, memberId, roleId, addedBy, now));
 
         return member;
     }
@@ -74,29 +74,38 @@ public sealed class TrustMember : AggregateRoot, ITenantScopedEntity
     /// rather than a second insert colliding with the unique index on
     /// (TrustId, MemberId).
     /// </summary>
-    public void Reactivate(string? positionTitle, Guid addedBy, DateTimeOffset now)
+    public void Reactivate(Guid roleId, Guid addedBy, DateTimeOffset now)
     {
-        PositionTitle = Normalize(positionTitle);
+        RoleId = roleId;
         Status = TrustMemberStatus.Active;
         AddedBy = addedBy;
         AddedAt = now;
         RemovedBy = null;
         RemovedAt = null;
 
-        Raise(new TrustMemberAddedDomainEvent(Id, TenantId, TrustId, MemberId, PositionTitle, addedBy, now));
+        Raise(new TrustMemberAddedDomainEvent(Id, TenantId, TrustId, MemberId, RoleId, addedBy, now));
     }
 
-    /// <summary>False when this member is not currently active - an update has nothing to update.</summary>
-    public bool UpdatePosition(string? positionTitle, Guid updatedBy, DateTimeOffset now)
+    /// <summary>
+    /// Moves them into a role. False for a removed trustee; true and nothing
+    /// raised when they already hold it. Seats are checked by the caller, which
+    /// can count the role's holders.
+    /// </summary>
+    public bool AssignRole(Guid roleId, Guid updatedBy, DateTimeOffset now)
     {
         if (Status != TrustMemberStatus.Active)
         {
             return false;
         }
 
-        PositionTitle = Normalize(positionTitle);
+        if (RoleId == roleId)
+        {
+            return true;
+        }
 
-        Raise(new TrustMemberUpdatedDomainEvent(Id, TenantId, TrustId, MemberId, PositionTitle, updatedBy, now));
+        RoleId = roleId;
+
+        Raise(new TrustMemberUpdatedDomainEvent(Id, TenantId, TrustId, MemberId, roleId, updatedBy, now));
 
         return true;
     }
@@ -118,7 +127,6 @@ public sealed class TrustMember : AggregateRoot, ITenantScopedEntity
         return true;
     }
 
-    private static string? Normalize(string? value) => string.IsNullOrWhiteSpace(value) ? null : value.Trim();
 }
 
 public enum TrustMemberStatus

@@ -21,7 +21,10 @@ export interface TrustMember {
   readonly id: string;
   readonly trustId: string;
   readonly memberId: string;
+
+  /** The title of the role they hold - "Trustee" unless they hold another. */
   readonly positionTitle: string | null;
+  readonly roleId: string;
   readonly status: TrustMemberStatus;
   readonly addedBy: string;
   readonly addedAt: string;
@@ -35,6 +38,8 @@ export type TrustElectionStatus = 'Draft' | 'NominationsOpen' | 'VotingOpen' | '
 export interface TrustElection {
   readonly id: string;
   readonly trustId: string;
+
+  /** The title of the role it fills. */
   readonly positionTitle: string;
   readonly nominationStartAt: string;
   readonly nominationEndAt: string;
@@ -46,14 +51,18 @@ export interface TrustElection {
   readonly acceptsNominations: boolean;
   readonly acceptsVotes: boolean;
 
-  /** The candidate this member voted for, or null if they have not voted. */
-  readonly myVoteCandidateId: string | null;
+  /** The candidates this member picked; empty if they have not voted. */
+  readonly myVoteCandidateIds: readonly string[];
   readonly candidateCount: number;
 
-  /** Set once the election is Published. Null until then. */
-  readonly winnerMemberId: string | null;
+  /** Ranked; empty until the election is Published. */
+  readonly winnerMemberIds: readonly string[];
   readonly publishedAt: string | null;
   readonly createdAt: string;
+  readonly roleId: string;
+
+  /** How many it fills, and so the most one ballot may pick. */
+  readonly seats: number;
 }
 
 /** A Trust election's vote counts are never hidden - it has no results-visibility setting. */
@@ -81,9 +90,11 @@ export interface NominateTrustCandidateResult {
 
 export interface CastTrustVoteResult {
   readonly electionId: string;
-  readonly candidateId: string;
 
-  /** False when this member had already voted - the unique index is what prevents it, not this call. */
+  /** The ballot this member holds - the one just cast, or the one they cast before. */
+  readonly candidateIds: readonly string[];
+
+  /** False when this member had already voted - the unique indexes are what prevent it, not this call. */
   readonly accepted: boolean;
 }
 

@@ -1027,16 +1027,37 @@ public static class KnownEvents
             EntityIdProperty: "electionId",
             BeforeProperties: ["previousStatus"]),
 
-        // WinnerMemberId is who the event is about, not who published it -
+        // WinnerMemberIds are who the event is about, not who published it -
         // the event carries no publisher id at all, the same shape
         // volunteer-groups.election.results-published.v1 already has.
-        // Publishing also installs the winner on their own TrustMember row,
+        // Publishing also seats each winner on their own TrustMember row,
         // which raises its own trust.member.updated.v1 with UpdatedBy - "who
         // did this" is answered there, not here.
         ["trust.election.results-published.v1"] = new(
             Action: "ElectionResultsPublished",
             EntityName: "TrustElection",
             EntityIdProperty: "electionId"),
+
+        // A Trust's roles (2026-09-27). The role is the entity, and the
+        // administrator who changed it the actor; the title is on the Trust,
+        // not in a payload kept forever.
+        ["trust.role.defined.v1"] = new(
+            Action: "RoleDefined",
+            EntityName: "TrustRole",
+            EntityIdProperty: "roleId",
+            ActorIdProperty: "changedBy"),
+
+        ["trust.role.updated.v1"] = new(
+            Action: "RoleUpdated",
+            EntityName: "TrustRole",
+            EntityIdProperty: "roleId",
+            ActorIdProperty: "changedBy"),
+
+        ["trust.role.removed.v1"] = new(
+            Action: "RoleRemoved",
+            EntityName: "TrustRole",
+            EntityIdProperty: "roleId",
+            ActorIdProperty: "changedBy"),
 
         // trust-service, phase 3 (money). Every write here moves or approves
         // money, so each one that a person performs names them: who recorded

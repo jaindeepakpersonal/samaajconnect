@@ -10,6 +10,7 @@ namespace Sangam.Trust.Application.Elections.Queries;
 public sealed record ListTrustElectionsQuery(Guid TrustId) : IQuery<IReadOnlyList<TrustElectionResponse>>;
 
 public sealed class ListTrustElectionsQueryHandler(
+    ITrustRepository trusts,
     IElectionRepository elections,
     IVoteRepository votes,
     ICurrentUser currentUser,
@@ -25,6 +26,13 @@ public sealed class ListTrustElectionsQueryHandler(
                 Error.Unauthorized("Auth.Required", "Authentication is required for this request."));
         }
 
+        var trust = await trusts.GetByIdAsync(query.TrustId, cancellationToken);
+
+        if (trust is null)
+        {
+            return Result.Success<IReadOnlyList<TrustElectionResponse>>([]);
+        }
+
         var found = await elections.ListForTrustAsync(query.TrustId, cancellationToken);
         var now = clock.UtcNow;
         var results = new List<TrustElectionResponse>(found.Count);
@@ -36,7 +44,7 @@ public sealed class ListTrustElectionsQueryHandler(
             // ListElectionsQuery already applies.
             var mine = await votes.FindForVoterAsync(election.Id, memberId, cancellationToken);
 
-            results.Add(election.ToResponse(now, mine?.CandidateId));
+            results.Add(election.ToResponse(trust, now, mine));
         }
 
         return Result.Success<IReadOnlyList<TrustElectionResponse>>(
@@ -49,6 +57,7 @@ public sealed class ListTrustElectionsQueryHandler(
 public sealed record GetTrustElectionQuery(Guid ElectionId) : IQuery<TrustElectionDetailResponse>;
 
 public sealed class GetTrustElectionQueryHandler(
+    ITrustRepository trusts,
     IElectionRepository elections,
     IVoteRepository votes,
     ICurrentUser currentUser,
@@ -65,8 +74,9 @@ public sealed class GetTrustElectionQueryHandler(
         }
 
         var election = await elections.GetByIdAsync(query.ElectionId, cancellationToken);
+        var trust = election is null ? null : await trusts.GetByIdAsync(election.TrustId, cancellationToken);
 
-        if (election is null)
+        if (election is null || trust is null)
         {
             return Result.Failure<TrustElectionDetailResponse>(
                 Error.NotFound("Election.NotFound", "No such election in this Samaaj."));
@@ -75,6 +85,6 @@ public sealed class GetTrustElectionQueryHandler(
         var tally = await votes.TallyAsync(election.Id, cancellationToken);
         var mine = await votes.FindForVoterAsync(election.Id, memberId, cancellationToken);
 
-        return Result.Success(election.ToDetail(clock.UtcNow, mine?.CandidateId, tally));
+        return Result.Success(election.ToDetail(trust, clock.UtcNow, mine, tally));
     }
 }

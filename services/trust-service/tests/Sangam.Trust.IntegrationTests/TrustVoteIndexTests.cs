@@ -17,9 +17,10 @@ namespace Sangam.Trust.IntegrationTests;
 /// </summary>
 /// <remarks>
 /// These talk to the database directly, past the handler and past the
-/// repository, so that only the unique index on
-/// <c>(ElectionId, VoterMemberId)</c> being present and unique can make them
-/// pass. Delete that index and these fail; that is the point of them.
+/// repository, so that only the unique indexes on
+/// <c>(ElectionId, VoterMemberId, Choice)</c> and
+/// <c>(ElectionId, VoterMemberId, CandidateId)</c> being present and unique can
+/// make them pass. Delete either and these fail; that is the point of them.
 /// </remarks>
 public sealed class TrustVoteIndexTests(TrustApiFactory factory)
     : IClassFixture<TrustApiFactory>, IAsyncLifetime
@@ -28,8 +29,10 @@ public sealed class TrustVoteIndexTests(TrustApiFactory factory)
 
     public Task DisposeAsync() => Task.CompletedTask;
 
-    [Fact]
-    public async Task The_votes_index_exists_and_is_unique()
+    [Theory]
+    [InlineData("ix_trust_election_votes_election_id_voter_member_id_choice")]
+    [InlineData("ix_trust_election_votes_election_id_voter_member_id_candidate_")]
+    public async Task The_votes_indexes_exist_and_are_unique(string index)
     {
         var definition = await factory.WithDbContextAsync(async db =>
         {
@@ -40,13 +43,12 @@ public sealed class TrustVoteIndexTests(TrustApiFactory factory)
             command.CommandText =
                 "SELECT indexdef FROM pg_indexes "
                 + "WHERE tablename = 'trust_election_votes' "
-                + "AND indexname = 'ix_trust_election_votes_election_id_voter_member_id';";
+                + $"AND indexname = '{index}';";
 
             return (string?)await command.ExecuteScalarAsync();
         });
 
-        definition.Should().NotBeNull(
-            "the index on (election_id, voter_member_id) is what prevents double voting");
+        definition.Should().NotBeNull("this index is what holds one ballot per voter");
 
         definition.Should().StartWith("CREATE UNIQUE INDEX",
             "a non-unique index on those columns would make the votes query fast "
@@ -54,15 +56,16 @@ public sealed class TrustVoteIndexTests(TrustApiFactory factory)
     }
 
     [Fact]
-    public async Task A_second_vote_from_one_member_is_refused_by_the_database()
+    public async Task A_second_ballot_from_one_member_is_refused_by_the_database()
     {
         var electionId = Guid.NewGuid();
         var voterId = Guid.NewGuid();
         var now = DateTimeOffset.UtcNow;
 
-        await InsertAsync(new Vote(electionId, Guid.NewGuid(), voterId, now));
+        await InsertAsync(new Vote(electionId, Guid.NewGuid(), voterId, 1, now));
 
-        var second = async () => await InsertAsync(new Vote(electionId, Guid.NewGuid(), voterId, now));
+        // Every ballot starts at choice 1, so a second one collides on it.
+        var second = async () => await InsertAsync(new Vote(electionId, Guid.NewGuid(), voterId, 1, now));
 
         var thrown = await second.Should().ThrowAsync<DbUpdateException>(
             "the index, not the application, is what refuses it");
@@ -77,6 +80,22 @@ public sealed class TrustVoteIndexTests(TrustApiFactory factory)
             db.Votes.CountAsync(v => v.ElectionId == electionId));
 
         votes.Should().Be(1);
+    }
+
+    [Fact]
+    public async Task One_ballot_cannot_mark_a_candidate_twice()
+    {
+        var electionId = Guid.NewGuid();
+        var voterId = Guid.NewGuid();
+        var candidateId = Guid.NewGuid();
+        var now = DateTimeOffset.UtcNow;
+
+        await InsertAsync(new Vote(electionId, candidateId, voterId, 1, now));
+
+        var again = async () => await InsertAsync(new Vote(electionId, candidateId, voterId, 2, now));
+
+        (await again.Should().ThrowAsync<DbUpdateException>()).Which.InnerException
+            .Should().BeOfType<PostgresException>().Which.SqlState.Should().Be(PostgresErrorCodes.UniqueViolation);
     }
 
     private async Task InsertAsync(Vote vote)

@@ -36,7 +36,7 @@ screen. The spec is `docs/product/wireframes/admin-panel-wireframes.html`.
 | Volunteer Groups | `/groups` | `#groups` (member-facing) | built. Create (president optional), set a president later, and stand one down |
 | Group roles & elections | `/groups/:id` | — | built; no wireframe covers running one. Define volunteer roles and their seats, assign them, open an election for any role, approve nominations, move its stages, publish - the president or an administrator of the group |
 | Trusts | `/trust` | — | built; no wireframe covers this new module. This Samaaj's locality Trusts; setting one up and renaming one in a popup |
-| Trust detail | `/trust/:id` | — | built; no wireframe covers running one. Tabs: roster and elections (add/change position/remove; open, approve nominations, move stages, publish), donations (pledge, then collect against a receipt number), expenses (record, approve), collections (what a Boli winner owes; record the payment) |
+| Trust detail | `/trust/:id` | — | built; no wireframe covers running one. Six tabs: members (add in a popup, a role picker per row, remove), roles (define with seats, rename/resize, remove), elections (set up for a role, approve nominations, move stages, publish), donations (pledge, then collect against a receipt number), collections (what a Boli winner or a pledge owes; record the payment), expenses (record, approve) |
 | Social Issues | `/issues` | `#issues` | built. The reviewer's approval queue |
 | Members | `/members` | `#members` | built. Search the Samaaj directory and open somebody |
 | Member detail | `/members/:id` | — | built; the wireframe's "View" had no screen behind it. The correction form |
@@ -974,6 +974,21 @@ Donations settles it there. "Send a reminder" sends the member an in-app
 notification; the button is not drawn for a donor with no account and is
 disabled for a day after the last one, mirroring the service's rule so it is
 not a control that always answers 409.
+
+**A Trust's page is six tabs since 2026-09-27, each its own component loading
+when it is opened**: Members, Roles, Elections, Donations, Collections,
+Expenses - the order the request named them in, with Roles beside Members
+because each needs the other. The page itself loads the Trust and the
+directory's names once and hands the names to every tab. Positions stopped
+being free text the same day: a Trust has roles, Trustee built in and the rest
+its own with seats, the shape Volunteer Groups' "Volunteer roles" card already
+had and copied from it. Adding a trustee is a popup (search the directory, pick
+a role with a free seat); each Members row has a role select offering only
+roles with a free seat plus the one held, and a refused move re-reads the
+roster so the select never shows a change the service refused. The Elections
+tab's form picks a role - never Trustee, and never one already being elected -
+and its publish confirmation says the winners are seated and the losing
+holders go back to Trustee.
 
 **There is no `iCanLead`/president-equivalent split here, and that is a real
 difference from Volunteer Groups, not an oversight.** A Trust's positions are

@@ -3,13 +3,21 @@ using Sangam.Trust.Domain.Elections;
 namespace Sangam.Trust.Application.Elections;
 
 /// <summary>Domain to wire. No decisions here beyond shape.</summary>
+/// <remarks>
+/// The Trust supplies the role's title - the election holds only its id, so a
+/// renamed role reads the same on every election for it. A role since removed
+/// reads as the empty string rather than failing the whole list.
+/// </remarks>
 internal static class TrustElectionMappings
 {
     public static TrustElectionResponse ToResponse(
-        this TrustElection election, DateTimeOffset now, Guid? myVoteCandidateId) =>
+        this TrustElection election,
+        Domain.Trusts.Trust trust,
+        DateTimeOffset now,
+        IReadOnlyList<Guid> myVoteCandidateIds) =>
         new(election.Id,
             election.TrustId,
-            election.PositionTitle,
+            trust.FindRole(election.RoleId)?.Title ?? string.Empty,
             election.NominationStartAt,
             election.NominationEndAt,
             election.VotingStartAt,
@@ -17,18 +25,21 @@ internal static class TrustElectionMappings
             election.Status.ToString(),
             election.AcceptsNominations(now),
             election.AcceptsVotes(now),
-            myVoteCandidateId,
+            myVoteCandidateIds,
             election.Candidates.Count,
-            election.WinnerMemberId,
+            [.. election.WinnerMemberIds],
             election.PublishedAt,
-            election.CreatedAt);
+            election.CreatedAt,
+            election.RoleId,
+            election.Seats);
 
     public static TrustElectionDetailResponse ToDetail(
         this TrustElection election,
+        Domain.Trusts.Trust trust,
         DateTimeOffset now,
-        Guid? myVoteCandidateId,
+        IReadOnlyList<Guid> myVoteCandidateIds,
         IReadOnlyDictionary<Guid, int> tally) =>
-        new(election.ToResponse(now, myVoteCandidateId),
+        new(election.ToResponse(trust, now, myVoteCandidateIds),
             [.. election.Candidates.Select(c => new TrustElectionCandidateResponse(
                 c.Id, c.MemberId, c.Status.ToString(), c.NominatedBy, tally.GetValueOrDefault(c.Id)))]);
 }

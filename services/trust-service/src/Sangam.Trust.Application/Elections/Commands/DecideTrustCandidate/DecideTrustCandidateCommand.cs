@@ -25,6 +25,7 @@ public sealed class DecideTrustCandidateCommandValidator : AbstractValidator<Dec
 }
 
 public sealed class DecideTrustCandidateCommandHandler(
+    ITrustRepository trusts,
     IElectionRepository elections,
     IVoteRepository votes,
     IUnitOfWork unitOfWork,
@@ -42,8 +43,9 @@ public sealed class DecideTrustCandidateCommandHandler(
         }
 
         var election = await elections.GetByIdAsync(command.ElectionId, cancellationToken);
+        var trust = election is null ? null : await trusts.GetByIdAsync(election.TrustId, cancellationToken);
 
-        if (election is null)
+        if (election is null || trust is null)
         {
             return Result.Failure<TrustElectionDetailResponse>(
                 Error.NotFound("Election.NotFound", "No such election in this Samaaj."));
@@ -72,6 +74,6 @@ public sealed class DecideTrustCandidateCommandHandler(
 
         var tally = await votes.TallyAsync(election.Id, cancellationToken);
 
-        return Result.Success(election.ToDetail(now, myVoteCandidateId: null, tally));
+        return Result.Success(election.ToDetail(trust, now, [], tally));
     }
 }

@@ -19,11 +19,12 @@ itself should be gated by a caller's Trust position.
 
 | Entity | Notes |
 |---|---|
-| `Trust` | Aggregate root. `TenantId`, `LocalityId`, `Name`, `Status` (Active/Inactive), `CreatedAt`. Exactly one per `(TenantId, LocalityId)` |
-| `TrustMember` | Its own aggregate root, **not** owned by `Trust` — so a roster change raises its own event, the same reasoning panch-service's `PanelMember` gives for standing apart from its election. One member's seat: `MemberId`, `PositionTitle` (nullable free text), `Status` (Active/Removed), `AddedBy`/`AddedAt`, `RemovedBy`/`RemovedAt` |
-| `TrustElection` | Aggregate root. An election for one named position on one Trust's roster — nominate, approve, vote, close, publish. Owns its `TrustElectionCandidate`s and **not** its votes. Copies volunteer-groups-service's `GroupElection` shape; see "Elections" below |
+| `Trust` | Aggregate root. `TenantId`, `LocalityId`, `Name`, `Status` (Active/Inactive), `CreatedAt`. Exactly one per `(TenantId, LocalityId)`. Owns its `TrustRole`s |
+| `TrustRole` | Owned by `Trust` (table `trust_roles`). `Title` (unique on the Trust, any case), `Kind` (Trustee/Elected), `Seats` (null for Trustee). Every Trust has **Trustee**, built in - see "Roles" below |
+| `TrustMember` | Its own aggregate root, **not** owned by `Trust` — so a roster change raises its own event, the same reasoning panch-service's `PanelMember` gives for standing apart from its election. One member's seat: `MemberId`, `RoleId` (Trustee unless they hold another), `Status` (Active/Removed), `AddedBy`/`AddedAt`, `RemovedBy`/`RemovedAt` |
+| `TrustElection` | Aggregate root. An election for one of the Trust's roles — nominate, approve, vote, close, publish. `RoleId`, `Seats` (the role's, when set up), `WinnerMemberIds` (uuid[], ranked). Owns its `TrustElectionCandidate`s and **not** its votes. Copies volunteer-groups-service's `GroupElection` shape; see "Elections" below |
 | `TrustElectionCandidate` | Owned by `TrustElection`. Nominated → Approved onto the ballot, or removed before voting opens |
-| `Vote` | One Trust member's one vote in one election. Written directly, outside the aggregate — see "The guarantee" |
+| `Vote` | One pick on one Trust member's ballot: `Choice` 1..Seats. Written directly, outside the aggregate — see "The guarantee" |
 | `Donation` | Aggregate root. Pledged, then Collected with the Trust's next receipt number. A member or a named donor with an optional phone. Integer paise |
 | `Expense` | Aggregate root. Recorded, then Approved. Category, description, amount, optional vendor |
 | `Collection` | Aggregate root. An amount due to the Trust from a source (`BoliResult`, or a pledged `Donation`), owed by `PayerMemberId` - or `PayerName`, a donor with no account. Due, then Collected with a mode. One per source. `LastRemindedAt` holds the once-a-day reminder rule |
@@ -39,15 +40,18 @@ no referential integrity across the service boundary — the same convention
 | `CreateTrustCommand` | `Trust.Manage` | Refuses a duplicate `(TenantId, LocalityId)` — a 409, backed by a real unique index, not just the handler's own read |
 | `ChangeTrustStatusCommand` | `Trust.Manage` | Active/Inactive. Setting the status it already has is success and changes nothing |
 | `RenameTrustCommand` | `Trust.Manage` | Corrects the name. The locality is not editable: it is what a published Boli is matched on |
-| `AddTrustMemberCommand` | `Trust.Manage` | Adding somebody already active is a no-op reported as success. Adding somebody previously removed reactivates their old row rather than inserting a second one |
-| `UpdateTrustMemberCommand` | `Trust.Manage` | Changes an active trustee's position title. 409 on a removed member |
+| `AddTrustMemberCommand` | `Trust.Manage` | Optional `RoleId`, Trustee by default; 409 when that role's seats are all taken. Adding somebody already active is a no-op reported as success. Adding somebody previously removed reactivates their old row rather than inserting a second one |
+| `AssignTrustRoleCommand` | `Trust.Manage` | Moves an active trustee into a role by hand. 409 on a removed member, and when the role is full |
+| `DefineTrustRoleCommand` | `Trust.Manage` | A title and 1-50 seats. 409 on a title the Trust already has, Trustee included |
+| `UpdateTrustRoleCommand` | `Trust.Manage` | Rename or resize. Never Trustee, and never below the role's current holders |
+| `RemoveTrustRoleCommand` | `Trust.Manage` | Never Trustee; refused while anybody holds it or an election for it is unpublished |
 | `RemoveTrustMemberCommand` | `Trust.Manage` | Soft: sets `Status = Removed`. Removing somebody already removed is a no-op reported as success |
-| `OpenTrustElectionCommand` | `Trust.Manage` | Sets an election up for a position. Starts `Draft` |
+| `OpenTrustElectionCommand` | `Trust.Manage` | Sets an election up for a role, filling its seats. Never Trustee, and not while another for the same role is unpublished. Starts `Draft` |
 | `MoveTrustElectionCommand` | `Trust.Manage` | Strictly forward: `NominationsOpen`, `VotingOpen`, `Closed`. Refuses `VotingOpen` on an empty ballot |
 | `NominateTrustCandidateCommand` | `Members.Read` + active member of this Trust | A repeat nomination is a no-op reported as success |
 | `DecideTrustCandidateCommand` | `Trust.Manage` | Approve onto the ballot, or remove before voting opens |
-| `CastTrustVoteCommand` | `Members.Read` + active member of this Trust | Self-votes refused. A repeat vote is reported as accepted:false |
-| `PublishTrustElectionResultsCommand` | `Trust.Manage` | Only from `Closed`. Installs the winner's position via `TrustMember.UpdatePosition`, clearing the same title from any other active member who held it. Publishing twice is safe and does not reinstall |
+| `CastTrustVoteCommand` | `Members.Read` + active member of this Trust | One ballot of 1..Seats distinct candidates. Self-votes refused. A second ballot is reported as accepted:false, carrying the first |
+| `PublishTrustElectionResultsCommand` | `Trust.Manage` | Only from `Closed`. The top `Seats` by tally win and are seated in the role via `TrustMember.AssignRole`; whoever held it and did not win returns to Trustee. Publishing twice is safe and seats nobody again |
 | `RecordDonationCommand` | `Trust.Manage` | A pledge: a member or a donor name, optional phone, amount, purpose, mode. No receipt number yet. Opens the pledge's Collection in the same transaction |
 | `MarkDonationCollectedCommand` | `Trust.Manage` | Issues the Trust's next receipt number, and settles the pledge's Collection. 409 on one already collected |
 | `RecordExpenseCommand` | `Trust.Manage` | Starts `Recorded` |
@@ -62,8 +66,9 @@ no referential integrity across the service boundary — the same convention
 |---|---|---|
 | `ListTrustsQuery` | `Members.Read` | This Samaaj's Trusts, newest first. Optionally narrowed to one locality |
 | `GetTrustQuery` | `Members.Read` | One Trust |
-| `ListTrustMembersQuery` | `Members.Read` | One Trust's roster, active members first |
-| `ListTrustElectionsQuery` | `Members.Read` | This Trust's elections, newest first, with the caller's own vote on each |
+| `ListTrustMembersQuery` | `Members.Read` | One Trust's roster, active members first, each with their role's title |
+| `ListTrustRolesQuery` | `Members.Read` | One Trust's roles, Trustee first, each with its seats and how many hold it |
+| `ListTrustElectionsQuery` | `Members.Read` | This Trust's elections, newest first, with the caller's own ballot on each |
 | `GetTrustElectionQuery` | `Members.Read` | One election with its ballot and tally — never hidden |
 | `ListDonationsQuery` | `Trust.Manage` | Newest first, optionally one status |
 | `ListExpensesQuery` | `Trust.Manage` | Newest first, optionally one status |
@@ -75,11 +80,12 @@ no referential integrity across the service boundary — the same convention
 - `TrustCreatedDomainEvent` — `trust.trust.created.v1`
 - `TrustStatusChangedDomainEvent` — `trust.trust.status-changed.v1`
 - `TrustRenamedDomainEvent` — `trust.trust.renamed.v1` (ids and who, not the name)
-- `TrustMemberAddedDomainEvent` — `trust.member.added.v1` (also raised on reactivation)
-- `TrustMemberUpdatedDomainEvent` — `trust.member.updated.v1` (also raised when publishing an election installs or clears a position)
+- `TrustRoleDefinedDomainEvent` / `TrustRoleUpdatedDomainEvent` / `TrustRoleRemovedDomainEvent` — `trust.role.defined.v1` / `trust.role.updated.v1` / `trust.role.removed.v1` (ids and who, not the title)
+- `TrustMemberAddedDomainEvent` — `trust.member.added.v1` (also raised on reactivation; carries the role id)
+- `TrustMemberUpdatedDomainEvent` — `trust.member.updated.v1` (a role assigned by hand, or by publishing an election - seating a winner or returning an outgoing holder to Trustee)
 - `TrustMemberRemovedDomainEvent` — `trust.member.removed.v1`
 - `TrustElectionStatusChangedDomainEvent` — `trust.election.status-changed.v1`
-- `TrustElectionResultsPublishedDomainEvent` — `trust.election.results-published.v1`
+- `TrustElectionResultsPublishedDomainEvent` — `trust.election.results-published.v1` (the role and the ranked winners)
 - `DonationRecordedDomainEvent` — `trust.donation.recorded.v1`; `DonationCollectedDomainEvent` — `trust.donation.collected.v1`
 - `ExpenseRecordedDomainEvent` — `trust.expense.recorded.v1`; `ExpenseApprovedDomainEvent` — `trust.expense.approved.v1`
 - `CollectionDueDomainEvent` — `trust.collection.due.v1` (ids, amount and payer); `CollectionSettledDomainEvent` — `trust.collection.settled.v1`
@@ -170,11 +176,16 @@ with it.
 getting 1-10, the index refusing a duplicate number, and the Boli consumer
 opening one Collection however often the event arrives.
 
-**At most one vote per `(ElectionId, VoterMemberId)`.** The unique index on
-`trust_election_votes`, not `CastTrustVoteCommandHandler`'s own courtesy
-check beforehand — the identical guarantee volunteer-groups-service's and
-celebrity-voting-service's own elections already hold the same way, copied
-rather than reinvented.
+**At most one ballot per voter, and one mark per candidate on it.** A ballot is
+one `trust_election_votes` row per pick, numbered by `Choice` from 1, and two
+unique indexes hold it: `(ElectionId, VoterMemberId, Choice)` - every ballot
+has a choice 1, so a second ballot always collides there - and
+`(ElectionId, VoterMemberId, CandidateId)`. `IVoteRepository.TryCastAsync`
+inserts the whole ballot in one SaveChanges on its own scope, so it lands whole
+or not at all. `CastTrustVoteCommandHandler`'s read beforehand is the
+courtesy, not the guarantee - the same split volunteer-groups-service's and
+celebrity-voting-service's elections keep. `TrustVoteIndexTests` names both
+indexes against `pg_indexes`.
 
 ## Elections
 
@@ -191,16 +202,45 @@ nominated, may nominate, or may vote — `volunteer-groups-service`'s
 against the separate `TrustMember` aggregate, since the election does not
 hold the Trust's roster itself.
 
-**Publishing installs the winner, not merely announces them.**
-`PublishTrustElectionResultsCommand` freezes the winner on `TrustElection`,
-then calls the exact same `TrustMember.UpdatePosition` method
-`UpdateTrustMemberCommand` already uses — so this raises the identical
-`TrustMemberUpdatedDomainEvent` phase 1 shipped, rather than a second event
-for the same fact. It also clears that title from any other active member of
-the same Trust who held it: a position has one holder, the same reasoning
-`VolunteerGroup.ElectPosition` gives for clearing a same-titled predecessor.
-Publishing a second time changes nothing and does not reinstall the position
-a second time — the frozen winner is the answer, not a fresh computation.
+**An election is for a role, and fills its seats.** Added 2026-09-27, when
+free-text positions became roles. Each ballot picks up to `Seats` candidates;
+the top `Seats` by tally win, ties to the earlier nomination. The seats are
+copied onto the election when it is set up, and publishing seats no more than
+the role has *then*, in case it was resized in between.
+
+**Publishing seats the winners, not merely announces them.**
+`PublishTrustElectionResultsCommand` freezes the ranked winners on
+`TrustElection`, then calls the same `TrustMember.AssignRole`
+`AssignTrustRoleCommand` uses - so it raises the same
+`TrustMemberUpdatedDomainEvent`, rather than a second event for the same fact.
+Whoever held the role before and did not win goes back to Trustee: an election
+replaces a role's holders, the reasoning `VolunteerGroup.ElectPosition` gives
+for clearing a predecessor. Publishing a second time changes nothing - the
+frozen winners are the answer, not a fresh computation.
+
+## Roles
+
+**Every Trust has Trustee, and every trustee holds it until they hold
+another.** It has no seat limit, cannot be renamed or removed, and nobody is
+elected to it - the shape of a volunteer group's Volunteer role. Every other
+role is the Trust's own (President, Secretary, Treasurer...), with 1-50 seats.
+A role's holders are counted from the roster (`TrustMember.RoleId`), which is
+its own aggregate, so the handler counts them and passes the number in: a role
+is never resized below its holders, never removed while held, and never given
+a holder beyond its seats. The count is a read, not an index - two admins
+filling the last seat at the same moment could both succeed, which an admin
+screen corrects by moving one back, unlike a vote.
+
+**The title is on the role, and nowhere else.** A roster row and an election
+hold the role's id; the title is looked up from the Trust when responding, so a
+renamed role reads the same on every row and every past election. Events carry
+the role id, never the title.
+
+**`TrustRoles` carried the old titles across.** Each Trust got Trustee; each
+distinct title it had used - on its roster or for an election, any case or
+spacing - became a role sized to hold everybody active who carried it; every
+row points at its role; every past election fills one seat and keeps its
+winner. `TrustRolesMigrationTests` runs it against legacy rows.
 
 **There is no permission split between "manage" and "run your own
 election"**, unlike volunteer-groups-service's `Manage`/`Lead` pair. A Trust
@@ -228,11 +268,10 @@ for this design; `CreateTrustCommand` enforces the single-Trust rule as a
 real database guarantee rather than a soft default that a later feature
 would have to work around.
 
-**`PositionTitle` is free text and is not a platform role**, the identical
-stance `volunteer-groups-service`'s `RolePosition` takes and for the same
-reason: what somebody is called on a Trust grants nothing anywhere and
-should not need a deployment to add. It is set by hand in this phase because
-there is no election yet.
+**A Trust role is not a platform role**, the identical stance
+`volunteer-groups-service`'s `RolePosition` takes and for the same reason:
+what somebody is called on a Trust grants nothing anywhere, and a Trust
+defines its own without a deployment.
 
 **Reactivating a removed member is a deliberate design choice, not an
 oversight.** A plain unique index on `(TrustId, MemberId)` would make
@@ -266,21 +305,22 @@ needing a second table for "current roster" versus "history".
 
 - `Sangam.Trust.UnitTests` — the aggregate rules: duplicate-locality
   refusal at the domain layer, reactivate-on-re-add, the no-op on
-  re-adding an already-active member, and refusing an update on a removed
-  member.
+  re-adding an already-active member, refusing a role for a removed member,
+  Trustee being built in and fixed, role titles unique, seats never below
+  holders, and the top-`Seats` winners.
 - `Sangam.Trust.IntegrationTests` — Testcontainers against a real Postgres.
   `TrustEndpointsTests` proves both unique indexes against `pg_indexes`,
   tenant isolation, outbox rows landing in the same transaction as the state
-  change, and an end-to-end walk: create Trust → add member → update
-  position → remove → list, including the reactivation and no-op paths
-  through the real endpoints rather than only at the domain layer.
-  `TrustElectionEndpointsTests` walks nominate → approve → vote → close →
-  publish end to end and asserts the winner's position actually lands on
-  their `TrustMember` row, including clearing a same-titled predecessor and
-  publishing twice being safe; `TrustVoteIndexTests` names the double-voting
-  guarantee directly against `pg_indexes`, the same proof
-  volunteer-groups-service's and celebrity-voting-service's own tests of the
-  same name already run.
+  change, and an end-to-end walk: create Trust → add member → assign a
+  role → remove → list, including the reactivation and no-op paths, a full
+  role refusing another holder, and role management being admin-only.
+  `TrustElectionEndpointsTests` walks define a two-seat role → nominate →
+  approve → vote → close → publish end to end and asserts the top two are
+  seated on their `TrustMember` rows and the previous holder is back to
+  Trustee, publishing twice being safe, Trustee never elected, and one
+  election per role at a time; `TrustVoteIndexTests` names both ballot
+  indexes directly against `pg_indexes`; `TrustRolesMigrationTests` runs
+  the titles-to-roles migration against legacy rows.
 - `scripts/smoke-through-gateway.sh` covers the whole path through the
   gateway, including switching the `trust` module on and off and confirming
   the route answers 404 once it is off. Its money checks walk a member's

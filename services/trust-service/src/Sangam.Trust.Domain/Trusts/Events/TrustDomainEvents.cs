@@ -36,3 +36,36 @@ public sealed record TrustRenamedDomainEvent(
 {
     public string Topic => "trust.trust.renamed.v1";
 }
+
+/// <summary>A Trust's roles changed. Ids and who; the role is on the Trust.</summary>
+public sealed record TrustRoleDefinedDomainEvent(
+    Guid TrustId,
+    Guid TenantId,
+    Guid RoleId,
+    Guid ChangedBy,
+    DateTimeOffset OccurredAt) : IDomainEvent
+{
+    public string Topic => "trust.role.defined.v1";
+}
+
+/// <summary>A Trust's roles changed. Ids and who; the role is on the Trust.</summary>
+public sealed record TrustRoleUpdatedDomainEvent(
+    Guid TrustId,
+    Guid TenantId,
+    Guid RoleId,
+    Guid ChangedBy,
+    DateTimeOffset OccurredAt) : IDomainEvent
+{
+    public string Topic => "trust.role.updated.v1";
+}
+
+/// <summary>A Trust's roles changed. Ids and who; the role is on the Trust.</summary>
+public sealed record TrustRoleRemovedDomainEvent(
+    Guid TrustId,
+    Guid TenantId,
+    Guid RoleId,
+    Guid ChangedBy,
+    DateTimeOffset OccurredAt) : IDomainEvent
+{
+    public string Topic => "trust.role.removed.v1";
+}

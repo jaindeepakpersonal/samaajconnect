@@ -8,7 +8,30 @@ version of the plan; the reasoning behind the ordering lives in
 ## Current Status
 
 - **Stage:** every module has a service and member screens; Phase 5 hardening under way
-- **Last updated:** 2026-09-20 - **a new module, trust-service: locality-wise
+- **Last updated:** 2026-09-27 - **trust-service: roles with seats, and
+  elections that fill them.** Free-text positions became the Trust's own
+  roles (`TrustRole`, owned by `Trust`): Trustee built in with no limit, the
+  rest defined with 1-50 seats (`Define`/`Update`/`RemoveTrustRole`,
+  `ListTrustRolesQuery`), a trustee moved into one by hand
+  (`AssignTrustRoleCommand`, replacing `UpdateTrustMemberCommand`) or by an
+  election. An election is for a role and fills its seats: a ballot picks up
+  to that many (one row per pick, held by unique indexes on
+  `(election, voter, choice)` and `(election, voter, candidate)`), the top
+  that many win, and publishing returns whoever held the role and lost to
+  Trustee. The `TrustRoles` migration carried every old title across,
+  tested against legacy rows. admin-portal's Trust page is six tabs now -
+  Members (with an Add-a-trustee popup and a role picker per row), Roles,
+  Elections, Donations, Collections, Expenses; member-portal's ballot ticks
+  up to the seats and casts once. Also since phase 1, all 2026-09-27:
+  elections (phase 2), the Trust's money (phase 3), a member picker for
+  donors with pledges chased like any amount due, and create/edit popups
+  for Trusts, competitions and Boli occasions (competitions gained an
+  optional locality).
+
+  Still to come from the same request: locality filters across the admin
+  modules, the member's own photo and author photos on Timeline, OTP two-
+  factor sign-in with a self-hosted CAPTCHA, and a security hardening pass.
+- **Previously:** 2026-09-20 - **a new module, trust-service: locality-wise
   Trust management, phase 1 (roster only).** One Trust per `(Samaaj,
   Locality)`, with `TrustMember` as its own aggregate so a roster change
   raises its own event - the same reasoning panch-service's `PanelMember`

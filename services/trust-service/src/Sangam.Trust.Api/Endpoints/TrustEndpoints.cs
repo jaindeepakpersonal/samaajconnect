@@ -2,14 +2,15 @@ using MediatR;
 using Sangam.Trust.Api.Extensions;
 using Sangam.Trust.Application.Members;
 using Sangam.Trust.Application.Members.Commands.AddTrustMember;
+using Sangam.Trust.Application.Members.Commands.AssignTrustRole;
 using Sangam.Trust.Application.Members.Commands.RemoveTrustMember;
-using Sangam.Trust.Application.Members.Commands.UpdateTrustMember;
 using Sangam.Trust.Application.Members.Queries;
 using Sangam.Trust.Application.Trusts;
 using Sangam.Trust.Application.Trusts.Commands.ChangeTrustStatus;
 using Sangam.Trust.Application.Trusts.Commands.CreateTrust;
 using Sangam.Trust.Application.Trusts.Commands.RenameTrust;
 using Sangam.Trust.Application.Trusts.Queries;
+using Sangam.Trust.Application.Trusts.Roles;
 
 namespace Sangam.Trust.Api.Endpoints;
 
@@ -137,7 +138,7 @@ public static class TrustEndpoints
                 ISender sender,
                 CancellationToken cancellationToken) =>
             {
-                var command = new AddTrustMemberCommand(id, request.MemberId, request.PositionTitle);
+                var command = new AddTrustMemberCommand(id, request.MemberId, request.RoleId);
 
                 var result = await sender.Send(command, cancellationToken);
 
@@ -152,23 +153,23 @@ public static class TrustEndpoints
             .ProducesProblem(StatusCodes.Status403Forbidden)
             .ProducesProblem(StatusCodes.Status404NotFound);
 
-        group.MapPut("/trusts/{id:guid}/members/{trustMemberId:guid}/position", async (
+        group.MapPut("/trusts/{id:guid}/members/{trustMemberId:guid}/role", async (
                 Guid id,
                 Guid trustMemberId,
-                UpdatePositionRequest request,
+                AssignRoleRequest request,
                 ISender sender,
                 CancellationToken cancellationToken) =>
             {
                 _ = id; // The Trust is named in the path for readability; the row id already identifies it.
 
                 var result = await sender.Send(
-                    new UpdateTrustMemberCommand(trustMemberId, request.PositionTitle), cancellationToken);
+                    new AssignTrustRoleCommand(trustMemberId, request.RoleId), cancellationToken);
 
                 return result.ToApiResult();
             })
             .RequireAuthorization()
-            .WithName("UpdateTrustMemberPosition")
-            .WithSummary("Change an active trustee's position title.")
+            .WithName("AssignTrustRole")
+            .WithSummary("Move an active trustee into one of the Trust's roles. 409 when every seat is taken.")
             .Produces<TrustMemberResponse>()
             .ProducesValidationProblem()
             .ProducesProblem(StatusCodes.Status401Unauthorized)
@@ -196,6 +197,85 @@ public static class TrustEndpoints
             .ProducesProblem(StatusCodes.Status403Forbidden)
             .ProducesProblem(StatusCodes.Status404NotFound);
 
+        group.MapGet("/trusts/{id:guid}/roles", async (
+                Guid id,
+                ISender sender,
+                CancellationToken cancellationToken) =>
+            {
+                var result = await sender.Send(new ListTrustRolesQuery(id), cancellationToken);
+
+                return result.ToApiResult();
+            })
+            .RequireAuthorization()
+            .WithName("ListTrustRoles")
+            .WithSummary("A Trust's roles - Trustee first - each with its seats and how many hold it.")
+            .Produces<IReadOnlyList<TrustRoleResponse>>()
+            .ProducesProblem(StatusCodes.Status401Unauthorized)
+            .ProducesProblem(StatusCodes.Status404NotFound);
+
+        group.MapPost("/trusts/{id:guid}/roles", async (
+                Guid id,
+                TrustRoleRequest request,
+                ISender sender,
+                CancellationToken cancellationToken) =>
+            {
+                var result = await sender.Send(
+                    new DefineTrustRoleCommand(id, request.Title, request.Seats), cancellationToken);
+
+                return result.ToApiResult(created =>
+                    Results.Created($"/v1/trust/trusts/{id}/roles/{created.Id}", created));
+            })
+            .RequireAuthorization()
+            .WithName("DefineTrustRole")
+            .WithSummary("Add a role to a Trust, with the number of seats an election for it fills.")
+            .Produces<TrustRoleResponse>(StatusCodes.Status201Created)
+            .ProducesValidationProblem()
+            .ProducesProblem(StatusCodes.Status401Unauthorized)
+            .ProducesProblem(StatusCodes.Status403Forbidden)
+            .ProducesProblem(StatusCodes.Status404NotFound)
+            .ProducesProblem(StatusCodes.Status409Conflict);
+
+        group.MapPut("/trusts/{id:guid}/roles/{roleId:guid}", async (
+                Guid id,
+                Guid roleId,
+                TrustRoleRequest request,
+                ISender sender,
+                CancellationToken cancellationToken) =>
+            {
+                var result = await sender.Send(
+                    new UpdateTrustRoleCommand(id, roleId, request.Title, request.Seats), cancellationToken);
+
+                return result.ToApiResult();
+            })
+            .RequireAuthorization()
+            .WithName("UpdateTrustRole")
+            .WithSummary("Rename or resize a role. Never below its current holders, and never Trustee.")
+            .Produces<TrustRoleResponse>()
+            .ProducesValidationProblem()
+            .ProducesProblem(StatusCodes.Status401Unauthorized)
+            .ProducesProblem(StatusCodes.Status403Forbidden)
+            .ProducesProblem(StatusCodes.Status404NotFound)
+            .ProducesProblem(StatusCodes.Status409Conflict);
+
+        group.MapDelete("/trusts/{id:guid}/roles/{roleId:guid}", async (
+                Guid id,
+                Guid roleId,
+                ISender sender,
+                CancellationToken cancellationToken) =>
+            {
+                var result = await sender.Send(new RemoveTrustRoleCommand(id, roleId), cancellationToken);
+
+                return result.ToApiResult();
+            })
+            .RequireAuthorization()
+            .WithName("RemoveTrustRole")
+            .WithSummary("Remove a role nobody holds and no unpublished election is for.")
+            .Produces<Guid>()
+            .ProducesProblem(StatusCodes.Status401Unauthorized)
+            .ProducesProblem(StatusCodes.Status403Forbidden)
+            .ProducesProblem(StatusCodes.Status404NotFound)
+            .ProducesProblem(StatusCodes.Status409Conflict);
+
         return app;
     }
 
@@ -207,7 +287,9 @@ public static class TrustEndpoints
     public sealed record RenameTrustRequest(string Name);
 
     /// <summary>MemberId is a string, not Guid: see AddTrustMemberCommand's own remarks.</summary>
-    public sealed record AddMemberRequest(string MemberId, string? PositionTitle);
+    public sealed record AddMemberRequest(string MemberId, string? RoleId = null);
 
-    public sealed record UpdatePositionRequest(string? PositionTitle);
+    public sealed record AssignRoleRequest(Guid RoleId);
+
+    public sealed record TrustRoleRequest(string Title, int Seats);
 }

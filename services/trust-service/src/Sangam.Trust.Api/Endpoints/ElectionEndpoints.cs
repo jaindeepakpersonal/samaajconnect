@@ -44,7 +44,7 @@ public static class ElectionEndpoints
             {
                 var command = new OpenTrustElectionCommand(
                     trustId,
-                    request.PositionTitle,
+                    request.RoleId,
                     request.NominationStartAt,
                     request.NominationEndAt,
                     request.VotingStartAt,
@@ -57,7 +57,7 @@ public static class ElectionEndpoints
             })
             .RequireAuthorization()
             .WithName("OpenTrustElection")
-            .WithSummary("Set an election up for a position on this Trust's roster. It stays a draft until opened.")
+            .WithSummary("Set an election up for one of this Trust's roles. It stays a draft until opened.")
             .Produces<TrustElectionResponse>(StatusCodes.Status201Created)
             .ProducesValidationProblem()
             .ProducesProblem(StatusCodes.Status401Unauthorized)
@@ -150,7 +150,7 @@ public static class ElectionEndpoints
                 CancellationToken cancellationToken) =>
             {
                 var result = await sender.Send(
-                    new CastTrustVoteCommand(id, request.CandidateId), cancellationToken);
+                    new CastTrustVoteCommand(id, request.CandidateIds), cancellationToken);
 
                 return result.ToApiResult();
             })
@@ -187,7 +187,7 @@ public static class ElectionEndpoints
     }
 
     public sealed record OpenElectionRequest(
-        string PositionTitle,
+        Guid RoleId,
         DateTimeOffset NominationStartAt,
         DateTimeOffset NominationEndAt,
         DateTimeOffset VotingStartAt,
@@ -205,5 +205,6 @@ public static class ElectionEndpoints
     /// </summary>
     public sealed record DecideRequest(bool Approve);
 
-    public sealed record VoteRequest(Guid CandidateId);
+    /// <summary>Up to the election's seats, in order of preference.</summary>
+    public sealed record VoteRequest(IReadOnlyList<Guid> CandidateIds);
 }

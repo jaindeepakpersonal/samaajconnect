@@ -97,6 +97,7 @@ import {
   TrustExpense,
   TrustExpenseInput,
   TrustMember,
+  TrustRole,
   TrustStatus,
   UserStatusResult,
   VolunteerGroup,
@@ -744,28 +745,38 @@ export class AdminApi {
     return this.http.get<TrustMember[]>(`/v1/trust/trusts/${trustId}/members`);
   }
 
-  /** Adds a member, or reactivates one previously removed - a repeat add of an active member is a no-op. */
-  addTrustMember(
-    trustId: string,
-    memberId: string,
-    positionTitle: string | null,
-  ): Observable<TrustMember> {
-    return this.http.post<TrustMember>(`/v1/trust/trusts/${trustId}/members`, {
-      memberId,
-      positionTitle,
+  /**
+   * Adds a member, or reactivates one previously removed - a repeat add of an
+   * active member is a no-op. Trustee unless a role is named; 409 when it is full.
+   */
+  addTrustMember(trustId: string, memberId: string, roleId: string | null): Observable<TrustMember> {
+    return this.http.post<TrustMember>(`/v1/trust/trusts/${trustId}/members`, { memberId, roleId });
+  }
+
+  /** Moves an active trustee into a role. 409 on a removed member, or a full role. */
+  assignTrustRole(trustId: string, trustMemberId: string, roleId: string): Observable<TrustMember> {
+    return this.http.put<TrustMember>(`/v1/trust/trusts/${trustId}/members/${trustMemberId}/role`, {
+      roleId,
     });
   }
 
-  /** Changes an active trustee's position title by hand. 409 on a removed member. */
-  updateTrustMemberPosition(
-    trustId: string,
-    trustMemberId: string,
-    positionTitle: string | null,
-  ): Observable<TrustMember> {
-    return this.http.put<TrustMember>(
-      `/v1/trust/trusts/${trustId}/members/${trustMemberId}/position`,
-      { positionTitle },
-    );
+  /** A Trust's roles, Trustee first, each with its seats and how many hold it. */
+  listTrustRoles(trustId: string): Observable<TrustRole[]> {
+    return this.http.get<TrustRole[]>(`/v1/trust/trusts/${trustId}/roles`);
+  }
+
+  defineTrustRole(trustId: string, title: string, seats: number): Observable<TrustRole> {
+    return this.http.post<TrustRole>(`/v1/trust/trusts/${trustId}/roles`, { title, seats });
+  }
+
+  /** Rename or resize. 409 below the current holders. */
+  updateTrustRole(trustId: string, roleId: string, title: string, seats: number): Observable<TrustRole> {
+    return this.http.put<TrustRole>(`/v1/trust/trusts/${trustId}/roles/${roleId}`, { title, seats });
+  }
+
+  /** 409 while anybody holds it, or an election for it is unpublished. */
+  removeTrustRole(trustId: string, roleId: string): Observable<string> {
+    return this.http.delete<string>(`/v1/trust/trusts/${trustId}/roles/${roleId}`);
   }
 
   /** Takes a member off the roster. Soft: a repeat removal is a no-op. */
@@ -780,7 +791,7 @@ export class AdminApi {
     return this.http.get<TrustElection[]>(`/v1/trust/trusts/${trustId}/elections`);
   }
 
-  /** Sets an election up for a named position on this Trust's roster. Starts as a draft. */
+  /** Sets an election up for one of this Trust's roles, filling its seats. Starts as a draft. */
   openTrustElection(trustId: string, election: TrustElectionInput): Observable<TrustElection> {
     return this.http.post<TrustElection>(`/v1/trust/trusts/${trustId}/elections`, election);
   }

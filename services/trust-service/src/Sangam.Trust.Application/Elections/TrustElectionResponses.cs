@@ -4,6 +4,8 @@ namespace Sangam.Trust.Application.Elections;
 public sealed record TrustElectionResponse(
     Guid Id,
     Guid TrustId,
+
+    /// <summary>The title of the role it fills, as the Trust names it now.</summary>
     string PositionTitle,
     DateTimeOffset NominationStartAt,
     DateTimeOffset NominationEndAt,
@@ -15,14 +17,18 @@ public sealed record TrustElectionResponse(
     bool AcceptsNominations,
     bool AcceptsVotes,
 
-    /// <summary>The candidate this member voted for, if they have voted.</summary>
-    Guid? MyVoteCandidateId,
+    /// <summary>The candidates this member picked, in their order. Empty until they vote.</summary>
+    IReadOnlyList<Guid> MyVoteCandidateIds,
     int CandidateCount,
 
-    /// <summary>Set once the election is Published. Null until then.</summary>
-    Guid? WinnerMemberId,
+    /// <summary>Set once the election is Published, in ranked order. Empty until then.</summary>
+    IReadOnlyList<Guid> WinnerMemberIds,
     DateTimeOffset? PublishedAt,
-    DateTimeOffset CreatedAt);
+    DateTimeOffset CreatedAt,
+    Guid RoleId,
+
+    /// <summary>How many it fills, and so the most candidates one ballot may pick.</summary>
+    int Seats);
 
 /// <summary>One name on the ballot. The vote count is never hidden - a Trust election has no results-visibility setting.</summary>
 public sealed record TrustElectionCandidateResponse(

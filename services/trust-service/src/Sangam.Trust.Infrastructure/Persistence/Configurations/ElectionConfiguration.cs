@@ -14,10 +14,13 @@ public sealed class ElectionConfiguration : IEntityTypeConfiguration<TrustElecti
         // Domain-assigned, like every key on this platform.
         builder.Property(e => e.Id).ValueGeneratedNever();
 
-        builder.Property(e => e.PositionTitle).IsRequired().HasMaxLength(100);
         builder.Property(e => e.Status).HasConversion<string>().HasMaxLength(20);
 
         builder.HasIndex(e => new { e.TrustId, e.Status });
+        builder.HasIndex(e => e.RoleId);
+
+        // A uuid[] in ranked order, like the other services' loose id lists.
+        builder.Property(e => e.WinnerMemberIds).HasColumnType("uuid[]");
 
         builder.HasMany(e => e.Candidates)
             .WithOne()
@@ -56,12 +59,15 @@ public sealed class VoteConfiguration : IEntityTypeConfiguration<Vote>
         builder.Property(v => v.Id).ValueGeneratedNever();
 
         // ---------------------------------------------------------------
-        // This index is the double-voting guarantee, not the handler's own
-        // courtesy check and not a distributed lock. See CastTrustVoteCommand's
-        // remarks, and volunteer-groups-service's own VoteConfiguration,
-        // which this copies verbatim.
+        // These two indexes are the one-ballot guarantee, not the handler's
+        // own courtesy check and not a distributed lock. A ballot is one row
+        // per pick, numbered from 1: the first holds one ballot per voter
+        // (every ballot has a choice 1, so a second collides on it), the
+        // second one mark per candidate on it. See CastTrustVoteCommand's
+        // remarks, and volunteer-groups-service's own VoteConfiguration.
         // ---------------------------------------------------------------
-        builder.HasIndex(v => new { v.ElectionId, v.VoterMemberId }).IsUnique();
+        builder.HasIndex(v => new { v.ElectionId, v.VoterMemberId, v.Choice }).IsUnique();
+        builder.HasIndex(v => new { v.ElectionId, v.VoterMemberId, v.CandidateId }).IsUnique();
 
         // The tally: GROUP BY candidate within an election.
         builder.HasIndex(v => new { v.ElectionId, v.CandidateId });

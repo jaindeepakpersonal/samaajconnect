@@ -18,7 +18,8 @@ public sealed record TrustElectionResultsPublishedDomainEvent(
     Guid ElectionId,
     Guid TenantId,
     Guid TrustId,
-    Guid WinnerMemberId,
+    Guid RoleId,
+    IReadOnlyList<Guid> WinnerMemberIds,
     DateTimeOffset OccurredAt) : IDomainEvent
 {
     public string Topic => "trust.election.results-published.v1";

@@ -48,5 +48,11 @@ public interface ITrustMemberRepository
 
     Task<IReadOnlyList<TrustMember>> ListByTrustAsync(Guid trustId, CancellationToken cancellationToken = default);
 
+    /// <summary>Active trustees holding this role - what a role's seats are counted against.</summary>
+    Task<int> CountActiveHoldersAsync(Guid trustId, Guid roleId, CancellationToken cancellationToken = default);
+
+    /// <summary>Active trustees per role, as a GROUP BY.</summary>
+    Task<IReadOnlyDictionary<Guid, int>> CountActiveByRoleAsync(Guid trustId, CancellationToken cancellationToken = default);
+
     void Add(TrustMember member);
 }

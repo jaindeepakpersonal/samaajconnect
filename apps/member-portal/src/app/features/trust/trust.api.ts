@@ -55,7 +55,7 @@ export class TrustApi {
     return this.http.get<TrustMember[]>(`/v1/trust/trusts/${trustId}/members`);
   }
 
-  /** A Trust's elections, newest first, each with this member's own vote. */
+  /** A Trust's elections, newest first, each with this member's own ballot. */
   elections(trustId: string): Observable<TrustElection[]> {
     return this.http.get<TrustElection[]>(`/v1/trust/trusts/${trustId}/elections`);
   }
@@ -77,13 +77,13 @@ export class TrustApi {
   }
 
   /**
-   * Casts this member's one vote. A second vote is reported as success with
-   * `accepted: false` - the unique index on (election, voter) is what
-   * prevents it, not this call. Self-votes are refused.
+   * Casts this member's one ballot: up to the election's seats. A second ballot
+   * is reported as success with `accepted: false` - the unique indexes are
+   * what prevent it, not this call. Self-votes are refused.
    */
-  castVote(electionId: string, candidateId: string): Observable<CastTrustVoteResult> {
+  castVote(electionId: string, candidateIds: readonly string[]): Observable<CastTrustVoteResult> {
     return this.http.post<CastTrustVoteResult>(`/v1/trust/elections/${electionId}/votes`, {
-      candidateId,
+      candidateIds,
     });
   }
 }

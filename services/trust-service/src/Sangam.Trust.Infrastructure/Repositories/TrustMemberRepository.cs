@@ -22,5 +22,19 @@ public sealed class TrustMemberRepository(TrustDbContext dbContext) : ITrustMemb
             .Where(m => m.TrustId == trustId)
             .ToListAsync(cancellationToken);
 
+    public Task<int> CountActiveHoldersAsync(
+        Guid trustId, Guid roleId, CancellationToken cancellationToken = default) =>
+        dbContext.TrustMembers.CountAsync(
+            m => m.TrustId == trustId && m.RoleId == roleId && m.Status == TrustMemberStatus.Active,
+            cancellationToken);
+
+    public async Task<IReadOnlyDictionary<Guid, int>> CountActiveByRoleAsync(
+        Guid trustId, CancellationToken cancellationToken = default) =>
+        await dbContext.TrustMembers
+            .Where(m => m.TrustId == trustId && m.Status == TrustMemberStatus.Active)
+            .GroupBy(m => m.RoleId)
+            .Select(g => new { RoleId = g.Key, Count = g.Count() })
+            .ToDictionaryAsync(x => x.RoleId, x => x.Count, cancellationToken);
+
     public void Add(TrustMember member) => dbContext.TrustMembers.Add(member);
 }

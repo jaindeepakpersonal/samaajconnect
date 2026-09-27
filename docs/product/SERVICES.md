@@ -377,21 +377,23 @@ and expose its endpoints behind the gateway at the route prefix shown.
 - **First / primary aggregate:** `Trust` (with `TrustMember` and
   `TrustElection` as peer, not owned, aggregates — a roster change and an
   election status change each raise their own event)
-- **Owns:** Trust, TrustMember, TrustElection (with `TrustElectionCandidate`
-  as an owned entity), Vote, Donation, Expense, Collection
+- **Owns:** Trust (with `TrustRole` as an owned entity - Trustee built in,
+  the rest the Trust's own, with seats), TrustMember, TrustElection (with
+  `TrustElectionCandidate` as an owned entity), Vote, Donation, Expense, Collection
 - **Key commands:** `CreateTrustCommand`, `ChangeTrustStatusCommand`,
-  `AddTrustMemberCommand`, `UpdateTrustMemberCommand`,
-  `RemoveTrustMemberCommand`, `OpenTrustElectionCommand`,
+  `RenameTrustCommand`, `AddTrustMemberCommand`, `AssignTrustRoleCommand`,
+  `RemoveTrustMemberCommand`, `DefineTrustRoleCommand`,
+  `UpdateTrustRoleCommand`, `RemoveTrustRoleCommand`, `OpenTrustElectionCommand`,
   `MoveTrustElectionCommand`, `NominateTrustCandidateCommand`,
   `DecideTrustCandidateCommand`, `CastTrustVoteCommand`,
   `PublishTrustElectionResultsCommand`, `RecordDonationCommand`,
   `MarkDonationCollectedCommand`, `RecordExpenseCommand`,
   `ApproveExpenseCommand`, `RecordCollectionPaymentCommand`, `RemindPayerCommand`
 - **Key queries:** `ListTrustsQuery`, `GetTrustQuery`, `ListTrustMembersQuery`,
-  `ListTrustElectionsQuery`, `GetTrustElectionQuery`, `ListDonationsQuery`,
+  `ListTrustRolesQuery`, `ListTrustElectionsQuery`, `GetTrustElectionQuery`, `ListDonationsQuery`,
   `ListExpensesQuery`, `ListCollectionsQuery`, `ListMyDuesQuery`
-- **Events published:** `TrustCreated`, `TrustStatusChanged`,
-  `TrustMemberAdded`, `TrustMemberUpdated`, `TrustMemberRemoved`,
+- **Events published:** `TrustCreated`, `TrustStatusChanged`, `TrustRenamed`,
+  `TrustRoleDefined`, `TrustRoleUpdated`, `TrustRoleRemoved`, `TrustMemberAdded`, `TrustMemberUpdated`, `TrustMemberRemoved`,
   `TrustElectionStatusChanged`, `TrustElectionResultsPublished`,
   `DonationRecorded`, `DonationCollected`, `ExpenseRecorded`,
   `ExpenseApproved`, `CollectionDue`, `CollectionSettled`, `CollectionReminderSent`
@@ -403,13 +405,13 @@ and expose its endpoints behind the gateway at the route prefix shown.
   for every write except nominating/voting; `Members.Read` for every read
   and, for nominating/voting, gated further by being an active member of the
   Trust the election belongs to
-- **Notes:** Phase 2 of a larger plan — locality-wise Trust management, one
-  Trust per `(TenantId, LocalityId)`. Phase 1 shipped roster CRUD; phase 2
-  adds elections for trustee positions, copying volunteer-groups-service's
-  `GroupElection` shape rather than sharing code with it. Donation and
-  expense management, and a payment-collection ledger against both donations
-  and a future locality-wise Boli, are later phases, not built yet. See the
-  service's own `CLAUDE.md`.
+- **Notes:** Locality-wise Trust management, one Trust per `(TenantId,
+  LocalityId)`. Phase 1 shipped roster CRUD; phase 2 elections, copying
+  volunteer-groups-service's `GroupElection` shape rather than sharing code
+  with it; phase 3 the Trust's money - donations, expenses, and a
+  collections ledger a locality-wise Boli result opens. Free-text positions
+  became roles with seats on 2026-09-27, and an election fills a role's
+  seats. See the service's own `CLAUDE.md`.
 
 ## Inter-service data access rule
 

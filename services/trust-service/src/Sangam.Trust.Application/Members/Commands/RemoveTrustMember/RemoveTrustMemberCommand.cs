@@ -19,6 +19,7 @@ public sealed class RemoveTrustMemberCommandValidator : AbstractValidator<Remove
 }
 
 public sealed class RemoveTrustMemberCommandHandler(
+    ITrustRepository trusts,
     ITrustMemberRepository members,
     IUnitOfWork unitOfWork,
     ICurrentUser currentUser,
@@ -43,11 +44,19 @@ public sealed class RemoveTrustMemberCommandHandler(
                 Error.NotFound("TrustMember.NotFound", "No such Trust member in this Samaaj."));
         }
 
+        var trust = await trusts.GetByIdAsync(member.TrustId, cancellationToken);
+
+        if (trust is null)
+        {
+            return Result.Failure<TrustMemberResponse>(
+                Error.NotFound("TrustMember.NotFound", "No such Trust member in this Samaaj."));
+        }
+
         if (member.Remove(actorId, clock.UtcNow))
         {
             await unitOfWork.SaveChangesAsync(cancellationToken);
         }
 
-        return Result.Success(member.ToResponse());
+        return Result.Success(member.ToResponse(trust));
     }
 }

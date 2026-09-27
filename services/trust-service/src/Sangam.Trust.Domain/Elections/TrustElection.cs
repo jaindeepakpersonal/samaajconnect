@@ -32,13 +32,11 @@ public sealed class TrustElection : AggregateRoot, ITenantScopedEntity
     /// <summary>The Trust this election fills a position for. A plain reference - see CLAUDE.md.</summary>
     public Guid TrustId { get; private set; }
 
-    /// <summary>
-    /// What is being elected - President, Secretary, Treasurer. Free text,
-    /// the same label <see cref="Members.TrustMember.PositionTitle"/> already
-    /// holds; not a closed list, for the identical reason that field is not
-    /// one.
-    /// </summary>
-    public string PositionTitle { get; private set; } = null!;
+    /// <summary>The role it fills. Never the built-in Trustee role.</summary>
+    public Guid RoleId { get; private set; }
+
+    /// <summary>How many it fills - the role's seats when it was set up, and a ballot's most picks.</summary>
+    public int Seats { get; private set; }
 
     public DateTimeOffset NominationStartAt { get; private set; }
     public DateTimeOffset NominationEndAt { get; private set; }
@@ -49,8 +47,8 @@ public sealed class TrustElection : AggregateRoot, ITenantScopedEntity
     public DateTimeOffset CreatedAt { get; private set; }
     public DateTimeOffset? ClosedAt { get; private set; }
 
-    /// <summary>Set once, by <see cref="Publish"/>. Null until then.</summary>
-    public Guid? WinnerMemberId { get; private set; }
+    /// <summary>Set once, by <see cref="Publish"/>, in ranked order. Empty until then.</summary>
+    public List<Guid> WinnerMemberIds { get; private set; } = [];
 
     public DateTimeOffset? PublishedAt { get; private set; }
 
@@ -61,21 +59,23 @@ public sealed class TrustElection : AggregateRoot, ITenantScopedEntity
     public static TrustElection Open(
         Guid tenantId,
         Guid trustId,
-        string positionTitle,
+        Guid roleId,
+        int seats,
         DateTimeOffset nominationStartAt,
         DateTimeOffset nominationEndAt,
         DateTimeOffset votingStartAt,
         DateTimeOffset votingEndAt,
         DateTimeOffset now)
     {
-        ArgumentException.ThrowIfNullOrWhiteSpace(positionTitle);
+        ArgumentOutOfRangeException.ThrowIfLessThan(seats, 1);
 
         return new TrustElection
         {
             Id = Guid.NewGuid(),
             TenantId = tenantId,
             TrustId = trustId,
-            PositionTitle = positionTitle.Trim(),
+            RoleId = roleId,
+            Seats = seats,
             NominationStartAt = nominationStartAt,
             NominationEndAt = nominationEndAt,
             VotingStartAt = votingStartAt,
@@ -209,34 +209,33 @@ public sealed class TrustElection : AggregateRoot, ITenantScopedEntity
             .OrderBy(c => c.NominatedAt)];
 
     /// <summary>
-    /// Picks the winner by tally, tie-broken by earliest nomination - the
-    /// identical tie-break <c>GroupElection.WinnerBy</c> already uses, held
-    /// by the same two mechanisms agreeing: this ordering, and the stable
-    /// sort LINQ's own <c>OrderBy</c> already performs.
+    /// The top <see cref="Seats"/> candidates by tally, ties broken by the
+    /// earlier nomination - the tie-break volunteer-groups-service's elections
+    /// use. Fewer when the ballot is shorter: everybody on it wins.
     /// </summary>
-    public TrustElectionCandidate? WinnerBy(IReadOnlyDictionary<Guid, int> tally) =>
-        Ballot
+    public IReadOnlyList<TrustElectionCandidate> WinnersBy(IReadOnlyDictionary<Guid, int> tally) =>
+        [.. Ballot
             .OrderByDescending(c => tally.GetValueOrDefault(c.Id))
             .ThenBy(c => c.NominatedAt)
-            .FirstOrDefault();
+            .Take(Seats)];
 
     /// <summary>
-    /// Freezes the winner and moves to Published. Only from Closed. Returns
-    /// false on a second attempt - publishing twice would leave "the result"
-    /// with no single referent.
+    /// Freezes the winners and moves to Published. Only from Closed, and false
+    /// on a second attempt - publishing twice would leave "the result" with no
+    /// single referent.
     /// </summary>
-    public bool Publish(Guid winnerMemberId, DateTimeOffset now)
+    public bool Publish(IReadOnlyList<Guid> winnerMemberIds, DateTimeOffset now)
     {
-        if (Status != TrustElectionStatus.Closed)
+        if (Status != TrustElectionStatus.Closed || winnerMemberIds.Count == 0)
         {
             return false;
         }
 
         Status = TrustElectionStatus.Published;
-        WinnerMemberId = winnerMemberId;
+        WinnerMemberIds = [.. winnerMemberIds];
         PublishedAt = now;
 
-        Raise(new TrustElectionResultsPublishedDomainEvent(Id, TenantId, TrustId, winnerMemberId, now));
+        Raise(new TrustElectionResultsPublishedDomainEvent(Id, TenantId, TrustId, RoleId, [.. winnerMemberIds], now));
 
         return true;
     }

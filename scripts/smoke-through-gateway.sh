@@ -4434,11 +4434,11 @@ trust_checks() {
   check "a member cannot add a Trust member" 403 \
     "$(status -X POST "$GATEWAY/v1/trust/trusts/$TRUST_ID/members" -H 'Content-Type: application/json' \
        -H "Authorization: Bearer $MEMBER_TOKEN" \
-       -d "{\"memberId\":\"$MEMBER_ID\",\"positionTitle\":\"Trustee\"}")"
+       -d "{\"memberId\":\"$MEMBER_ID\"}")"
 
   TRUST_MEMBER=$(curl -s -X POST "$GATEWAY/v1/trust/trusts/$TRUST_ID/members" \
     -H 'Content-Type: application/json' -H "Authorization: Bearer $ADMIN_TOKEN" -H "$ADMIN_TENANT_HEADER" \
-    -d "{\"memberId\":\"$MEMBER_ID\",\"positionTitle\":\"Trustee\"}")
+    -d "{\"memberId\":\"$MEMBER_ID\"}")
 
   TRUST_MEMBER_ID=$(printf '%s' "$TRUST_MEMBER" | json_field id)
 
@@ -4461,30 +4461,50 @@ trust_checks() {
     fail=$((fail + 1))
   fi
 
-  UPDATED=$(curl -s -X PUT "$GATEWAY/v1/trust/trusts/$TRUST_ID/members/$TRUST_MEMBER_ID/position" \
-    -H 'Content-Type: application/json' -H "Authorization: Bearer $ADMIN_TOKEN" -H "$ADMIN_TENANT_HEADER" \
-    -d '{"positionTitle":"Treasurer"}')
+  # A Trust's own role, with one seat - what the election below is for.
+  check "a member cannot define a Trust role" 403 \
+    "$(status -X POST "$GATEWAY/v1/trust/trusts/$TRUST_ID/roles" -H 'Content-Type: application/json' \
+       -H "Authorization: Bearer $MEMBER_TOKEN" -d '{"title":"Treasurer","seats":1}')"
 
-  if printf '%s' "$UPDATED" | grep -q '"positionTitle":"Treasurer"'; then
-    echo "  ok    an administrator changes a trustee's position"
+  TREASURER_ROLE=$(curl -s -X POST "$GATEWAY/v1/trust/trusts/$TRUST_ID/roles" \
+    -H 'Content-Type: application/json' -H "Authorization: Bearer $ADMIN_TOKEN" -H "$ADMIN_TENANT_HEADER" \
+    -d '{"title":"Treasurer","seats":1}')
+
+  TREASURER_ROLE_ID=$(printf '%s' "$TREASURER_ROLE" | json_field id)
+
+  if [ -n "$TREASURER_ROLE_ID" ]; then
+    echo "  ok    an administrator defines a Trust role"
     pass=$((pass + 1))
   else
-    echo "  FAIL  changing the position title (got '$UPDATED')"
+    echo "  FAIL  defining a Trust role (got '$TREASURER_ROLE')"
+    fail=$((fail + 1))
+    return 1
+  fi
+
+  UPDATED=$(curl -s -X PUT "$GATEWAY/v1/trust/trusts/$TRUST_ID/members/$TRUST_MEMBER_ID/role" \
+    -H 'Content-Type: application/json' -H "Authorization: Bearer $ADMIN_TOKEN" -H "$ADMIN_TENANT_HEADER" \
+    -d "{\"roleId\":\"$TREASURER_ROLE_ID\"}")
+
+  if printf '%s' "$UPDATED" | grep -q '"positionTitle":"Treasurer"'; then
+    echo "  ok    an administrator moves a trustee into the role"
+    pass=$((pass + 1))
+  else
+    echo "  FAIL  assigning the role (got '$UPDATED')"
     fail=$((fail + 1))
   fi
 
-  # An election for a named Trust position - nominate, approve, vote, close,
-  # publish - and what publishing actually does to the winner's own roster
-  # row. TRUST_MEMBER_ID (MEMBER_ID) is still active on the roster here,
-  # holding "Treasurer" from the position-change check above, which is what
-  # lets this section also prove publishing clears a same-titled predecessor
-  # rather than only installing a fresh winner.
+  # An election for that role - nominate, approve, vote, close, publish - and
+  # what publishing actually does to the winner's own roster row.
+  # TRUST_MEMBER_ID (MEMBER_ID) is still active on the roster here, holding
+  # Treasurer from the check above, which is what lets this section also prove
+  # publishing returns the previous holder to Trustee rather than only seating
+  # a fresh winner.
   ELECTION_CANDIDATE="eeeeeeee-0000-4000-8000-00000000e202"
 
   check "an administrator adds the election candidate to the roster" 200 \
     "$(status -X POST "$GATEWAY/v1/trust/trusts/$TRUST_ID/members" -H 'Content-Type: application/json' \
        -H "Authorization: Bearer $ADMIN_TOKEN" -H "$ADMIN_TENANT_HEADER" \
-       -d "{\"memberId\":\"$ELECTION_CANDIDATE\",\"positionTitle\":null}")"
+       -d "{\"memberId\":\"$ELECTION_CANDIDATE\"}")"
 
   # Nominations and voting are never open at once, so this section has a real
   # window to wait out, the same as the Panch election above.
@@ -4495,11 +4515,11 @@ trust_checks() {
   check "a member cannot open a Trust election" 403 \
     "$(status -X POST "$GATEWAY/v1/trust/trusts/$TRUST_ID/elections" -H 'Content-Type: application/json' \
        -H "Authorization: Bearer $MEMBER_TOKEN" \
-       -d "{\"positionTitle\":\"Treasurer\",\"nominationStartAt\":\"$NOMINATIONS_OPENED\",\"nominationEndAt\":\"$NOMINATIONS_CLOSE\",\"votingStartAt\":\"$NOMINATIONS_CLOSE\",\"votingEndAt\":\"$VOTING_CLOSES\"}")"
+       -d "{\"roleId\":\"$TREASURER_ROLE_ID\",\"nominationStartAt\":\"$NOMINATIONS_OPENED\",\"nominationEndAt\":\"$NOMINATIONS_CLOSE\",\"votingStartAt\":\"$NOMINATIONS_CLOSE\",\"votingEndAt\":\"$VOTING_CLOSES\"}")"
 
   TRUST_ELECTION=$(curl -s -X POST "$GATEWAY/v1/trust/trusts/$TRUST_ID/elections" \
     -H 'Content-Type: application/json' -H "Authorization: Bearer $ADMIN_TOKEN" -H "$ADMIN_TENANT_HEADER" \
-    -d "{\"positionTitle\":\"Treasurer\",\"nominationStartAt\":\"$NOMINATIONS_OPENED\",\"nominationEndAt\":\"$NOMINATIONS_CLOSE\",\"votingStartAt\":\"$NOMINATIONS_CLOSE\",\"votingEndAt\":\"$VOTING_CLOSES\"}")
+    -d "{\"roleId\":\"$TREASURER_ROLE_ID\",\"nominationStartAt\":\"$NOMINATIONS_OPENED\",\"nominationEndAt\":\"$NOMINATIONS_CLOSE\",\"votingStartAt\":\"$NOMINATIONS_CLOSE\",\"votingEndAt\":\"$VOTING_CLOSES\"}")
 
   TRUST_ELECTION_ID=$(printf '%s' "$TRUST_ELECTION" | json_field id)
 
@@ -4549,7 +4569,7 @@ trust_checks() {
 
   FIRST_TRUST_VOTE=$(curl -s -X POST "$GATEWAY/v1/trust/elections/$TRUST_ELECTION_ID/votes" \
     -H 'Content-Type: application/json' -H "Authorization: Bearer $MEMBER_TOKEN" \
-    -d "{\"candidateId\":\"$TRUST_CANDIDATE_ID\"}")
+    -d "{\"candidateIds\":[\"$TRUST_CANDIDATE_ID\"]}")
 
   if printf '%s' "$FIRST_TRUST_VOTE" | grep -q '"accepted":true'; then
     echo "  ok    a Trust member's vote is accepted"
@@ -4561,7 +4581,7 @@ trust_checks() {
 
   SECOND_TRUST_VOTE=$(curl -s -X POST "$GATEWAY/v1/trust/elections/$TRUST_ELECTION_ID/votes" \
     -H 'Content-Type: application/json' -H "Authorization: Bearer $MEMBER_TOKEN" \
-    -d "{\"candidateId\":\"$TRUST_CANDIDATE_ID\"}")
+    -d "{\"candidateIds\":[\"$TRUST_CANDIDATE_ID\"]}")
 
   if printf '%s' "$SECOND_TRUST_VOTE" | grep -q '"accepted":false'; then
     echo "  ok    a second vote from the same member is reported, not applied"
@@ -4579,7 +4599,7 @@ trust_checks() {
   PUBLISHED_TRUST_ELECTION=$(curl -s -X POST "$GATEWAY/v1/trust/elections/$TRUST_ELECTION_ID/publish" \
     -H "Authorization: Bearer $ADMIN_TOKEN" -H "$ADMIN_TENANT_HEADER")
 
-  if printf '%s' "$PUBLISHED_TRUST_ELECTION" | grep -q "\"winnerMemberId\":\"$ELECTION_CANDIDATE\""; then
+  if printf '%s' "$PUBLISHED_TRUST_ELECTION" | grep -q "\"winnerMemberIds\":\[\"$ELECTION_CANDIDATE\"\]"; then
     echo "  ok    the nominee with the most votes wins"
     pass=$((pass + 1))
   else
@@ -4591,19 +4611,19 @@ trust_checks() {
 
   if printf '%s' "$ROSTER_AFTER_ELECTION" \
       | grep -q "\"memberId\":\"$ELECTION_CANDIDATE\",\"positionTitle\":\"Treasurer\""; then
-    echo "  ok    publishing installs the winner's position on their own roster row"
+    echo "  ok    publishing seats the winner in the role on their own roster row"
     pass=$((pass + 1))
   else
-    echo "  FAIL  the winner's position was not installed (got '$ROSTER_AFTER_ELECTION')"
+    echo "  FAIL  the winner was not seated (got '$ROSTER_AFTER_ELECTION')"
     fail=$((fail + 1))
   fi
 
   if printf '%s' "$ROSTER_AFTER_ELECTION" \
-      | grep -q "\"memberId\":\"$MEMBER_ID\",\"positionTitle\":null"; then
-    echo "  ok    publishing clears the same title from the member who held it before"
+      | grep -q "\"memberId\":\"$MEMBER_ID\",\"positionTitle\":\"Trustee\""; then
+    echo "  ok    publishing returns the member who held the role before to Trustee"
     pass=$((pass + 1))
   else
-    echo "  FAIL  the previous holder's title was not cleared (got '$ROSTER_AFTER_ELECTION')"
+    echo "  FAIL  the previous holder was not returned to Trustee (got '$ROSTER_AFTER_ELECTION')"
     fail=$((fail + 1))
   fi
 

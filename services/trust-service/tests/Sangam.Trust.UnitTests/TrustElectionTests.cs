@@ -1,25 +1,27 @@
 using FluentAssertions;
 using Sangam.Trust.Domain.Elections;
+using Sangam.Trust.Domain.Elections.Events;
 using Xunit;
 
 namespace Sangam.Trust.UnitTests;
 
 /// <summary>
-/// An election for one Trust position: nominate, approve, vote, close,
-/// publish.
+/// An election for one Trust role: nominate, approve, vote, close, publish.
 /// </summary>
 public sealed class TrustElectionTests
 {
     private static readonly Guid TenantId = Guid.NewGuid();
     private static readonly Guid TrustId = Guid.NewGuid();
     private static readonly Guid AdminId = Guid.NewGuid();
+    private static readonly Guid RoleId = Guid.NewGuid();
     private static readonly DateTimeOffset Now = new(2026, 3, 1, 9, 0, 0, TimeSpan.Zero);
 
-    private static TrustElection Election(DateTimeOffset? now = null) =>
+    private static TrustElection Election(DateTimeOffset? now = null, int seats = 1) =>
         TrustElection.Open(
             TenantId,
             TrustId,
-            "  Treasurer  ",
+            RoleId,
+            seats,
             nominationStartAt: now ?? Now,
             nominationEndAt: (now ?? Now).AddDays(7),
             votingStartAt: (now ?? Now).AddDays(7),
@@ -27,9 +29,20 @@ public sealed class TrustElectionTests
             now ?? Now);
 
     [Fact]
-    public void Opening_trims_the_position_title()
+    public void Opening_names_the_role_and_its_seats()
     {
-        Election().PositionTitle.Should().Be("Treasurer");
+        var election = Election(seats: 3);
+
+        election.RoleId.Should().Be(RoleId);
+        election.Seats.Should().Be(3);
+    }
+
+    [Fact]
+    public void An_election_fills_at_least_one_seat()
+    {
+        var open = () => Election(seats: 0);
+
+        open.Should().Throw<ArgumentOutOfRangeException>();
     }
 
     [Fact]
@@ -135,7 +148,7 @@ public sealed class TrustElectionTests
             .BeFalse("removing now would discard votes already cast for them");
     }
 
-    // ---- Picking the winner -----------------------------------------------
+    // ---- Picking the winners ----------------------------------------------
 
     [Fact]
     public void The_highest_tally_wins()
@@ -149,7 +162,37 @@ public sealed class TrustElectionTests
 
         var tally = new Dictionary<Guid, int> { [leader.Id] = 5, [runnerUp.Id] = 3 };
 
-        election.WinnerBy(tally)!.Id.Should().Be(leader.Id);
+        election.WinnersBy(tally).Should().ContainSingle().Which.Id.Should().Be(leader.Id);
+    }
+
+    [Fact]
+    public void As_many_win_as_there_are_seats_in_tally_order()
+    {
+        var election = Election(seats: 2);
+        election.MoveTo(TrustElectionStatus.NominationsOpen, Now);
+        var first = election.Nominate(Guid.NewGuid(), AdminId, Now)!;
+        var second = election.Nominate(Guid.NewGuid(), AdminId, Now.AddMinutes(1))!;
+        var third = election.Nominate(Guid.NewGuid(), AdminId, Now.AddMinutes(2))!;
+
+        foreach (var candidate in new[] { first, second, third })
+        {
+            election.ApproveCandidate(candidate.Id, AdminId, Now);
+        }
+
+        var tally = new Dictionary<Guid, int> { [first.Id] = 1, [second.Id] = 4, [third.Id] = 3 };
+
+        election.WinnersBy(tally).Select(c => c.Id).Should().Equal(second.Id, third.Id);
+    }
+
+    [Fact]
+    public void A_short_ballot_seats_everybody_on_it()
+    {
+        var election = Election(seats: 3);
+        election.MoveTo(TrustElectionStatus.NominationsOpen, Now);
+        var only = election.Nominate(Guid.NewGuid(), AdminId, Now)!;
+        election.ApproveCandidate(only.Id, AdminId, Now);
+
+        election.WinnersBy(new Dictionary<Guid, int>()).Should().ContainSingle().Which.Id.Should().Be(only.Id);
     }
 
     [Fact]
@@ -168,13 +211,13 @@ public sealed class TrustElectionTests
 
         var tally = new Dictionary<Guid, int> { [later.Id] = 2, [earlier.Id] = 2 };
 
-        election.WinnerBy(tally)!.Id.Should().Be(earlier.Id);
+        election.WinnersBy(tally).Should().ContainSingle().Which.Id.Should().Be(earlier.Id);
     }
 
     [Fact]
     public void No_candidates_means_no_winner()
     {
-        Election().WinnerBy(new Dictionary<Guid, int>()).Should().BeNull();
+        Election().WinnersBy(new Dictionary<Guid, int>()).Should().BeEmpty();
     }
 
     // ---- Publishing -----------------------------------------------------------
@@ -184,26 +227,30 @@ public sealed class TrustElectionTests
     {
         var election = Election();
 
-        election.Publish(Guid.NewGuid(), Now).Should().BeFalse();
+        election.Publish([Guid.NewGuid()], Now).Should().BeFalse();
     }
 
     [Fact]
-    public void Publishing_freezes_the_winner_and_cannot_happen_twice()
+    public void Publishing_freezes_the_winners_and_cannot_happen_twice()
     {
         var election = Election();
         election.MoveTo(TrustElectionStatus.NominationsOpen, Now);
         election.MoveTo(TrustElectionStatus.VotingOpen, Now);
         election.MoveTo(TrustElectionStatus.Closed, Now);
 
-        var winnerId = Guid.NewGuid();
+        var winnerIds = new[] { Guid.NewGuid(), Guid.NewGuid() };
 
-        election.Publish(winnerId, Now).Should().BeTrue();
+        election.Publish(winnerIds, Now).Should().BeTrue();
         election.Status.Should().Be(TrustElectionStatus.Published);
-        election.WinnerMemberId.Should().Be(winnerId);
+        election.WinnerMemberIds.Should().Equal(winnerIds);
         election.PublishedAt.Should().Be(Now);
 
-        election.Publish(Guid.NewGuid(), Now).Should()
+        var raised = election.DomainEvents.OfType<TrustElectionResultsPublishedDomainEvent>().Should().ContainSingle().Subject;
+        raised.RoleId.Should().Be(RoleId);
+        raised.WinnerMemberIds.Should().Equal(winnerIds);
+
+        election.Publish([Guid.NewGuid()], Now).Should()
             .BeFalse("a second publish would leave \"the result\" with no single referent");
-        election.WinnerMemberId.Should().Be(winnerId, "the first result is the one that stands");
+        election.WinnerMemberIds.Should().Equal(winnerIds, "the first result is the one that stands");
     }
 }

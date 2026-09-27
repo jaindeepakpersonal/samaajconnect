@@ -13,7 +13,7 @@ import {
 } from './trust.models';
 
 /**
- * One Trust: its roster, and the elections that fill its named positions.
+ * One Trust: its roster, and the elections that fill its roles.
  *
  * No wireframe covers this - a new module. **Membership is admin-curated**,
  * so unlike Volunteer Groups there is no "Apply to join" here: the roster is
@@ -27,6 +27,11 @@ import {
  * screen gives for its own picker: a Trust's roster is small and already on
  * screen, so there is no case here for Celebrities of Samaaj's
  * Samaaj-wide autosuggest.
+ *
+ * **An election fills a role's seats.** For one seat a candidate has a Vote
+ * button; for more, each gets a tick box - capped at the seats by disabling the
+ * rest - and one "Cast my ballot" sends them together, because a ballot is
+ * final. Volunteer Groups' own ballot, copied.
  */
 @Component({
   selector: 'app-trust-detail',
@@ -68,7 +73,7 @@ import {
               <caption class="sr-only">This Trust's roster</caption>
               <tr>
                 <th scope="col">Member</th>
-                <th scope="col">Position</th>
+                <th scope="col">Role</th>
               </tr>
               @for (person of activeMembers(); track person.id) {
                 <tr>
@@ -94,10 +99,16 @@ import {
                 <h3>{{ election.positionTitle }}</h3>
                 <p>
                   <span class="pill" [class]="pillClass(election)">{{ stage(election) }}</span>
+                  · {{ election.seats }} seat{{ election.seats === 1 ? '' : 's' }}
                 </p>
 
-                @if (election.winnerMemberId; as winnerId) {
-                  <p>Elected: <b>{{ nameFor(winnerId) }}</b></p>
+                @if (election.winnerMemberIds.length > 0) {
+                  <p>
+                    Elected:
+                    @for (winnerId of election.winnerMemberIds; track winnerId; let last = $last) {
+                      <b>{{ nameFor(winnerId) }}</b>{{ last ? '' : ', ' }}
+                    }
+                  </p>
                 }
 
                 @if (electionActionError()[election.id]; as message) {
@@ -151,6 +162,13 @@ import {
                     @if (approvedCandidates(detail).length === 0) {
                       <p class="small">Nobody is on the ballot yet.</p>
                     } @else {
+                      @if (canBallot(election) && election.seats > 1) {
+                        <p class="small">
+                          Pick up to {{ election.seats }}, then cast your ballot once. It is final: you
+                          cannot come back to add another.
+                        </p>
+                      }
+
                       @for (candidate of approvedCandidates(detail); track candidate.id) {
                         <div class="candidate-row">
                           <span>{{ nameFor(candidate.memberId) }}</span>
@@ -158,26 +176,45 @@ import {
                             {{ candidate.votes }} {{ candidate.votes === 1 ? 'vote' : 'votes' }}
                           </span>
 
-                          @if (election.myVoteCandidateId === candidate.id) {
+                          @if (election.myVoteCandidateIds.includes(candidate.id)) {
                             <span class="pill ok">Your vote</span>
-                          } @else if (
-                            election.acceptsVotes &&
-                            election.myVoteCandidateId === null &&
-                            isActiveMember()
-                          ) {
+                          } @else if (canBallot(election)) {
                             @if (candidate.memberId === me()) {
                               <span class="small">You cannot vote for yourself.</span>
-                            } @else {
+                            } @else if (election.seats === 1) {
                               <button
                                 class="btn small"
                                 type="button"
                                 [disabled]="electionBusy()"
-                                (click)="castVote(election.id, candidate.id)"
+                                (click)="castVote(election.id, [candidate.id])"
                               >
                                 Vote
                               </button>
+                            } @else {
+                              <label>
+                                <input
+                                  type="checkbox"
+                                  [checked]="picked(election.id, candidate.id)"
+                                  [disabled]="!picked(election.id, candidate.id) && picks(election.id).length >= election.seats"
+                                  (change)="togglePick(election.id, candidate.id)"
+                                />
+                                Pick<span class="sr-only"> {{ nameFor(candidate.memberId) }}</span>
+                              </label>
                             }
                           }
+                        </div>
+                      }
+
+                      @if (canBallot(election) && election.seats > 1) {
+                        <div class="actions">
+                          <button
+                            class="btn"
+                            type="button"
+                            [disabled]="electionBusy() || picks(election.id).length === 0"
+                            (click)="castVote(election.id, picks(election.id))"
+                          >
+                            Cast my ballot ({{ picks(election.id).length }} of {{ election.seats }})
+                          </button>
                         </div>
                       }
                     }
@@ -227,6 +264,9 @@ export class TrustDetailComponent implements OnInit {
 
   readonly electionBusy = signal(false);
   readonly nomineeDrafts = signal<Record<string, string>>({});
+
+  /** Ticked candidates per election, before the ballot is cast. */
+  readonly ballotDrafts = signal<Record<string, readonly string[]>>({});
   readonly electionActionError = signal<Record<string, string>>({});
 
   private get id(): string {
@@ -386,13 +426,38 @@ export class TrustDetailComponent implements OnInit {
     });
   }
 
-  castVote(electionId: string, candidateId: string): void {
+  /** Whether this reader may still cast a ballot in it: voting is open, they are a trustee, and have not voted. */
+  canBallot(election: TrustElection): boolean {
+    return election.acceptsVotes && election.myVoteCandidateIds.length === 0 && this.isActiveMember();
+  }
+
+  picks(electionId: string): readonly string[] {
+    return this.ballotDrafts()[electionId] ?? [];
+  }
+
+  picked(electionId: string, candidateId: string): boolean {
+    return this.picks(electionId).includes(candidateId);
+  }
+
+  togglePick(electionId: string, candidateId: string): void {
+    const current = this.picks(electionId);
+
+    this.ballotDrafts.update((drafts) => ({
+      ...drafts,
+      [electionId]: current.includes(candidateId)
+        ? current.filter((id) => id !== candidateId)
+        : [...current, candidateId],
+    }));
+  }
+
+  castVote(electionId: string, candidateIds: readonly string[]): void {
     this.electionBusy.set(true);
     this.clearElectionActionError(electionId);
 
-    this.api.castVote(electionId, candidateId).subscribe({
+    this.api.castVote(electionId, candidateIds).subscribe({
       next: () => {
         this.electionBusy.set(false);
+        this.ballotDrafts.update((drafts) => ({ ...drafts, [electionId]: [] }));
         this.loadElections();
         this.refreshExpanded(electionId);
       },

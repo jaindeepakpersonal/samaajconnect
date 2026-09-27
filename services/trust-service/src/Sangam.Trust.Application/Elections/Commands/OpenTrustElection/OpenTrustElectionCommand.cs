@@ -8,13 +8,17 @@ using Sangam.Trust.Domain.Elections;
 namespace Sangam.Trust.Application.Elections.Commands.OpenTrustElection;
 
 /// <summary>
-/// Sets an election up for one position on one Trust's roster. It stays a
-/// Draft until an admin opens nominations.
+/// Sets an election up for one of a Trust's roles. It stays a Draft until an
+/// admin opens nominations, and fills as many seats as the role has now.
 /// </summary>
+/// <remarks>
+/// Refused for Trustee, which is not elected, and while another election for
+/// the same role is still unpublished - two would each claim the same seats.
+/// </remarks>
 [RequiresPermission(PermissionKeys.TrustManage)]
 public sealed record OpenTrustElectionCommand(
     Guid TrustId,
-    string PositionTitle,
+    Guid RoleId,
     DateTimeOffset NominationStartAt,
     DateTimeOffset NominationEndAt,
     DateTimeOffset VotingStartAt,
@@ -25,7 +29,7 @@ public sealed class OpenTrustElectionCommandValidator : AbstractValidator<OpenTr
     public OpenTrustElectionCommandValidator()
     {
         RuleFor(x => x.TrustId).NotEmpty();
-        RuleFor(x => x.PositionTitle).NotEmpty().MaximumLength(100);
+        RuleFor(x => x.RoleId).NotEmpty();
 
         RuleFor(x => x.NominationEndAt)
             .GreaterThan(x => x.NominationStartAt)
@@ -63,12 +67,35 @@ public sealed class OpenTrustElectionCommandHandler(
                 Error.NotFound("Trust.NotFound", "No such Trust in this Samaaj."));
         }
 
+        var role = trust.FindRole(command.RoleId);
+
+        if (role is null)
+        {
+            return Result.Failure<TrustElectionResponse>(
+                Error.NotFound("TrustRole.NotFound", "No such role on this Trust."));
+        }
+
+        if (!role.IsElected || role.Seats is not { } seats)
+        {
+            return Result.Failure<TrustElectionResponse>(Error.Conflict(
+                "TrustRole.NotElected",
+                "Nobody is elected to Trustee - every trustee holds it until they hold another role."));
+        }
+
+        if (await elections.AnyUnpublishedForRoleAsync(role.Id, cancellationToken))
+        {
+            return Result.Failure<TrustElectionResponse>(Error.Conflict(
+                "Election.AlreadyRunning",
+                "An election for this role is already under way. Publish it before setting up another."));
+        }
+
         var now = clock.UtcNow;
 
         var election = TrustElection.Open(
             trust.TenantId,
             trust.Id,
-            command.PositionTitle,
+            role.Id,
+            seats,
             command.NominationStartAt,
             command.NominationEndAt,
             command.VotingStartAt,
@@ -79,6 +106,6 @@ public sealed class OpenTrustElectionCommandHandler(
 
         await unitOfWork.SaveChangesAsync(cancellationToken);
 
-        return Result.Success(election.ToResponse(now, myVoteCandidateId: null));
+        return Result.Success(election.ToResponse(trust, now, []));
     }
 }

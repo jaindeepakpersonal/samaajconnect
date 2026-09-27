@@ -11,6 +11,9 @@ public interface IElectionRepository
     Task<IReadOnlyList<TrustElection>> ListForTrustAsync(
         Guid trustId, CancellationToken cancellationToken = default);
 
+    /// <summary>Whether any election for this role has not yet been published - a role being elected is not removed.</summary>
+    Task<bool> AnyUnpublishedForRoleAsync(Guid roleId, CancellationToken cancellationToken = default);
+
     void Add(TrustElection election);
 }
 
@@ -21,21 +24,24 @@ public interface IElectionRepository
 public interface IVoteRepository
 {
     /// <summary>
-    /// Has this member already voted in this election? A courtesy check for a
-    /// decent error message, and <b>not</b> the guarantee: two requests can
-    /// both pass it. The unique index on (ElectionId, VoterMemberId) is what
-    /// actually prevents a double vote.
+    /// The candidates this member picked, in order of choice - empty when they
+    /// have not voted. A courtesy check for a decent answer, and <b>not</b>
+    /// the guarantee: two requests can both find nothing. The unique indexes
+    /// are what actually prevent a second ballot.
     /// </summary>
-    Task<Vote?> FindForVoterAsync(
+    Task<IReadOnlyList<Guid>> FindForVoterAsync(
         Guid electionId, Guid voterMemberId, CancellationToken cancellationToken = default);
 
     /// <summary>
-    /// Inserts a vote directly, on its own scope, returning false when the
-    /// unique index refuses it because this member has already voted. See
+    /// Inserts one voter's whole ballot - one row per pick - on its own scope
+    /// and in one transaction, returning false when a unique index refuses any
+    /// of it because this member has already voted. Every ballot's first pick
+    /// is choice 1, so a second ballot always collides on
+    /// <c>(ElectionId, VoterMemberId, Choice)</c> and none of it lands. See
     /// volunteer-groups-service's own <c>VoteRepository.TryCastAsync</c> for
     /// why this writes on its own connection rather than the request's.
     /// </summary>
-    Task<bool> TryCastAsync(Vote vote, CancellationToken cancellationToken = default);
+    Task<bool> TryCastAsync(IReadOnlyList<Vote> ballot, CancellationToken cancellationToken = default);
 
     /// <summary>The tally, as a GROUP BY rather than a count over loaded rows.</summary>
     Task<IReadOnlyDictionary<Guid, int>> TallyAsync(

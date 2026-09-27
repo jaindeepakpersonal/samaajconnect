@@ -1057,12 +1057,28 @@ export interface TrustMember {
   readonly id: string;
   readonly trustId: string;
   readonly memberId: string;
+
+  /** The title of the role they hold - "Trustee" unless they hold another. */
   readonly positionTitle: string | null;
+  readonly roleId: string;
   readonly status: TrustMemberStatus;
   readonly addedBy: string;
   readonly addedAt: string;
   readonly removedBy: string | null;
   readonly removedAt: string | null;
+}
+
+/**
+ * One of a Trust's roles. Mirrors `TrustRoleResponse`. Trustee is built in:
+ * no seat limit, never elected, never edited.
+ */
+export interface TrustRole {
+  readonly id: string;
+  readonly title: string;
+  readonly kind: 'Trustee' | 'Elected';
+  readonly seats: number | null;
+  readonly holders: number;
+  readonly isElected: boolean;
 }
 
 export type TrustElectionStatus = 'Draft' | 'NominationsOpen' | 'VotingOpen' | 'Closed' | 'Published';
@@ -1082,11 +1098,17 @@ export interface TrustElection {
   readonly status: TrustElectionStatus;
   readonly acceptsNominations: boolean;
   readonly acceptsVotes: boolean;
-  readonly myVoteCandidateId: string | null;
+  readonly myVoteCandidateIds: readonly string[];
   readonly candidateCount: number;
-  readonly winnerMemberId: string | null;
+
+  /** Ranked; empty until published. */
+  readonly winnerMemberIds: readonly string[];
   readonly publishedAt: string | null;
   readonly createdAt: string;
+  readonly roleId: string;
+
+  /** How many it fills, and the most one ballot may pick. */
+  readonly seats: number;
 }
 
 /** A Trust election's vote counts are never hidden - it has no results-visibility setting. */
@@ -1105,7 +1127,7 @@ export interface TrustElectionDetail {
 
 /** What opening an election sends. */
 export interface TrustElectionInput {
-  readonly positionTitle: string;
+  readonly roleId: string;
   readonly nominationStartAt: string;
   readonly nominationEndAt: string;
   readonly votingStartAt: string;

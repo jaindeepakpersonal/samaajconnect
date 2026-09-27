@@ -480,32 +480,38 @@ collections ledger (below, after the election entities).
 
 **Trust** — `Id, TenantId, LocalityId, Name, Status (Active/Inactive),
 CreatedAt` — unique on `(TenantId, LocalityId)`: exactly one Trust per
-locality. `LocalityId` is a loose reference into master-data-service's
+locality. Owns **TrustRole** (`trust_roles`: `Id, TrustId, Title, Kind
+(Trustee/Elected), Seats (nullable - null for Trustee), CreatedAt`): Trustee
+is built into every Trust, and every other role is the Trust's own, with the
+seats an election for it fills. `LocalityId` is a loose reference into master-data-service's
 `Locality`, with no referential integrity across the service boundary — the
 same convention `Business.LocalityId` and `BiodataProfile.LocalityId`
 already use.
 
-**TrustMember** — `Id, TenantId, TrustId, MemberId, PositionTitle (nullable
-free text — grants nothing), Status (Active/Removed), AddedBy, AddedAt,
+**TrustMember** — `Id, TenantId, TrustId, MemberId, RoleId (Trustee unless
+they hold another — grants nothing), Status (Active/Removed), AddedBy, AddedAt,
 RemovedBy (nullable), RemovedAt (nullable)` — its own aggregate, not owned
 by `Trust`, so a roster change raises its own event, the same reasoning
 panch-service's `PanelMember` gives for standing apart from its election.
 Unique on `(TrustId, MemberId)`: at most one row per pair ever — re-adding a
 previously removed member reactivates that same row rather than inserting a
-second one. `PositionTitle` is set by hand (phase 1) or installed by a
-published `TrustElection` (phase 2) — both paths go through the same
-`UpdatePosition` method, so there is one way a position is ever held.
+second one. `RoleId` is set by hand or by a published `TrustElection` —
+both paths go through the same `AssignRole` method, so there is one way a
+role is ever held. Free-text `PositionTitle` was replaced by roles on
+2026-09-27; the `TrustRoles` migration carried every title across.
 
-**TrustElection** — `Id, TenantId, TrustId, PositionTitle, NominationStartAt,
+**TrustElection** — `Id, TenantId, TrustId, RoleId, Seats, NominationStartAt,
 NominationEndAt, VotingStartAt, VotingEndAt, Status
 (Draft/NominationsOpen/VotingOpen/Closed/Published), CreatedAt, ClosedAt
-(nullable), WinnerMemberId (nullable), PublishedAt (nullable)` — copies
+(nullable), WinnerMemberIds (uuid[], ranked; empty until published),
+PublishedAt (nullable)` — copies
 volunteer-groups-service's `GroupElection` shape. Owns `TrustElectionCandidate`
 (`Id, ElectionId, MemberId, NominatedBy, NominatedAt, Status
 (Nominated/Approved), ApprovedBy (nullable), ApprovedAt (nullable)`; unique
 on `(ElectionId, MemberId)`) and does not own `Vote` (`Id, ElectionId,
-CandidateId, VoterMemberId, CreatedAt`; unique on `(ElectionId,
-VoterMemberId)` — the double-voting guarantee, written directly rather than
+CandidateId, VoterMemberId, Choice, CreatedAt` - one row per pick on a
+ballot; unique on `(ElectionId, VoterMemberId, Choice)` and `(ElectionId,
+VoterMemberId, CandidateId)` — the one-ballot guarantee, written directly rather than
 through the aggregate, the same shape every election on this platform uses).
 The electorate for nominating and voting is the Trust's own active
 `TrustMember` roster, not the whole Samaaj.

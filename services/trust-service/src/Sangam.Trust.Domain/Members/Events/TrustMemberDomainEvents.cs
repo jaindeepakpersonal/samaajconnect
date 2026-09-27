@@ -11,7 +11,7 @@ public sealed record TrustMemberAddedDomainEvent(
     Guid TenantId,
     Guid TrustId,
     Guid MemberId,
-    string? PositionTitle,
+    Guid RoleId,
     Guid AddedBy,
     DateTimeOffset OccurredAt) : IDomainEvent
 {
@@ -24,7 +24,7 @@ public sealed record TrustMemberUpdatedDomainEvent(
     Guid TenantId,
     Guid TrustId,
     Guid MemberId,
-    string? PositionTitle,
+    Guid RoleId,
     Guid UpdatedBy,
     DateTimeOffset OccurredAt) : IDomainEvent
 {

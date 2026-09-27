@@ -33,6 +33,6 @@ public sealed class ListTrustMembersQueryHandler(
             .OrderBy(m => m.Status == TrustMemberStatus.Active ? 0 : 1)
             .ThenBy(m => m.AddedAt);
 
-        return Result.Success<IReadOnlyList<TrustMemberResponse>>([.. ordered.Select(m => m.ToResponse())]);
+        return Result.Success<IReadOnlyList<TrustMemberResponse>>([.. ordered.Select(m => m.ToResponse(trust))]);
     }
 }

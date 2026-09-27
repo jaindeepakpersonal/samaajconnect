@@ -38,7 +38,8 @@ function rosterMember(overrides: Partial<TrustMember> = {}): TrustMember {
     id: 'tm1',
     trustId: TRUST_ID,
     memberId: ME,
-    positionTitle: null,
+    positionTitle: 'Trustee',
+    roleId: 'r0',
     status: 'Active',
     addedBy: 'admin1',
     addedAt: '2026-09-02T00:00:00Z',
@@ -60,11 +61,13 @@ function election(overrides: Partial<TrustElection> = {}): TrustElection {
     status: 'NominationsOpen',
     acceptsNominations: true,
     acceptsVotes: false,
-    myVoteCandidateId: null,
+    myVoteCandidateIds: [],
     candidateCount: 0,
-    winnerMemberId: null,
+    winnerMemberIds: [],
     publishedAt: null,
     createdAt: '2026-08-25T00:00:00Z',
+    roleId: 'r1',
+    seats: 1,
     ...overrides,
   };
 }
@@ -161,5 +164,80 @@ describe('TrustDetailComponent', () => {
     fixture.detectChanges();
 
     expect(text()).toContain('You cannot vote for yourself');
+  });
+
+  it('casts a multi-seat ballot once, capped at the seats', () => {
+    const votingElection = election({
+      positionTitle: 'Secretary',
+      status: 'VotingOpen',
+      acceptsNominations: false,
+      acceptsVotes: true,
+      seats: 2,
+    });
+
+    load(
+      [rosterMember(), rosterMember({ id: 'tm2', memberId: 'm2' }), rosterMember({ id: 'tm3', memberId: 'm3' }),
+        rosterMember({ id: 'tm4', memberId: 'm4' })],
+      [votingElection],
+    );
+    for (const id of ['m2', 'm3', 'm4']) {
+      http.expectOne(`/v1/members/${id}`).flush({ id, fullName: 'Member ' + id });
+    }
+
+    fixture.componentInstance.toggleElection('e1');
+
+    const candidates = ['m2', 'm3', 'm4'].map((memberId, i) => ({
+      id: 'c' + i,
+      memberId,
+      status: 'Approved' as const,
+      nominatedBy: ME,
+      votes: 0,
+    }));
+
+    http.expectOne('/v1/trust/elections/e1').flush({ election: votingElection, candidates });
+    fixture.detectChanges();
+
+    expect(text()).toContain('Pick up to 2');
+
+    const boxes = () => [...(fixture.nativeElement as HTMLElement).querySelectorAll<HTMLInputElement>('input[type="checkbox"]')];
+
+    expect(boxes()).toHaveLength(3);
+
+    boxes()[0]!.click();
+    boxes()[1]!.click();
+    fixture.detectChanges();
+
+    expect(boxes()[2]!.disabled).toBe(true);
+    expect(text()).toContain('Cast my ballot (2 of 2)');
+
+    fixture.componentInstance.castVote('e1', fixture.componentInstance.picks('e1'));
+
+    const request = http.expectOne('/v1/trust/elections/e1/votes');
+    expect(request.request.body).toEqual({ candidateIds: ['c0', 'c1'] });
+    request.flush({ electionId: 'e1', candidateIds: ['c0', 'c1'], accepted: true });
+
+    http.expectOne(`/v1/trust/trusts/${TRUST_ID}/elections`).flush([
+      { ...votingElection, myVoteCandidateIds: ['c0', 'c1'] },
+    ]);
+    http.expectOne('/v1/trust/elections/e1').flush({
+      election: { ...votingElection, myVoteCandidateIds: ['c0', 'c1'] },
+      candidates,
+    });
+    fixture.detectChanges();
+
+    expect(text().match(/Your vote/g)).toHaveLength(2);
+  });
+
+  it('names every winner of a published election', () => {
+    load(
+      [rosterMember(), rosterMember({ id: 'tm2', memberId: 'm2' })],
+      [election({ status: 'Published', acceptsNominations: false, seats: 2, winnerMemberIds: [ME, 'm2'] })],
+    );
+    http.expectOne('/v1/members/m2').flush({ id: 'm2', fullName: 'Aarav Jain' });
+    fixture.detectChanges();
+
+    expect(text()).toContain('Elected:');
+    expect(text()).toContain('You');
+    expect(text()).toContain('Aarav Jain');
   });
 });

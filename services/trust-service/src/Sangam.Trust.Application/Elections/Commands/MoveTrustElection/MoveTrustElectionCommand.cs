@@ -33,6 +33,7 @@ public sealed class MoveTrustElectionCommandValidator : AbstractValidator<MoveTr
 }
 
 public sealed class MoveTrustElectionCommandHandler(
+    ITrustRepository trusts,
     IElectionRepository elections,
     IUnitOfWork unitOfWork,
     IDateTimeProvider clock)
@@ -42,8 +43,9 @@ public sealed class MoveTrustElectionCommandHandler(
         MoveTrustElectionCommand command, CancellationToken cancellationToken)
     {
         var election = await elections.GetByIdAsync(command.ElectionId, cancellationToken);
+        var trust = election is null ? null : await trusts.GetByIdAsync(election.TrustId, cancellationToken);
 
-        if (election is null)
+        if (election is null || trust is null)
         {
             return Result.Failure<TrustElectionResponse>(
                 Error.NotFound("Election.NotFound", "No such election in this Samaaj."));
@@ -69,6 +71,6 @@ public sealed class MoveTrustElectionCommandHandler(
 
         await unitOfWork.SaveChangesAsync(cancellationToken);
 
-        return Result.Success(election.ToResponse(now, myVoteCandidateId: null));
+        return Result.Success(election.ToResponse(trust, now, []));
     }
 }
