@@ -970,6 +970,79 @@ export interface Trust {
   readonly createdAt: string;
 }
 
+// ---- Trust finance ------------------------------------------------------------
+//
+// Amounts are integer paise, converted only by libs/shared's money helpers.
+
+export type TrustDonationMode = 'Cash' | 'Cheque' | 'Upi' | 'BankTransfer';
+
+/** Mirrors `DonationResponse`. A pledge has no receipt number until it is collected. */
+export interface TrustDonation {
+  readonly id: string;
+  readonly trustId: string;
+  readonly donorMemberId: string | null;
+  readonly donorName: string | null;
+  readonly donorPhone: string | null;
+  readonly amount: number;
+  readonly purpose: string;
+  readonly mode: TrustDonationMode;
+  readonly status: 'Pledged' | 'Collected';
+  readonly receiptNumber: number | null;
+  readonly recordedBy: string;
+  readonly createdAt: string;
+  readonly collectedBy: string | null;
+  readonly collectedAt: string | null;
+}
+
+export interface TrustDonationInput {
+  readonly donorMemberId: string | null;
+  readonly donorName: string | null;
+  readonly donorPhone: string | null;
+  readonly amount: number;
+  readonly purpose: string;
+  readonly mode: TrustDonationMode;
+}
+
+/** Mirrors `ExpenseResponse`. */
+export interface TrustExpense {
+  readonly id: string;
+  readonly trustId: string;
+  readonly category: string;
+  readonly description: string;
+  readonly amount: number;
+  readonly vendor: string | null;
+  readonly status: 'Recorded' | 'Approved';
+  readonly recordedBy: string;
+  readonly recordedAt: string;
+  readonly approvedBy: string | null;
+  readonly approvedAt: string | null;
+}
+
+export interface TrustExpenseInput {
+  readonly category: string;
+  readonly description: string;
+  readonly amount: number;
+  readonly vendor: string | null;
+}
+
+/**
+ * Mirrors `CollectionResponse`: an amount due to a Trust. Today these are
+ * opened by a published Boli result in the Trust's locality, owed by its winner.
+ */
+export interface TrustCollection {
+  readonly id: string;
+  readonly trustId: string;
+  readonly sourceType: 'Donation' | 'BoliResult';
+  readonly sourceId: string;
+  readonly payerMemberId: string | null;
+  readonly amount: number;
+  readonly status: 'Due' | 'Collected';
+  readonly mode: string | null;
+  readonly collectedBy: string | null;
+  readonly collectedAt: string | null;
+  readonly createdAt: string;
+}
+
 export type TrustMemberStatus = 'Active' | 'Removed';
 
 /** One row on a Trust's roster. Mirrors `TrustMemberResponse`. */

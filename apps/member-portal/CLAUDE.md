@@ -38,7 +38,7 @@ before translating another screen.
 | Competition detail | `/competitions/:id` | — | built. Rounds and entries, a judging section visible only to an assigned judge, and the published result |
 | Samaaj Panch | `/panch` | — | built; no wireframe covers it. Who sits on the Panch, and the elections |
 | Panch election | `/panch/:id` | — | built. Nominate somebody by name, cast one final ballot of up to ten, read the result |
-| Trusts | `/trust` | — | built; no wireframe covers this new module. Our Samaaj's locality Trusts, read-only |
+| Trusts | `/trust` | — | built; no wireframe covers this new module. Our Samaaj's locality Trusts, read-only, with a "What you owe" card above them when a Boli the member won has fallen due to a Trust |
 | Trust detail | `/trust/:id` | — | built. Roster, and its elections - nominate a fellow trustee, vote, see the result |
 | Pathshala events | — | `#pathevents` | not built — no endpoint exists |
 | Set your password | `/activate` | — | built; no wireframe covers redeeming an activation code, and three admin screens told people to do it here |

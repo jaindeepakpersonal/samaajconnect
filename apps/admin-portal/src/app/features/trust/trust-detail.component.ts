@@ -15,6 +15,11 @@ import {
   TrustMember,
 } from '../../core/admin.models';
 import { isNotFound } from '../../core/http-status';
+import { TrustCollectionsComponent } from './trust-collections.component';
+import { TrustDonationsComponent } from './trust-donations.component';
+import { TrustExpensesComponent } from './trust-expenses.component';
+
+export type TrustTab = 'people' | 'donations' | 'expenses' | 'collections';
 
 /**
  * One Trust: its roster, and the elections that fill its named positions.
@@ -44,10 +49,22 @@ import { isNotFound } from '../../core/http-status';
  * screen almost exactly** - nominate/approve/vote/publish, one button per
  * stage, a confirmed publish - copied deliberately rather than shared, per
  * this repo's own "copy the template, don't couple services" rule.
+ *
+ * **The money is three more tabs**, each its own component loading when
+ * opened: donations (pledged, then collected against a receipt number),
+ * expenses (recorded, then approved) and collections (what a Boli winner owes
+ * this Trust). All three are `Trust.Manage`, like everything else here.
  */
 @Component({
   selector: 'app-trust-detail',
-  imports: [FormsModule, DatePipe, RouterLink],
+  imports: [
+    FormsModule,
+    DatePipe,
+    RouterLink,
+    TrustDonationsComponent,
+    TrustExpensesComponent,
+    TrustCollectionsComponent,
+  ],
   template: `
     <p><a class="btn link" routerLink="/trust">← Trusts</a></p>
 
@@ -70,6 +87,34 @@ import { isNotFound } from '../../core/http-status';
         · {{ activeMembers().length }} trustee{{ activeMembers().length === 1 ? '' : 's' }}
       </p>
 
+      <div class="tabs" role="tablist" aria-label="This Trust">
+        @for (item of tabs; track item.value) {
+          <button
+            type="button"
+            role="tab"
+            [id]="'trust-tab-' + item.value"
+            [class.on]="tab() === item.value"
+            [attr.aria-selected]="tab() === item.value"
+            aria-controls="trust-tab-panel"
+            (click)="selectTab(item.value)"
+          >
+            {{ item.label }}
+          </button>
+        }
+      </div>
+
+      <div id="trust-tab-panel" role="tabpanel" [attr.aria-labelledby]="'trust-tab-' + tab()">
+      @switch (tab()) {
+      @case ('donations') {
+        <app-trust-donations [trustId]="found.id" [names]="memberNames()" />
+      }
+      @case ('expenses') {
+        <app-trust-expenses [trustId]="found.id" [names]="memberNames()" />
+      }
+      @case ('collections') {
+        <app-trust-collections [trustId]="found.id" [names]="memberNames()" />
+      }
+      @default {
       <!-- Roster ------------------------------------------------------- -->
       <div class="card">
         <h2>Roster</h2>
@@ -363,6 +408,9 @@ import { isNotFound } from '../../core/http-status';
           }
         }
       </div>
+      }
+      }
+      </div>
     }
   `,
   styles: `
@@ -454,6 +502,18 @@ export class TrustDetailComponent implements OnInit {
 
   private readonly names = signal<ReadonlyMap<string, string>>(new Map());
 
+  /** The same names, for the money tabs' payers, donors and approvers. */
+  readonly memberNames = this.names.asReadonly();
+
+  readonly tabs: readonly { value: TrustTab; label: string }[] = [
+    { value: 'people', label: 'Roster & elections' },
+    { value: 'donations', label: 'Donations' },
+    { value: 'expenses', label: 'Expenses' },
+    { value: 'collections', label: 'Collections' },
+  ];
+
+  readonly tab = signal<TrustTab>('people');
+
   private get id(): string {
     return this.route.snapshot.paramMap.get('id') ?? '';
   }
@@ -485,6 +545,12 @@ export class TrustDetailComponent implements OnInit {
 
   ngOnInit(): void {
     this.load();
+  }
+
+  selectTab(tab: TrustTab): void {
+    this.done.set(null);
+    this.error.set(null);
+    this.tab.set(tab);
   }
 
   memberName(memberId: string): string {

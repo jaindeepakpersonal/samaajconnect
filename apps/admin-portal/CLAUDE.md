@@ -36,7 +36,7 @@ screen. The spec is `docs/product/wireframes/admin-panel-wireframes.html`.
 | Volunteer Groups | `/groups` | `#groups` (member-facing) | built. Create (president optional), set a president later, and stand one down |
 | Group roles & elections | `/groups/:id` | — | built; no wireframe covers running one. Define volunteer roles and their seats, assign them, open an election for any role, approve nominations, move its stages, publish - the president or an administrator of the group |
 | Trusts | `/trust` | — | built; no wireframe covers this new module. This Samaaj's locality Trusts, and setting one up |
-| Trust detail | `/trust/:id` | — | built; no wireframe covers running one. Roster (add/change position/remove), and its elections - open, approve nominations, move stages, publish |
+| Trust detail | `/trust/:id` | — | built; no wireframe covers running one. Tabs: roster and elections (add/change position/remove; open, approve nominations, move stages, publish), donations (pledge, then collect against a receipt number), expenses (record, approve), collections (what a Boli winner owes; record the payment) |
 | Social Issues | `/issues` | `#issues` | built. The reviewer's approval queue |
 | Members | `/members` | `#members` | built. Search the Samaaj directory and open somebody |
 | Member detail | `/members/:id` | — | built; the wireframe's "View" had no screen behind it. The correction form |
@@ -935,6 +935,17 @@ the same one Invite Admin's "existing member" mode uses, since a Samaaj's
 whole membership is not already on screen the way a small group's roster is)
 and "Remove", with no confirmation on either - reversible, since re-adding a
 removed member reactivates their old row rather than refusing them.
+
+**A Trust's money is three more tabs on its page (2026-09-27)**, each its own
+component loading when opened, the roster and elections staying the first tab
+so nothing about them moved. Donations are recorded as pledges and marked
+collected, which is when trust-service issues the receipt number - the
+screen shows pledged and collected totals separately, because what was
+promised and what arrived are different questions. Expenses are recorded and
+then approved, with both names shown. Collections has no create form at all:
+an amount falls due only when a Boli in the Trust's locality has its result
+announced, owed by the winner, and the tab records how it was paid. Names
+(donors, approvers, payers) come from the page's one directory call.
 
 **There is no `iCanLead`/president-equivalent split here, and that is a real
 difference from Volunteer Groups, not an oversight.** A Trust's positions are

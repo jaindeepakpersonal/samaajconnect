@@ -109,3 +109,17 @@ export function trustElectionStageLabel(election: TrustElection): string {
       return 'Result published';
   }
 }
+
+/**
+ * Mirrors `CollectionResponse`, as `/collections/mine` returns it: an amount
+ * this member owes a Trust - today, a Boli they won in its locality. Integer
+ * paise.
+ */
+export interface TrustDue {
+  readonly id: string;
+  readonly trustId: string;
+  readonly sourceType: 'Donation' | 'BoliResult';
+  readonly sourceId: string;
+  readonly amount: number;
+  readonly createdAt: string;
+}

@@ -46,3 +46,18 @@
 .candidate-row + .candidate-row {
   border-top: 1px solid var(--line);
 }
+
+/* What the member owes: above the Trusts, one line per amount. */
+.dues {
+  margin-bottom: var(--space-4);
+}
+
+.plain-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.plain-list li + li {
+  margin-top: var(--space-2);
+}

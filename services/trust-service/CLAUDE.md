@@ -8,15 +8,12 @@ the roster of trustees who run it.
 Behind the `trust` module key, **off by default**: a Samaaj switches it on
 once it organises itself by locality Trusts.
 
-**This is phase 2 of a larger plan.** The full scope discussed for this
-service is: add/update/delete trust members (phase 1, shipped); elections
-and positions of trustees (phase 2, this one); donation management; expense
-management; and payment collection against both donations and Boli (auction)
-results — with Boli itself becoming locality-wise so a Trust's own officer
-eventually runs its locality's auctions. Donations, expenses and collection
-are not built yet. See "Decisions worth knowing before you change this
-service" for what each later phase is expected to need and why it was
-deliberately left out of this one.
+**Built in three phases.** Add/update/delete trust members (phase 1);
+elections and positions of trustees (phase 2); and the Trust's money
+(phase 3, 2026-09-27) - donations, expenses, and a collections ledger that a
+published Boli result in the Trust's locality opens against its winner. See
+"The Trust's money" below. What is still open is whether Boli management
+itself should be gated by a caller's Trust position.
 
 ## Entities
 
@@ -27,6 +24,9 @@ deliberately left out of this one.
 | `TrustElection` | Aggregate root. An election for one named position on one Trust's roster — nominate, approve, vote, close, publish. Owns its `TrustElectionCandidate`s and **not** its votes. Copies volunteer-groups-service's `GroupElection` shape; see "Elections" below |
 | `TrustElectionCandidate` | Owned by `TrustElection`. Nominated → Approved onto the ballot, or removed before voting opens |
 | `Vote` | One Trust member's one vote in one election. Written directly, outside the aggregate — see "The guarantee" |
+| `Donation` | Aggregate root. Pledged, then Collected with the Trust's next receipt number. A member or a named donor with an optional phone. Integer paise |
+| `Expense` | Aggregate root. Recorded, then Approved. Category, description, amount, optional vendor |
+| `Collection` | Aggregate root. An amount due to the Trust from a source (`BoliResult`, or `Donation`), owed by `PayerMemberId`. Due, then Collected with a mode. One per source |
 
 `LocalityId` is a loose reference into master-data-service's `Locality`, with
 no referential integrity across the service boundary — the same convention
@@ -47,6 +47,12 @@ no referential integrity across the service boundary — the same convention
 | `DecideTrustCandidateCommand` | `Trust.Manage` | Approve onto the ballot, or remove before voting opens |
 | `CastTrustVoteCommand` | `Members.Read` + active member of this Trust | Self-votes refused. A repeat vote is reported as accepted:false |
 | `PublishTrustElectionResultsCommand` | `Trust.Manage` | Only from `Closed`. Installs the winner's position via `TrustMember.UpdatePosition`, clearing the same title from any other active member who held it. Publishing twice is safe and does not reinstall |
+| `RecordDonationCommand` | `Trust.Manage` | A pledge: a member or a donor name, optional phone, amount, purpose, mode. No receipt number yet |
+| `MarkDonationCollectedCommand` | `Trust.Manage` | Issues the Trust's next receipt number. 409 on one already collected |
+| `RecordExpenseCommand` | `Trust.Manage` | Starts `Recorded` |
+| `ApproveExpenseCommand` | `Trust.Manage` | Approving one already approved is success and changes nothing |
+| `RecordCollectionPaymentCommand` | `Trust.Manage` | Records the mode it was paid by. 409 once paid |
+| `ConsumeIntegrationEventCommand` | `[InternalRequest]` | Opens a `Due` Collection from `boli.result.published.v1` - see "The Trust's money" |
 
 ## Queries
 
@@ -57,6 +63,10 @@ no referential integrity across the service boundary — the same convention
 | `ListTrustMembersQuery` | `Members.Read` | One Trust's roster, active members first |
 | `ListTrustElectionsQuery` | `Members.Read` | This Trust's elections, newest first, with the caller's own vote on each |
 | `GetTrustElectionQuery` | `Members.Read` | One election with its ballot and tally — never hidden |
+| `ListDonationsQuery` | `Trust.Manage` | Newest first, optionally one status |
+| `ListExpensesQuery` | `Trust.Manage` | Newest first, optionally one status |
+| `ListCollectionsQuery` | `Trust.Manage` | Newest first, optionally one status, each with who owes it |
+| `ListMyDuesQuery` | `Members.Read` | What the caller still owes to any Trust, oldest first. The payer is the signed-in member, never a parameter |
 
 ## Events published
 
@@ -67,10 +77,35 @@ no referential integrity across the service boundary — the same convention
 - `TrustMemberRemovedDomainEvent` — `trust.member.removed.v1`
 - `TrustElectionStatusChangedDomainEvent` — `trust.election.status-changed.v1`
 - `TrustElectionResultsPublishedDomainEvent` — `trust.election.results-published.v1`
+- `DonationRecordedDomainEvent` — `trust.donation.recorded.v1`; `DonationCollectedDomainEvent` — `trust.donation.collected.v1`
+- `ExpenseRecordedDomainEvent` — `trust.expense.recorded.v1`; `ExpenseApprovedDomainEvent` — `trust.expense.approved.v1`
+- `CollectionDueDomainEvent` — `trust.collection.due.v1` (ids, amount and payer); `CollectionSettledDomainEvent` — `trust.collection.settled.v1`
 
 ## Events consumed
 
-None. A leaf service, like volunteer-groups-service and timeline-service.
+`boli.result.published.v1`, by `IntegrationEventConsumer` on one explicit
+topic, group `trust-service` (both in `ConsumerOptions`, not appsettings - the
+rule pathshala-service's options explain).
+
+## The Trust's money
+
+Added 2026-09-27. Amounts are integer paise throughout.
+
+**A pledge and a receipt are two steps.** A donation is recorded `Pledged`
+with no receipt number; marking it collected issues the Trust's next number.
+A number on a slip therefore always means money received.
+
+**A published Boli result opens what its winner owes.** boli-service's
+`boli.result.published.v1` carries the occasion's `LocalityId` (added for
+this); `ConsumeIntegrationEventCommand` finds this Samaaj's Trust for that
+locality, past the tenant filter since a consumer has no request, and opens a
+`Due` Collection with the winner as `PayerMemberId`. A Samaaj-wide Boli, or a
+locality with no Trust, opens nothing. Nothing on either screen creates a
+Collection by hand - a typed figure would be a debt nobody incurred.
+
+**The winner sees it.** `ListMyDuesQuery` answers the member portal's "What
+you owe" card; a Trust officer records the payment and its mode in the admin
+panel, which takes it off that card.
 
 ## API endpoints
 
@@ -92,6 +127,27 @@ unique index, not a convention. `AddTrustMemberCommandHandler` reads any
 existing row for the pair first and either creates, reactivates, or no-ops —
 but the index is what would refuse a genuine race between two adds, not that
 read.
+
+**A receipt number names exactly one donation.** Numbers run from 1 per
+Trust. `IDonationRepository.ReserveNextReceiptNumberAsync` takes
+`pg_advisory_xact_lock(namespace, trust key)` inside the request's own
+transaction, then reads `MAX(receipt_number) + 1` past the tenant filter - the
+sequence is everything this Trust has issued. The key is the Trust id's bytes
+folded to 32 bits by hand, not `GetHashCode`, so every replica takes the same
+lock. The filtered unique index on `(TrustId, ReceiptNumber)` is the backstop
+for a reservation made outside a transaction, where the lock would be
+released as soon as it was taken.
+
+**One `Collection` per source, ever.** A unique index on
+`(SourceType, SourceId)`. `ICollectionRepository.TryOpenAsync` inserts on its
+own scope and catches `23505`, the `TryAddAsync` shape, which is what makes a
+redelivered `boli.result.published.v1` a no-op rather than a second amount
+due. The refused insert's `trust.collection.due.v1` outbox row is discarded
+with it.
+
+`TrustFinanceRepositoryTests` holds all three: ten concurrent collections
+getting 1-10, the index refusing a duplicate number, and the Boli consumer
+opening one Collection however often the event arrives.
 
 **At most one vote per `(ElectionId, VoterMemberId)`.** The unique index on
 `trust_election_votes`, not `CastTrustVoteCommandHandler`'s own courtesy
@@ -167,24 +223,22 @@ needing a second table for "current roster" versus "history".
 
 **What the later phases will need, so this phase doesn't foreclose them:**
 
-- *Donations, expenses, and a payment-collection ledger* — expected to be new
-  aggregates in this same service (`Donation`, `Expense`, `Collection`), with
-  `Collection` generalised over a `SourceType` (`Donation` vs `BoliResult`)
-  rather than duplicating collection logic per source.
-- *A locality-wise Boli* — a separate, later change to `boli-service` itself
-  (adding `LocalityId` to `BoliOccasion`), deliberately decoupled from this
-  service for now so neither build blocks the other. The intended integration
-  point once both exist is this service consuming `boli.result.published.v1`
-  to open a `Due` `Collection` row against the winning member — see that
-  event's own descriptor in audit-notification-service's `KnownEvents.cs` for
-  what it already carries. Whether `Boli.Manage`/`Boli.PublishResults` should
+- *Donations, expenses, and a payment-collection ledger* — built as planned
+  (phase 3): `Donation`, `Expense` and `Collection` aggregates here, with
+  `Collection` generalised over a `SourceType` rather than one ledger per
+  source. Only `BoliResult` opens one today; `Donation` is there for pledges
+  that should be chased the same way.
+- *A locality-wise Boli* — done: `BoliOccasion` has a `LocalityId`, its
+  result event carries it, and this service consumes it (see "The Trust's
+  money"). Whether `Boli.Manage`/`Boli.PublishResults` should
   eventually be gated by a caller's Trust position, rather than staying
   Samaaj-wide, was deliberately deferred past this phase.
 
 ## Dependencies
 
 - PostgreSQL — `samaajconnect_trust`
-- Kafka via the Outbox (`OutboxDispatcher`), publishing only
+- Kafka via the Outbox (`OutboxDispatcher`), publishing; and one consumer
+  (`IntegrationEventConsumer`) on `boli.result.published.v1`
 - No Redis dependency
 
 ## Testing

@@ -22,6 +22,161 @@ namespace Sangam.Trust.Infrastructure.Persistence.Migrations
 
             NpgsqlModelBuilderExtensions.UseIdentityByDefaultColumns(modelBuilder);
 
+            modelBuilder.Entity("Sangam.Trust.Domain.Collections.Collection", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<long>("Amount")
+                        .HasColumnType("bigint")
+                        .HasColumnName("amount");
+
+                    b.Property<DateTimeOffset?>("CollectedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("collected_at");
+
+                    b.Property<Guid?>("CollectedBy")
+                        .HasColumnType("uuid")
+                        .HasColumnName("collected_by");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at");
+
+                    b.Property<string>("Mode")
+                        .HasMaxLength(50)
+                        .HasColumnType("character varying(50)")
+                        .HasColumnName("mode");
+
+                    b.Property<Guid?>("PayerMemberId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("payer_member_id");
+
+                    b.Property<Guid>("SourceId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("source_id");
+
+                    b.Property<string>("SourceType")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)")
+                        .HasColumnName("source_type");
+
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)")
+                        .HasColumnName("status");
+
+                    b.Property<Guid>("TenantId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("tenant_id");
+
+                    b.Property<Guid>("TrustId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("trust_id");
+
+                    b.HasKey("Id")
+                        .HasName("pk_trust_collections");
+
+                    b.HasIndex("PayerMemberId")
+                        .HasDatabaseName("ix_trust_collections_payer_member_id");
+
+                    b.HasIndex("SourceType", "SourceId")
+                        .IsUnique()
+                        .HasDatabaseName("ix_trust_collections_source_type_source_id");
+
+                    b.HasIndex("TrustId", "CreatedAt")
+                        .HasDatabaseName("ix_trust_collections_trust_id_created_at");
+
+                    b.ToTable("trust_collections", (string)null);
+                });
+
+            modelBuilder.Entity("Sangam.Trust.Domain.Donations.Donation", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<long>("Amount")
+                        .HasColumnType("bigint")
+                        .HasColumnName("amount");
+
+                    b.Property<DateTimeOffset?>("CollectedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("collected_at");
+
+                    b.Property<Guid?>("CollectedBy")
+                        .HasColumnType("uuid")
+                        .HasColumnName("collected_by");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at");
+
+                    b.Property<Guid?>("DonorMemberId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("donor_member_id");
+
+                    b.Property<string>("DonorName")
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)")
+                        .HasColumnName("donor_name");
+
+                    b.Property<string>("DonorPhone")
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)")
+                        .HasColumnName("donor_phone");
+
+                    b.Property<string>("Mode")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)")
+                        .HasColumnName("mode");
+
+                    b.Property<string>("Purpose")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)")
+                        .HasColumnName("purpose");
+
+                    b.Property<int?>("ReceiptNumber")
+                        .HasColumnType("integer")
+                        .HasColumnName("receipt_number");
+
+                    b.Property<Guid>("RecordedBy")
+                        .HasColumnType("uuid")
+                        .HasColumnName("recorded_by");
+
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)")
+                        .HasColumnName("status");
+
+                    b.Property<Guid>("TenantId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("tenant_id");
+
+                    b.Property<Guid>("TrustId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("trust_id");
+
+                    b.HasKey("Id")
+                        .HasName("pk_trust_donations");
+
+                    b.HasIndex("TrustId", "CreatedAt")
+                        .HasDatabaseName("ix_trust_donations_trust_id_created_at");
+
+                    b.HasIndex("TrustId", "ReceiptNumber")
+                        .IsUnique()
+                        .HasDatabaseName("ix_trust_donations_trust_id_receipt_number")
+                        .HasFilter("receipt_number IS NOT NULL");
+
+                    b.ToTable("trust_donations", (string)null);
+                });
+
             modelBuilder.Entity("Sangam.Trust.Domain.Elections.TrustElection", b =>
                 {
                     b.Property<Guid>("Id")
@@ -175,6 +330,72 @@ namespace Sangam.Trust.Infrastructure.Persistence.Migrations
                         .HasDatabaseName("ix_trust_election_votes_election_id_voter_member_id");
 
                     b.ToTable("trust_election_votes", (string)null);
+                });
+
+            modelBuilder.Entity("Sangam.Trust.Domain.Expenses.Expense", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<long>("Amount")
+                        .HasColumnType("bigint")
+                        .HasColumnName("amount");
+
+                    b.Property<DateTimeOffset?>("ApprovedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("approved_at");
+
+                    b.Property<Guid?>("ApprovedBy")
+                        .HasColumnType("uuid")
+                        .HasColumnName("approved_by");
+
+                    b.Property<string>("Category")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)")
+                        .HasColumnName("category");
+
+                    b.Property<string>("Description")
+                        .IsRequired()
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)")
+                        .HasColumnName("description");
+
+                    b.Property<DateTimeOffset>("RecordedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("recorded_at");
+
+                    b.Property<Guid>("RecordedBy")
+                        .HasColumnType("uuid")
+                        .HasColumnName("recorded_by");
+
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)")
+                        .HasColumnName("status");
+
+                    b.Property<Guid>("TenantId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("tenant_id");
+
+                    b.Property<Guid>("TrustId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("trust_id");
+
+                    b.Property<string>("Vendor")
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)")
+                        .HasColumnName("vendor");
+
+                    b.HasKey("Id")
+                        .HasName("pk_trust_expenses");
+
+                    b.HasIndex("TrustId", "RecordedAt")
+                        .HasDatabaseName("ix_trust_expenses_trust_id_recorded_at");
+
+                    b.ToTable("trust_expenses", (string)null);
                 });
 
             modelBuilder.Entity("Sangam.Trust.Domain.Members.TrustMember", b =>

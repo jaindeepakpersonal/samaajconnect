@@ -378,19 +378,25 @@ and expose its endpoints behind the gateway at the route prefix shown.
   `TrustElection` as peer, not owned, aggregates — a roster change and an
   election status change each raise their own event)
 - **Owns:** Trust, TrustMember, TrustElection (with `TrustElectionCandidate`
-  as an owned entity), Vote
+  as an owned entity), Vote, Donation, Expense, Collection
 - **Key commands:** `CreateTrustCommand`, `ChangeTrustStatusCommand`,
   `AddTrustMemberCommand`, `UpdateTrustMemberCommand`,
   `RemoveTrustMemberCommand`, `OpenTrustElectionCommand`,
   `MoveTrustElectionCommand`, `NominateTrustCandidateCommand`,
   `DecideTrustCandidateCommand`, `CastTrustVoteCommand`,
-  `PublishTrustElectionResultsCommand`
+  `PublishTrustElectionResultsCommand`, `RecordDonationCommand`,
+  `MarkDonationCollectedCommand`, `RecordExpenseCommand`,
+  `ApproveExpenseCommand`, `RecordCollectionPaymentCommand`
 - **Key queries:** `ListTrustsQuery`, `GetTrustQuery`, `ListTrustMembersQuery`,
-  `ListTrustElectionsQuery`, `GetTrustElectionQuery`
+  `ListTrustElectionsQuery`, `GetTrustElectionQuery`, `ListDonationsQuery`,
+  `ListExpensesQuery`, `ListCollectionsQuery`, `ListMyDuesQuery`
 - **Events published:** `TrustCreated`, `TrustStatusChanged`,
   `TrustMemberAdded`, `TrustMemberUpdated`, `TrustMemberRemoved`,
-  `TrustElectionStatusChanged`, `TrustElectionResultsPublished`
-- **Events consumed:** none — a leaf service, like volunteer-groups-service
+  `TrustElectionStatusChanged`, `TrustElectionResultsPublished`,
+  `DonationRecorded`, `DonationCollected`, `ExpenseRecorded`,
+  `ExpenseApproved`, `CollectionDue`, `CollectionSettled`
+- **Events consumed:** `boli.result.published.v1` — opens a `Due` Collection
+  against the winner for the Trust of the occasion's locality, once per Boli
 - **Gateway route prefix:** `/v1/trust/**`, module-gated on `trust` (off by
   default, the same stance as `boli`/`matrimony`/`panch`)
 - **Tenant role(s):** new permission `Trust.Manage`, granted to `SamaajAdmin`,

@@ -72,6 +72,31 @@ describe('TrustDetailComponent', () => {
     fixture.detectChanges();
   }
 
+  it('opens on the roster, and loads a money tab only when it is opened', () => {
+    load([member()]);
+
+    const tabs = [...(fixture.nativeElement as HTMLElement).querySelectorAll<HTMLButtonElement>('[role="tab"]')];
+
+    expect(tabs.map((t) => t.textContent?.trim())).toEqual([
+      'Roster & elections',
+      'Donations',
+      'Expenses',
+      'Collections',
+    ]);
+    expect(text()).toContain('Roster');
+
+    http.expectNone(`/v1/trust/trusts/${TRUST_ID}/collections`);
+
+    tabs[3]!.click();
+    fixture.detectChanges();
+
+    http.expectOne(`/v1/trust/trusts/${TRUST_ID}/collections`).flush([]);
+    fixture.detectChanges();
+
+    expect(text()).toContain('Nothing is owed to this Trust yet');
+    expect(text()).not.toContain('Add a trustee');
+  });
+
   it('reads a 404 as no such Trust', () => {
     fixture.detectChanges();
     http.expectOne(`/v1/trust/trusts/${TRUST_ID}`).flush({}, { status: 404, statusText: 'Not Found' });

@@ -49,6 +49,7 @@ app.MapGet("/health", () => Results.Ok(new { status = "healthy" }))
 
 app.MapTrustEndpoints();
 app.MapElectionEndpoints();
+app.MapFinanceEndpoints();
 
 await app.RunAsync();
 

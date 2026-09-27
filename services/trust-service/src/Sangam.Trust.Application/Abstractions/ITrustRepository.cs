@@ -16,6 +16,15 @@ public interface ITrustRepository
 
     Task<Domain.Trusts.Trust?> FindByLocalityAsync(Guid localityId, CancellationToken cancellationToken = default);
 
+    /// <summary>
+    /// For the Kafka consumer, which runs outside any request: there is no
+    /// tenant context, so the query filter would compare against Guid.Empty
+    /// and match nothing. Bypasses the filter and names the tenant - the one
+    /// the event itself came from - explicitly instead.
+    /// </summary>
+    Task<Domain.Trusts.Trust?> FindByLocalityAsync(
+        Guid tenantId, Guid localityId, CancellationToken cancellationToken = default);
+
     Task<IReadOnlyList<Domain.Trusts.Trust>> ListAsync(
         Guid? localityId, CancellationToken cancellationToken = default);
 

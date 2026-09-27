@@ -545,10 +545,9 @@ granted to `SamaajAdmin`, for every write except nominating and voting;
 `Members.Read` for every read, and for nominating/voting further gated by
 being an active member of the Trust the election belongs to.
 
-Phase 2: Trust + roster CRUD (phase 1), plus elections for trustee positions
-(this phase). Donations, expenses and a payment-collection ledger against
-both donations and Boli results are later phases and are not in this API
-yet.
+Trust + roster CRUD, elections for trustee positions, and the Trust's money:
+donations, expenses, and a collections ledger that a published Boli result in
+the Trust's locality opens against its winner. Amounts are integer paise.
 
 | Method | Path | Roles | Purpose |
 |---|---|---|---|
@@ -568,6 +567,15 @@ yet.
 | POST | `/elections/{id}/candidates/{candidateId}/decide` | `Trust.Manage` | Approve onto the ballot, or remove before voting opens |
 | POST | `/elections/{id}/votes` | `Members.Read` + active Trust member | Cast this member's one vote. Self-votes and a second vote are both refused/reported without accepting - see the service's own CLAUDE.md |
 | POST | `/elections/{id}/publish` | `Trust.Manage` | Only from `Closed`. Installs the winner's position on their `TrustMember` row, clearing it from any prior holder. Publishing twice changes nothing |
+| GET | `/trusts/{id}/donations` | `Trust.Manage` | Donations, newest first. `?status=Pledged\|Collected` |
+| POST | `/trusts/{id}/donations` | `Trust.Manage` | Record a pledge: a member id or a donor name, optional phone, amount, purpose, mode (`Cash`/`Cheque`/`Upi`/`BankTransfer`). No receipt number yet |
+| POST | `/donations/{donationId}/collect` | `Trust.Manage` | Mark it collected, issuing the Trust's next receipt number. 409 if already collected |
+| GET | `/trusts/{id}/expenses` | `Trust.Manage` | Expenses, newest first. `?status=Recorded\|Approved` |
+| POST | `/trusts/{id}/expenses` | `Trust.Manage` | Record an expense: category, description, amount, optional vendor |
+| POST | `/expenses/{expenseId}/approve` | `Trust.Manage` | Approve it. Approving one already approved is 200 and changes nothing |
+| GET | `/trusts/{id}/collections` | `Trust.Manage` | Amounts due to the Trust, newest first, each with who owes it. `?status=Due\|Collected` |
+| POST | `/collections/{collectionId}/payment` | `Trust.Manage` | Record that it was paid, and the mode (free text, 50 characters). 409 if already paid |
+| GET | `/collections/mine` | `Members.Read` | What the caller still owes to any Trust in their Samaaj, oldest first. The payer is read off the token |
 
 `LocalityId` and member ids on the wire are strings, validated and parsed in
 the command, so a malformed id is a 400 rather than an unhandled binding

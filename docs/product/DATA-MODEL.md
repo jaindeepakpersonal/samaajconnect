@@ -470,10 +470,9 @@ service.
 
 ## 17. Trust (locality-wise Trust management, phase 2)
 
-Phase 1 shipped Trust + roster CRUD; phase 2 (this one) adds elections for
-trustee positions. Donations, expenses and a payment-collection ledger
-against both donations and Boli results are later phases and add their own
-entities when they land.
+Phase 1 shipped Trust + roster CRUD; phase 2 added elections for trustee
+positions; phase 3 adds the Trust's money - donations, expenses and a
+collections ledger (below, after the election entities).
 
 **Trust** — `Id, TenantId, LocalityId, Name, Status (Active/Inactive),
 CreatedAt` — unique on `(TenantId, LocalityId)`: exactly one Trust per
@@ -506,3 +505,21 @@ VoterMemberId)` — the double-voting guarantee, written directly rather than
 through the aggregate, the same shape every election on this platform uses).
 The electorate for nominating and voting is the Trust's own active
 `TrustMember` roster, not the whole Samaaj.
+
+**Donation** (`trust_donations`) — `Id, TenantId, TrustId, DonorMemberId
+(nullable), DonorName (nullable), DonorPhone (nullable), Amount (paise),
+Purpose, Mode (Cash/Cheque/Upi/BankTransfer), Status (Pledged/Collected),
+ReceiptNumber (nullable until collected), RecordedBy, CreatedAt, CollectedBy,
+CollectedAt` — unique on `(TrustId, ReceiptNumber)` where a number is set: a
+receipt names exactly one donation. Numbers run from 1 per Trust, issued under
+a transaction-scoped advisory lock.
+
+**Expense** (`trust_expenses`) — `Id, TenantId, TrustId, Category,
+Description, Amount (paise), Vendor (nullable), Status (Recorded/Approved),
+RecordedBy, RecordedAt, ApprovedBy, ApprovedAt`.
+
+**Collection** (`trust_collections`) — `Id, TenantId, TrustId, SourceType
+(Donation/BoliResult), SourceId, PayerMemberId (nullable), Amount (paise),
+Status (Due/Collected), Mode (nullable free text), CollectedBy, CollectedAt,
+CreatedAt` — unique on `(SourceType, SourceId)`: one Collection per source,
+which is what makes consuming `boli.result.published.v1` idempotent.

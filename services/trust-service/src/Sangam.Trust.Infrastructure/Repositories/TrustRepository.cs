@@ -24,6 +24,13 @@ public sealed class TrustRepository(
         Guid localityId, CancellationToken cancellationToken = default) =>
         dbContext.Trusts.AsNoTracking().FirstOrDefaultAsync(t => t.LocalityId == localityId, cancellationToken);
 
+    public Task<Domain.Trusts.Trust?> FindByLocalityAsync(
+        Guid tenantId, Guid localityId, CancellationToken cancellationToken = default) =>
+        dbContext.Trusts
+            .IgnoreQueryFilters()
+            .AsNoTracking()
+            .FirstOrDefaultAsync(t => t.TenantId == tenantId && t.LocalityId == localityId, cancellationToken);
+
     public async Task<IReadOnlyList<Domain.Trusts.Trust>> ListAsync(
         Guid? localityId, CancellationToken cancellationToken = default)
     {

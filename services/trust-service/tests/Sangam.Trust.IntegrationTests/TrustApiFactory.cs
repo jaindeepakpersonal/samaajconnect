@@ -78,7 +78,8 @@ public sealed class TrustApiFactory : WebApplicationFactory<Program>, IAsyncLife
 
         await dbContext.Database.ExecuteSqlRawAsync(
             "TRUNCATE TABLE trust_election_votes, trust_election_candidates, trust_elections, "
-            + "trust_members, trusts, outbox_messages RESTART IDENTITY CASCADE;");
+            + "trust_members, trusts, trust_donations, trust_expenses, trust_collections, "
+            + "outbox_messages RESTART IDENTITY CASCADE;");
     }
 
     public async Task<T> WithDbContextAsync<T>(Func<TrustDbContext, Task<T>> action)

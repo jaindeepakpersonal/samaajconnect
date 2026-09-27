@@ -61,9 +61,40 @@ describe('TrustsListComponent', () => {
   it('lists a Trust with its status', () => {
     fixture.detectChanges();
     http.expectOne('/v1/trust/trusts').flush([trust()]);
+    http.expectOne('/v1/trust/collections/mine').flush([]);
     fixture.detectChanges();
 
     expect(text()).toContain('Hiran Magri Samaaj Trust');
     expect(text()).toContain('Active');
+    expect(text()).not.toContain('What you owe');
+  });
+
+  it('says what the member owes, to which Trust, and for what', () => {
+    fixture.detectChanges();
+    http.expectOne('/v1/trust/trusts').flush([trust()]);
+    http.expectOne('/v1/trust/collections/mine').flush([
+      {
+        id: 'c1',
+        trustId: trust().id,
+        sourceType: 'BoliResult',
+        sourceId: 'b1',
+        amount: 2_100_000,
+        createdAt: '2026-09-20T10:00:00Z',
+      },
+    ]);
+    fixture.detectChanges();
+
+    expect(text()).toContain('What you owe');
+    expect(text()).toContain('₹21,000 to Hiran Magri Samaaj Trust for a Boli you won');
+  });
+
+  it('shows the Trusts even when what is owed cannot be read', () => {
+    fixture.detectChanges();
+    http.expectOne('/v1/trust/trusts').flush([trust()]);
+    http.expectOne('/v1/trust/collections/mine').flush({}, { status: 500, statusText: 'Server Error' });
+    fixture.detectChanges();
+
+    expect(text()).toContain('Hiran Magri Samaaj Trust');
+    expect(fixture.nativeElement.querySelector('[role="alert"]')).toBeNull();
   });
 });

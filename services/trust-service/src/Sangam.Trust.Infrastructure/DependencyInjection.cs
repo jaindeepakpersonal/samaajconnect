@@ -35,6 +35,9 @@ public static class DependencyInjection
         services.AddScoped<ITrustMemberRepository, TrustMemberRepository>();
         services.AddScoped<IElectionRepository, ElectionRepository>();
         services.AddScoped<IVoteRepository, VoteRepository>();
+        services.AddScoped<IDonationRepository, DonationRepository>();
+        services.AddScoped<IExpenseRepository, ExpenseRepository>();
+        services.AddScoped<ICollectionRepository, CollectionRepository>();
         services.AddSingleton<IDateTimeProvider, SystemDateTimeProvider>();
 
         services.AddOptions<JwtOptions>()
@@ -46,9 +49,11 @@ public static class DependencyInjection
 
         services.Configure<KafkaOptions>(configuration.GetSection(KafkaOptions.SectionName));
         services.Configure<OutboxOptions>(configuration.GetSection(OutboxOptions.SectionName));
+        services.Configure<ConsumerOptions>(configuration.GetSection(ConsumerOptions.SectionName));
 
         services.AddSingleton<IEventPublisher, KafkaProducer>();
         services.AddHostedService<OutboxDispatcher>();
+        services.AddHostedService<IntegrationEventConsumer>();
 
         return services;
     }

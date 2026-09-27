@@ -86,10 +86,15 @@ import {
   Tenant,
   TenantStatus,
   Trust,
+  TrustCollection,
+  TrustDonation,
+  TrustDonationInput,
   TrustElection,
   TrustElectionDetail,
   TrustElectionInput,
   TrustElectionStatus,
+  TrustExpense,
+  TrustExpenseInput,
   TrustMember,
   TrustStatus,
   UserStatusResult,
@@ -787,6 +792,44 @@ export class AdminApi {
   /** Freezes the winner and installs them in the position, clearing any prior holder. */
   publishTrustElection(id: string): Observable<TrustElection> {
     return this.http.post<TrustElection>(`/v1/trust/elections/${id}/publish`, {});
+  }
+
+  // ---- Trust finance -------------------------------------------------------
+
+  trustDonations(trustId: string): Observable<TrustDonation[]> {
+    return this.http.get<TrustDonation[]>(`/v1/trust/trusts/${trustId}/donations`);
+  }
+
+  /** Records a pledge. It is given a receipt number when it is collected, not now. */
+  recordTrustDonation(trustId: string, donation: TrustDonationInput): Observable<TrustDonation> {
+    return this.http.post<TrustDonation>(`/v1/trust/trusts/${trustId}/donations`, donation);
+  }
+
+  /** Issues the Trust's next receipt number. 409 on a donation already collected. */
+  collectTrustDonation(donationId: string): Observable<TrustDonation> {
+    return this.http.post<TrustDonation>(`/v1/trust/donations/${donationId}/collect`, null);
+  }
+
+  trustExpenses(trustId: string): Observable<TrustExpense[]> {
+    return this.http.get<TrustExpense[]>(`/v1/trust/trusts/${trustId}/expenses`);
+  }
+
+  recordTrustExpense(trustId: string, expense: TrustExpenseInput): Observable<TrustExpense> {
+    return this.http.post<TrustExpense>(`/v1/trust/trusts/${trustId}/expenses`, expense);
+  }
+
+  /** Approving one already approved changes nothing and answers 200. */
+  approveTrustExpense(expenseId: string): Observable<TrustExpense> {
+    return this.http.post<TrustExpense>(`/v1/trust/expenses/${expenseId}/approve`, null);
+  }
+
+  trustCollections(trustId: string): Observable<TrustCollection[]> {
+    return this.http.get<TrustCollection[]>(`/v1/trust/trusts/${trustId}/collections`);
+  }
+
+  /** Records that an amount due was paid, and how. 409 once it has been. */
+  recordTrustPayment(collectionId: string, mode: string): Observable<TrustCollection> {
+    return this.http.post<TrustCollection>(`/v1/trust/collections/${collectionId}/payment`, { mode });
   }
 
   // ---- Social issues -----------------------------------------------------

@@ -7,6 +7,7 @@ import {
   Trust,
   TrustElection,
   TrustElectionDetail,
+  TrustDue,
   TrustMember,
 } from './trust.models';
 
@@ -25,6 +26,14 @@ import {
 @Injectable({ providedIn: 'root' })
 export class TrustApi {
   private readonly http = inject(HttpClient);
+
+  /**
+   * What the signed-in member still owes to a Trust, oldest first. Only ever
+   * their own: the service reads the payer off the token, not a parameter.
+   */
+  myDues(): Observable<TrustDue[]> {
+    return this.http.get<TrustDue[]>('/v1/trust/collections/mine');
+  }
 
   /** This Samaaj's Trusts, optionally narrowed to one locality. */
   list(localityId?: string | null): Observable<Trust[]> {
