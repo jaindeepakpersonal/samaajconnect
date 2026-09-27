@@ -281,7 +281,13 @@ needing a second table for "current roster" versus "history".
   same name already run.
 - `scripts/smoke-through-gateway.sh` covers the whole path through the
   gateway, including switching the `trust` module on and off and confirming
-  the route answers 404 once it is off.
+  the route answers 404 once it is off. Its money checks walk a member's
+  pledge (owed, reminded - the reminder polled until it lands in the donor's
+  notifications - then collected with receipt 1), a named donor's pledge paid
+  from the collections ledger (receipt 2), an expense, and the cross-service
+  path no Testcontainers test can reach: a Boli published under an occasion in
+  the Trust's locality, polled until trust-service's consumer has made it
+  something the winner owes.
 
 ```
 dotnet test services/trust-service/Sangam.Trust.sln

@@ -4381,15 +4381,16 @@ panch_checks() {
 panch_checks || echo "  ..    the rest of the Panch checks were skipped"
 
 echo
-echo "Trust (locality-wise Trust management, phase 2: rosters and elections)"
+echo "Trust (locality-wise Trust management: rosters, elections, and its money)"
 
 # Wrapped in a function for the same reason competition_checks is.
 trust_checks() {
 
+  # boli too: the finance checks below publish a Boli in this Trust's locality.
   check "switching the trust module on" 200 \
     "$(status -X PUT "$GATEWAY/v1/identity/tenants/$TENANT_ID/modules" \
        -H 'Content-Type: application/json' -H "Authorization: Bearer $ADMIN_TOKEN" -H "$ADMIN_TENANT_HEADER" \
-       -d '{"enabledModules":["community","trust"]}')"
+       -d '{"enabledModules":["community","trust","boli"]}')"
 
   sleep 62
 
@@ -4613,6 +4614,241 @@ trust_checks() {
   check "removing the same member again is still success" 200 \
     "$(status -X DELETE "$GATEWAY/v1/trust/trusts/$TRUST_ID/members/$TRUST_MEMBER_ID" \
        -H "Authorization: Bearer $ADMIN_TOKEN" -H "$ADMIN_TENANT_HEADER")"
+
+  # ---- The Trust's money: donations, expenses, collections -----------------
+  #
+  # Two things only a run through the gateway can show. The finance routes are
+  # wired at all, and the one path that crosses services: a Boli published in
+  # this Trust's locality reaches trust-service over Kafka and becomes what its
+  # winner owes, with a reminder that comes back as the winner's notification
+  # through audit-notification-service. Amounts are paise.
+
+  # The id of the Collection whose source is $2, out of the list in $1.
+  # CollectionResponse starts id, trustId, sourceType, sourceId, which is what
+  # lets a grep pick one row out of an array without jq.
+  collection_for() {
+    printf '%s' "$1" \
+      | { grep -o "\"id\":\"[^\"]*\",\"trustId\":\"[^\"]*\",\"sourceType\":\"[^\"]*\",\"sourceId\":\"$2\"" || true; } \
+      | json_field id
+  }
+
+  check "a member cannot read a Trust's donations" 403 \
+    "$(status -H "Authorization: Bearer $MEMBER_TOKEN" "$GATEWAY/v1/trust/trusts/$TRUST_ID/donations")"
+
+  PLEDGE=$(curl -s -X POST "$GATEWAY/v1/trust/trusts/$TRUST_ID/donations" \
+    -H 'Content-Type: application/json' -H "Authorization: Bearer $ADMIN_TOKEN" -H "$ADMIN_TENANT_HEADER" \
+    -d "{\"donorMemberId\":\"$MEMBER_ID\",\"donorName\":null,\"donorPhone\":null,\"amount\":510000,\"purpose\":\"Temple fund\",\"mode\":\"Upi\"}")
+
+  PLEDGE_ID=$(printf '%s' "$PLEDGE" | json_field id)
+
+  if [ -n "$PLEDGE_ID" ] && printf '%s' "$PLEDGE" | grep -q '"status":"Pledged","receiptNumber":null'; then
+    echo "  ok    an administrator records a member's pledge, with no receipt number yet"
+    pass=$((pass + 1))
+  else
+    echo "  FAIL  recording a pledge (got '$PLEDGE')"
+    fail=$((fail + 1))
+    return 1
+  fi
+
+  MY_DUES=$(curl -s -H "Authorization: Bearer $MEMBER_TOKEN" "$GATEWAY/v1/trust/collections/mine")
+  PLEDGE_COLLECTION_ID=$(collection_for "$MY_DUES" "$PLEDGE_ID")
+
+  if [ -n "$PLEDGE_COLLECTION_ID" ]; then
+    echo "  ok    the donor sees the pledge under what they owe"
+    pass=$((pass + 1))
+  else
+    echo "  FAIL  the pledge is not among what the donor owes (got '$MY_DUES')"
+    fail=$((fail + 1))
+    return 1
+  fi
+
+  check "a member cannot send a reminder" 403 \
+    "$(status -X POST "$GATEWAY/v1/trust/collections/$PLEDGE_COLLECTION_ID/remind" \
+       -H "Authorization: Bearer $MEMBER_TOKEN")"
+
+  check "an administrator reminds the donor" 200 \
+    "$(status -X POST "$GATEWAY/v1/trust/collections/$PLEDGE_COLLECTION_ID/remind" \
+       -H "Authorization: Bearer $ADMIN_TOKEN" -H "$ADMIN_TENANT_HEADER")"
+
+  check "and a second reminder the same day is refused" 409 \
+    "$(status -X POST "$GATEWAY/v1/trust/collections/$PLEDGE_COLLECTION_ID/remind" \
+       -H "Authorization: Bearer $ADMIN_TOKEN" -H "$ADMIN_TENANT_HEADER")"
+
+  # trust.collection.reminded.v1 -> outbox -> Kafka -> audit-notification-service
+  # -> the donor's notifications. Polled, like every other check of a row that
+  # arrives over Kafka rather than inside the request that caused it.
+  reminder_delivered=0
+  for attempt in $(seq 1 30); do
+    if curl -s -H "Authorization: Bearer $MEMBER_TOKEN" "$GATEWAY/v1/notifications" \
+       | grep -q 'A reminder from your Trust'; then
+      reminder_delivered=1
+      break
+    fi
+    sleep 2
+  done
+
+  if [ "$reminder_delivered" -eq 1 ]; then
+    echo "  ok    the reminder reaches the donor as a notification"
+    pass=$((pass + 1))
+  else
+    echo "  FAIL  the reminder never reached the donor's notifications"
+    fail=$((fail + 1))
+  fi
+
+  COLLECTED=$(curl -s -X POST "$GATEWAY/v1/trust/donations/$PLEDGE_ID/collect" \
+    -H "Authorization: Bearer $ADMIN_TOKEN" -H "$ADMIN_TENANT_HEADER")
+
+  if printf '%s' "$COLLECTED" | grep -q '"status":"Collected","receiptNumber":1,'; then
+    echo "  ok    collecting the pledge issues the Trust's first receipt number"
+    pass=$((pass + 1))
+  else
+    echo "  FAIL  collecting the pledge (got '$COLLECTED')"
+    fail=$((fail + 1))
+  fi
+
+  check "and collecting it again is refused" 409 \
+    "$(status -X POST "$GATEWAY/v1/trust/donations/$PLEDGE_ID/collect" \
+       -H "Authorization: Bearer $ADMIN_TOKEN" -H "$ADMIN_TENANT_HEADER")"
+
+  if [ -z "$(collection_for "$(curl -s -H "Authorization: Bearer $MEMBER_TOKEN" \
+       "$GATEWAY/v1/trust/collections/mine")" "$PLEDGE_ID")" ]; then
+    echo "  ok    and the donor no longer owes it"
+    pass=$((pass + 1))
+  else
+    echo "  FAIL  a collected pledge is still listed as owed"
+    fail=$((fail + 1))
+  fi
+
+  # A donor with no account: named on the pledge, paid from the collections
+  # ledger - which is what collects the donation and numbers its receipt.
+  NAMED_PLEDGE_ID=$(curl -s -X POST "$GATEWAY/v1/trust/trusts/$TRUST_ID/donations" \
+    -H 'Content-Type: application/json' -H "Authorization: Bearer $ADMIN_TOKEN" -H "$ADMIN_TENANT_HEADER" \
+    -d '{"donorMemberId":null,"donorName":"Shri Mahendra Jain","donorPhone":"98290 12345","amount":110000,"purpose":"Books","mode":"Cash"}' \
+    | json_field id)
+
+  TRUST_DUES=$(curl -s -H "Authorization: Bearer $ADMIN_TOKEN" -H "$ADMIN_TENANT_HEADER" \
+    "$GATEWAY/v1/trust/trusts/$TRUST_ID/collections?status=Due")
+  NAMED_COLLECTION_ID=$(collection_for "$TRUST_DUES" "$NAMED_PLEDGE_ID")
+
+  if [ -n "$NAMED_COLLECTION_ID" ] && printf '%s' "$TRUST_DUES" | grep -q '"payerName":"Shri Mahendra Jain"'; then
+    echo "  ok    a donor with no account is owed-by-name on the collections ledger"
+    pass=$((pass + 1))
+  else
+    echo "  FAIL  the named donor's pledge is not on the ledger (got '$TRUST_DUES')"
+    fail=$((fail + 1))
+  fi
+
+  check "who cannot be sent a reminder" 409 \
+    "$(status -X POST "$GATEWAY/v1/trust/collections/$NAMED_COLLECTION_ID/remind" \
+       -H "Authorization: Bearer $ADMIN_TOKEN" -H "$ADMIN_TENANT_HEADER")"
+
+  check "paying it from the collections ledger is accepted" 200 \
+    "$(status -X POST "$GATEWAY/v1/trust/collections/$NAMED_COLLECTION_ID/payment" \
+       -H 'Content-Type: application/json' -H "Authorization: Bearer $ADMIN_TOKEN" -H "$ADMIN_TENANT_HEADER" \
+       -d '{"mode":"Cash"}')"
+
+  if curl -s -H "Authorization: Bearer $ADMIN_TOKEN" -H "$ADMIN_TENANT_HEADER" \
+       "$GATEWAY/v1/trust/trusts/$TRUST_ID/donations?status=Collected" \
+     | grep -q "\"id\":\"$NAMED_PLEDGE_ID\".*\"receiptNumber\":2,"; then
+    echo "  ok    and collects the donation with the next receipt number"
+    pass=$((pass + 1))
+  else
+    echo "  FAIL  paying the pledge's collection did not collect the donation"
+    fail=$((fail + 1))
+  fi
+
+  EXPENSE_ID=$(curl -s -X POST "$GATEWAY/v1/trust/trusts/$TRUST_ID/expenses" \
+    -H 'Content-Type: application/json' -H "Authorization: Bearer $ADMIN_TOKEN" -H "$ADMIN_TENANT_HEADER" \
+    -d '{"category":"Maintenance","description":"Roof repair","amount":1250000,"vendor":null}' \
+    | json_field id)
+
+  if [ -n "$EXPENSE_ID" ]; then
+    echo "  ok    an administrator records an expense"
+    pass=$((pass + 1))
+  else
+    echo "  FAIL  recording an expense"
+    fail=$((fail + 1))
+  fi
+
+  if curl -s -X POST "$GATEWAY/v1/trust/expenses/$EXPENSE_ID/approve" \
+       -H "Authorization: Bearer $ADMIN_TOKEN" -H "$ADMIN_TENANT_HEADER" \
+     | grep -q '"status":"Approved"'; then
+    echo "  ok    and approves it"
+    pass=$((pass + 1))
+  else
+    echo "  FAIL  approving the expense"
+    fail=$((fail + 1))
+  fi
+
+  # The cross-service path. An occasion in this Trust's locality, a Boli the
+  # member wins, its result announced - and trust-service, which boli-service
+  # knows nothing about, opens what the winner owes. SAMAAJ_ADMIN_TOKEN for the
+  # Boli calls, for the reason boli_checks gives.
+  LOCAL_OCCASION_ID=$(curl -s -X POST "$GATEWAY/v1/boli/occasions" \
+    -H 'Content-Type: application/json' -H "Authorization: Bearer $SAMAAJ_ADMIN_TOKEN" \
+    -d "{\"title\":\"Locality Paryushan\",\"description\":null,\"occasionDate\":\"2026-09-10\",\"localityId\":\"$LOCALITY_ID\"}" \
+    | json_field id)
+
+  LOCAL_TYPE_ID=$(curl -s -X POST "$GATEWAY/v1/boli/occasions/$LOCAL_OCCASION_ID/boli-types" \
+    -H 'Content-Type: application/json' -H "Authorization: Bearer $SAMAAJ_ADMIN_TOKEN" \
+    -d '{"name":"Shanti Kalash","description":null}' | json_field id)
+
+  LOCAL_BOLI_ID=$(curl -s -X POST "$GATEWAY/v1/boli/occasions/$LOCAL_OCCASION_ID/boli" \
+    -H 'Content-Type: application/json' -H "Authorization: Bearer $SAMAAJ_ADMIN_TOKEN" \
+    -d "{\"boliTypeId\":\"$LOCAL_TYPE_ID\",\"title\":\"Shanti Kalash\",
+         \"startAt\":\"$(date -u -d '-5 minutes' +%Y-%m-%dT%H:%M:%SZ)\",
+         \"endAt\":\"$(date -u -d '+2 hours' +%Y-%m-%dT%H:%M:%SZ)\",
+         \"startingAmount\":100000,\"minIncrement\":50000,\"eligibilityRule\":\"Anyone.\"}" \
+    | json_field id)
+
+  if [ -n "$LOCAL_BOLI_ID" ]; then
+    echo "  ok    a Boli opens under an occasion in the Trust's locality"
+    pass=$((pass + 1))
+  else
+    echo "  FAIL  opening a locality Boli"
+    fail=$((fail + 1))
+    return 1
+  fi
+
+  curl -s -o /dev/null -X POST "$GATEWAY/v1/boli/boli/$LOCAL_BOLI_ID/bids" \
+    -H 'Content-Type: application/json' -H "Authorization: Bearer $MEMBER_TOKEN" -d '{"amount":210000}'
+  curl -s -o /dev/null -X POST "$GATEWAY/v1/boli/boli/$LOCAL_BOLI_ID/close" \
+    -H "Authorization: Bearer $SAMAAJ_ADMIN_TOKEN"
+  curl -s -o /dev/null -X POST "$GATEWAY/v1/boli/boli/$LOCAL_BOLI_ID/result" \
+    -H "Authorization: Bearer $SAMAAJ_ADMIN_TOKEN"
+
+  check "its result is announced" 200 \
+    "$(status -X POST "$GATEWAY/v1/boli/boli/$LOCAL_BOLI_ID/result/publish" \
+       -H "Authorization: Bearer $SAMAAJ_ADMIN_TOKEN")"
+
+  BOLI_COLLECTION_ID=""
+  for attempt in $(seq 1 30); do
+    BOLI_COLLECTION_ID=$(collection_for "$(curl -s -H "Authorization: Bearer $MEMBER_TOKEN" \
+      "$GATEWAY/v1/trust/collections/mine")" "$LOCAL_BOLI_ID")
+    if [ -n "$BOLI_COLLECTION_ID" ]; then
+      break
+    fi
+    sleep 2
+  done
+
+  if [ -n "$BOLI_COLLECTION_ID" ]; then
+    echo "  ok    the winner now owes the locality's Trust, over Kafka from boli-service"
+    pass=$((pass + 1))
+  else
+    echo "  FAIL  the published Boli never became an amount the winner owes"
+    fail=$((fail + 1))
+    return 1
+  fi
+
+  check "the Trust records the winner's payment" 200 \
+    "$(status -X POST "$GATEWAY/v1/trust/collections/$BOLI_COLLECTION_ID/payment" \
+       -H 'Content-Type: application/json' -H "Authorization: Bearer $ADMIN_TOKEN" -H "$ADMIN_TENANT_HEADER" \
+       -d '{"mode":"UPI"}')"
+
+  check "and a second payment for it is refused" 409 \
+    "$(status -X POST "$GATEWAY/v1/trust/collections/$BOLI_COLLECTION_ID/payment" \
+       -H 'Content-Type: application/json' -H "Authorization: Bearer $ADMIN_TOKEN" -H "$ADMIN_TENANT_HEADER" \
+       -d '{"mode":"UPI"}')"
 
   check "switching the trust module off" 200 \
     "$(status -X PUT "$GATEWAY/v1/identity/tenants/$TENANT_ID/modules" \
