@@ -29,6 +29,10 @@ public sealed class PathshalaDbContext(
 
     public DbSet<ExamResult> ExamResults => Set<ExamResult>();
 
+    public DbSet<Domain.Donations.PathshalaDonation> Donations => Set<Domain.Donations.PathshalaDonation>();
+
+    public DbSet<Domain.Announcements.PathshalaAnnouncement> Announcements => Set<Domain.Announcements.PathshalaAnnouncement>();
+
     public DbSet<OutboxMessage> OutboxMessages => Set<OutboxMessage>();
 
     /// <summary>

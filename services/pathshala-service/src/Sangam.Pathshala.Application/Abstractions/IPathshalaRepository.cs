@@ -167,6 +167,57 @@ public interface IEnrolmentRepository
         Guid classId, CancellationToken cancellationToken = default);
 
     void AddResult(ExamResult result);
+
+    // ---- Whole-Pathshala reports ------------------------------------------
+
+    /// <summary>
+    /// Present/absent/excused per enrolment, for every enrolment at one
+    /// Pathshala - one GROUP BY, not one tally per child.
+    /// </summary>
+    Task<IReadOnlyDictionary<Guid, AttendanceTally>> TallyAttendanceByEnrolmentAsync(
+        Guid pathshalaId, CancellationToken cancellationToken = default);
+
+    /// <summary>Per class: the tally, and on how many distinct days the register was marked.</summary>
+    Task<IReadOnlyDictionary<Guid, ClassAttendance>> TallyAttendanceByClassAsync(
+        IReadOnlyCollection<Guid> classIds, CancellationToken cancellationToken = default);
+
+    Task<IReadOnlyList<Exam>> ListExamsForClassesAsync(
+        IReadOnlyCollection<Guid> classIds, CancellationToken cancellationToken = default);
+
+    Task<IReadOnlyList<ExamResult>> ListResultsForExamsAsync(
+        IReadOnlyCollection<Guid> examIds, CancellationToken cancellationToken = default);
+}
+
+/// <summary>One class's register over its life: how many days were marked, and the marks.</summary>
+public sealed record ClassAttendance(int DaysMarked, AttendanceTally Tally);
+
+/// <summary>A Pathshala's donation ledger.</summary>
+public interface IDonationRepository
+{
+    Task<Domain.Donations.PathshalaDonation?> GetByIdAsync(
+        Guid id, CancellationToken cancellationToken = default);
+
+    Task<IReadOnlyList<Domain.Donations.PathshalaDonation>> ListForPathshalaAsync(
+        Guid pathshalaId, CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// The next receipt number: one more than the highest, voided ones
+    /// included. A courtesy - the unique index on (Pathshala, ReceiptNumber) is
+    /// what stops two donations recorded at once from sharing one.
+    /// </summary>
+    Task<int> NextReceiptNumberAsync(Guid pathshalaId, CancellationToken cancellationToken = default);
+
+    void Add(Domain.Donations.PathshalaDonation donation);
+}
+
+/// <summary>Announcements from Pathshalas to parents.</summary>
+public interface IAnnouncementRepository
+{
+    /// <summary>Newest first.</summary>
+    Task<IReadOnlyList<Domain.Announcements.PathshalaAnnouncement>> ListForPathshalasAsync(
+        IReadOnlyCollection<Guid> pathshalaIds, CancellationToken cancellationToken = default);
+
+    void Add(Domain.Announcements.PathshalaAnnouncement announcement);
 }
 
 /// <summary>One student's mark, resolved against the roll and ready to write.</summary>

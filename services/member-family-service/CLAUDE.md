@@ -57,7 +57,7 @@ worked example of a cross-service flow with no synchronous call.
 | `ListConversionRequestsQuery` | `SamaajAdmin` + `Family.ApproveConversion` | built |
 | `GetChildDataNoticeQuery` | any member | built |
 | `GetMyDataQuery` | any authenticated role | built |
-| `GetChildNamesQuery` | `SamaajAdmin`/`SuperAdmin` + `Members.Read` | built |
+| `GetChildNamesQuery` | `SamaajAdmin`/`SuperAdmin`/`AreaAdmin`/`PathshalaTeacher` + `Members.Read` | built. Names only, for ids a Pathshala gave them |
 | `GetMemberPhotoQuery` | `Members.Read` | built |
 | `GetChildPhotoQuery` | `Members.Read`, then the child's household | built |
 | `GetRegistrationSummaryQuery` | `SamaajAdmin`/`SuperAdmin` + `Members.Read` | built |
@@ -109,7 +109,7 @@ here, which looks exactly like a broker problem and is not one.
 | POST | `/v1/children/{id}/conversion` | family admin + `Family.Write` |
 | GET | `/v1/children/conversion-requests` | `SamaajAdmin` + `Family.ApproveConversion` |
 | POST | `/v1/children/conversion-requests/{requestId}/decide` | `SamaajAdmin` + `Family.ApproveConversion` |
-| GET | `/v1/children/names` | `SamaajAdmin`, `SuperAdmin` + `Members.Read` |
+| GET | `/v1/children/names` | `SamaajAdmin`, `SuperAdmin`, `AreaAdmin`, `PathshalaTeacher` + `Members.Read` |
 | GET | `/v1/children/data-notice` | any member |
 | GET | `/v1/members/me/data-export` | any authenticated role |
 | GET | `/health` | anonymous |

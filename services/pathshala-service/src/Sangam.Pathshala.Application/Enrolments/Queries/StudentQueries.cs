@@ -109,7 +109,9 @@ public sealed class GetMyClassQueryHandler(
             pathshalaClass.RoomLabel,
             pathshala.FindSession(pathshalaClass.SessionId)?.Label ?? string.Empty,
             [.. pathshalaClass.ToSlots()],
-            [.. pathshalaClass.Teachers.Select(t => t.TeacherMemberId)],
+            [.. pathshalaClass.Teachers
+                .Select(t => pathshala.FindTeacher(t.TeacherId)?.FullName)
+                .OfType<string>()],
 
             // The wireframe's "Students: 24" - a count, not a list of other
             // people's children.

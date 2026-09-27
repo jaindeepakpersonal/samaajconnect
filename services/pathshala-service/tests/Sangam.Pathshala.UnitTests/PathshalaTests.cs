@@ -143,13 +143,66 @@ public sealed class PathshalaTests
         // The check that stops Pathshala.Attendance.Write meaning "any class".
         var (pathshala, first) = AClass();
         var second = pathshala.AddClass(pathshala.CurrentSession!.Id, "Class 9", null)!;
-        var teacherId = Guid.NewGuid();
+        var login = Guid.NewGuid();
+        var teacher = pathshala.AddTeacher("Pt. Ramesh Shastri", null, null, null, login, Guid.NewGuid(), Now)!;
 
-        first.AssignTeacher(teacherId, Now);
+        first.AssignTeacher(teacher.Id, Now);
 
-        first.IsTaughtBy(teacherId).Should().BeTrue();
-        second.IsTaughtBy(teacherId).Should().BeFalse();
-        pathshala.IsTeacher(teacherId).Should().BeTrue("they teach somewhere here");
+        pathshala.Teaches(login, first).Should().BeTrue();
+        pathshala.Teaches(login, second).Should().BeFalse();
+        pathshala.IsTeacher(login).Should().BeTrue("they teach here");
+    }
+
+    // ---- Teachers ------------------------------------------------------------
+
+    [Fact]
+    public void A_teacher_without_a_login_teaches_nothing_as_far_as_access_goes()
+    {
+        // An administrator marks for them. Nobody signed in is them.
+        var (pathshala, pathshalaClass) = AClass();
+        var teacher = pathshala.AddTeacher("Smt. Kavita Jain", "98290 00000", null, "Shastri", null, Guid.NewGuid(), Now)!;
+
+        pathshalaClass.AssignTeacher(teacher.Id, Now);
+
+        pathshalaClass.HasTeacher(teacher.Id).Should().BeTrue();
+        pathshala.Teaches(Guid.NewGuid(), pathshalaClass).Should().BeFalse();
+        teacher.Phone.Should().Be("98290 00000");
+        pathshala.DomainEvents.OfType<TeacherAddedDomainEvent>().Should().ContainSingle();
+    }
+
+    [Fact]
+    public void One_login_is_one_teacher_at_a_Pathshala()
+    {
+        var pathshala = APathshala();
+        var login = Guid.NewGuid();
+        var first = pathshala.AddTeacher("First", null, null, null, login, Guid.NewGuid(), Now)!;
+        var second = pathshala.AddTeacher("Second", null, null, null, null, Guid.NewGuid(), Now)!;
+
+        pathshala.AddTeacher("Again", null, null, null, login, Guid.NewGuid(), Now).Should().BeNull();
+        pathshala.UpdateTeacher(second.Id, "Second", null, null, null, login, Guid.NewGuid(), Now)
+            .Should().Be(TeacherChange.AccountTaken);
+        pathshala.UpdateTeacher(first.Id, "  First, corrected ", null, "  ", null, login, Guid.NewGuid(), Now)
+            .Should().Be(TeacherChange.Done);
+
+        first.FullName.Should().Be("First, corrected");
+        first.Email.Should().BeNull();
+    }
+
+    [Fact]
+    public void Removing_a_teacher_takes_them_off_every_class()
+    {
+        var (pathshala, first) = AClass();
+        var second = pathshala.AddClass(pathshala.CurrentSession!.Id, "Class 9", null)!;
+        var teacher = pathshala.AddTeacher("Pt. Ramesh Shastri", null, null, null, null, Guid.NewGuid(), Now)!;
+        first.AssignTeacher(teacher.Id, Now);
+        second.AssignTeacher(teacher.Id, Now);
+
+        pathshala.RemoveTeacher(teacher.Id, Guid.NewGuid(), Now).Should().BeTrue();
+
+        pathshala.Teachers.Should().BeEmpty();
+        first.Teachers.Should().BeEmpty();
+        second.Teachers.Should().BeEmpty();
+        pathshala.RemoveTeacher(teacher.Id, Guid.NewGuid(), Now).Should().BeFalse();
     }
 
     [Fact]

@@ -24,8 +24,14 @@ namespace Sangam.Pathshala.Application.Enrolments.Commands;
 /// the family looks, and an unplaced request grants access to nothing, because
 /// no attendance or result exists to read.
 /// </remarks>
+///
+/// <b>The parent gives the Pathshala a name and phone to reach them by</b>
+/// (2026-09-26). The Students tab shows them to its administrators and
+/// teachers whatever the parent's directory privacy setting - which is why they
+/// are asked for here, on a form that says so, rather than looked up.
 [RequiresPermission(PermissionKeys.MembersRead)]
-public sealed record RequestEnrolmentCommand(Guid PathshalaId, Guid ChildProfileId)
+public sealed record RequestEnrolmentCommand(
+    Guid PathshalaId, Guid ChildProfileId, string ContactName, string ContactPhone)
     : ICommand<EnrolmentResponse>;
 
 public sealed class RequestEnrolmentCommandValidator : AbstractValidator<RequestEnrolmentCommand>
@@ -34,6 +40,12 @@ public sealed class RequestEnrolmentCommandValidator : AbstractValidator<Request
     {
         RuleFor(x => x.PathshalaId).NotEmpty();
         RuleFor(x => x.ChildProfileId).NotEmpty();
+        RuleFor(x => x.ContactName).NotEmpty().MaximumLength(200);
+
+        RuleFor(x => x.ContactPhone)
+            .NotEmpty()
+            .Matches(@"^\+?[0-9 ()-]{7,20}$")
+            .WithMessage("Enter a phone number the Pathshala can call.");
     }
 }
 
@@ -82,7 +94,13 @@ public sealed class RequestEnrolmentCommandHandler(
         }
 
         var enrolment = StudentEnrolment.Request(
-            pathshala.TenantId, pathshala.Id, command.ChildProfileId, memberId, clock.UtcNow);
+            pathshala.TenantId,
+            pathshala.Id,
+            command.ChildProfileId,
+            memberId,
+            clock.UtcNow,
+            command.ContactName,
+            command.ContactPhone);
 
         enrolments.Add(enrolment);
 

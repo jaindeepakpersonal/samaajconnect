@@ -3047,7 +3047,7 @@ check "a member cannot either" 403 \
 check "it takes no enrolments before a session is open" 409 \
   "$(status -X POST "$GATEWAY/v1/pathshala/pathshalas/$PATHSHALA_ID/enrollments" \
      -H 'Content-Type: application/json' -H "Authorization: Bearer $MEMBER_TOKEN" \
-     -d "{\"childProfileId\":\"$CHILD_ID\"}")"
+     -d "{\"childProfileId\":\"$CHILD_ID\",\"contactName\":\"Smoke Parent\",\"contactPhone\":\"+91 98290 00000\"}")"
 
 # Running it is the Samaaj's job, and this is the half that would have been
 # unreachable if Pathshala.Manage had been withheld to reserve creation.
@@ -3100,10 +3100,19 @@ else
   fail=$((fail + 1))
 fi
 
-check "assigning the member as its teacher" 200 \
+# A teacher is the Pathshala's own record - they need not be a member - linked
+# here to the member's login, so the register they mark below is theirs.
+TEACHER=$(curl -s -X POST "$GATEWAY/v1/pathshala/pathshalas/$PATHSHALA_ID/teachers" \
+  -H 'Content-Type: application/json' -H "Authorization: Bearer $SAMAAJ_ADMIN_TOKEN" \
+  -d "{\"fullName\":\"Smoke Teacher\",\"phone\":\"+91 98290 11111\",\"userId\":\"$MEMBER_ID\"}")
+
+TEACHER_ID=$(printf '%s' "$TEACHER" | json_field id)
+require_id teacher_id "$TEACHER_ID"
+
+check "assigning that teacher to the class" 200 \
   "$(status -X POST "$GATEWAY/v1/pathshala/classes/$CLASS_ID/teachers" \
      -H 'Content-Type: application/json' -H "Authorization: Bearer $SAMAAJ_ADMIN_TOKEN" \
-     -d "{\"teacherMemberId\":\"$MEMBER_ID\",\"assign\":true}")"
+     -d "{\"teacherId\":\"$TEACHER_ID\",\"assign\":true}")"
 
 # Teaching a class is not enough on its own: marking a register needs the
 # Pathshala.Attendance.Write permission, which arrives with the
@@ -3140,7 +3149,7 @@ check "and the overlap itself is a conflict" 409 \
 
 ENROLMENT=$(curl -s -X POST "$GATEWAY/v1/pathshala/pathshalas/$PATHSHALA_ID/enrollments" \
   -H 'Content-Type: application/json' -H "Authorization: Bearer $MEMBER_TOKEN" \
-  -d "{\"childProfileId\":\"$CHILD_ID\"}")
+  -d "{\"childProfileId\":\"$CHILD_ID\",\"contactName\":\"Smoke Parent\",\"contactPhone\":\"+91 98290 00000\"}")
 
 ENROLMENT_ID=$(printf '%s' "$ENROLMENT" | json_field id)
 require_id enrolment_id "$ENROLMENT_ID"

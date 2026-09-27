@@ -70,35 +70,27 @@ public sealed class PathshalaClass
     }
 
     /// <summary>
-    /// Whether <paramref name="memberId"/> teaches this class.
+    /// Whether this <see cref="Teacher"/> record teaches this class. Who is
+    /// signed in as them is <see cref="Pathshala.Teaches"/>'s question.
     /// </summary>
-    /// <remarks>
-    /// This is the check that decides who may mark a register or record a
-    /// result, and it is deliberately about <i>this</i> class rather than about
-    /// holding the teacher role. `Pathshala.Attendance.Write` says somebody is a
-    /// teacher somewhere; it does not say whose attendance they may write, and
-    /// treating it as though it did would let any teacher in the Samaaj mark any
-    /// class in any Pathshala. Same shape as "are you this group's president?"
-    /// in volunteer-groups-service.
-    /// </remarks>
-    public bool IsTaughtBy(Guid memberId) => _teachers.Any(t => t.TeacherMemberId == memberId);
+    public bool HasTeacher(Guid teacherId) => _teachers.Any(t => t.TeacherId == teacherId);
 
     /// <summary>Assigns a teacher. A repeat assignment is a no-op.</summary>
-    public bool AssignTeacher(Guid teacherMemberId, DateTimeOffset now)
+    public bool AssignTeacher(Guid teacherId, DateTimeOffset now)
     {
-        if (IsTaughtBy(teacherMemberId))
+        if (HasTeacher(teacherId))
         {
             return false;
         }
 
-        _teachers.Add(new TeacherAssignment(Id, teacherMemberId, now));
+        _teachers.Add(new TeacherAssignment(Id, teacherId, now));
 
         return true;
     }
 
-    public bool RemoveTeacher(Guid teacherMemberId)
+    public bool RemoveTeacher(Guid teacherId)
     {
-        var assignment = _teachers.FirstOrDefault(t => t.TeacherMemberId == teacherMemberId);
+        var assignment = _teachers.FirstOrDefault(t => t.TeacherId == teacherId);
 
         if (assignment is null)
         {
@@ -168,20 +160,21 @@ public sealed class ClassSchedule
     }
 }
 
+/// <summary>A <see cref="Teacher"/> teaching one class.</summary>
 public sealed class TeacherAssignment
 {
     public Guid Id { get; private set; }
     public Guid ClassId { get; private set; }
-    public Guid TeacherMemberId { get; private set; }
+    public Guid TeacherId { get; private set; }
     public DateTimeOffset AssignedAt { get; private set; }
 
     private TeacherAssignment() { }   // EF Core
 
-    internal TeacherAssignment(Guid classId, Guid teacherMemberId, DateTimeOffset assignedAt)
+    internal TeacherAssignment(Guid classId, Guid teacherId, DateTimeOffset assignedAt)
     {
         Id = Guid.NewGuid();
         ClassId = classId;
-        TeacherMemberId = teacherMemberId;
+        TeacherId = teacherId;
         AssignedAt = assignedAt;
     }
 }

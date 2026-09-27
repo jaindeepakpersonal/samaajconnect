@@ -640,6 +640,64 @@ public static class KnownEvents
             EntityName: "Pathshala",
             EntityIdProperty: "pathshalaId"),
 
+        // A Pathshala's teachers - who need not be members. Ids only: their
+        // names and phones are in pathshala-service, where they can be corrected.
+        ["pathshala.teacher.added.v1"] = new(
+            Action: "TeacherAdded",
+            EntityName: "Teacher",
+            EntityIdProperty: "teacherId",
+            ActorIdProperty: "changedBy"),
+
+        ["pathshala.teacher.updated.v1"] = new(
+            Action: "TeacherUpdated",
+            EntityName: "Teacher",
+            EntityIdProperty: "teacherId",
+            ActorIdProperty: "changedBy"),
+
+        ["pathshala.teacher.removed.v1"] = new(
+            Action: "TeacherRemoved",
+            EntityName: "Teacher",
+            EntityIdProperty: "teacherId",
+            ActorIdProperty: "changedBy"),
+
+        // The donation ledger. Money recorded and money taken back out of the
+        // totals each name who did it; the donor's name and the purpose stay
+        // in the ledger.
+        ["pathshala.donation.recorded.v1"] = new(
+            Action: "DonationRecorded",
+            EntityName: "PathshalaDonation",
+            EntityIdProperty: "donationId",
+            ActorIdProperty: "recordedBy"),
+
+        ["pathshala.donation.voided.v1"] = new(
+            Action: "DonationVoided",
+            EntityName: "PathshalaDonation",
+            EntityIdProperty: "donationId",
+            ActorIdProperty: "voidedBy"),
+
+        ["pathshala.announcement.sent.v1"] = new(
+            Action: "AnnouncementSent",
+            EntityName: "PathshalaAnnouncement",
+            EntityIdProperty: "announcementId",
+            ActorIdProperty: "sentBy"),
+
+        // One per parent. The recipient is who it is about, not who acted, so
+        // no ActorIdProperty. The notification says there is something to
+        // read and never what: the text is the Pathshala's, read where it can
+        // be corrected, never copied into a notification or this log.
+        ["pathshala.announcement.addressed.v1"] = new(
+            Action: "AnnouncementAddressed",
+            EntityName: "PathshalaAnnouncement",
+            EntityIdProperty: "announcementId",
+            Notification: payload =>
+                payload.TryGetProperty("recipientMemberId", out var recipient)
+                && recipient.TryGetGuid(out var recipientId)
+                    ? new NotificationSpec(
+                        recipientId,
+                        "A message from your child's Pathshala",
+                        "Your child's Pathshala has sent an announcement. Open Jain Pathshala to read it.")
+                    : null),
+
         ["pathshala.deactivated.v1"] = new(
             Action: "PathshalaDeactivated",
             EntityName: "Pathshala",

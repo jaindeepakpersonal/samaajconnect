@@ -16,8 +16,13 @@ public sealed class PathshalaRepository(PathshalaDbContext dbContext) : IPathsha
     private IQueryable<Domain.Pathshalas.Pathshala> Full =>
         dbContext.Pathshalas
             .Include(p => p.Sessions)
+            .Include(p => p.Teachers)
             .Include(p => p.Classes).ThenInclude(c => c.Schedule)
-            .Include(p => p.Classes).ThenInclude(c => c.Teachers);
+            .Include(p => p.Classes).ThenInclude(c => c.Teachers)
+
+            // Four collections joined in one query multiply into each other's
+            // rows; split, each is read once.
+            .AsSplitQuery();
 
     public Task<Domain.Pathshalas.Pathshala?> GetByIdAsync(
         Guid id, CancellationToken cancellationToken = default) =>
@@ -355,4 +360,103 @@ public sealed class EnrolmentRepository(
             .ToListAsync(cancellationToken);
 
     public void AddResult(ExamResult result) => dbContext.ExamResults.Add(result);
+
+    // ---- Whole-Pathshala reports ------------------------------------------
+
+    public async Task<IReadOnlyDictionary<Guid, AttendanceTally>> TallyAttendanceByEnrolmentAsync(
+        Guid pathshalaId, CancellationToken cancellationToken = default)
+    {
+        var rows = await dbContext.Attendance
+            .AsNoTracking()
+            .Where(a => dbContext.Enrolments.Any(e => e.Id == a.EnrolmentId && e.PathshalaId == pathshalaId))
+            .GroupBy(a => new { a.EnrolmentId, a.Status })
+            .Select(g => new { g.Key.EnrolmentId, g.Key.Status, Count = g.Count() })
+            .ToListAsync(cancellationToken);
+
+        return rows
+            .GroupBy(r => r.EnrolmentId)
+            .ToDictionary(g => g.Key, g => ToTally(g.ToDictionary(r => r.Status, r => r.Count)));
+    }
+
+    public async Task<IReadOnlyDictionary<Guid, ClassAttendance>> TallyAttendanceByClassAsync(
+        IReadOnlyCollection<Guid> classIds, CancellationToken cancellationToken = default)
+    {
+        var counts = await dbContext.Attendance
+            .AsNoTracking()
+            .Where(a => classIds.Contains(a.ClassId))
+            .GroupBy(a => new { a.ClassId, a.Status })
+            .Select(g => new { g.Key.ClassId, g.Key.Status, Count = g.Count() })
+            .ToListAsync(cancellationToken);
+
+        var days = await dbContext.Attendance
+            .AsNoTracking()
+            .Where(a => classIds.Contains(a.ClassId))
+            .GroupBy(a => a.ClassId)
+            .Select(g => new { ClassId = g.Key, Days = g.Select(a => a.ClassDate).Distinct().Count() })
+            .ToDictionaryAsync(x => x.ClassId, x => x.Days, cancellationToken);
+
+        return counts
+            .GroupBy(r => r.ClassId)
+            .ToDictionary(
+                g => g.Key,
+                g => new ClassAttendance(
+                    days.GetValueOrDefault(g.Key), ToTally(g.ToDictionary(r => r.Status, r => r.Count))));
+    }
+
+    public async Task<IReadOnlyList<Exam>> ListExamsForClassesAsync(
+        IReadOnlyCollection<Guid> classIds, CancellationToken cancellationToken = default) =>
+        await dbContext.Exams
+            .AsNoTracking()
+            .Where(e => classIds.Contains(e.ClassId))
+            .OrderByDescending(e => e.ExamDate)
+            .ToListAsync(cancellationToken);
+
+    public async Task<IReadOnlyList<ExamResult>> ListResultsForExamsAsync(
+        IReadOnlyCollection<Guid> examIds, CancellationToken cancellationToken = default) =>
+        await dbContext.ExamResults
+            .AsNoTracking()
+            .Where(r => examIds.Contains(r.ExamId))
+            .ToListAsync(cancellationToken);
+
+    private static AttendanceTally ToTally(Dictionary<AttendanceStatus, int> counts) =>
+        new(counts.GetValueOrDefault(AttendanceStatus.Present),
+            counts.GetValueOrDefault(AttendanceStatus.Absent),
+            counts.GetValueOrDefault(AttendanceStatus.Excused));
+}
+
+public sealed class DonationRepository(PathshalaDbContext dbContext) : IDonationRepository
+{
+    public Task<Domain.Donations.PathshalaDonation?> GetByIdAsync(
+        Guid id, CancellationToken cancellationToken = default) =>
+        dbContext.Donations.FirstOrDefaultAsync(d => d.Id == id, cancellationToken);
+
+    public async Task<IReadOnlyList<Domain.Donations.PathshalaDonation>> ListForPathshalaAsync(
+        Guid pathshalaId, CancellationToken cancellationToken = default) =>
+        await dbContext.Donations
+            .AsNoTracking()
+            .Where(d => d.PathshalaId == pathshalaId)
+            .OrderByDescending(d => d.ReceiptNumber)
+            .ToListAsync(cancellationToken);
+
+    public async Task<int> NextReceiptNumberAsync(Guid pathshalaId, CancellationToken cancellationToken = default) =>
+        (await dbContext.Donations
+            .Where(d => d.PathshalaId == pathshalaId)
+            .MaxAsync(d => (int?)d.ReceiptNumber, cancellationToken) ?? 0) + 1;
+
+    public void Add(Domain.Donations.PathshalaDonation donation) => dbContext.Donations.Add(donation);
+}
+
+public sealed class AnnouncementRepository(PathshalaDbContext dbContext) : IAnnouncementRepository
+{
+    public async Task<IReadOnlyList<Domain.Announcements.PathshalaAnnouncement>> ListForPathshalasAsync(
+        IReadOnlyCollection<Guid> pathshalaIds, CancellationToken cancellationToken = default) =>
+        await dbContext.Announcements
+            .AsNoTracking()
+            .Where(a => pathshalaIds.Contains(a.PathshalaId))
+            .OrderByDescending(a => a.SentAt)
+            .Take(100)
+            .ToListAsync(cancellationToken);
+
+    public void Add(Domain.Announcements.PathshalaAnnouncement announcement) =>
+        dbContext.Announcements.Add(announcement);
 }

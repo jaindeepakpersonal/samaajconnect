@@ -33,6 +33,8 @@ public static class DependencyInjection
         services.AddScoped<IUnitOfWork, UnitOfWork>();
         services.AddScoped<IPathshalaRepository, PathshalaRepository>();
         services.AddScoped<IEnrolmentRepository, EnrolmentRepository>();
+        services.AddScoped<IDonationRepository, DonationRepository>();
+        services.AddScoped<IAnnouncementRepository, AnnouncementRepository>();
         services.AddSingleton<IDateTimeProvider, SystemDateTimeProvider>();
 
         services.AddOptions<JwtOptions>()

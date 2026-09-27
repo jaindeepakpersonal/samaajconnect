@@ -23,9 +23,9 @@ public static class PathshalaMappings
             pathshala.CurrentSession?.Id,
             pathshala.Classes.Count,
 
-            // Distinct, because one teacher taking two classes is one teacher.
-            pathshala.Classes.SelectMany(c => c.Teachers).Select(t => t.TeacherMemberId)
-                .Distinct().Count(),
+            // The teacher records, not the assignments - one teacher taking two
+            // classes is one teacher, and one not yet assigned is still one.
+            pathshala.Teachers.Count,
             pathshala.AcceptsEnrolments);
 
     public static PathshalaDetailResponse ToDetail(
@@ -55,7 +55,7 @@ public static class PathshalaMappings
             pathshalaClass.Name,
             pathshalaClass.RoomLabel,
             [.. pathshalaClass.ToSlots()],
-            [.. pathshalaClass.Teachers.Select(t => t.TeacherMemberId)],
+            [.. pathshalaClass.Teachers.Select(t => t.TeacherId)],
             studentCount);
 
     public static IEnumerable<ScheduleSlotResponse> ToSlots(this PathshalaClass pathshalaClass) =>

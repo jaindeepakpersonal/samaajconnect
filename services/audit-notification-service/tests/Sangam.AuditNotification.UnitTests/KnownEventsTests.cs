@@ -86,6 +86,24 @@ public sealed class KnownEventsTests
     }
 
     [Fact]
+    public void A_Pathshala_announcement_tells_each_parent_there_is_something_to_read_and_never_what()
+    {
+        var parent = Guid.NewGuid();
+
+        var spec = KnownEvents.Describe("pathshala.announcement.addressed.v1").Notification!(
+            Payload($$"""{"announcementId":"{{Guid.NewGuid()}}","recipientMemberId":"{{parent}}"}"""));
+
+        spec!.RecipientUserId.Should().Be(parent);
+        spec.Body.Should().Contain("Open Jain Pathshala to read it");
+        spec.Destination.Should().BeNull("in-app only - the event carries no address, and should not");
+
+        // The event that says who sent it names them, and notifies nobody.
+        var sent = KnownEvents.Describe("pathshala.announcement.sent.v1");
+        sent.ActorIdProperty.Should().Be("sentBy");
+        sent.Notification.Should().BeNull();
+    }
+
+    [Fact]
     public void Login_events_are_audited_but_do_not_notify_the_member()
     {
         KnownEvents.Describe("identity.user.logged-in.v1").Notification.Should().BeNull();

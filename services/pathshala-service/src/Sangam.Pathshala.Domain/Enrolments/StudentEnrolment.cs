@@ -54,6 +54,22 @@ public sealed class StudentEnrolment : AggregateRoot, ITenantScopedEntity
     public Guid RequestedByMemberId { get; private set; }
 
     /// <summary>
+    /// The name and phone the parent gave the Pathshala to reach them by, on the
+    /// request itself. Null on requests made before 2026-09-26.
+    /// </summary>
+    /// <remarks>
+    /// A copy the parent handed over for this purpose, not a lookup into
+    /// member-family-service. The Students tab shows it to the Pathshala's
+    /// administrators and teachers whatever the parent's directory privacy
+    /// setting (confirmed with the user) - and because it was given here, on a
+    /// form that says who will see it, nobody can use this service to look up a
+    /// phone number somebody chose to keep private in the directory.
+    /// </remarks>
+    public string? ContactName { get; private set; }
+
+    public string? ContactPhone { get; private set; }
+
+    /// <summary>
     /// The child's own account, once they have one. Null while they are a child
     /// profile.
     /// </summary>
@@ -79,7 +95,9 @@ public sealed class StudentEnrolment : AggregateRoot, ITenantScopedEntity
         Guid pathshalaId,
         Guid childProfileId,
         Guid requestedByMemberId,
-        DateTimeOffset now)
+        DateTimeOffset now,
+        string? contactName = null,
+        string? contactPhone = null)
     {
         var enrolment = new StudentEnrolment
         {
@@ -88,6 +106,8 @@ public sealed class StudentEnrolment : AggregateRoot, ITenantScopedEntity
             PathshalaId = pathshalaId,
             ChildProfileId = childProfileId,
             RequestedByMemberId = requestedByMemberId,
+            ContactName = string.IsNullOrWhiteSpace(contactName) ? null : contactName.Trim(),
+            ContactPhone = string.IsNullOrWhiteSpace(contactPhone) ? null : contactPhone.Trim(),
             Status = EnrolmentStatus.Requested,
             RequestedAt = now,
         };

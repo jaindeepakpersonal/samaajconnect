@@ -45,9 +45,9 @@ public sealed record SessionResponse(
 /// A class, its slots and its teachers.
 /// </summary>
 /// <remarks>
-/// Teachers are member ids, not names. A name here would be a copy of
-/// member-family-service's data kept in step by nothing; the portal resolves
-/// ids it already has to resolve for every other screen.
+/// Teachers are ids of the Pathshala's own teacher records. Their names and
+/// contact details are the teachers list, read by those who run the Pathshala
+/// or teach at it - not something a class carries to every parent.
 /// </remarks>
 public sealed record ClassResponse(
     Guid Id,
@@ -56,7 +56,7 @@ public sealed record ClassResponse(
     string Name,
     string? RoomLabel,
     IReadOnlyList<ScheduleSlotResponse> Schedule,
-    IReadOnlyList<Guid> TeacherMemberIds,
+    IReadOnlyList<Guid> TeacherIds,
     int StudentCount);
 
 public sealed record ScheduleSlotResponse(string DayOfWeek, TimeOnly StartTime, TimeOnly EndTime);
@@ -91,7 +91,9 @@ public sealed record MyClassResponse(
     string? RoomLabel,
     string SessionLabel,
     IReadOnlyList<ScheduleSlotResponse> Schedule,
-    IReadOnlyList<Guid> TeacherMemberIds,
+
+    /// <summary>A parent's own child's teachers, by name only - their contact details are staff-only.</summary>
+    IReadOnlyList<string> TeacherNames,
     int ClassmateCount);
 
 /// <summary>The wireframe's "My Attendance": the three tiles, and the detail.</summary>

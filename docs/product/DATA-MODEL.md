@@ -231,7 +231,13 @@ StartDate, EndDate, IsCurrent`
 
 **ClassSchedule** — `Id, ClassId, DayOfWeek, StartTime, EndTime`
 
-**TeacherAssignment** — `Id, ClassId, TeacherMemberId, AssignedAt`
+**Teacher** — `Id, PathshalaId, FullName, Phone, Email, Qualification, UserId (nullable login), AddedAt`. Need not be a member.
+
+**TeacherAssignment** — `Id, ClassId, TeacherId, AssignedAt`
+
+**PathshalaDonation** — `Id, TenantId, PathshalaId, ReceiptNumber (unique per Pathshala), DonorName, DonorMemberId, Amount (paise), DonatedOn, Mode, Purpose, RecordedBy, RecordedAt, VoidedAt, VoidedBy, VoidReason`
+
+**PathshalaAnnouncement** — `Id, TenantId, PathshalaId, Title, Body, SentBy, SentAt, RecipientCount`
 
 **StudentEnrollment** — `Id, ClassId, ChildProfileId, SessionId,
 EnrolledAt, Status (Active/Withdrawn)`

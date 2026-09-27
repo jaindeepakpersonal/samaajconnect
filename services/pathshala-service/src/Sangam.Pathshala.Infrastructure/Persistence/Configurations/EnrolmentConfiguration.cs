@@ -12,6 +12,8 @@ public sealed class StudentEnrolmentConfiguration : IEntityTypeConfiguration<Stu
         builder.HasKey(e => e.Id);
         builder.Property(e => e.Id).ValueGeneratedNever();
         builder.Property(e => e.Status).HasConversion<string>().HasMaxLength(20);
+        builder.Property(e => e.ContactName).HasMaxLength(200);
+        builder.Property(e => e.ContactPhone).HasMaxLength(20);
 
         // One place per child per Pathshala, whatever its state. A parent who
         // submits the form twice must not produce two rows: the child would

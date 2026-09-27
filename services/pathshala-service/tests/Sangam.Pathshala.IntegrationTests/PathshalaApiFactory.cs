@@ -44,6 +44,9 @@ public sealed class PathshalaApiFactory : WebApplicationFactory<Program>, IAsync
 
     public async Task InitializeAsync() => await _postgres.StartAsync();
 
+    /// <summary>The container's own connection string, for a test that needs a database of its own.</summary>
+    public string ConnectionString => _postgres.GetConnectionString();
+
     async Task IAsyncLifetime.DisposeAsync()
     {
         await base.DisposeAsync();
@@ -97,7 +100,8 @@ public sealed class PathshalaApiFactory : WebApplicationFactory<Program>, IAsync
 
         await dbContext.Database.ExecuteSqlRawAsync(
             "TRUNCATE TABLE attendance, exam_results, exams, student_enrolments, "
-            + "class_schedules, teacher_assignments, classes, academic_sessions, "
+            + "class_schedules, teacher_assignments, pathshala_teachers, classes, academic_sessions, "
+            + "pathshala_donations, pathshala_announcements, "
             + "pathshalas, outbox_messages RESTART IDENTITY CASCADE;");
     }
 

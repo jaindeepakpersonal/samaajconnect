@@ -24,8 +24,15 @@ namespace Sangam.MemberFamily.Application.Children.Queries.GetChildNames;
 /// can print a name would be the opposite of what section 9 asks of this
 /// platform. The caller already holds the ids; this answers for exactly those.
 /// </para>
+/// <para>
+/// <b>An Area Admin and a Pathshala teacher may ask too (2026-09-26).</b> Both
+/// run Pathshala classes - placing children, marking registers, the Students
+/// tab - from the same lists of ids, and were refused here, so a teacher's own
+/// class roll read "A child" for every child in it. It is still names only, for
+/// ids a Pathshala already gave them.
+/// </para>
 /// </remarks>
-[RequiresRoles(Roles.SamaajAdmin, Roles.SuperAdmin)]
+[RequiresRoles(Roles.SamaajAdmin, Roles.SuperAdmin, Roles.AreaAdmin, Roles.PathshalaTeacher)]
 [RequiresPermission(PermissionKeys.MembersRead)]
 public sealed record GetChildNamesQuery(IReadOnlyList<Guid> Ids)
     : IQuery<IReadOnlyList<ChildNameResponse>>;

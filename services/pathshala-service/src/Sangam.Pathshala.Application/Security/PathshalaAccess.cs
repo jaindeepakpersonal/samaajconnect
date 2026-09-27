@@ -21,6 +21,12 @@ namespace Sangam.Pathshala.Application.Security;
 /// not be able to map out a Pathshala's roster by the difference between two
 /// error codes.
 /// </remarks>
+/// <summary>
+/// A staff member's view of a Pathshala: whether they run it, and which classes'
+/// records they may read.
+/// </summary>
+public sealed record StaffScope(bool IsAdministrator, IReadOnlySet<Guid> ClassIds);
+
 public static class PathshalaAccess
 {
     public static readonly Error NoSuchPathshala =
@@ -90,8 +96,36 @@ public static class PathshalaAccess
         string permission) =>
         CanAdminister(currentUser, area, pathshala)
         || (currentUser.HasPermission(permission)
-            && currentUser.UserId is { } memberId
-            && pathshalaClass.IsTaughtBy(memberId));
+            && currentUser.UserId is { } userId
+            && pathshala.Teaches(userId, pathshalaClass));
+
+    /// <summary>
+    /// What this caller sees of a Pathshala as its staff: every class if they
+    /// run it, the classes they teach if they are one of its teachers, and null
+    /// if neither - which each staff read answers as "not found".
+    /// </summary>
+    /// <remarks>
+    /// The Students, Progress, Attendance and Exams tabs are all "rows for the
+    /// classes this caller may see", so they share this one answer rather than
+    /// four copies of "administrator, or teacher of which classes?".
+    /// </remarks>
+    public static StaffScope? StaffScopeOf(
+        ICurrentUser currentUser, IAreaScope area, Domain.Pathshalas.Pathshala pathshala)
+    {
+        if (CanAdminister(currentUser, area, pathshala))
+        {
+            return new StaffScope(true, pathshala.Classes.Select(c => c.Id).ToHashSet());
+        }
+
+        if (currentUser.UserId is { } userId && pathshala.TeacherFor(userId) is { } teacher)
+        {
+            return new StaffScope(
+                false,
+                pathshala.Classes.Where(c => c.HasTeacher(teacher.Id)).Select(c => c.Id).ToHashSet());
+        }
+
+        return null;
+    }
 
     /// <summary>
     /// Whether this caller may read one child's attendance, exams or progress.
@@ -124,6 +158,6 @@ public static class PathshalaAccess
             ? pathshala?.FindClass(classId)
             : null;
 
-        return pathshalaClass is not null && pathshalaClass.IsTaughtBy(memberId);
+        return pathshalaClass is not null && pathshala!.Teaches(memberId, pathshalaClass);
     }
 }

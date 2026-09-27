@@ -91,9 +91,19 @@ public sealed class PathshalaFlowTests(PathshalaApiFactory factory)
         var classId = (await classCreated.Content.ReadFromJsonAsync<JsonElement>())
             .GetProperty("id").GetGuid();
 
+        // A teacher is the Pathshala's own record, linked to the login they
+        // mark registers with - then assigned to the class by that record.
+        var teacher = await Admin().PostAsJsonAsync(
+            $"/v1/pathshala/pathshalas/{pathshalaId}/teachers",
+            new { fullName = "Pt. Ramesh Shastri", phone = "+91 98290 11111", userId = TeacherId.ToString() });
+
+        teacher.StatusCode.Should().Be(HttpStatusCode.Created);
+
+        var teacherRecordId = (await teacher.Content.ReadFromJsonAsync<JsonElement>()).GetProperty("id").GetGuid();
+
         (await Admin().PostAsJsonAsync(
                 $"/v1/pathshala/classes/{classId}/teachers",
-                new { teacherMemberId = TeacherId, assign = true }))
+                new { teacherId = teacherRecordId, assign = true }))
             .StatusCode.Should().Be(HttpStatusCode.OK);
 
         return new Fixture(pathshalaId, sessionId, classId);
@@ -105,7 +115,7 @@ public sealed class PathshalaFlowTests(PathshalaApiFactory factory)
     {
         var requested = await Parent(parentId).PostAsJsonAsync(
             $"/v1/pathshala/pathshalas/{fixture.PathshalaId}/enrollments",
-            new { childProfileId = childProfileId ?? Guid.NewGuid() });
+            new { contactName = "Ravi Shah", contactPhone = "+91 98290 00000", childProfileId = childProfileId ?? Guid.NewGuid() });
 
         requested.StatusCode.Should().Be(HttpStatusCode.OK);
 
@@ -155,7 +165,7 @@ public sealed class PathshalaFlowTests(PathshalaApiFactory factory)
 
         var requested = await Parent().PostAsJsonAsync(
             $"/v1/pathshala/pathshalas/{fixture.PathshalaId}/enrollments",
-            new { childProfileId = Guid.NewGuid() });
+            new { contactName = "Ravi Shah", contactPhone = "+91 98290 00000", childProfileId = Guid.NewGuid() });
 
         var body = await requested.Content.ReadFromJsonAsync<JsonElement>();
 
@@ -173,10 +183,10 @@ public sealed class PathshalaFlowTests(PathshalaApiFactory factory)
         var childProfileId = Guid.NewGuid();
 
         var first = await Parent().PostAsJsonAsync(
-            $"/v1/pathshala/pathshalas/{fixture.PathshalaId}/enrollments", new { childProfileId });
+            $"/v1/pathshala/pathshalas/{fixture.PathshalaId}/enrollments", new { contactName = "Ravi Shah", contactPhone = "+91 98290 00000", childProfileId });
 
         var second = await Parent().PostAsJsonAsync(
-            $"/v1/pathshala/pathshalas/{fixture.PathshalaId}/enrollments", new { childProfileId });
+            $"/v1/pathshala/pathshalas/{fixture.PathshalaId}/enrollments", new { contactName = "Ravi Shah", contactPhone = "+91 98290 00000", childProfileId });
 
         second.StatusCode.Should().Be(HttpStatusCode.OK);
 
@@ -203,7 +213,7 @@ public sealed class PathshalaFlowTests(PathshalaApiFactory factory)
 
         var requested = await Parent().PostAsJsonAsync(
             $"/v1/pathshala/pathshalas/{fixture.PathshalaId}/enrollments",
-            new { childProfileId = Guid.NewGuid() });
+            new { contactName = "Ravi Shah", contactPhone = "+91 98290 00000", childProfileId = Guid.NewGuid() });
 
         var enrolmentId = (await requested.Content.ReadFromJsonAsync<JsonElement>())
             .GetProperty("id").GetGuid();
@@ -227,7 +237,7 @@ public sealed class PathshalaFlowTests(PathshalaApiFactory factory)
 
         (await Parent().PostAsJsonAsync(
                 $"/v1/pathshala/pathshalas/{pathshalaId}/enrollments",
-                new { childProfileId = Guid.NewGuid() }))
+                new { contactName = "Ravi Shah", contactPhone = "+91 98290 00000", childProfileId = Guid.NewGuid() }))
             .StatusCode.Should().Be(HttpStatusCode.Conflict);
     }
 
@@ -525,7 +535,7 @@ public sealed class PathshalaFlowTests(PathshalaApiFactory factory)
 
         var requested = await Parent().PostAsJsonAsync(
             $"/v1/pathshala/pathshalas/{fixture.PathshalaId}/enrollments",
-            new { childProfileId = Guid.NewGuid() });
+            new { contactName = "Ravi Shah", contactPhone = "+91 98290 00000", childProfileId = Guid.NewGuid() });
 
         var enrolmentId = (await requested.Content.ReadFromJsonAsync<JsonElement>())
             .GetProperty("id").GetGuid();

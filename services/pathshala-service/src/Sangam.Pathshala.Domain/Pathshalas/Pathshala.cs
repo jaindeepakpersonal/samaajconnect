@@ -29,6 +29,7 @@ public sealed class Pathshala : AggregateRoot, ITenantScopedEntity
 {
     private readonly List<AcademicSession> _sessions = [];
     private readonly List<PathshalaClass> _classes = [];
+    private readonly List<Teacher> _teachers = [];
 
     public Guid Id { get; private set; }
     public Guid TenantId { get; private set; }
@@ -41,6 +42,8 @@ public sealed class Pathshala : AggregateRoot, ITenantScopedEntity
     public IReadOnlyCollection<AcademicSession> Sessions => _sessions.AsReadOnly();
 
     public IReadOnlyCollection<PathshalaClass> Classes => _classes.AsReadOnly();
+
+    public IReadOnlyCollection<Teacher> Teachers => _teachers.AsReadOnly();
 
     private Pathshala() { }   // EF Core
 
@@ -164,13 +167,126 @@ public sealed class Pathshala : AggregateRoot, ITenantScopedEntity
     /// <summary>Whether this Pathshala is taking new enrolments.</summary>
     public bool AcceptsEnrolments => Status == PathshalaStatus.Active && CurrentSession is not null;
 
-    /// <summary>Whether <paramref name="memberId"/> teaches any class here.</summary>
+    // ---- Teachers ------------------------------------------------------------
+
+    public Teacher? FindTeacher(Guid teacherId) => _teachers.FirstOrDefault(t => t.Id == teacherId);
+
+    /// <summary>The teacher record signed in as <paramref name="userId"/>, if any.</summary>
+    public Teacher? TeacherFor(Guid userId) => _teachers.FirstOrDefault(t => t.UserId == userId);
+
+    /// <summary>
+    /// Whether <paramref name="userId"/> is a teacher here at all - the coarse
+    /// check for Pathshala staff, e.g. who may send its parents an announcement.
+    /// </summary>
+    public bool IsTeacher(Guid userId) => TeacherFor(userId) is not null;
+
+    /// <summary>
+    /// Whether <paramref name="userId"/> teaches this particular class.
+    /// </summary>
     /// <remarks>
-    /// The coarse check, used to decide whether somebody is Pathshala staff at
-    /// all. Whether they may mark <i>this</i> register is a per-class question -
-    /// see <see cref="PathshalaClass.IsTaughtBy"/>.
+    /// This is the check that decides who may mark a register or record a
+    /// result, and it is deliberately about <i>this</i> class rather than about
+    /// holding the teacher role. <c>Pathshala.Attendance.Write</c> says somebody
+    /// is a teacher somewhere; it does not say whose attendance they may write,
+    /// and treating it as though it did would let any teacher in the Samaaj mark
+    /// any class in any Pathshala. Resolved through the teacher record's linked
+    /// account, so a teacher without a login teaches nothing as far as access
+    /// goes - an administrator acts for them.
     /// </remarks>
-    public bool IsTeacher(Guid memberId) => _classes.Any(c => c.IsTaughtBy(memberId));
+    public bool Teaches(Guid userId, PathshalaClass pathshalaClass) =>
+        TeacherFor(userId) is { } teacher && pathshalaClass.HasTeacher(teacher.Id);
+
+    /// <summary>
+    /// Adds a teacher. Null when <paramref name="userId"/> is already another
+    /// teacher here - one account is one teacher, or "which of these two is
+    /// signed in?" has no answer.
+    /// </summary>
+    public Teacher? AddTeacher(
+        string fullName,
+        string? phone,
+        string? email,
+        string? qualification,
+        Guid? userId,
+        Guid changedBy,
+        DateTimeOffset now)
+    {
+        if (userId is { } account && TeacherFor(account) is not null)
+        {
+            return null;
+        }
+
+        var teacher = new Teacher(Id, fullName, phone, email, qualification, userId, now);
+
+        _teachers.Add(teacher);
+
+        Raise(new TeacherAddedDomainEvent(Id, TenantId, teacher.Id, changedBy, now));
+
+        return teacher;
+    }
+
+    /// <summary>Corrects a teacher's details or login. The same one-account-one-teacher rule.</summary>
+    public TeacherChange UpdateTeacher(
+        Guid teacherId,
+        string fullName,
+        string? phone,
+        string? email,
+        string? qualification,
+        Guid? userId,
+        Guid changedBy,
+        DateTimeOffset now)
+    {
+        var teacher = FindTeacher(teacherId);
+
+        if (teacher is null)
+        {
+            return TeacherChange.NotFound;
+        }
+
+        if (userId is { } account && TeacherFor(account) is { } other && other.Id != teacherId)
+        {
+            return TeacherChange.AccountTaken;
+        }
+
+        teacher.Change(fullName, phone, email, qualification, userId);
+
+        Raise(new TeacherUpdatedDomainEvent(Id, TenantId, teacherId, changedBy, now));
+
+        return TeacherChange.Done;
+    }
+
+    /// <summary>
+    /// Removes a teacher, and with them every class assignment they held. The
+    /// registers they marked keep who marked them.
+    /// </summary>
+    public bool RemoveTeacher(Guid teacherId, Guid changedBy, DateTimeOffset now)
+    {
+        var teacher = FindTeacher(teacherId);
+
+        if (teacher is null)
+        {
+            return false;
+        }
+
+        foreach (var pathshalaClass in _classes)
+        {
+            pathshalaClass.RemoveTeacher(teacherId);
+        }
+
+        _teachers.Remove(teacher);
+
+        Raise(new TeacherRemovedDomainEvent(Id, TenantId, teacherId, changedBy, now));
+
+        return true;
+    }
+}
+
+public enum TeacherChange
+{
+    Done,
+    NotFound,
+
+    /// <summary>The login is already another teacher's here.</summary>
+    AccountTaken,
 }
 
 public enum PathshalaStatus

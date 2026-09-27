@@ -18,7 +18,10 @@ everything else is the Samaaj's to run.
 | `AcademicSession` | e.g. "2026-27". Exactly one per Pathshala is current |
 | `PathshalaClass` | One class in a session, with its timetable and teachers |
 | `ClassSchedule` | A weekly slot. Overlapping slots on one day are refused |
-| `TeacherAssignment` | Who teaches a class. Unique per (class, teacher) |
+| `Teacher` | Owned by the Pathshala. Name, phone, email, qualification, and an optional linked login - need not be a member |
+| `TeacherAssignment` | Which teacher record teaches a class. Unique per (class, teacher) |
+| `PathshalaDonation` | Aggregate root. One entry in the donation ledger, receipt-numbered, voided rather than deleted |
+| `PathshalaAnnouncement` | Aggregate root. A message to the parents; its text stays here |
 | `StudentEnrolment` | Aggregate root. One child's place: requested, then placed |
 | `AttendanceEntry` | One mark. Written directly, unique per (enrolment, date) |
 | `Exam` | Aggregate root. Set for a class |
@@ -32,12 +35,18 @@ Two entities in DATA-MODEL.md §9 are deliberately absent. See "Decisions".
 |---|---|---|
 | `CreatePathshalaCommand` | `SuperAdmin` + `Pathshala.Manage` | The one act reserved to the platform |
 | `UpdatePathshalaCommand` | `Pathshala.Manage` | Name, address, contact person. An Area Admin cannot move it out of their locality |
+| `AddTeacherCommand` | `Pathshala.Manage` | A teacher record - need not be a member. `userId` links their login, if any |
+| `UpdateTeacherCommand` | `Pathshala.Manage` | Details or login. One login is one teacher per Pathshala |
+| `RemoveTeacherCommand` | `Pathshala.Manage` | Takes them off every class; the registers they marked are kept |
+| `RecordDonationCommand` | `Pathshala.Manage` | Issues the next receipt number |
+| `VoidDonationCommand` | `Pathshala.Manage` | Out of the totals, with a reason. Never a delete |
+| `SendAnnouncementCommand` | `Members.Read` + a teacher of it or somebody who runs it | To the parents of every child with a place or a request |
 | `OpenSessionCommand` | `Pathshala.Manage` | Makes the new session current |
 | `CreateClassCommand` | `Pathshala.Manage` | |
 | `AddClassSlotCommand` | `Pathshala.Manage` | Refuses an overlap |
-| `AssignTeacherCommand` | `Pathshala.Manage` | Assign and remove in one command |
+| `AssignTeacherCommand` | `Pathshala.Manage` | Assign and remove in one command, by teacher record |
 | `DeactivatePathshalaCommand` | `Pathshala.Manage` | Records are kept; enrolments stop |
-| `RequestEnrolmentCommand` | `Members.Read` | A parent asks |
+| `RequestEnrolmentCommand` | `Members.Read` | A parent asks, giving a name and phone the Pathshala may reach them by |
 | `PlaceStudentCommand` | `Pathshala.Manage` | The Pathshala decides, and picks the class |
 | `WithdrawStudentCommand` | `Pathshala.Manage` | Off the roll; attendance and results stay |
 | `MarkAttendanceCommand` | `Pathshala.Attendance.Write` **and** teaching this class | The whole register in one submission |
@@ -61,11 +70,22 @@ Two entities in DATA-MODEL.md §9 are deliberately absent. See "Decisions".
 | `GetMyAttendanceQuery` | `Members.Read` + owns this enrolment | |
 | `GetMyExamsQuery` | `Members.Read` + owns this enrolment | |
 | `GetMyProgressQuery` | `Members.Read` + owns this enrolment | Computed, not stored |
+| `ListTeachersQuery` | `Members.Read` + a teacher of it or somebody who runs it | With contact details |
+| `ListStudentsQuery` | `Members.Read` + staff | Placed children in the caller's classes, and (for administrators) waiting requests, with the parent's contact |
+| `GetProgressReportQuery` | `Members.Read` + staff | Every placed child's attendance and exam average |
+| `GetAttendanceOverviewQuery` | `Members.Read` + staff | Per class: days marked and the tally |
+| `ListPathshalaExamsQuery` | `Members.Read` + staff | Every exam, with how far marking has got |
+| `ListDonationsQuery` | `Pathshala.Manage` | The ledger and its total |
+| `ListAnnouncementsQuery` | `Members.Read` + staff | What this Pathshala has sent |
+| `ListMyAnnouncementsQuery` | `Members.Read` | From every Pathshala where the caller has a child with a place or a request |
 
 ## Events published
 
 - `pathshala.created.v1`
 - `pathshala.updated.v1` (ids only, like its creation)
+- `pathshala.teacher.added.v1`, `.updated.v1`, `.removed.v1` (ids and who did it)
+- `pathshala.donation.recorded.v1`, `pathshala.donation.voided.v1` (ids, amount, who)
+- `pathshala.announcement.sent.v1` (who, and how many) and one `pathshala.announcement.addressed.v1` per parent - see "Teachers, the staff tabs, donations and announcements"
 - `pathshala.session.opened.v1`
 - `pathshala.deactivated.v1`
 - `pathshala.enrolment.requested.v1`
@@ -139,6 +159,58 @@ that exists is the Samaaj's to put right. An Area Admin may correct their own
 locality's Pathshala and not move it out: a blank locality is filled with
 theirs, because clearing it would hand the Pathshala to the Samaaj Admin, and
 naming another answers 403 - events-service's rule for an event.
+
+## Teachers, the staff tabs, donations and announcements
+
+Added 2026-09-26, for the admin panel's tabbed Pathshala page.
+
+**A teacher is the Pathshala's own record, and need not be a member of the
+Samaaj** (the user's requirement). `Teacher` (name, phone, email,
+qualification) is owned by the `Pathshala` aggregate like its sessions and
+classes, and a class's `TeacherAssignment` names a teacher record rather than a
+member id. `Teacher.UserId` optionally links a login - a Samaaj member, or an
+account given only the `PathshalaTeacher` role through Invite Admin - and it is
+what "teaches this class" is decided against (`Pathshala.Teaches`). A teacher
+without a login is a record, and an administrator marks and records for them
+(confirmed with the user). One login is one teacher per Pathshala: the aggregate
+refuses a second, and a filtered unique index holds it.
+
+The migration gave every member who taught a class before this a teacher record
+per Pathshala, linked to the same login so their registers keep working, named
+"Teacher (add their details)" because names were never held here;
+`TeacherRecordsMigrationTests` runs it against legacy rows.
+
+**The staff tabs share one access rule.** Students, Progress report, Attendance
+and Exams are "rows for the classes this caller may see", and
+`PathshalaAccess.StaffScopeOf` is that answer: every class for somebody who runs
+the Pathshala, the classes they teach for one of its teachers, and "not found"
+for anybody else. Waiting requests are the administrators' only. Each report is
+a couple of GROUP BYs over the whole Pathshala, never a query per child.
+
+**The parent's phone on the Students tab is one they gave on the request.**
+`RequestEnrolmentCommand` requires a contact name and phone, stored on the
+enrolment. The Pathshala sees it whatever the parent's directory privacy
+setting (confirmed with the user), which is exactly why it is asked for on a
+form that says so rather than looked up in member-family-service - a lookup
+would have let anybody holding `Pathshala.Manage` read the private phone of any
+member id. Requests made before this carry none, and the tab says so.
+
+**The donation ledger is record-keeping only, and voided rather than
+deleted.** A receipt number handed to a donor has to keep pointing at something,
+so a mistake leaves the totals with a reason and stays in the ledger. Receipt
+numbers are one more than the highest; the unique index on (Pathshala,
+ReceiptNumber) is what holds when two are recorded at once. Teachers do not see
+it - who gave how much is the administrators' to keep. Amounts are integer paise.
+
+**Announcements keep their text here.** `SendAnnouncementCommand` stores the
+title and body and raises ids only: `pathshala.announcement.sent.v1` (who sent
+it, to how many) and one `pathshala.announcement.addressed.v1` per recipient,
+which audit-notification-service turns into that parent's in-app notification -
+one per event, because its (source message, channel) unique index allows no
+more. The recipients are the parent who asked for each place with a place or a
+request, plus the student once they have their own account. Parents read the
+text through `ListMyAnnouncementsQuery`. There is no SMS or WhatsApp - the
+platform has no provider for either.
 
 ## The register
 

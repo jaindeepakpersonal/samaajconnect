@@ -173,9 +173,15 @@ public sealed class AttendanceIndexTests(PathshalaApiFactory factory)
         var classId = (await classCreated.Content.ReadFromJsonAsync<JsonElement>())
             .GetProperty("id").GetGuid();
 
+        var teacherRecord = await admin.PostAsJsonAsync(
+            $"/v1/pathshala/pathshalas/{pathshalaId}/teachers",
+            new { fullName = "Pt. Ramesh Shastri", userId = teacherId.ToString() });
+
+        var teacherRecordId = (await teacherRecord.Content.ReadFromJsonAsync<JsonElement>()).GetProperty("id").GetGuid();
+
         await admin.PostAsJsonAsync(
             $"/v1/pathshala/classes/{classId}/teachers",
-            new { teacherMemberId = teacherId, assign = true });
+            new { teacherId = teacherRecordId, assign = true });
 
         var enrolmentIds = new List<Guid>();
 
@@ -185,7 +191,7 @@ public sealed class AttendanceIndexTests(PathshalaApiFactory factory)
                 .CreateClientAs(Guid.NewGuid(), TenantId, [Roles.Member], [PermissionKeys.MembersRead])
                 .PostAsJsonAsync(
                     $"/v1/pathshala/pathshalas/{pathshalaId}/enrollments",
-                    new { childProfileId = Guid.NewGuid() });
+                    new { contactName = "Ravi Shah", contactPhone = "+91 98290 00000", childProfileId = Guid.NewGuid() });
 
             var enrolmentId = (await requested.Content.ReadFromJsonAsync<JsonElement>())
                 .GetProperty("id").GetGuid();
@@ -250,7 +256,7 @@ public sealed class AttendanceIndexTests(PathshalaApiFactory factory)
         var requested = await factory
             .CreateClientAs(parentId, TenantId, [Roles.Member], [PermissionKeys.MembersRead])
             .PostAsJsonAsync(
-                $"/v1/pathshala/pathshalas/{pathshalaId}/enrollments", new { childProfileId });
+                $"/v1/pathshala/pathshalas/{pathshalaId}/enrollments", new { contactName = "Ravi Shah", contactPhone = "+91 98290 00000", childProfileId });
 
         var enrolmentId = (await requested.Content.ReadFromJsonAsync<JsonElement>())
             .GetProperty("id").GetGuid();

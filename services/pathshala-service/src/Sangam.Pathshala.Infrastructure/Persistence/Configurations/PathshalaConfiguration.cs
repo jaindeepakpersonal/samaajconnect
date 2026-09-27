@@ -48,6 +48,14 @@ public sealed class PathshalaConfiguration : IEntityTypeConfiguration<Domain.Pat
             .HasForeignKey(c => c.PathshalaId)
             .OnDelete(DeleteBehavior.Cascade);
 
+        builder.HasMany(p => p.Teachers)
+            .WithOne()
+            .HasForeignKey(t => t.PathshalaId)
+            .OnDelete(DeleteBehavior.Cascade);
+
+        builder.Metadata.FindNavigation(nameof(Domain.Pathshalas.Pathshala.Teachers))!
+            .SetPropertyAccessMode(PropertyAccessMode.Field);
+
         builder.Metadata.FindNavigation(nameof(Domain.Pathshalas.Pathshala.Sessions))!
             .SetPropertyAccessMode(PropertyAccessMode.Field);
 
@@ -127,6 +135,37 @@ public sealed class TeacherAssignmentConfiguration : IEntityTypeConfiguration<Te
         // One assignment per teacher per class. The aggregate refuses a repeat;
         // this holds if two administrators assign the same teacher at once, and
         // a duplicate would double the teacher count on every screen.
-        builder.HasIndex(t => new { t.ClassId, t.TeacherMemberId }).IsUnique();
+        builder.HasIndex(t => new { t.ClassId, t.TeacherId }).IsUnique();
+
+        // An assignment names a teacher record of the same Pathshala. Removing
+        // the teacher removes the aggregate's own assignments first; the
+        // cascade is the floor under that.
+        builder.HasOne<Teacher>()
+            .WithMany()
+            .HasForeignKey(t => t.TeacherId)
+            .OnDelete(DeleteBehavior.Cascade);
+    }
+}
+
+public sealed class TeacherConfiguration : IEntityTypeConfiguration<Teacher>
+{
+    public void Configure(EntityTypeBuilder<Teacher> builder)
+    {
+        builder.ToTable("pathshala_teachers");
+        builder.HasKey(t => t.Id);
+        builder.Property(t => t.Id).ValueGeneratedNever();
+        builder.Property(t => t.FullName).IsRequired().HasMaxLength(200);
+        builder.Property(t => t.Phone).HasMaxLength(20);
+        builder.Property(t => t.Email).HasMaxLength(200);
+        builder.Property(t => t.Qualification).HasMaxLength(200);
+
+        // One account is one teacher per Pathshala - "which of these two is
+        // signed in?" would have no answer. The aggregate refuses it first.
+        builder.HasIndex(t => new { t.PathshalaId, t.UserId })
+            .IsUnique()
+            .HasFilter("user_id IS NOT NULL");
+
+        // "Which Pathshalas does this account teach at?"
+        builder.HasIndex(t => t.UserId);
     }
 }

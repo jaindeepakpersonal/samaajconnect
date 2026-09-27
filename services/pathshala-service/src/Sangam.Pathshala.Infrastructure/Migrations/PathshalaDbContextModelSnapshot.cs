@@ -22,6 +22,134 @@ namespace Sangam.Pathshala.Infrastructure.Migrations
 
             NpgsqlModelBuilderExtensions.UseIdentityByDefaultColumns(modelBuilder);
 
+            modelBuilder.Entity("Sangam.Pathshala.Domain.Announcements.PathshalaAnnouncement", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<string>("Body")
+                        .IsRequired()
+                        .HasMaxLength(2000)
+                        .HasColumnType("character varying(2000)")
+                        .HasColumnName("body");
+
+                    b.Property<Guid>("PathshalaId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("pathshala_id");
+
+                    b.Property<int>("RecipientCount")
+                        .HasColumnType("integer")
+                        .HasColumnName("recipient_count");
+
+                    b.Property<DateTimeOffset>("SentAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("sent_at");
+
+                    b.Property<Guid>("SentBy")
+                        .HasColumnType("uuid")
+                        .HasColumnName("sent_by");
+
+                    b.Property<Guid>("TenantId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("tenant_id");
+
+                    b.Property<string>("Title")
+                        .IsRequired()
+                        .HasMaxLength(150)
+                        .HasColumnType("character varying(150)")
+                        .HasColumnName("title");
+
+                    b.HasKey("Id")
+                        .HasName("pk_pathshala_announcements");
+
+                    b.HasIndex("PathshalaId", "SentAt")
+                        .HasDatabaseName("ix_pathshala_announcements_pathshala_id_sent_at");
+
+                    b.ToTable("pathshala_announcements", (string)null);
+                });
+
+            modelBuilder.Entity("Sangam.Pathshala.Domain.Donations.PathshalaDonation", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<long>("Amount")
+                        .HasColumnType("bigint")
+                        .HasColumnName("amount");
+
+                    b.Property<DateOnly>("DonatedOn")
+                        .HasColumnType("date")
+                        .HasColumnName("donated_on");
+
+                    b.Property<Guid?>("DonorMemberId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("donor_member_id");
+
+                    b.Property<string>("DonorName")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)")
+                        .HasColumnName("donor_name");
+
+                    b.Property<string>("Mode")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)")
+                        .HasColumnName("mode");
+
+                    b.Property<Guid>("PathshalaId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("pathshala_id");
+
+                    b.Property<string>("Purpose")
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)")
+                        .HasColumnName("purpose");
+
+                    b.Property<int>("ReceiptNumber")
+                        .HasColumnType("integer")
+                        .HasColumnName("receipt_number");
+
+                    b.Property<DateTimeOffset>("RecordedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("recorded_at");
+
+                    b.Property<Guid>("RecordedBy")
+                        .HasColumnType("uuid")
+                        .HasColumnName("recorded_by");
+
+                    b.Property<Guid>("TenantId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("tenant_id");
+
+                    b.Property<string>("VoidReason")
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)")
+                        .HasColumnName("void_reason");
+
+                    b.Property<DateTimeOffset?>("VoidedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("voided_at");
+
+                    b.Property<Guid?>("VoidedBy")
+                        .HasColumnType("uuid")
+                        .HasColumnName("voided_by");
+
+                    b.HasKey("Id")
+                        .HasName("pk_pathshala_donations");
+
+                    b.HasIndex("PathshalaId", "DonatedOn")
+                        .HasDatabaseName("ix_pathshala_donations_pathshala_id_donated_on");
+
+                    b.HasIndex("PathshalaId", "ReceiptNumber")
+                        .IsUnique()
+                        .HasDatabaseName("ix_pathshala_donations_pathshala_id_receipt_number");
+
+                    b.ToTable("pathshala_donations", (string)null);
+                });
+
             modelBuilder.Entity("Sangam.Pathshala.Domain.Enrolments.AttendanceEntry", b =>
                 {
                     b.Property<Guid>("Id")
@@ -169,6 +297,16 @@ namespace Sangam.Pathshala.Infrastructure.Migrations
                     b.Property<Guid?>("ClassId")
                         .HasColumnType("uuid")
                         .HasColumnName("class_id");
+
+                    b.Property<string>("ContactName")
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)")
+                        .HasColumnName("contact_name");
+
+                    b.Property<string>("ContactPhone")
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)")
+                        .HasColumnName("contact_phone");
 
                     b.Property<DateTimeOffset?>("EnrolledAt")
                         .HasColumnType("timestamp with time zone")
@@ -381,6 +519,59 @@ namespace Sangam.Pathshala.Infrastructure.Migrations
                     b.ToTable("classes", (string)null);
                 });
 
+            modelBuilder.Entity("Sangam.Pathshala.Domain.Pathshalas.Teacher", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<DateTimeOffset>("AddedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("added_at");
+
+                    b.Property<string>("Email")
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)")
+                        .HasColumnName("email");
+
+                    b.Property<string>("FullName")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)")
+                        .HasColumnName("full_name");
+
+                    b.Property<Guid>("PathshalaId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("pathshala_id");
+
+                    b.Property<string>("Phone")
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)")
+                        .HasColumnName("phone");
+
+                    b.Property<string>("Qualification")
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)")
+                        .HasColumnName("qualification");
+
+                    b.Property<Guid?>("UserId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("user_id");
+
+                    b.HasKey("Id")
+                        .HasName("pk_pathshala_teachers");
+
+                    b.HasIndex("UserId")
+                        .HasDatabaseName("ix_pathshala_teachers_user_id");
+
+                    b.HasIndex("PathshalaId", "UserId")
+                        .IsUnique()
+                        .HasDatabaseName("ix_pathshala_teachers_pathshala_id_user_id")
+                        .HasFilter("user_id IS NOT NULL");
+
+                    b.ToTable("pathshala_teachers", (string)null);
+                });
+
             modelBuilder.Entity("Sangam.Pathshala.Domain.Pathshalas.TeacherAssignment", b =>
                 {
                     b.Property<Guid>("Id")
@@ -395,16 +586,19 @@ namespace Sangam.Pathshala.Infrastructure.Migrations
                         .HasColumnType("uuid")
                         .HasColumnName("class_id");
 
-                    b.Property<Guid>("TeacherMemberId")
+                    b.Property<Guid>("TeacherId")
                         .HasColumnType("uuid")
-                        .HasColumnName("teacher_member_id");
+                        .HasColumnName("teacher_id");
 
                     b.HasKey("Id")
                         .HasName("pk_teacher_assignments");
 
-                    b.HasIndex("ClassId", "TeacherMemberId")
+                    b.HasIndex("TeacherId")
+                        .HasDatabaseName("ix_teacher_assignments_teacher_id");
+
+                    b.HasIndex("ClassId", "TeacherId")
                         .IsUnique()
-                        .HasDatabaseName("ix_teacher_assignments_class_id_teacher_member_id");
+                        .HasDatabaseName("ix_teacher_assignments_class_id_teacher_id");
 
                     b.ToTable("teacher_assignments", (string)null);
                 });
@@ -535,6 +729,16 @@ namespace Sangam.Pathshala.Infrastructure.Migrations
                         .HasConstraintName("fk_classes_pathshalas_pathshala_id");
                 });
 
+            modelBuilder.Entity("Sangam.Pathshala.Domain.Pathshalas.Teacher", b =>
+                {
+                    b.HasOne("Sangam.Pathshala.Domain.Pathshalas.Pathshala", null)
+                        .WithMany("Teachers")
+                        .HasForeignKey("PathshalaId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired()
+                        .HasConstraintName("fk_pathshala_teachers_pathshalas_pathshala_id");
+                });
+
             modelBuilder.Entity("Sangam.Pathshala.Domain.Pathshalas.TeacherAssignment", b =>
                 {
                     b.HasOne("Sangam.Pathshala.Domain.Pathshalas.PathshalaClass", null)
@@ -543,6 +747,13 @@ namespace Sangam.Pathshala.Infrastructure.Migrations
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired()
                         .HasConstraintName("fk_teacher_assignments_classes_class_id");
+
+                    b.HasOne("Sangam.Pathshala.Domain.Pathshalas.Teacher", null)
+                        .WithMany()
+                        .HasForeignKey("TeacherId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired()
+                        .HasConstraintName("fk_teacher_assignments_teacher_teacher_id");
                 });
 
             modelBuilder.Entity("Sangam.Pathshala.Domain.Pathshalas.Pathshala", b =>
@@ -550,6 +761,8 @@ namespace Sangam.Pathshala.Infrastructure.Migrations
                     b.Navigation("Classes");
 
                     b.Navigation("Sessions");
+
+                    b.Navigation("Teachers");
                 });
 
             modelBuilder.Entity("Sangam.Pathshala.Domain.Pathshalas.PathshalaClass", b =>

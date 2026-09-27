@@ -491,6 +491,28 @@ These are Data Fiduciary obligations that no amount of code discharges:
   brings a mandatory DPO in India, independent audits, and impact assessments.
 - How parental consent is made **verifiable** in their context.
 
+### Pathshala — a parent's phone given for the purpose, and teachers who are not members
+
+Added 2026-09-26. A Pathshala's Students tab shows the parent's name and phone to
+its administrators and teachers **whatever that parent's directory privacy
+setting says** (the Samaaj's decision). That is only defensible because of where
+the phone comes from: the enrolment request asks for it, on a form that says the
+Pathshala will see it, and pathshala-service stores that copy. It does not look
+the number up in member-family-service - which would have let anybody running a
+Pathshala read the private phone of any member id - and a parent who wants a
+different number used gives a different one. Requests made before the form asked
+carry none.
+
+Teachers need not be members, so pathshala-service now holds a teacher's name,
+phone, email and qualification itself. It does not consume
+`identity.user.erased.v1`: a teacher record is the Pathshala's own contact card,
+corrected or removed by its administrators, and removing it is how the details go.
+Whether a teacher with a login who erases their account should also lose the
+record automatically is question 8 below.
+
+Announcements keep their text in pathshala-service; every event about them
+carries ids only, so no message reaches the append-only audit log.
+
 ## Open questions for counsel
 
 1. Is de-identifying audit rows, rather than deleting them, a defensible
@@ -529,5 +551,11 @@ These are Data Fiduciary obligations that no amount of code discharges:
    member of a household with children cannot leave at all, because nothing on
    this platform can remove a child record and those records would otherwise
    have nobody able to manage them, permanently.
+
+8. A Pathshala teacher who is not a member has their name, phone and email in
+   pathshala-service, entered by the Pathshala. If they had a login and erase
+   their account, their teacher record stays until an administrator removes it.
+   Is that record the Pathshala's own staff record, kept under its own basis, or
+   personal data the erasure should reach?
 
 Nothing in this repository should be taken as an answer to any of these.

@@ -50,6 +50,7 @@ app.MapGet("/health", () => Results.Ok(new { status = "healthy" }))
     .ExcludeFromDescription();
 
 app.MapPathshalaEndpoints();
+app.MapStaffEndpoints();
 
 await app.RunAsync();
 

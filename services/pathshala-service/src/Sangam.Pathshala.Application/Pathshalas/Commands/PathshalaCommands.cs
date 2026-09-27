@@ -359,7 +359,7 @@ public sealed class AddClassSlotCommandHandler(
 /// tenant and Pathshala checks above.
 /// </remarks>
 [RequiresPermission(PermissionKeys.PathshalaManage)]
-public sealed record AssignTeacherCommand(Guid ClassId, Guid TeacherMemberId, bool Assign)
+public sealed record AssignTeacherCommand(Guid ClassId, Guid TeacherId, bool Assign)
     : ICommand<ClassResponse>;
 
 public sealed class AssignTeacherCommandValidator : AbstractValidator<AssignTeacherCommand>
@@ -367,7 +367,7 @@ public sealed class AssignTeacherCommandValidator : AbstractValidator<AssignTeac
     public AssignTeacherCommandValidator()
     {
         RuleFor(x => x.ClassId).NotEmpty();
-        RuleFor(x => x.TeacherMemberId).NotEmpty();
+        RuleFor(x => x.TeacherId).NotEmpty();
     }
 }
 
@@ -391,12 +391,20 @@ public sealed class AssignTeacherCommandHandler(
 
         var pathshalaClass = pathshala!.FindClass(command.ClassId)!;
 
+        // A teacher of this Pathshala - a record of another one, or none, is
+        // not somebody this class can be taught by.
+        if (pathshala.FindTeacher(command.TeacherId) is null)
+        {
+            return Result.Failure<ClassResponse>(
+                Error.NotFound("Teacher.NotFound", "This Pathshala has no such teacher."));
+        }
+
         // A no-op either way is success. Assigning a teacher who already
         // teaches the class, or removing one who does not, is not an error -
         // the caller wanted a state and that is the state.
         var changed = command.Assign
-            ? pathshalaClass.AssignTeacher(command.TeacherMemberId, clock.UtcNow)
-            : pathshalaClass.RemoveTeacher(command.TeacherMemberId);
+            ? pathshalaClass.AssignTeacher(command.TeacherId, clock.UtcNow)
+            : pathshalaClass.RemoveTeacher(command.TeacherId);
 
         if (changed)
         {

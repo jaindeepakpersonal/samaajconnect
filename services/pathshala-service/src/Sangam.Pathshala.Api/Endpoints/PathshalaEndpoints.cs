@@ -204,7 +204,7 @@ public static class PathshalaEndpoints
                 Guid classId, TeacherRequest request, ISender sender, CancellationToken cancellationToken) =>
             {
                 var result = await sender.Send(
-                    new AssignTeacherCommand(classId, request.TeacherMemberId, request.Assign),
+                    new AssignTeacherCommand(classId, request.TeacherId, request.Assign),
                     cancellationToken);
 
                 return result.ToApiResult();
@@ -333,7 +333,7 @@ public static class PathshalaEndpoints
                 Guid id, EnrolRequest request, ISender sender, CancellationToken cancellationToken) =>
             {
                 var result = await sender.Send(
-                    new RequestEnrolmentCommand(id, request.ChildProfileId), cancellationToken);
+                    new RequestEnrolmentCommand(id, request.ChildProfileId, request.ContactName, request.ContactPhone), cancellationToken);
 
                 return result.ToApiResult();
             })
@@ -508,7 +508,7 @@ public static class PathshalaEndpoints
     /// whose safest value is implicit is one where a mistyped request quietly
     /// removes a teacher from a class.
     /// </summary>
-    public sealed record TeacherRequest(Guid TeacherMemberId, bool Assign);
+    public sealed record TeacherRequest(Guid TeacherId, bool Assign);
 
     public sealed record MarkAttendanceRequest(
         DateOnly ClassDate, IReadOnlyList<AttendanceMark> Marks);
@@ -517,7 +517,7 @@ public static class PathshalaEndpoints
 
     public sealed record RecordResultRequest(Guid EnrolmentId, int Score, string? Grade);
 
-    public sealed record EnrolRequest(Guid ChildProfileId);
+    public sealed record EnrolRequest(Guid ChildProfileId, string ContactName, string ContactPhone);
 
     /// <summary>Same reasoning as <see cref="TeacherRequest"/>: no default.</summary>
     public sealed record PlacementRequest(Guid? ClassId, bool Place);

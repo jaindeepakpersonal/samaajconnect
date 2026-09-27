@@ -105,6 +105,17 @@ public sealed class ChildNamesTests(MemberFamilyApiFactory factory)
         ids.Should().NotContain(_elsewhere);
     }
 
+    [Theory]
+    [InlineData("AreaAdmin")]
+    [InlineData("PathshalaTeacher")]
+    public async Task Pathshala_staff_get_names_for_the_children_on_their_rolls(string role)
+    {
+        var client = factory.CreateClientAs(Guid.NewGuid(), TenantA, ["Member", role], ["Members.Read"]);
+
+        (await NamesAsync(client, _aarav)).EnumerateArray().Should().ContainSingle()
+            .Which.GetProperty("fullName").GetString().Should().Be("Aarav Shah");
+    }
+
     [Fact]
     public async Task An_ordinary_member_cannot_name_children_by_id()
     {
