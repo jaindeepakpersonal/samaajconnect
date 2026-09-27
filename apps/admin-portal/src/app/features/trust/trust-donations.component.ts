@@ -4,7 +4,7 @@ import { FormsModule } from '@angular/forms';
 import { describeError, formatRupees, parseRupees } from '@samaajconnect/shared';
 import { Observable } from 'rxjs';
 import { AdminApi } from '../../core/admin-api';
-import { TrustDonation, TrustDonationMode } from '../../core/admin.models';
+import { AdminMember, TrustDonation, TrustDonationMode } from '../../core/admin.models';
 
 /** What trust-service accepts for a donor's phone, character for character. */
 const PHONE = /^\+?[0-9 ()-]{7,20}$/;
@@ -21,6 +21,11 @@ const PHONE = /^\+?[0-9 ()-]{7,20}$/;
  * **The totals come apart the same way**: what was promised and what arrived
  * are different questions a Trust committee is asked, and adding them together
  * would answer neither.
+ *
+ * **A donor is picked from the directory when they are a member**, the same
+ * search Add a trustee uses, so the pledge is owed by their account: it shows
+ * on their own Trusts screen and they can be sent a reminder from Collections.
+ * Somebody with no account is typed by name instead, and is phoned.
  */
 @Component({
   selector: 'app-trust-donations',
@@ -39,10 +44,42 @@ const PHONE = /^\+?[0-9 ()-]{7,20}$/;
 
       <form (ngSubmit)="record()">
         <div class="form-grid">
-          <div class="field">
-            <label for="donor-name">Donor</label>
-            <input id="donor-name" class="input" name="donorName" [(ngModel)]="donorName"
-              maxlength="200" placeholder="Shri Mahendra Jain" />
+          <div class="field span-all">
+            @if (donorMember(); as picked) {
+              <span class="label">Donor</span>
+              <p class="picked">
+                <b>{{ picked.fullName }}</b>, a member
+                <button class="btn link" type="button" (click)="clearDonor()">Change</button>
+              </p>
+            } @else {
+              <label for="donor-search">Donor who is a member</label>
+              <div class="search-row">
+                <input id="donor-search" class="input" name="donorSearch" [(ngModel)]="donorSearch"
+                  placeholder="Name or mobile" (keydown.enter)="$event.preventDefault(); searchDonors()" />
+                <button class="btn alt" type="button" [disabled]="searching() || !donorSearch.trim()"
+                  (click)="searchDonors()">
+                  Search
+                </button>
+              </div>
+
+              @if (donorResults().length > 0) {
+                <ul class="suggestions">
+                  @for (member of donorResults(); track member.id) {
+                    <li>
+                      <button class="btn link" type="button" (click)="pickDonor(member)">
+                        {{ member.fullName }}@if (member.mobile) { · {{ member.mobile }} }
+                      </button>
+                    </li>
+                  }
+                </ul>
+              } @else if (searched()) {
+                <p class="small">No member matches. Type their name below instead.</p>
+              }
+
+              <label for="donor-name">Or a donor with no account</label>
+              <input id="donor-name" class="input" name="donorName" [(ngModel)]="donorName"
+                maxlength="200" placeholder="Shri Mahendra Jain" />
+            }
           </div>
 
           <div class="field">
@@ -138,6 +175,47 @@ const PHONE = /^\+?[0-9 ()-]{7,20}$/;
     .totals {
       font-size: 15px;
     }
+
+    .label {
+      display: block;
+      font-weight: 600;
+      margin-top: var(--space-3);
+    }
+
+    .picked {
+      margin: var(--space-1) 0 0;
+    }
+
+    .search-row {
+      display: flex;
+      gap: var(--space-2);
+      align-items: flex-start;
+    }
+
+    .search-row .input {
+      flex: 1;
+    }
+
+    .suggestions {
+      list-style: none;
+      margin: var(--space-2) 0;
+      padding: 0;
+      border: 1px solid var(--line);
+      border-radius: var(--radius-sm);
+      max-height: 220px;
+      overflow-y: auto;
+    }
+
+    .suggestions li + li {
+      border-top: 1px solid var(--line);
+    }
+
+    .suggestions button {
+      display: block;
+      width: 100%;
+      text-align: left;
+      padding: var(--space-2) var(--space-3);
+    }
   `,
 })
 export class TrustDonationsComponent implements OnInit {
@@ -171,6 +249,12 @@ export class TrustDonationsComponent implements OnInit {
 
   donorName = '';
   donorPhone = '';
+
+  donorSearch = '';
+  readonly donorMember = signal<AdminMember | null>(null);
+  readonly donorResults = signal<readonly AdminMember[]>([]);
+  readonly searching = signal(false);
+  readonly searched = signal(false);
   amount = '';
   mode: TrustDonationMode = 'Cash';
   purpose = '';
@@ -210,7 +294,7 @@ export class TrustDonationsComponent implements OnInit {
 
   canRecord(): boolean {
     return (
-      this.donorName.trim().length > 0 &&
+      (this.donorMember() !== null || this.donorName.trim().length > 0) &&
       this.purpose.trim().length > 0 &&
       this.paise() !== null &&
       !this.phoneInvalid()
@@ -224,11 +308,12 @@ export class TrustDonationsComponent implements OnInit {
       return;
     }
 
-    const donor = this.donorName.trim();
+    const member = this.donorMember();
+    const donor = member?.fullName ?? this.donorName.trim();
 
     this.run(
       this.api.recordTrustDonation(this.trustId(), {
-        donorMemberId: null,
+        donorMemberId: member?.id ?? null,
         donorName: donor,
         donorPhone: this.donorPhone.trim() || null,
         amount,
@@ -238,6 +323,7 @@ export class TrustDonationsComponent implements OnInit {
       () => {
         this.donorName = '';
         this.donorPhone = '';
+        this.clearDonor();
         this.amount = '';
         this.purpose = '';
         return `${formatRupees(amount)} pledged by ${donor}.`;
@@ -250,6 +336,44 @@ export class TrustDonationsComponent implements OnInit {
       this.api.collectTrustDonation(donation.id),
       (collected) => `Collected. Receipt ${collected?.receiptNumber ?? ''} for ${this.donorLabel(donation)}.`,
     );
+  }
+
+  searchDonors(): void {
+    const term = this.donorSearch.trim();
+
+    if (term.length === 0) {
+      return;
+    }
+
+    this.searching.set(true);
+
+    this.api.searchMembers(term, null, 0, 10).subscribe({
+      next: (page) => {
+        this.donorResults.set(page.items);
+        this.searched.set(true);
+        this.searching.set(false);
+      },
+      error: (failure: unknown) => {
+        this.error.set(describeError(failure));
+        this.searching.set(false);
+      },
+    });
+  }
+
+  /** Their mobile starts the phone box, since the Trust will call the number it has. */
+  pickDonor(member: AdminMember): void {
+    this.donorMember.set(member);
+    this.donorName = '';
+    this.donorPhone ||= member.mobile ?? '';
+    this.donorResults.set([]);
+    this.searched.set(false);
+  }
+
+  clearDonor(): void {
+    this.donorMember.set(null);
+    this.donorSearch = '';
+    this.donorResults.set([]);
+    this.searched.set(false);
   }
 
   private load(): void {

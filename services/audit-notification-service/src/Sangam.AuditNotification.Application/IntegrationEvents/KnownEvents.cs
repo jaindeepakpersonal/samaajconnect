@@ -1065,6 +1065,35 @@ public static class KnownEvents
             EntityName: "Collection",
             EntityIdProperty: "collectionId",
             ActorIdProperty: "collectedBy"),
+
+        // A Trust officer chasing an amount due. The officer is the actor; the
+        // payer is who it is addressed to. The notification says something is
+        // due and what for, never how much: the amount is on the member's own
+        // Trusts screen, and a figure here is a figure in an inbox anybody
+        // glancing at the phone can read.
+        ["trust.collection.reminded.v1"] = new(
+            Action: "CollectionReminded",
+            EntityName: "Collection",
+            EntityIdProperty: "collectionId",
+            ActorIdProperty: "remindedBy",
+            Notification: payload =>
+            {
+                if (!payload.TryGetProperty("payerMemberId", out var payer)
+                    || !payer.TryGetGuid(out var recipientId))
+                {
+                    return null;
+                }
+
+                var forWhat = payload.TryGetProperty("sourceType", out var source)
+                    && source.GetString() == "BoliResult"
+                        ? "a Boli you won"
+                        : "your pledge";
+
+                return new NotificationSpec(
+                    recipientId,
+                    "A reminder from your Trust",
+                    $"A payment for {forWhat} is still due. Open Trusts to see how much.");
+            }),
     };
 
     public static EventDescriptor Describe(string topic) =>

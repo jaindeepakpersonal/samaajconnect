@@ -2,6 +2,7 @@ using MediatR;
 using Sangam.Trust.Api.Extensions;
 using Sangam.Trust.Application.Collections;
 using Sangam.Trust.Application.Collections.Commands.RecordCollectionPayment;
+using Sangam.Trust.Application.Collections.Commands.RemindPayer;
 using Sangam.Trust.Application.Collections.Queries;
 using Sangam.Trust.Application.Donations;
 using Sangam.Trust.Application.Donations.Commands.MarkDonationCollected;
@@ -185,6 +186,24 @@ public static class FinanceEndpoints
             .WithSummary("Record that an amount due was paid, and how.")
             .Produces<CollectionResponse>()
             .ProducesValidationProblem()
+            .ProducesProblem(StatusCodes.Status401Unauthorized)
+            .ProducesProblem(StatusCodes.Status403Forbidden)
+            .ProducesProblem(StatusCodes.Status404NotFound)
+            .ProducesProblem(StatusCodes.Status409Conflict);
+
+        group.MapPost("/collections/{collectionId:guid}/remind", async (
+                Guid collectionId,
+                ISender sender,
+                CancellationToken cancellationToken) =>
+            {
+                var result = await sender.Send(new RemindPayerCommand(collectionId), cancellationToken);
+
+                return result.ToApiResult();
+            })
+            .RequireAuthorization()
+            .WithName("RemindTrustPayer")
+            .WithSummary("Send the member who owes this an in-app reminder. At most once a day; 409 for a non-member or once paid.")
+            .Produces<CollectionResponse>()
             .ProducesProblem(StatusCodes.Status401Unauthorized)
             .ProducesProblem(StatusCodes.Status403Forbidden)
             .ProducesProblem(StatusCodes.Status404NotFound)

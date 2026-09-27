@@ -8,11 +8,19 @@ import { TrustCollection } from '../../core/admin.models';
 /**
  * Money owed to the Trust, and recording it once it is paid.
  *
- * **Nothing here is created by hand.** An amount falls due when a Boli in this
- * Trust's locality has its result published: boli-service announces it and
- * trust-service opens a Collection against the winner, once, however often the
- * announcement is redelivered. So the screen has no "add" form - a figure typed
- * here would be a debt nobody incurred.
+ * **Nothing here is created by hand.** An amount falls due when a pledge is
+ * recorded on the Donations tab, or when a Boli in this Trust's locality has
+ * its result published - trust-service opens a Collection against the winner,
+ * once, however often the announcement is redelivered. So the screen has no
+ * "add" form - a figure typed here would be a debt nobody incurred.
+ *
+ * **Paying a pledge here collects the donation**, receipt number and all, and
+ * collecting it on the Donations tab settles it here: one fact, two places.
+ *
+ * **A reminder is a notification to the member who owes it**, at most one a
+ * day, and the service refuses both a second one and one to a donor with no
+ * account. The button mirrors the day rule so it is not a control that always
+ * answers 409, and is not drawn at all for somebody who can only be phoned.
  *
  * **Recording a payment asks how it was paid** and nothing else; the amount is
  * the winning bid, which is not the Trust's to change.
@@ -55,7 +63,12 @@ import { TrustCollection } from '../../core/admin.models';
               @for (collection of collections(); track collection.id) {
                 <tr>
                   <td><b>{{ payer(collection) }}</b></td>
-                  <td>{{ collection.sourceType === 'BoliResult' ? 'A Boli they won' : 'A pledged donation' }}</td>
+                  <td>
+                    {{ collection.sourceType === 'BoliResult' ? 'A Boli they won' : 'A pledged donation' }}
+                    @if (collection.lastRemindedAt; as reminded) {
+                      <br /><span class="small">Reminded {{ reminded | date: 'd MMM, h:mm a' }}</span>
+                    }
+                  </td>
                   <td>{{ rupees(collection.amount) }}</td>
                   <td>{{ collection.createdAt | date: 'd MMM y' }}</td>
                   <td>
@@ -76,6 +89,14 @@ import { TrustCollection } from '../../core/admin.models';
                         <button class="btn small" type="button" [disabled]="busy()" (click)="pay(collection)">
                           Record payment
                         </button>
+                        @if (collection.payerMemberId) {
+                          <button class="btn small alt" type="button"
+                            [disabled]="busy() || remindedToday(collection)"
+                            [attr.title]="remindedToday(collection) ? 'Reminded in the last day' : null"
+                            (click)="remind(collection)">
+                            Send a reminder
+                          </button>
+                        }
                       </div>
                     }
                   </td>
@@ -132,7 +153,37 @@ export class TrustCollectionsComponent implements OnInit {
   }
 
   payer(collection: TrustCollection): string {
-    return (collection.payerMemberId ? this.names().get(collection.payerMemberId) : undefined) ?? 'A member';
+    return (
+      (collection.payerMemberId ? this.names().get(collection.payerMemberId) : undefined) ??
+      collection.payerName ??
+      'A member'
+    );
+  }
+
+  /** The service allows one reminder a day; this mirrors it for the button. */
+  remindedToday(collection: TrustCollection): boolean {
+    return (
+      collection.lastRemindedAt !== null &&
+      Date.now() - Date.parse(collection.lastRemindedAt) < 24 * 60 * 60 * 1000
+    );
+  }
+
+  remind(collection: TrustCollection): void {
+    this.busy.set(true);
+    this.error.set(null);
+    this.done.set(null);
+
+    this.api.remindTrustPayer(collection.id).subscribe({
+      next: () => {
+        this.done.set(`${this.payer(collection)} has been sent a reminder.`);
+        this.busy.set(false);
+        this.load();
+      },
+      error: (failure: unknown) => {
+        this.error.set(describeError(failure));
+        this.busy.set(false);
+      },
+    });
   }
 
   pay(collection: TrustCollection): void {

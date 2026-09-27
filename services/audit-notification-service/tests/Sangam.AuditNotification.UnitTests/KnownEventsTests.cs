@@ -103,6 +103,25 @@ public sealed class KnownEventsTests
         sent.Notification.Should().BeNull();
     }
 
+    [Theory]
+    [InlineData("BoliResult", "a Boli you won")]
+    [InlineData("Donation", "your pledge")]
+    public void A_Trust_reminder_reaches_the_payer_and_names_no_amount(string sourceType, string forWhat)
+    {
+        var payer = Guid.NewGuid();
+        var officer = Guid.NewGuid();
+
+        var descriptor = KnownEvents.Describe("trust.collection.reminded.v1");
+        var spec = descriptor.Notification!(Payload(
+            $$"""{"collectionId":"{{Guid.NewGuid()}}","payerMemberId":"{{payer}}","sourceType":"{{sourceType}}","remindedBy":"{{officer}}"}"""));
+
+        descriptor.ActorIdProperty.Should().Be("remindedBy");
+        spec!.RecipientUserId.Should().Be(payer, "the reminder goes to who owes it, not who sent it");
+        spec.Body.Should().Contain(forWhat);
+        spec.Body.Should().NotContainAny("₹", "Rs");
+        spec.Destination.Should().BeNull();
+    }
+
     [Fact]
     public void Login_events_are_audited_but_do_not_notify_the_member()
     {

@@ -58,12 +58,14 @@ function collection(overrides: Partial<TrustCollection> = {}): TrustCollection {
     sourceType: 'BoliResult',
     sourceId: 'b1',
     payerMemberId: 'm1',
+    payerName: null,
     amount: 2_100_000,
     status: 'Due',
     mode: null,
     collectedBy: null,
     collectedAt: null,
     createdAt: '2026-09-20T10:00:00Z',
+    lastRemindedAt: null,
     ...overrides,
   };
 }
@@ -156,6 +158,60 @@ describe('TrustDonationsComponent', () => {
 
     component.record();
     http.expectNone((r) => r.method === 'POST');
+  });
+
+  it('records a member as the donor, by their account, with their mobile to call', () => {
+    load([]);
+    const component = fixture.componentInstance;
+
+    component.donorSearch = 'Diya';
+    component.searchDonors();
+
+    http
+      .expectOne((r) => r.url === '/v1/members' && r.params.get('term') === 'Diya')
+      .flush({ items: [{ id: 'm1', fullName: 'Diya Jain', mobile: '9829012345', email: null }], hasMore: false });
+    fixture.detectChanges();
+
+    expect(textOf(fixture)).toContain('Diya Jain');
+
+    component.pickDonor(component.donorResults()[0]!);
+    fixture.detectChanges();
+
+    expect(textOf(fixture)).toContain('Diya Jain, a member');
+    expect(component.donorPhone).toBe('9829012345');
+
+    component.amount = '5,000';
+    component.purpose = 'Temple fund';
+    component.record();
+
+    const call = http.expectOne(`${BASE}/donations`);
+
+    expect(call.request.body.donorMemberId).toBe('m1');
+    expect(call.request.body.donorName).toBe('Diya Jain');
+    expect(call.request.body.donorPhone).toBe('9829012345');
+
+    call.flush(donation());
+    http.expectOne(`${BASE}/donations`).flush([]);
+
+    expect(component.donorMember()).toBeNull();
+  });
+
+  it('says so when no member matches, and still takes a typed name', () => {
+    load([]);
+    const component = fixture.componentInstance;
+
+    component.donorSearch = 'Nobody';
+    component.searchDonors();
+    http.expectOne((r) => r.url === '/v1/members').flush({ items: [], hasMore: false });
+    fixture.detectChanges();
+
+    expect(textOf(fixture)).toContain('No member matches');
+
+    component.donorName = 'Shri Mahendra Jain';
+    component.amount = '500';
+    component.purpose = 'Books';
+
+    expect(component.canRecord()).toBe(true);
   });
 
   it('collects a pledge and says the receipt number the service issued', () => {
@@ -258,6 +314,43 @@ describe('TrustCollectionsComponent', () => {
 
     expect(textOf(fixture)).toContain('A member');
     expect(textOf(fixture)).not.toContain('m9');
+  });
+
+  it('names a donor with no account by the name on the pledge, and offers no reminder', () => {
+    load([collection({ sourceType: 'Donation', payerMemberId: null, payerName: 'Shri Mahendra Jain' })]);
+
+    expect(textOf(fixture)).toContain('Shri Mahendra Jain');
+    expect(textOf(fixture)).toContain('A pledged donation');
+    expect(textOf(fixture)).not.toContain('Send a reminder');
+  });
+
+  it('sends a member a reminder', () => {
+    load([collection()]);
+
+    fixture.componentInstance.remind(collection());
+
+    const call = http.expectOne('/v1/trust/collections/c1/remind');
+
+    expect(call.request.method).toBe('POST');
+
+    const reminded = collection({ lastRemindedAt: new Date().toISOString() });
+    call.flush(reminded);
+    http.expectOne(`${BASE}/collections`).flush([reminded]);
+    fixture.detectChanges();
+
+    expect(textOf(fixture)).toContain('Diya Jain has been sent a reminder');
+    expect(textOf(fixture)).toContain('Reminded');
+  });
+
+  it('will not offer a second reminder the same day, and offers one the day after', () => {
+    const today = collection({ lastRemindedAt: new Date(Date.now() - 60 * 60 * 1000).toISOString() });
+    const yesterday = collection({ id: 'c2', lastRemindedAt: new Date(Date.now() - 26 * 60 * 60 * 1000).toISOString() });
+    load([today, yesterday]);
+
+    const buttons = [...(fixture.nativeElement as HTMLElement).querySelectorAll<HTMLButtonElement>('button')]
+      .filter((b) => b.textContent?.includes('Send a reminder'));
+
+    expect(buttons.map((b) => b.disabled)).toEqual([true, false]);
   });
 
   it('records a payment with the mode picked, starting on Cash', () => {

@@ -568,13 +568,14 @@ the Trust's locality opens against its winner. Amounts are integer paise.
 | POST | `/elections/{id}/votes` | `Members.Read` + active Trust member | Cast this member's one vote. Self-votes and a second vote are both refused/reported without accepting - see the service's own CLAUDE.md |
 | POST | `/elections/{id}/publish` | `Trust.Manage` | Only from `Closed`. Installs the winner's position on their `TrustMember` row, clearing it from any prior holder. Publishing twice changes nothing |
 | GET | `/trusts/{id}/donations` | `Trust.Manage` | Donations, newest first. `?status=Pledged\|Collected` |
-| POST | `/trusts/{id}/donations` | `Trust.Manage` | Record a pledge: a member id or a donor name, optional phone, amount, purpose, mode (`Cash`/`Cheque`/`Upi`/`BankTransfer`). No receipt number yet |
+| POST | `/trusts/{id}/donations` | `Trust.Manage` | Record a pledge: a member id or a donor name, optional phone, amount, purpose, mode (`Cash`/`Cheque`/`Upi`/`BankTransfer`). No receipt number yet; it opens an amount due, chased like any other |
 | POST | `/donations/{donationId}/collect` | `Trust.Manage` | Mark it collected, issuing the Trust's next receipt number. 409 if already collected |
 | GET | `/trusts/{id}/expenses` | `Trust.Manage` | Expenses, newest first. `?status=Recorded\|Approved` |
 | POST | `/trusts/{id}/expenses` | `Trust.Manage` | Record an expense: category, description, amount, optional vendor |
 | POST | `/expenses/{expenseId}/approve` | `Trust.Manage` | Approve it. Approving one already approved is 200 and changes nothing |
 | GET | `/trusts/{id}/collections` | `Trust.Manage` | Amounts due to the Trust, newest first, each with who owes it. `?status=Due\|Collected` |
 | POST | `/collections/{collectionId}/payment` | `Trust.Manage` | Record that it was paid, and the mode (free text, 50 characters). 409 if already paid |
+| POST | `/collections/{collectionId}/remind` | `Trust.Manage` | An in-app reminder to the member who owes it. At most once a day; 409 once paid or for a donor with no account |
 | GET | `/collections/mine` | `Members.Read` | What the caller still owes to any Trust in their Samaaj, oldest first. The payer is read off the token |
 
 `LocalityId` and member ids on the wire are strings, validated and parsed in

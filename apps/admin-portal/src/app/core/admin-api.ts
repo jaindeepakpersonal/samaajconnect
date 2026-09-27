@@ -827,6 +827,14 @@ export class AdminApi {
     return this.http.get<TrustCollection[]>(`/v1/trust/trusts/${trustId}/collections`);
   }
 
+  /**
+   * Sends the member who owes it an in-app reminder. At most once a day; 409
+   * for a donor with no account, or once it is paid.
+   */
+  remindTrustPayer(collectionId: string): Observable<TrustCollection> {
+    return this.http.post<TrustCollection>(`/v1/trust/collections/${collectionId}/remind`, null);
+  }
+
   /** Records that an amount due was paid, and how. 409 once it has been. */
   recordTrustPayment(collectionId: string, mode: string): Observable<TrustCollection> {
     return this.http.post<TrustCollection>(`/v1/trust/collections/${collectionId}/payment`, { mode });

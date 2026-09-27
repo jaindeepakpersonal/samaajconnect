@@ -23,6 +23,7 @@ public sealed class MarkDonationCollectedCommandValidator : AbstractValidator<Ma
 
 public sealed class MarkDonationCollectedCommandHandler(
     IDonationRepository donations,
+    ICollectionRepository collections,
     IUnitOfWork unitOfWork,
     ICurrentUser currentUser,
     IDateTimeProvider clock)
@@ -57,6 +58,14 @@ public sealed class MarkDonationCollectedCommandHandler(
         var receiptNumber = await donations.ReserveNextReceiptNumberAsync(donation.TrustId, cancellationToken);
 
         donation.Collect(receiptNumber, actorId, clock.UtcNow);
+
+        // The pledge's Collection is settled with it, by the mode the donor
+        // pledged. A pledge recorded before pledges were chased has none.
+        var owed = await collections.GetBySourceAsync(
+            Domain.Collections.CollectionSourceType.Donation, donation.Id, cancellationToken);
+
+        owed?.Settle(donation.Mode.ToString(), actorId, clock.UtcNow);
+
         await unitOfWork.SaveChangesAsync(cancellationToken);
 
         return Result.Success(donation.ToResponse());

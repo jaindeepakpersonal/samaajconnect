@@ -67,6 +67,7 @@ public sealed class CollectionConfiguration : IEntityTypeConfiguration<Domain.Co
         builder.Property(c => c.SourceType).HasConversion<string>().HasMaxLength(20);
         builder.Property(c => c.Status).HasConversion<string>().HasMaxLength(20);
         builder.Property(c => c.Mode).HasMaxLength(50);
+        builder.Property(c => c.PayerName).HasMaxLength(200);
 
         // One Collection per source, ever. This is what makes consuming
         // boli.result.published.v1 safe under at-least-once delivery - see

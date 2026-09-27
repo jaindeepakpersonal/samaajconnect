@@ -44,6 +44,10 @@ namespace Sangam.Trust.Infrastructure.Persistence.Migrations
                         .HasColumnType("timestamp with time zone")
                         .HasColumnName("created_at");
 
+                    b.Property<DateTimeOffset?>("LastRemindedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("last_reminded_at");
+
                     b.Property<string>("Mode")
                         .HasMaxLength(50)
                         .HasColumnType("character varying(50)")
@@ -52,6 +56,11 @@ namespace Sangam.Trust.Infrastructure.Persistence.Migrations
                     b.Property<Guid?>("PayerMemberId")
                         .HasColumnType("uuid")
                         .HasColumnName("payer_member_id");
+
+                    b.Property<string>("PayerName")
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)")
+                        .HasColumnName("payer_name");
 
                     b.Property<Guid>("SourceId")
                         .HasColumnType("uuid")

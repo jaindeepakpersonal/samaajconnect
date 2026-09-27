@@ -947,6 +947,15 @@ an amount falls due only when a Boli in the Trust's locality has its result
 announced, owed by the winner, and the tab records how it was paid. Names
 (donors, approvers, payers) come from the page's one directory call.
 
+**Pledges are chased from Collections too.** A donor who is a member is picked
+from the directory (the same search as Add a trustee), so the pledge is owed
+by their account; one with no account is typed by name, and Collections shows
+that name. Paying a pledge there collects the donation, and collecting it on
+Donations settles it there. "Send a reminder" sends the member an in-app
+notification; the button is not drawn for a donor with no account and is
+disabled for a day after the last one, mirroring the service's rule so it is
+not a control that always answers 409.
+
 **There is no `iCanLead`/president-equivalent split here, and that is a real
 difference from Volunteer Groups, not an oversight.** A Trust's positions are
 plural - President, Secretary, Treasurer - so there is no single instance-level

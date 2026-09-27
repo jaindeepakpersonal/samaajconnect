@@ -519,7 +519,8 @@ Description, Amount (paise), Vendor (nullable), Status (Recorded/Approved),
 RecordedBy, RecordedAt, ApprovedBy, ApprovedAt`.
 
 **Collection** (`trust_collections`) — `Id, TenantId, TrustId, SourceType
-(Donation/BoliResult), SourceId, PayerMemberId (nullable), Amount (paise),
-Status (Due/Collected), Mode (nullable free text), CollectedBy, CollectedAt,
-CreatedAt` — unique on `(SourceType, SourceId)`: one Collection per source,
+(Donation/BoliResult), SourceId, PayerMemberId (nullable), PayerName (nullable -
+a donor with no account), Amount (paise), Status (Due/Collected), Mode (nullable
+free text), CollectedBy, CollectedAt, CreatedAt, LastRemindedAt (nullable)` -
+every pledge opens one, owed by its donor — unique on `(SourceType, SourceId)`: one Collection per source,
 which is what makes consuming `boli.result.published.v1` idempotent.

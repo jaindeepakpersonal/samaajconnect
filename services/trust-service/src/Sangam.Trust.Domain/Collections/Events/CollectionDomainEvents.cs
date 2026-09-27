@@ -31,3 +31,19 @@ public sealed record CollectionSettledDomainEvent(
 {
     public string Topic => "trust.collection.settled.v1";
 }
+
+/// <summary>
+/// An officer reminded the payer. Ids only - the amount is on the Collection,
+/// and the notification says there is something due rather than repeating it.
+/// </summary>
+public sealed record CollectionReminderSentDomainEvent(
+    Guid CollectionId,
+    Guid TenantId,
+    Guid TrustId,
+    Guid PayerMemberId,
+    string SourceType,
+    Guid RemindedBy,
+    DateTimeOffset OccurredAt) : IDomainEvent
+{
+    public string Topic => "trust.collection.reminded.v1";
+}

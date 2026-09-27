@@ -128,6 +128,13 @@ public sealed class CollectionRepository(
             .OrderBy(c => c.CreatedAt)
             .ToListAsync(cancellationToken);
 
+    public Task<Domain.Collections.Collection?> GetBySourceAsync(
+        Domain.Collections.CollectionSourceType sourceType,
+        Guid sourceId,
+        CancellationToken cancellationToken = default) =>
+        dbContext.Collections
+            .FirstOrDefaultAsync(c => c.SourceType == sourceType && c.SourceId == sourceId, cancellationToken);
+
     public void Add(Domain.Collections.Collection collection) => dbContext.Collections.Add(collection);
 
     public async Task<bool> TryOpenAsync(

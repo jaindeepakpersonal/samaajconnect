@@ -11,10 +11,12 @@ internal static class CollectionMappings
         collection.SourceType.ToString(),
         collection.SourceId,
         collection.PayerMemberId,
+        collection.PayerName,
         collection.Amount,
         collection.Status.ToString(),
         collection.Mode,
         collection.CollectedBy,
         collection.CollectedAt,
-        collection.CreatedAt);
+        collection.CreatedAt,
+        collection.LastRemindedAt);
 }

@@ -65,6 +65,12 @@ public interface ICollectionRepository
     Task<IReadOnlyList<Domain.Collections.Collection>> ListDueForPayerAsync(
         Guid payerMemberId, CancellationToken cancellationToken = default);
 
+    /// <summary>Tenant-filtered and tracked, for keeping a pledge and its Collection in step.</summary>
+    Task<Domain.Collections.Collection?> GetBySourceAsync(
+        Domain.Collections.CollectionSourceType sourceType,
+        Guid sourceId,
+        CancellationToken cancellationToken = default);
+
     void Add(Domain.Collections.Collection collection);
 
     /// <summary>

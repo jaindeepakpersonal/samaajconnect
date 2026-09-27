@@ -26,7 +26,7 @@ itself should be gated by a caller's Trust position.
 | `Vote` | One Trust member's one vote in one election. Written directly, outside the aggregate — see "The guarantee" |
 | `Donation` | Aggregate root. Pledged, then Collected with the Trust's next receipt number. A member or a named donor with an optional phone. Integer paise |
 | `Expense` | Aggregate root. Recorded, then Approved. Category, description, amount, optional vendor |
-| `Collection` | Aggregate root. An amount due to the Trust from a source (`BoliResult`, or `Donation`), owed by `PayerMemberId`. Due, then Collected with a mode. One per source |
+| `Collection` | Aggregate root. An amount due to the Trust from a source (`BoliResult`, or a pledged `Donation`), owed by `PayerMemberId` - or `PayerName`, a donor with no account. Due, then Collected with a mode. One per source. `LastRemindedAt` holds the once-a-day reminder rule |
 
 `LocalityId` is a loose reference into master-data-service's `Locality`, with
 no referential integrity across the service boundary — the same convention
@@ -47,11 +47,12 @@ no referential integrity across the service boundary — the same convention
 | `DecideTrustCandidateCommand` | `Trust.Manage` | Approve onto the ballot, or remove before voting opens |
 | `CastTrustVoteCommand` | `Members.Read` + active member of this Trust | Self-votes refused. A repeat vote is reported as accepted:false |
 | `PublishTrustElectionResultsCommand` | `Trust.Manage` | Only from `Closed`. Installs the winner's position via `TrustMember.UpdatePosition`, clearing the same title from any other active member who held it. Publishing twice is safe and does not reinstall |
-| `RecordDonationCommand` | `Trust.Manage` | A pledge: a member or a donor name, optional phone, amount, purpose, mode. No receipt number yet |
-| `MarkDonationCollectedCommand` | `Trust.Manage` | Issues the Trust's next receipt number. 409 on one already collected |
+| `RecordDonationCommand` | `Trust.Manage` | A pledge: a member or a donor name, optional phone, amount, purpose, mode. No receipt number yet. Opens the pledge's Collection in the same transaction |
+| `MarkDonationCollectedCommand` | `Trust.Manage` | Issues the Trust's next receipt number, and settles the pledge's Collection. 409 on one already collected |
 | `RecordExpenseCommand` | `Trust.Manage` | Starts `Recorded` |
 | `ApproveExpenseCommand` | `Trust.Manage` | Approving one already approved is success and changes nothing |
-| `RecordCollectionPaymentCommand` | `Trust.Manage` | Records the mode it was paid by. 409 once paid |
+| `RecordCollectionPaymentCommand` | `Trust.Manage` | Records the mode it was paid by; for a pledge, also collects the donation and issues its receipt number. 409 once paid |
+| `RemindPayerCommand` | `Trust.Manage` | An in-app reminder to the member who owes it. 409 once paid, for a donor with no account, and within a day of the last one |
 | `ConsumeIntegrationEventCommand` | `[InternalRequest]` | Opens a `Due` Collection from `boli.result.published.v1` - see "The Trust's money" |
 
 ## Queries
@@ -80,6 +81,7 @@ no referential integrity across the service boundary — the same convention
 - `DonationRecordedDomainEvent` — `trust.donation.recorded.v1`; `DonationCollectedDomainEvent` — `trust.donation.collected.v1`
 - `ExpenseRecordedDomainEvent` — `trust.expense.recorded.v1`; `ExpenseApprovedDomainEvent` — `trust.expense.approved.v1`
 - `CollectionDueDomainEvent` — `trust.collection.due.v1` (ids, amount and payer); `CollectionSettledDomainEvent` — `trust.collection.settled.v1`
+- `CollectionReminderSentDomainEvent` — `trust.collection.reminded.v1` (ids and source type, no amount), which audit-notification-service turns into the payer's notification
 
 ## Events consumed
 
@@ -106,6 +108,23 @@ Collection by hand - a typed figure would be a debt nobody incurred.
 **The winner sees it.** `ListMyDuesQuery` answers the member portal's "What
 you owe" card; a Trust officer records the payment and its mode in the admin
 panel, which takes it off that card.
+
+**A pledge is chased the same way (2026-09-27).** Recording a donation opens a
+`Donation`-sourced Collection in the same transaction, owed by the donor's
+account when they are a member, or carrying their name when they are not. The
+two are one fact kept in two places, so each side settles the other: marking
+the donation collected settles its Collection (by the pledged mode), and
+recording the Collection's payment collects the donation and issues its
+receipt number. `ChaseCollections` gave every pledge still outstanding its
+Collection; `ChaseMigrationTests` runs it against legacy rows.
+
+**A reminder is one notification, at most once a day.** `RemindPayerCommand`
+raises `trust.collection.reminded.v1`, ids only; audit-notification-service
+tells the payer a payment for "a Boli you won" or "your pledge" is still due,
+and never the amount - that is on their own Trusts screen, not in an inbox.
+A donor with no account cannot be reminded (there is nowhere to send it), and
+the day rule lives on the aggregate (`Collection.ReminderInterval`) so a
+double press cannot send two.
 
 ## API endpoints
 

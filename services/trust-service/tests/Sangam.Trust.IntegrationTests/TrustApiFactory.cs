@@ -43,6 +43,9 @@ public sealed class TrustApiFactory : WebApplicationFactory<Program>, IAsyncLife
 
     public TestClock Clock { get; } = new();
 
+    /// <summary>For a test that needs a database of its own on the same server - see ChaseMigrationTests.</summary>
+    public string ConnectionString => _postgres.GetConnectionString();
+
     protected override void ConfigureWebHost(IWebHostBuilder builder)
     {
         builder.UseEnvironment("Development");

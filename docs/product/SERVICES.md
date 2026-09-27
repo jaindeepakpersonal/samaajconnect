@@ -386,7 +386,7 @@ and expose its endpoints behind the gateway at the route prefix shown.
   `DecideTrustCandidateCommand`, `CastTrustVoteCommand`,
   `PublishTrustElectionResultsCommand`, `RecordDonationCommand`,
   `MarkDonationCollectedCommand`, `RecordExpenseCommand`,
-  `ApproveExpenseCommand`, `RecordCollectionPaymentCommand`
+  `ApproveExpenseCommand`, `RecordCollectionPaymentCommand`, `RemindPayerCommand`
 - **Key queries:** `ListTrustsQuery`, `GetTrustQuery`, `ListTrustMembersQuery`,
   `ListTrustElectionsQuery`, `GetTrustElectionQuery`, `ListDonationsQuery`,
   `ListExpensesQuery`, `ListCollectionsQuery`, `ListMyDuesQuery`
@@ -394,7 +394,7 @@ and expose its endpoints behind the gateway at the route prefix shown.
   `TrustMemberAdded`, `TrustMemberUpdated`, `TrustMemberRemoved`,
   `TrustElectionStatusChanged`, `TrustElectionResultsPublished`,
   `DonationRecorded`, `DonationCollected`, `ExpenseRecorded`,
-  `ExpenseApproved`, `CollectionDue`, `CollectionSettled`
+  `ExpenseApproved`, `CollectionDue`, `CollectionSettled`, `CollectionReminderSent`
 - **Events consumed:** `boli.result.published.v1` — opens a `Due` Collection
   against the winner for the Trust of the occasion's locality, once per Boli
 - **Gateway route prefix:** `/v1/trust/**`, module-gated on `trust` (off by

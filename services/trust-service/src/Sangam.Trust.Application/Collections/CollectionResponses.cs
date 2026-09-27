@@ -6,9 +6,11 @@ public sealed record CollectionResponse(
     string SourceType,
     Guid SourceId,
     Guid? PayerMemberId,
+    string? PayerName,
     long Amount,
     string Status,
     string? Mode,
     Guid? CollectedBy,
     DateTimeOffset? CollectedAt,
-    DateTimeOffset CreatedAt);
+    DateTimeOffset CreatedAt,
+    DateTimeOffset? LastRemindedAt);

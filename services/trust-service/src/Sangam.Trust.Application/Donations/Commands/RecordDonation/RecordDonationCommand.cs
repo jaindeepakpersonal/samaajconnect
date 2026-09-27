@@ -3,6 +3,7 @@ using MediatR;
 using Sangam.Trust.Application.Abstractions;
 using Sangam.Trust.Application.Common;
 using Sangam.Trust.Application.Security;
+using Sangam.Trust.Domain.Collections;
 using Sangam.Trust.Domain.Donations;
 
 namespace Sangam.Trust.Application.Donations.Commands.RecordDonation;
@@ -60,6 +61,7 @@ public sealed class RecordDonationCommandValidator : AbstractValidator<RecordDon
 public sealed class RecordDonationCommandHandler(
     ITrustRepository trusts,
     IDonationRepository donations,
+    ICollectionRepository collections,
     IUnitOfWork unitOfWork,
     ICurrentUser currentUser,
     IDateTimeProvider clock)
@@ -101,6 +103,21 @@ public sealed class RecordDonationCommandHandler(
             clock.UtcNow);
 
         donations.Add(donation);
+
+        // A pledge is chased like any other amount due: it opens a Collection
+        // in the same transaction, owed by the donor - a member sees it under
+        // "What you owe", and settling either side settles the other (see
+        // MarkDonationCollectedCommand and RecordCollectionPaymentCommand).
+        collections.Add(Domain.Collections.Collection.Open(
+            trust.TenantId,
+            trust.Id,
+            CollectionSourceType.Donation,
+            donation.Id,
+            donation.DonorMemberId,
+            donation.Amount,
+            donation.CreatedAt,
+            donation.DonorName));
+
         await unitOfWork.SaveChangesAsync(cancellationToken);
 
         return Result.Success(donation.ToResponse());

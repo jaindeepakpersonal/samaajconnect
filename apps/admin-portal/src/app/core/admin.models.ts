@@ -1035,12 +1035,16 @@ export interface TrustCollection {
   readonly sourceType: 'Donation' | 'BoliResult';
   readonly sourceId: string;
   readonly payerMemberId: string | null;
+
+  /** A donor with no account, by name. Null for a member. */
+  readonly payerName: string | null;
   readonly amount: number;
   readonly status: 'Due' | 'Collected';
   readonly mode: string | null;
   readonly collectedBy: string | null;
   readonly collectedAt: string | null;
   readonly createdAt: string;
+  readonly lastRemindedAt: string | null;
 }
 
 export type TrustMemberStatus = 'Active' | 'Removed';

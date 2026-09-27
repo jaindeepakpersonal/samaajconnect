@@ -21,6 +21,7 @@ public sealed class RecordCollectionPaymentCommandValidator : AbstractValidator<
 
 public sealed class RecordCollectionPaymentCommandHandler(
     ICollectionRepository collections,
+    IDonationRepository donations,
     IUnitOfWork unitOfWork,
     ICurrentUser currentUser,
     IDateTimeProvider clock)
@@ -50,6 +51,22 @@ public sealed class RecordCollectionPaymentCommandHandler(
         }
 
         collection.Settle(command.Mode, actorId, clock.UtcNow);
+
+        // A pledge paid from the collections ledger is a donation collected:
+        // it gets its receipt number here, exactly as if it had been marked
+        // collected on the donations list, so the two never disagree.
+        if (collection.SourceType == Domain.Collections.CollectionSourceType.Donation)
+        {
+            var donation = await donations.GetByIdAsync(collection.SourceId, cancellationToken);
+
+            if (donation is { Status: Domain.Donations.DonationStatus.Pledged })
+            {
+                var receiptNumber = await donations.ReserveNextReceiptNumberAsync(donation.TrustId, cancellationToken);
+
+                donation.Collect(receiptNumber, actorId, clock.UtcNow);
+            }
+        }
+
         await unitOfWork.SaveChangesAsync(cancellationToken);
 
         return Result.Success(collection.ToResponse());
