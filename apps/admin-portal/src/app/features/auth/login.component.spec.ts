@@ -100,6 +100,36 @@ describe('AdminLoginComponent', () => {
     expect(navigate).toHaveBeenCalledWith('/dashboard');
   });
 
+  it('submits the code form through Angular, not as a native form post that reloads the page', () => {
+    // The code step is a plain <form> with no [formGroup]. Without FormsModule
+    // nothing on it emits ngSubmit, so pressing the button posted the form
+    // natively and reloaded onto the password step. Calling verify() directly,
+    // as the test above does, cannot see that; only a DOM submit can.
+    vi.spyOn(TestBed.inject(Router), 'navigateByUrl').mockResolvedValue(true);
+
+    fill();
+    component.submit();
+    http.expectOne('/v1/identity/login').flush({
+      codeRequired: true,
+      session: null,
+      challengeToken: 'challenge-1',
+      codeSentTo: 'ad***@example.com',
+      challengeExpiresAt: new Date().toISOString(),
+      deviceToken: null,
+      deviceTrustedUntil: null,
+    } satisfies SignInResult);
+    fixture.detectChanges();
+
+    component.code.set('123456');
+    fixture.detectChanges();
+
+    const form = (fixture.nativeElement as HTMLElement).querySelector('form')!;
+    const notPrevented = form.dispatchEvent(new Event('submit', { cancelable: true }));
+
+    expect(notPrevented).toBe(false);
+    http.expectOne('/v1/identity/login/verify').flush(signedIn(['Member', 'SamaajAdmin']));
+  });
+
   it('signs a plain member out again, back at the password with a new picture', () => {
     fill();
     component.submit();

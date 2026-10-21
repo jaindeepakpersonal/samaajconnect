@@ -148,6 +148,29 @@ describe('LoginComponent', () => {
     expect(navigate).toHaveBeenCalledWith('/timeline');
   });
 
+  it('submits the code form through Angular, not as a native form post that reloads the page', () => {
+    // The code step is a plain <form> with no [formGroup]. Without FormsModule
+    // nothing on it emits ngSubmit, so pressing the button posted the form
+    // natively and reloaded onto the password step - every correct code put the
+    // member back at Login. Calling verify() directly, as the test above does,
+    // cannot see that; only a DOM submit can.
+    setup();
+    fill();
+    component.submit();
+    http.expectOne('/v1/identity/login').flush(CODE_SENT);
+    fixture.detectChanges();
+
+    vi.spyOn(TestBed.inject(Router), 'navigateByUrl').mockResolvedValue(true);
+    component.code.set('123456');
+    fixture.detectChanges();
+
+    const form = (fixture.nativeElement as HTMLElement).querySelector('form')!;
+    const notPrevented = form.dispatchEvent(new Event('submit', { cancelable: true }));
+
+    expect(notPrevented).toBe(false);
+    http.expectOne('/v1/identity/login/verify').flush(signedIn());
+  });
+
   it('shows the API message when the credentials are wrong, with a fresh CAPTCHA to try again', () => {
     setup();
     fill();

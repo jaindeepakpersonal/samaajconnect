@@ -1,5 +1,5 @@
 import { Component, OnInit, inject, signal } from '@angular/core';
-import { FormBuilder, ReactiveFormsModule, Validators } from '@angular/forms';
+import { FormBuilder, FormsModule, ReactiveFormsModule, Validators } from '@angular/forms';
 import { ActivatedRoute, Router } from '@angular/router';
 import { AuthService, LoginResult, SignInFlow, describeError } from '@samaajconnect/shared';
 
@@ -34,7 +34,9 @@ const ADMIN_ROLES = [
  */
 @Component({
   selector: 'app-admin-login',
-  imports: [ReactiveFormsModule],
+  // FormsModule for the code step's plain <form>: without NgForm on it,
+  // (ngSubmit) never fires and the browser submits natively, reloading the page.
+  imports: [FormsModule, ReactiveFormsModule],
   providers: [SignInFlow],
   styleUrl: './login.css',
   template: `

@@ -1,5 +1,5 @@
 import { Component, OnInit, inject, signal } from '@angular/core';
-import { FormBuilder, ReactiveFormsModule, Validators } from '@angular/forms';
+import { FormBuilder, FormsModule, ReactiveFormsModule, Validators } from '@angular/forms';
 import { ActivatedRoute, Router, RouterLink } from '@angular/router';
 import { AuthService, LoginResult, SignInFlow, describeError } from '@samaajconnect/shared';
 
@@ -22,7 +22,9 @@ import { AuthService, LoginResult, SignInFlow, describeError } from '@samaajconn
  */
 @Component({
   selector: 'app-login',
-  imports: [ReactiveFormsModule, RouterLink],
+  // FormsModule for the code step's plain <form>: without NgForm on it,
+  // (ngSubmit) never fires and the browser submits natively, reloading the page.
+  imports: [FormsModule, ReactiveFormsModule, RouterLink],
   providers: [SignInFlow],
   styleUrl: './auth.css',
   template: `
