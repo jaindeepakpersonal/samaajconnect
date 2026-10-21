@@ -107,6 +107,7 @@ public sealed class LoginCommandHandler(
         }
 
         return Result.Success(SignInResponse.CodeSent(
-            challengeToken, SignInSteps.MaskContact(user.MobileOrEmail), challenge.ExpiresAt));
+            challengeToken, SignInSteps.MaskContact(user.MobileOrEmail), challenge.ExpiresAt,
+            options.RevealSecretsInLogs ? code : null));
     }
 }

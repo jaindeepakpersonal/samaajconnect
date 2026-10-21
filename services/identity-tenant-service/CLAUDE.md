@@ -310,6 +310,20 @@ either is off. `RevealSecretsInLogs` writes each CAPTCHA answer and code to
 this service's log - set only in docker-compose, which has no SMS or email
 provider and whose smoke run signs in by reading them (`scripts/lib/sign-in.sh`).
 
+**The same flag now also puts the code on the response itself, as `DevCode`
+- since 2026-09-27.** `LoginCommand`'s `SignInResponse`,
+`ResendSignInCodeCommand`'s response and `RequestPasswordResetCommand`'s all
+carry it, null unless `RevealSecretsInLogs` is on. It reuses the one flag
+rather than adding a second, because both are the same fact about the
+environment: no real provider exists to read the code from, so reveal it
+somewhere a developer can. `libs/shared`'s `AuthService` is the one reader,
+and prints it to the browser console - with no gate of its own, so this flag
+is the whole of it; see that library's `CLAUDE.md` for why. `RequestPasswordResetResponse`'s `DevCode` is the one case worth
+naming: present or absent now says whether the identifier belongs to a real,
+active account, which the response is otherwise built never to reveal - only
+acceptable because the log this flag already writes says the same thing the
+same way, on the same local-only stack.
+
 **The one typed value that meets `HashDeterministic` is the CAPTCHA answer,
 knowingly** - see `CaptchaChallenge`'s remarks: hashed with its own id, good
 for five minutes and one try, it is worth nothing to reverse.

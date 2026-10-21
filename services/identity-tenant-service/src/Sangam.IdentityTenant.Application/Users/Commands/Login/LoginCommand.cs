@@ -43,11 +43,20 @@ public sealed record SignInResponse(
 
     /// <summary>Set when the device was just trusted: keep it, and send it with the next sign-in.</summary>
     string? DeviceToken = null,
-    DateTimeOffset? DeviceTrustedUntil = null)
+    DateTimeOffset? DeviceTrustedUntil = null,
+
+    /// <summary>
+    /// The code itself, echoed back only when
+    /// <see cref="Abstractions.SignInSecurityOptions.RevealSecretsInLogs"/> is
+    /// on - local compose only, with no email or SMS provider for a developer
+    /// to read the code from otherwise. Null everywhere else, including every
+    /// deployed environment.
+    /// </summary>
+    string? DevCode = null)
 {
     public static SignInResponse SignedIn(LoginResponse session, string? deviceToken = null, DateTimeOffset? trustedUntil = null) =>
         new(false, session, null, null, null, deviceToken, trustedUntil);
 
-    public static SignInResponse CodeSent(string challengeToken, string codeSentTo, DateTimeOffset expiresAt) =>
-        new(true, null, challengeToken, codeSentTo, expiresAt);
+    public static SignInResponse CodeSent(string challengeToken, string codeSentTo, DateTimeOffset expiresAt, string? devCode = null) =>
+        new(true, null, challengeToken, codeSentTo, expiresAt, DevCode: devCode);
 }

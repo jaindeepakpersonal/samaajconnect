@@ -21,6 +21,26 @@ export interface SignInResult {
   /** Set when this device was just trusted - `DeviceTrustStore` keeps it. */
   readonly deviceToken: string | null;
   readonly deviceTrustedUntil: string | null;
+
+  /**
+   * The code itself, set only when identity-tenant-service's
+   * `SignInSecurity:RevealSecretsInLogs` is on - the local compose stack,
+   * which has no email/SMS provider. Optional because most fixtures in this
+   * repo's own specs predate the field. `AuthService` is the only reader.
+   */
+  readonly devCode?: string | null;
+}
+
+/** Mirrors `ResendSignInCodeResponse`. */
+export interface ResendSignInCodeResult {
+  /** Same `RevealSecretsInLogs`-only case as `SignInResult.devCode`. */
+  readonly devCode: string | null;
+}
+
+/** Mirrors `RequestPasswordResetResponse`. */
+export interface RequestPasswordResetResult {
+  /** Same `RevealSecretsInLogs`-only case as `SignInResult.devCode`. */
+  readonly devCode: string | null;
 }
 
 /** Mirrors LoginResponse from identity-tenant-service: an open session. */

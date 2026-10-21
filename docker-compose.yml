@@ -104,7 +104,9 @@ services:
       # Sign-in takes a CAPTCHA and a code (SignInSecurityOptions). This stack
       # has no SMS or email provider, so both are written to this service's log
       # - `docker compose logs identity-tenant-service` - which is also how the
-      # smoke run signs in. Local development only; it warns at every start.
+      # smoke run signs in. Codes are also echoed on the response itself
+      # (DevCode) for the member/admin portal's own browser console to print.
+      # Local development only; it warns at every start.
       SignInSecurity__RevealSecretsInLogs: "true"
       Outbox__PollIntervalSeconds: "5"
       Outbox__BatchSize: "50"

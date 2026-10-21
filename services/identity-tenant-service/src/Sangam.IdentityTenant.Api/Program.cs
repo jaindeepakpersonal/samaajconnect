@@ -43,7 +43,9 @@ if (!signIn.CaptchaRequired || !signIn.TwoFactorRequired)
 if (signIn.RevealSecretsInLogs)
 {
     app.Logger.LogWarning(
-        "SignInSecurity:RevealSecretsInLogs is on: CAPTCHA answers and sign-in codes are written to this log. Local development only.");
+        "SignInSecurity:RevealSecretsInLogs is on: CAPTCHA answers and sign-in/password-reset codes are "
+        + "written to this log, and echoed in the API response itself (DevCode) for the browser console to "
+        + "read. Local development only - never enable outside the compose stack.");
 }
 
 if (app.Environment.IsDevelopment())

@@ -9,6 +9,8 @@ import {
   CurrentUser,
   RegisterRequest,
   RegisterResult,
+  RequestPasswordResetResult,
+  ResendSignInCodeResult,
   SignInResult,
   TenantSummary,
 } from './auth.models';
@@ -49,7 +51,12 @@ export class AuthService {
         captchaAnswer,
         deviceToken: this.deviceTrust.get(),
       })
-      .pipe(tap((result) => this.keep(result)));
+      .pipe(
+        tap((result) => {
+          this.keep(result);
+          this.logDevCode('Sign-in', result.devCode);
+        }),
+      );
   }
 
   /** Step two: the code that was sent, and whether to trust this device for thirty days. */
@@ -60,8 +67,10 @@ export class AuthService {
   }
 
   /** Sends a new code for a waiting sign-in, at most every thirty seconds. Answers the same either way. */
-  resendSignInCode(challengeToken: string): Observable<void> {
-    return this.http.post<void>('/v1/identity/login/resend', { challengeToken });
+  resendSignInCode(challengeToken: string): Observable<ResendSignInCodeResult> {
+    return this.http
+      .post<ResendSignInCodeResult>('/v1/identity/login/resend', { challengeToken })
+      .pipe(tap((result) => this.logDevCode('Sign-in', result.devCode)));
   }
 
   /** A session when there is one, and the device token when one was issued. */
@@ -72,6 +81,20 @@ export class AuthService {
 
     if (result.deviceToken) {
       this.deviceTrust.set(result.deviceToken);
+    }
+  }
+
+  /**
+   * Local dev only: the backend sends `devCode` at all only when there is no
+   * real email/SMS provider to have delivered it (`RevealSecretsInLogs`, which
+   * identity-tenant-service refuses to start with outside Development). That
+   * flag is the whole gate. A second one here would guard nothing - the code
+   * is already in the response body, in the Network tab - and it silenced the
+   * compose stack, whose portal containers are production builds.
+   */
+  private logDevCode(kind: string, devCode: string | null | undefined): void {
+    if (devCode) {
+      console.info(`[dev] ${kind} code: ${devCode}`);
     }
   }
 
@@ -145,8 +168,10 @@ export class AuthService {
    * Asks for a password reset code. Answers the same way whether or not the
    * identifier belongs to a real, active account.
    */
-  requestPasswordReset(mobileOrEmail: string): Observable<void> {
-    return this.http.post<void>('/v1/identity/password-reset/request', { mobileOrEmail });
+  requestPasswordReset(mobileOrEmail: string): Observable<RequestPasswordResetResult> {
+    return this.http
+      .post<RequestPasswordResetResult>('/v1/identity/password-reset/request', { mobileOrEmail })
+      .pipe(tap((result) => this.logDevCode('Password reset', result.devCode)));
   }
 
   /**

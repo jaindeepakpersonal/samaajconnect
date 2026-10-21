@@ -192,6 +192,7 @@ public sealed class LoginCommandHandlerTests
         result.Value.Session.Should().BeNull();
         result.Value.ChallengeToken.Should().NotBeNullOrEmpty();
         result.Value.CodeSentTo.Should().Be("ra***@example.com");
+        result.Value.DevCode.Should().BeNull("RevealSecretsInLogs is off by default");
 
         _user.LoginChallenge!.Hash.Should().Be($"det({result.Value.ChallengeToken})");
         _user.DomainEvents.Should().ContainSingle(e => e is LoginOtpRequestedDomainEvent);
@@ -199,6 +200,18 @@ public sealed class LoginCommandHandlerTests
         _tokenIssuer.DidNotReceive().Issue(
             Arg.Any<Guid>(), Arg.Any<Guid>(), Arg.Any<string>(),
             Arg.Any<IReadOnlyCollection<string>>(), Arg.Any<IReadOnlyCollection<string>>());
+    }
+
+    /// <summary>Local compose only - see SignInSecurityOptions.RevealSecretsInLogs.</summary>
+    [Fact]
+    public async Task RevealSecretsInLogs_puts_the_plaintext_code_on_the_response()
+    {
+        _options.TwoFactorRequired = true;
+        _options.RevealSecretsInLogs = true;
+
+        var result = await Login();
+
+        result.Value.DevCode.Should().MatchRegex("^[0-9]{6}$");
     }
 
     [Fact]

@@ -19,6 +19,14 @@ namespace Sangam.IdentityTenant.Application.Abstractions;
 /// email provider and the smoke run has to sign in, the same stance as
 /// audit-notification-service's <c>NotificationDelivery:Logging:RevealContent</c>.
 /// </para>
+/// <para>
+/// Since 2026-09-27 it also echoes the sign-in and password-reset codes back
+/// in the response body itself (each command's own <c>DevCode</c>), for the
+/// same local-only reason: a developer's browser has no email client either.
+/// The name stayed - this is still the one flag for "no real provider, local
+/// dev only" - rather than splitting into a second flag for a second place the
+/// same secret now surfaces. Never on outside the compose stack.
+/// </para>
 /// </remarks>
 public sealed class SignInSecurityOptions
 {

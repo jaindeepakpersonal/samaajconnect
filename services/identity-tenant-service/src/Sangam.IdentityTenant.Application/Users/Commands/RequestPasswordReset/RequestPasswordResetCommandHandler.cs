@@ -17,7 +17,8 @@ public sealed class RequestPasswordResetCommandHandler(
     IPasswordHasher passwordHasher,
     IUnitOfWork unitOfWork,
     IDateTimeProvider clock,
-    ISecurityPolicyResolver securityPolicy)
+    ISecurityPolicyResolver securityPolicy,
+    SignInSecurityOptions options)
     : IRequestHandler<RequestPasswordResetCommand, Result<RequestPasswordResetResponse>>
 {
     public async Task<Result<RequestPasswordResetResponse>> Handle(
@@ -51,6 +52,6 @@ public sealed class RequestPasswordResetCommandHandler(
 
         await unitOfWork.SaveChangesAsync(cancellationToken);
 
-        return Result.Success(new RequestPasswordResetResponse());
+        return Result.Success(new RequestPasswordResetResponse(options.RevealSecretsInLogs ? plaintext : null));
     }
 }

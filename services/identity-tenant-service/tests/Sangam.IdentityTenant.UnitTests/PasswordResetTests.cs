@@ -91,6 +91,7 @@ public sealed class RequestPasswordResetCommandHandlerTests
     private readonly IUnitOfWork _unitOfWork = Substitute.For<IUnitOfWork>();
     private readonly IDateTimeProvider _clock = Substitute.For<IDateTimeProvider>();
     private readonly ISecurityPolicyResolver _securityPolicy = Substitute.For<ISecurityPolicyResolver>();
+    private readonly SignInSecurityOptions _options = new();
     private readonly RequestPasswordResetCommandHandler _handler;
 
     private readonly Tenant _tenant;
@@ -114,7 +115,7 @@ public sealed class RequestPasswordResetCommandHandlerTests
                 10, PasswordResetCode.Lifetime, User.MaxFailedAttempts, User.LockoutDuration, RefreshToken.Lifetime));
 
         _handler = new RequestPasswordResetCommandHandler(
-            _users, _tenants, _hasher, _unitOfWork, _clock, _securityPolicy);
+            _users, _tenants, _hasher, _unitOfWork, _clock, _securityPolicy, _options);
     }
 
     private Task<Result<RequestPasswordResetResponse>> Request(string identifier = "ravi@example.com") =>
@@ -151,6 +152,25 @@ public sealed class RequestPasswordResetCommandHandlerTests
 
         result.IsSuccess.Should().BeTrue();
         _user.PasswordResetCode.Should().BeNull();
+    }
+
+    [Fact]
+    public async Task DevCode_is_null_unless_RevealSecretsInLogs_is_on()
+    {
+        var result = await Request();
+
+        result.Value.DevCode.Should().BeNull();
+    }
+
+    /// <summary>Local compose only - see SignInSecurityOptions.RevealSecretsInLogs.</summary>
+    [Fact]
+    public async Task RevealSecretsInLogs_puts_the_plaintext_code_on_the_response()
+    {
+        _options.RevealSecretsInLogs = true;
+
+        var result = await Request();
+
+        result.Value.DevCode.Should().MatchRegex("^[0-9]{6}$");
     }
 }
 

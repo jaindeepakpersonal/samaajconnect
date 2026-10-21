@@ -105,6 +105,21 @@ template, so the steps live here, tested (`sign-in-flow.spec.ts`), and each
 app draws its own few lines of form. Provide it per component - it holds one
 sign-in's state.
 
+**`AuthService` echoes a `DevCode` to the browser console, and the backend is
+the only gate.** identity-tenant-service sends the field only when its own
+`SignInSecurity:RevealSecretsInLogs` is on - compose-only, where there is no
+email/SMS provider for a developer to read a sign-in or password-reset code
+from otherwise, and refused at start-up outside Development (that service's
+own `CLAUDE.md` covers the flag). `console.info` prints `[dev] Sign-in code:`
+or `[dev] Password reset code:` whenever one arrives.
+
+A second, client-side "is this a dev build" gate (a `DEV_MODE` token both
+apps provided) was tried and removed the same day. It guarded nothing - the code is
+already in the response body, in the Network tab - and it silenced the one
+stack the echo exists for: both portal containers in docker-compose are
+production builds, so the console stayed empty exactly where a developer was
+looking.
+
 **The device token is the one thing here in `localStorage`.** A trust that
 ended with the tab would ask for a code every visit, which is what a member
 ticked a box to stop. It can outlive the session because it is worth so much

@@ -21,7 +21,15 @@ namespace Sangam.IdentityTenant.Application.Users.Commands.ResendSignInCode;
 [AllowAnonymousRequest]
 public sealed record ResendSignInCodeCommand(string ChallengeToken) : ICommand<ResendSignInCodeResponse>;
 
-public sealed record ResendSignInCodeResponse;
+public sealed record ResendSignInCodeResponse(
+    /// <summary>
+    /// The code itself, echoed back only when
+    /// <see cref="SignInSecurityOptions.RevealSecretsInLogs"/> is on - the same
+    /// local-compose-only case <see cref="Login.SignInResponse.DevCode"/> covers.
+    /// Null (including when no code was actually sent - an unknown or
+    /// too-recent challenge answers the same either way).
+    /// </summary>
+    string? DevCode = null);
 
 public sealed class ResendSignInCodeCommandValidator : AbstractValidator<ResendSignInCodeCommand>
 {
@@ -54,6 +62,8 @@ public sealed class ResendSignInCodeCommandHandler(
         var policy = await securityPolicy.ResolveAsync(user.TenantId, cancellationToken);
         var (otp, code) = LoginOtp.Issue(passwordHasher.Hash, now, policy.OtpLifetime);
 
+        string? devCode = null;
+
         if (user.ResendSecondFactor(otp, code, now))
         {
             await unitOfWork.SaveChangesAsync(cancellationToken);
@@ -63,9 +73,10 @@ public sealed class ResendSignInCodeCommandHandler(
                 logger.LogWarning(
                     "Sign-in code {SignInCode} for {MobileOrEmail} (revealed: SignInSecurity:RevealSecretsInLogs)",
                     code, user.MobileOrEmail);
+                devCode = code;
             }
         }
 
-        return Result.Success(new ResendSignInCodeResponse());
+        return Result.Success(new ResendSignInCodeResponse(devCode));
     }
 }
