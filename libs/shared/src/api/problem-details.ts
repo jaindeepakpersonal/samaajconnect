@@ -24,6 +24,12 @@ export function describeError(error: unknown): string {
     return 'Could not reach the server. Check your connection and try again.';
   }
 
+  // The gateway's rate limits refuse with an empty body on purpose - it tells a
+  // script nothing about pacing - so the sentence a person needs is written here.
+  if (error.status === 429) {
+    return 'Too many requests just now. Wait a minute, then try again.';
+  }
+
   const problem = error.error as ProblemDetails | null;
 
   if (problem?.errors) {

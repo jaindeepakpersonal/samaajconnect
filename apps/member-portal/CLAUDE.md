@@ -874,11 +874,14 @@ case for "I withdrew earlier."
 
 **The Node server sends a content security policy and the other security
 headers (2026-09-27)**, in `server.ts`, after the `/v1` proxy so API responses
-keep the gateway's. The policy is this origin only, scripts held to `'self'`,
-styles `'unsafe-inline'` for Angular's injected component styles; `x-powered-by`
-is off. It holds only while every route renders on the client
-(`app.routes.server.ts`): a server-rendered route would bring event replay's
-inline script, which needs a CSP nonce wired first. Nothing may load from
+keep the gateway's. The policy is this origin only, with no `'unsafe-inline'`:
+since 2026-10-21 every response gets 128 fresh random bits as a nonce, in the
+policy and stamped on `<app-root>` as `ngCspNonce` (`withNonce` in `server.ts`),
+which Angular puts on every `<style>` it injects; `x-powered-by` is off. The
+nonce is on scripts too, so a server-rendered route's event-replay script
+would pass. **No inline `style="..."` attribute in a template** - a nonce does
+not cover one, so it silently does nothing; use a class (the two quantity boxes
+on a business page were the only ones). Nothing may load from
 another origin without widening the policy on purpose, and critical-CSS
 inlining stays off in `angular.json` - its inline `onload` handler is exactly
 what the policy blocks.

@@ -31,8 +31,13 @@ public sealed class SecurityHeadersMiddleware(RequestDelegate next, SecurityHead
 {
     public const string ApiContentSecurityPolicy = "default-src 'none'; frame-ancestors 'none'";
 
+    /// <summary>
+    /// For HTML that arrives with no policy of its own. The member portal sends
+    /// its own, with a per-response nonce the gateway cannot know - so this
+    /// fallback allows no inline script or style at all.
+    /// </summary>
     public const string PageContentSecurityPolicy =
-        "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; "
+        "default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' data: blob:; "
         + "font-src 'self' data:; connect-src 'self'; object-src 'none'; base-uri 'self'; form-action 'self'; "
         + "frame-ancestors 'none'";
 

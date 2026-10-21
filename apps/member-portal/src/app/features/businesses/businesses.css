@@ -97,3 +97,9 @@
 .tabs button:hover:not(.on) {
   color: var(--ink);
 }
+
+/* A quantity box is a few digits wide. A class rather than an inline style
+   attribute, which the content security policy does not allow. */
+.qty-input {
+  width: 70px;
+}

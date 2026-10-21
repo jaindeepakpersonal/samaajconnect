@@ -6,6 +6,7 @@ import {
 } from '@angular/ssr/node';
 import express from 'express';
 import { createProxyMiddleware } from 'http-proxy-middleware';
+import { randomBytes } from 'node:crypto';
 import { join } from 'node:path';
 
 const browserDistFolder = join(import.meta.dirname, '../browser');
@@ -53,27 +54,40 @@ if (gatewayUrl) {
  * Security headers on every page and asset this server sends - after the /v1
  * proxy, so API responses keep the gateway's own. The same policy
  * apps/admin-portal/security-headers.conf gives the admin panel: this origin
- * only, images it fetched itself (blob:) or was handed inline (data: - the
- * sign-in CAPTCHA), and 'unsafe-inline' for styles alone, because Angular
- * injects component styles as <style> tags. Scripts are held to 'self', which
- * holds while every route renders on the client (app.routes.server.ts); a
- * server-rendered route with event replay would need a CSP nonce first.
+ * only, and images it fetched itself (blob:) or was handed inline (data: - the
+ * sign-in CAPTCHA).
+ *
+ * **No 'unsafe-inline' anywhere, since 2026-10-21: a nonce instead.** Angular
+ * injects component styles as <style> tags; each response gets 128 fresh
+ * random bits, sent in the policy and stamped on <app-root> as `ngCspNonce`,
+ * which Angular reads at bootstrap and puts on every <style> it adds. A <style>
+ * an attacker manages to inject carries no nonce and does not apply - the CSS
+ * attribute-selector tricks that read a page out character by character need
+ * exactly that. Scripts stay 'self' and carry the nonce too, so a
+ * server-rendered route with event replay's inline script would already pass.
+ * Inline `style="..."` attributes are not covered by a nonce and so are not
+ * allowed at all: a template uses a class.
  */
-const CONTENT_SECURITY_POLICY = [
-  "default-src 'self'",
-  "script-src 'self'",
-  "style-src 'self' 'unsafe-inline'",
-  "img-src 'self' data: blob:",
-  "font-src 'self' data:",
-  "connect-src 'self'",
-  "object-src 'none'",
-  "base-uri 'self'",
-  "form-action 'self'",
-  "frame-ancestors 'none'",
-].join('; ');
+function contentSecurityPolicy(nonce: string): string {
+  return [
+    "default-src 'self'",
+    `script-src 'self' 'nonce-${nonce}'`,
+    `style-src 'self' 'nonce-${nonce}'`,
+    "img-src 'self' data: blob:",
+    "font-src 'self' data:",
+    "connect-src 'self'",
+    "object-src 'none'",
+    "base-uri 'self'",
+    "form-action 'self'",
+    "frame-ancestors 'none'",
+  ].join('; ');
+}
 
 app.use((_req, res, next) => {
-  res.setHeader('Content-Security-Policy', CONTENT_SECURITY_POLICY);
+  const nonce = randomBytes(16).toString('base64');
+
+  res.locals['cspNonce'] = nonce;
+  res.setHeader('Content-Security-Policy', contentSecurityPolicy(nonce));
   res.setHeader('X-Content-Type-Options', 'nosniff');
   res.setHeader('X-Frame-Options', 'DENY');
   res.setHeader('Referrer-Policy', 'strict-origin-when-cross-origin');
@@ -111,11 +125,33 @@ app.use(
 app.use((req, res, next) => {
   angularApp
     .handle(req)
-    .then((response) =>
-      response ? writeResponseToNodeResponse(response, res) : next(),
+    .then(async (response) =>
+      response
+        ? writeResponseToNodeResponse(await withNonce(response, res.locals['cspNonce'] as string), res)
+        : next(),
     )
     .catch(next);
 });
+
+/**
+ * Stamps this response's nonce on the app's root element, where Angular looks
+ * for it (`ngCspNonce`). HTML only; anything else passes through untouched.
+ */
+async function withNonce(response: Response, nonce: string): Promise<Response> {
+  if (!response.headers.get('content-type')?.startsWith('text/html')) {
+    return response;
+  }
+
+  const html = (await response.text()).replace('<app-root', `<app-root ngCspNonce="${nonce}"`);
+  const headers = new Headers(response.headers);
+
+  // The body changed length, and a page carrying a one-time nonce is never
+  // one to keep: a cached copy would pair a stale nonce with a fresh policy.
+  headers.delete('content-length');
+  headers.set('cache-control', 'no-store');
+
+  return new Response(html, { status: response.status, statusText: response.statusText, headers });
+}
 
 /**
  * Start the server if this module is the main entry point, or it is ran via PM2.

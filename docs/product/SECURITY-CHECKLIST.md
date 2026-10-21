@@ -391,9 +391,18 @@ is the outer gate and grants nothing on its own.
       `X-Frame-Options: DENY` and `frame-ancestors 'none'` (clickjacking),
       `Referrer-Policy`, `Permissions-Policy`, `Cross-Origin-Opener-Policy`,
       and a content security policy - `default-src 'none'` on API responses,
-      and on pages this origin only, with scripts held to `'self'`. Styles keep
-      `'unsafe-inline'` because Angular injects component styles as `<style>`
-      tags; a nonce is the way to drop it. **Critical-CSS inlining is off in
+      and on pages this origin only, with **no `'unsafe-inline'` at all** (since
+      2026-10-21). Angular injects component styles as `<style>` tags, so every
+      page response carries a fresh 128-bit nonce, in the policy and stamped on
+      `<app-root>` as `ngCspNonce`, which Angular puts on each tag it adds - the
+      member portal's Node server makes one per response, the admin panel's
+      nginx uses `$request_id`. An injected `<style>` carries no nonce and does
+      not apply: verified in the browser, with the violation logged. That closes
+      CSS injection (attribute-selector tricks that read a page out character
+      by character). Inline `style="..."` attributes are not covered by a nonce
+      and are therefore not allowed - templates use classes; there were two.
+      Scripts carry the nonce too, so a server-rendered route with event
+      replay's inline script would pass. **Critical-CSS inlining is off in
       both apps' production builds** (`angular.json`): it loads the stylesheet
       through an inline `onload` handler, which the policy blocks, leaving
       pages unstyled - found by opening them after the policy went on.
@@ -422,12 +431,26 @@ is the outer gate and grants nothing on its own.
       two-factor sign-in one-factor. identity-tenant-service refuses to start
       with it on in any other environment.
 
-- [ ] **Not done, and worth doing next:** a CSP nonce, so styles can drop
-      `'unsafe-inline'` and a server-rendered route with event replay can
-      exist under the policy; a general per-client rate limit on the API
-      beyond the credential and registration policies (hard to size while a
-      whole Samaaj may sit behind one NAT address); and virus scanning of
-      uploads (see File handling).
+- [x] **A general API rate limit, per account** (2026-10-21), beside the
+      credential and registration policies. Every `/v1` request spends from a
+      budget: the signed-in account's (1200 a minute) when the gateway has
+      validated a token, the source address's (600 a minute) only when it has
+      not. Per account is what made a general limit possible - an address may be
+      a whole carrier range or a Samaaj hall's WiFi, an account is one member,
+      and only a validated token names one, so it cannot be forged into fresh
+      budgets. Portal pages and assets are not counted. The refusal is a bare
+      429 (the apps say "Too many requests just now"). Verified live: 600
+      anonymous requests answered, the rest 429, pages unaffected.
+
+      **The proxies in front of the gateway matter here.** The admin panel's
+      nginx and the member portal's Node server forward `/v1`, so anonymous
+      requests from either share the proxy's address. Signed-in traffic is
+      unaffected (it counts per account), but a real deployment behind any
+      proxy or load balancer must configure ForwardedHeaders for the trusted
+      proxies, or every anonymous caller shares one budget - see the gateway's
+      `RateLimiting` remarks.
+
+- [ ] **Not done:** virus scanning of uploads (see File handling).
 
 ## File handling
 

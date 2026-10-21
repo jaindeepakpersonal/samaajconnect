@@ -64,19 +64,17 @@ import { Business, PlaceOrderItem } from './businesses.models';
                   {{ formatPrice(product.priceInPaise) }}
                   @if (isOwner()) {
                     <input
-                      class="input"
+                      class="input qty-input"
                       type="number"
                       min="0"
-                      style="width: 70px"
                       [attr.aria-label]="'Quantity of ' + product.name"
                       disabled
                     />
                   } @else {
                     <input
-                      class="input"
+                      class="input qty-input"
                       type="number"
                       min="0"
-                      style="width: 70px"
                       [attr.aria-label]="'Quantity of ' + product.name"
                       [ngModel]="quantities[product.id] ?? 0"
                       (ngModelChange)="setQuantity(product.id, $event)"

@@ -8,7 +8,17 @@ version of the plan; the reasoning behind the ordering lives in
 ## Current Status
 
 - **Stage:** every module has a service and member screens; Phase 5 hardening under way
-- **Last updated:** 2026-09-27 - **trust-service: roles with seats, and
+- **Last updated:** 2026-10-21 - **a CSP nonce, and a general API rate
+  limit.** Both portals' pages now carry a fresh nonce per response (the
+  member portal's Node server; the admin panel's nginx `$request_id`),
+  stamped on `<app-root>` as `ngCspNonce`, so the content security policy has
+  no `'unsafe-inline'` at all - an injected `<style>` was shown blocked in the
+  browser. The two inline style attributes became a class. The gateway gained
+  a global limiter on `/v1`: per signed-in account (1200/min, from a validated
+  token's `sub`), per address only for anonymous calls (600/min), pages and
+  assets uncounted - verified live at exactly 600. A 429 now reads "Too many
+  requests just now" in both apps. See SECURITY-CHECKLIST.md.
+- **Previously:** 2026-09-27 - **trust-service: roles with seats, and
   elections that fill them.** Free-text positions became the Trust's own
   roles (`TrustRole`, owned by `Trust`): Trustee built in with no limit, the
   rest defined with 1-50 seats (`Define`/`Update`/`RemoveTrustRole`,

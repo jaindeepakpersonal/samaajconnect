@@ -750,9 +750,12 @@ disappears once `hasPublishedResult` is true.
 **nginx sends a content security policy and the other security headers
 (2026-09-27)**, from `security-headers.conf`, included in each location because
 nginx drops inherited `add_header`s the moment a location sets its own. The
-policy is this origin only, scripts held to `'self'`; styles keep
-`'unsafe-inline'` for Angular's injected component styles. Two things follow
-for anybody changing this app. **Nothing may load from another origin** - a
+policy is this origin only, with no `'unsafe-inline'`: since 2026-10-21 each
+`index.html` response carries a nonce (`$request_id`) in the policy, and
+`sub_filter` stamps the same value on `<app-root>` as `ngCspNonce`, which
+Angular puts on every `<style>` it injects. Three things follow for anybody
+changing this app. **No inline `style="..."` attribute in a template** - a nonce
+does not cover one, so it silently does nothing; use a class. **Nothing may load from another origin** - a
 font from a CDN, an analytics script - without widening the policy on purpose.
 And **critical-CSS inlining stays off** in `angular.json`'s production build:
 it loads the stylesheet through an inline `onload` handler the policy blocks,

@@ -176,8 +176,15 @@ matching. That is not hypothetical: the override check passed its unit tests
 and failed against a real token, because the tests built the principal by hand.
 
 **Rate limiting is per source address and deliberately loose.** `/login`,
-`/activations/redeem` and `/register` carry policies; everything else is
-unlimited. The limits are set well above any plausible human volume because
+`/activations/redeem` and `/register` (and the sign-in CAPTCHA, code and
+resend routes) carry policies. **Since 2026-10-21 every other `/v1` request is
+limited too, per account rather than per address**: the global limiter counts
+a signed-in caller against their own account (the `sub` of a token
+`UseAuthentication` has already validated, so a forged one counts by address)
+and only an anonymous caller against their address. That is what made a
+general limit safe on networks where one address is a crowd. Portal pages and
+assets are never counted. `ApiRateLimitTests` holds the partitioning. The
+limits are set well above any plausible human volume because
 Indian mobile carriers put very large numbers of subscribers behind one address
 - they exist to make scripted attacks expensive, not to police individuals, and
 the per-account lockout in identity-tenant-service is what protects a specific
@@ -200,6 +207,8 @@ Those three routes are declared above the identity catch-all with a lower
 | `RateLimiting__Enabled` | Set false only in a host that must make hundreds of credential attempts on purpose |
 | `RateLimiting__CredentialAttemptsPerWindow` | Sign-in and activation attempts per source per window |
 | `RateLimiting__RegistrationsPerWindow` | Registrations per source per window |
+| `RateLimiting__ApiRequestsPerAccountPerWindow` | Any `/v1` request, per signed-in account per window (default 1200) |
+| `RateLimiting__ApiRequestsPerAddressPerWindow` | Any `/v1` request with no signed-in account, per source per window (default 600) |
 | `RateLimiting__WindowSeconds` | Window length, default 60 |
 
 ## Testing

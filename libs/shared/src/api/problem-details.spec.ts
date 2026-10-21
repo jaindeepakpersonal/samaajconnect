@@ -28,6 +28,10 @@ describe('describeError', () => {
     expect(describeError(problem(0, null))).toContain('Could not reach the server');
   });
 
+  it('explains a rate-limit refusal, whose body is deliberately empty', () => {
+    expect(describeError(problem(429, ''))).toBe('Too many requests just now. Wait a minute, then try again.');
+  });
+
   it('falls back to something readable when the body is not a problem document', () => {
     expect(describeError(problem(500, 'boom'))).toBe('Something went wrong. Please try again.');
   });

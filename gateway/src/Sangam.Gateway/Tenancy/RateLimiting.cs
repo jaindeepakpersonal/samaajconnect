@@ -38,6 +38,18 @@ namespace Sangam.Gateway.Tenancy;
 /// The per-account lockout is what actually protects a specific person, and it
 /// is unaffected by any of this.
 ///
+/// <b>A general API limit, since 2026-10-21, counts per account.</b> Every
+/// <c>/v1</c> request also spends from a budget - the signed-in account's when
+/// the gateway has validated a token, the source address's only when it has
+/// not. Per account is what makes a general limit possible at all here: an
+/// address can be a whole carrier range, but an account is one member, and a
+/// member's token cannot be forged into a hundred fresh budgets because only a
+/// token that passed validation names one. It stops a stolen or scripted
+/// session from scraping the directory or hammering a service, and an
+/// anonymous flood from reaching the services at the rate it arrives; the
+/// numbers are again far above what any person does. The portal's own pages and
+/// assets are not counted - only the API.
+///
 /// When a real deployment puts a load balancer or CDN in front of this,
 /// configure ForwardedHeaders - otherwise every request partitions into one
 /// bucket keyed on the proxy, and the limit becomes a global cap that will take
@@ -51,6 +63,9 @@ public static class RateLimiting
     /// <summary>Anything anonymous that creates something.</summary>
     public const string RegistrationPolicy = "registration";
 
+    /// <summary>The path the general API limit counts. Everything else is the portal.</summary>
+    public const string ApiPrefix = "/v1";
+
     public static IServiceCollection AddGatewayRateLimiting(
         this IServiceCollection services,
         GatewayRateLimitOptions options)
@@ -58,6 +73,37 @@ public static class RateLimiting
         services.AddRateLimiter(limiter =>
         {
             limiter.RejectionStatusCode = StatusCodes.Status429TooManyRequests;
+
+            // Runs for every request, before and alongside the named policies
+            // below - a sign-in spends from both its credential budget and the
+            // general one.
+            limiter.GlobalLimiter = PartitionedRateLimiter.Create<HttpContext, string>(context =>
+            {
+                if (!context.Request.Path.StartsWithSegments(ApiPrefix))
+                {
+                    return RateLimitPartition.GetNoLimiter("portal");
+                }
+
+                var account = Account(context);
+
+                return account is not null
+                    ? RateLimitPartition.GetFixedWindowLimiter(
+                        "account:" + account,
+                        _ => new FixedWindowRateLimiterOptions
+                        {
+                            PermitLimit = options.ApiRequestsPerAccountPerWindow,
+                            Window = TimeSpan.FromSeconds(options.WindowSeconds),
+                            QueueLimit = 0,
+                        })
+                    : RateLimitPartition.GetFixedWindowLimiter(
+                        "address:" + Partition(context),
+                        _ => new FixedWindowRateLimiterOptions
+                        {
+                            PermitLimit = options.ApiRequestsPerAddressPerWindow,
+                            Window = TimeSpan.FromSeconds(options.WindowSeconds),
+                            QueueLimit = 0,
+                        });
+            });
 
             limiter.OnRejected = async (context, cancellationToken) =>
             {
@@ -68,10 +114,11 @@ public static class RateLimiting
                     .GetRequiredService<ILoggerFactory>()
                     .CreateLogger("Sangam.Gateway.RateLimiting")
                     .LogWarning(
-                        "Rate limit rejected {Method} {Path} from {Ip}",
+                        "Rate limit rejected {Method} {Path} from {Ip} (account {Account})",
                         context.HttpContext.Request.Method,
                         context.HttpContext.Request.Path,
-                        Partition(context.HttpContext));
+                        Partition(context.HttpContext),
+                        Account(context.HttpContext) ?? "none");
 
                 await context.HttpContext.Response.WriteAsync(string.Empty, cancellationToken);
             };
@@ -106,6 +153,14 @@ public static class RateLimiting
 
     private static string Partition(HttpContext context) =>
         context.Connection.RemoteIpAddress?.ToString() ?? "unknown";
+
+    /// <summary>
+    /// The account a validated token names, or null. UseAuthentication runs
+    /// before UseRateLimiter, so an invalid or forged token never gets here as
+    /// an identity - it is counted by address like any anonymous call.
+    /// </summary>
+    private static string? Account(HttpContext context) =>
+        context.User.Identity?.IsAuthenticated == true ? context.User.FindFirst("sub")?.Value : null;
 }
 
 public sealed class GatewayRateLimitOptions
@@ -132,4 +187,20 @@ public sealed class GatewayRateLimitOptions
     /// signing its members up together on one WiFi connection is unaffected.
     /// </summary>
     public int RegistrationsPerWindow { get; set; } = 100;
+
+    /// <summary>
+    /// API requests per window for one signed-in account. Twenty a second,
+    /// sustained for a minute, is many times what any screen asks for - a
+    /// directory page with its photos is a few dozen - and far below what a
+    /// script scraping the platform with a stolen session wants.
+    /// </summary>
+    public int ApiRequestsPerAccountPerWindow { get; set; } = 1200;
+
+    /// <summary>
+    /// API requests per window from one address with no signed-in account.
+    /// Anonymous traffic is the sign-in, registration and directory screens,
+    /// so this is generous for a hall of people registering together, and is
+    /// what keeps an unauthenticated flood from reaching the services.
+    /// </summary>
+    public int ApiRequestsPerAddressPerWindow { get; set; } = 600;
 }
