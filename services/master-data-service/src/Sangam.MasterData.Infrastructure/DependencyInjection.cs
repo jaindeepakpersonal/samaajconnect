@@ -41,6 +41,9 @@ public static class DependencyInjection
             .Validate(
                 jwt => !string.IsNullOrWhiteSpace(jwt.SigningKey) && jwt.SigningKey.Length >= 32,
                 "Jwt:SigningKey must be configured and at least 32 characters long.")
+            .Validate(
+                jwt => JwtOptions.IsAllowedHere(jwt.SigningKey),
+                "Jwt:SigningKey is the published local-development key, which only a Development environment may use. Inject a real key.")
             .ValidateOnStart();
 
         services.Configure<KafkaOptions>(configuration.GetSection(KafkaOptions.SectionName));

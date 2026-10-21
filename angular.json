@@ -59,7 +59,15 @@
                   "replace": "apps/member-portal/src/environments/environment.ts",
                   "with": "apps/member-portal/src/environments/environment.production.ts"
                 }
-              ]
+              ],
+              "optimization": {
+                "scripts": true,
+                "styles": {
+                  "minify": true,
+                  "inlineCritical": false
+                },
+                "fonts": true
+              }
             },
             "development": {
               "optimization": false,
@@ -146,7 +154,15 @@
                   "replace": "apps/admin-portal/src/environments/environment.ts",
                   "with": "apps/admin-portal/src/environments/environment.production.ts"
                 }
-              ]
+              ],
+              "optimization": {
+                "scripts": true,
+                "styles": {
+                  "minify": true,
+                  "inlineCritical": false
+                },
+                "fonts": true
+              }
             },
             "development": {
               "optimization": false,

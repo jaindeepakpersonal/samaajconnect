@@ -13,6 +13,9 @@ const browserDistFolder = join(import.meta.dirname, '../browser');
 const app = express();
 const angularApp = new AngularNodeAppEngine();
 
+// Which server this is is nobody's business.
+app.disable('x-powered-by');
+
 /**
  * Sends `/v1` to the gateway, so the app and its API share an origin.
  *
@@ -45,6 +48,39 @@ if (gatewayUrl) {
     }),
   );
 }
+
+/**
+ * Security headers on every page and asset this server sends - after the /v1
+ * proxy, so API responses keep the gateway's own. The same policy
+ * apps/admin-portal/security-headers.conf gives the admin panel: this origin
+ * only, images it fetched itself (blob:) or was handed inline (data: - the
+ * sign-in CAPTCHA), and 'unsafe-inline' for styles alone, because Angular
+ * injects component styles as <style> tags. Scripts are held to 'self', which
+ * holds while every route renders on the client (app.routes.server.ts); a
+ * server-rendered route with event replay would need a CSP nonce first.
+ */
+const CONTENT_SECURITY_POLICY = [
+  "default-src 'self'",
+  "script-src 'self'",
+  "style-src 'self' 'unsafe-inline'",
+  "img-src 'self' data: blob:",
+  "font-src 'self' data:",
+  "connect-src 'self'",
+  "object-src 'none'",
+  "base-uri 'self'",
+  "form-action 'self'",
+  "frame-ancestors 'none'",
+].join('; ');
+
+app.use((_req, res, next) => {
+  res.setHeader('Content-Security-Policy', CONTENT_SECURITY_POLICY);
+  res.setHeader('X-Content-Type-Options', 'nosniff');
+  res.setHeader('X-Frame-Options', 'DENY');
+  res.setHeader('Referrer-Policy', 'strict-origin-when-cross-origin');
+  res.setHeader('Permissions-Policy', 'camera=(), microphone=(), geolocation=(), payment=()');
+  res.setHeader('Cross-Origin-Opener-Policy', 'same-origin');
+  next();
+});
 
 /**
  * Example Express Rest API endpoints can be defined here.

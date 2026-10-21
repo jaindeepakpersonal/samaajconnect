@@ -37,6 +37,7 @@ EXPOSE 8080
 # Replaces the stock server block, which listens on 80 and serves nginx's
 # welcome page.
 COPY apps/admin-portal/nginx.conf /etc/nginx/conf.d/default.conf
+COPY apps/admin-portal/security-headers.conf /etc/nginx/security-headers.conf
 
 COPY --from=build /src/dist/admin-portal/browser /usr/share/nginx/html
 

@@ -747,6 +747,18 @@ the same frozen result rather than being refused, so there is nothing
 irreversible about a second click to warn against - the button simply
 disappears once `hasPublishedResult` is true.
 
+**nginx sends a content security policy and the other security headers
+(2026-09-27)**, from `security-headers.conf`, included in each location because
+nginx drops inherited `add_header`s the moment a location sets its own. The
+policy is this origin only, scripts held to `'self'`; styles keep
+`'unsafe-inline'` for Angular's injected component styles. Two things follow
+for anybody changing this app. **Nothing may load from another origin** - a
+font from a CDN, an analytics script - without widening the policy on purpose.
+And **critical-CSS inlining stays off** in `angular.json`'s production build:
+it loads the stylesheet through an inline `onload` handler the policy blocks,
+which left this panel unstyled the first time the policy went on. `/v1` is left
+to the gateway's own headers.
+
 ## Accessibility
 
 Same standard as member-portal (WCAG 2.1 AA). In place: labelled controls

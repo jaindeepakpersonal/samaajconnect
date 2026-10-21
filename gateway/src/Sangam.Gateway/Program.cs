@@ -6,6 +6,22 @@ using StackExchange.Redis;
 
 var builder = WebApplication.CreateBuilder(args);
 
+builder.WebHost.ConfigureKestrel(kestrel =>
+{
+    // Which server answers is nobody's business - see SecurityHeadersMiddleware.
+    kestrel.AddServerHeader = false;
+
+    // Twice the largest thing anybody uploads (a 2 MB image, as multipart):
+    // the 30 MB default let any anonymous caller make every service read 30 MB
+    // before its own validation could refuse it.
+    kestrel.Limits.MaxRequestBodySize = 4 * 1024 * 1024;
+});
+
+var securityHeaders = builder.Configuration
+    .GetSection(Sangam.Gateway.Security.SecurityHeadersOptions.SectionName)
+    .Get<Sangam.Gateway.Security.SecurityHeadersOptions>() ?? new Sangam.Gateway.Security.SecurityHeadersOptions();
+builder.Services.AddSingleton(securityHeaders);
+
 builder.Services.Configure<GatewayOptions>(builder.Configuration.GetSection(GatewayOptions.SectionName));
 
 builder.Services.AddReverseProxy()
@@ -69,6 +85,17 @@ if (string.IsNullOrWhiteSpace(signingKey) || signingKey.Length < 32)
         "Jwt:SigningKey must be configured and at least 32 characters long.");
 }
 
+// The published local key (docker-compose, appsettings.Development.json) is
+// readable by anybody with this repository. Outside Development it would let
+// anyone sign a token the gateway accepts, so the gateway refuses to start -
+// the same rule every service applies to its own JwtOptions.
+if (signingKey.Contains("do-not-use-in-production", StringComparison.OrdinalIgnoreCase)
+    && !builder.Environment.IsDevelopment())
+{
+    throw new InvalidOperationException(
+        "Jwt:SigningKey is the published local-development key, which only a Development environment may use. Inject a real key.");
+}
+
 builder.Services
     .AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
     .AddJwtBearer(jwt =>
@@ -105,6 +132,10 @@ if (rateLimits.Enabled)
 }
 
 var app = builder.Build();
+
+// First, so every response carries them - a 429 or a module-gate 404 as much
+// as a proxied 200.
+app.UseMiddleware<Sangam.Gateway.Security.SecurityHeadersMiddleware>();
 
 app.MapGet("/health", () => Results.Ok(new { status = "healthy" }));
 

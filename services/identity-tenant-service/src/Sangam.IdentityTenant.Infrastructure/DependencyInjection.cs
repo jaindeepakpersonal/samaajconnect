@@ -1,6 +1,7 @@
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Hosting;
 using Sangam.IdentityTenant.Application.Abstractions;
 using Sangam.IdentityTenant.Infrastructure.Messaging;
 using Sangam.IdentityTenant.Infrastructure.Persistence;
@@ -51,8 +52,25 @@ public static class DependencyInjection
         services.AddSingleton<ICaptchaRenderer, CaptchaRenderer>();
 
         // Read when first asked for, so a host's (or a test's) configuration is final by then.
-        services.AddSingleton(sp => sp.GetRequiredService<IConfiguration>()
-            .GetSection(SignInSecurityOptions.SectionName).Get<SignInSecurityOptions>() ?? new SignInSecurityOptions());
+        services.AddSingleton(sp =>
+        {
+            var signIn = sp.GetRequiredService<IConfiguration>()
+                .GetSection(SignInSecurityOptions.SectionName).Get<SignInSecurityOptions>() ?? new SignInSecurityOptions();
+
+            // Revealing the CAPTCHA answers and sign-in codes switches both
+            // guards off for anybody who can read the log or the response. On
+            // the compose stack that is the point; anywhere else it would
+            // quietly make two-factor sign-in one-factor. Program.cs resolves
+            // this at start-up, so a host configured that way refuses to start.
+            if (signIn.RevealSecretsInLogs && !sp.GetRequiredService<IHostEnvironment>().IsDevelopment())
+            {
+                throw new InvalidOperationException(
+                    "SignInSecurity:RevealSecretsInLogs is for the local compose stack only and may not be on "
+                    + "outside a Development environment.");
+            }
+
+            return signIn;
+        });
         services.AddScoped<IFailedActivationRecorder, FailedActivationRecorder>();
 
         // Bound and validated here rather than in Api: this service issues
@@ -62,6 +80,9 @@ public static class DependencyInjection
             .Validate(
                 jwt => !string.IsNullOrWhiteSpace(jwt.SigningKey) && jwt.SigningKey.Length >= 32,
                 "Jwt:SigningKey must be configured and at least 32 characters long.")
+            .Validate(
+                jwt => JwtOptions.IsAllowedHere(jwt.SigningKey),
+                "Jwt:SigningKey is the published local-development key, which only a Development environment may use. Inject a real key.")
             .ValidateOnStart();
 
         services.Configure<BootstrapOptions>(configuration.GetSection(BootstrapOptions.SectionName));

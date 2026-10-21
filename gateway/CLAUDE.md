@@ -103,6 +103,7 @@ works whether you curl a service directly or go through here.
 ## Pipeline order — load-bearing
 
 ```
+SecurityHeadersMiddleware    → first, so every response carries them - a 429 or a module-gate 404 too
 UseAuthentication            → the override check needs to know if the caller is a Super Admin
 UseRateLimiter               → before tenant resolution: a rejected request should not cost a Samaaj lookup
 TenantResolutionMiddleware   → strips forged headers, resolves the Samaaj, injects X-Tenant-Id
@@ -116,6 +117,16 @@ as ordinary middleware it executes before YARP has selected a route, so
 being gated.
 
 ## Decisions worth knowing before you change this
+
+**Security headers are the gateway's, on everything it sends (2026-09-27).**
+`SecurityHeadersMiddleware` sets them as each response starts - its own and
+every proxied one - and leaves a header alone when the upstream already set it,
+so the member portal's own page policy is not overruled. JSON gets
+`default-src 'none'`, HTML without a policy the portal's. `Server` and
+`X-Powered-By` are stripped, including the ones services and the portal's
+Node server would forward. Kestrel also stops reading any request body past
+4 MB - twice the largest upload - instead of the 30 MB default.
+`SecurityHeadersMiddlewareTests` holds all of it.
 
 **Inbound `X-Tenant-Id`, `X-Tenant-Override-Id` and `X-Tenant-Slug` are stripped
 unconditionally, first, on every request** — including anonymous ones that never
@@ -184,7 +195,8 @@ Those three routes are declared above the identity catch-all with a lower
 | `Gateway__IdentityServiceUrl` | Where tenant ids are resolved |
 | `Gateway__TenantCacheSeconds` | Cache TTL; also how long deactivating a Samaaj takes to bite |
 | `Redis__ConnectionString` | Optional. Absent means no caching, not a failure |
-| `Jwt__SigningKey` | Must match the key `identity-tenant-service` signs with |
+| `Jwt__SigningKey` | Must match the key `identity-tenant-service` signs with. The published local key (its value contains `do-not-use-in-production`) is refused outside Development |
+| `SecurityHeaders__Hsts` | Send Strict-Transport-Security. Only where TLS terminates in front of the gateway |
 | `RateLimiting__Enabled` | Set false only in a host that must make hundreds of credential attempts on purpose |
 | `RateLimiting__CredentialAttemptsPerWindow` | Sign-in and activation attempts per source per window |
 | `RateLimiting__RegistrationsPerWindow` | Registrations per source per window |

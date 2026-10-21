@@ -52,7 +52,17 @@ version of the plan; the reasoning behind the ordering lives in
   reveals. The security checklist's anonymous and internal lists were brought
   up to date, closing two of security-invariants' four standing failures.
 
-  Still to come from the same request: a security hardening pass.
+  Then **a hardening pass** at the edges: security headers from the gateway,
+  the member portal's Node server and the admin panel's nginx (a content
+  security policy with scripts held to `'self'`, clickjacking and sniffing
+  headers, software names stripped), critical-CSS inlining off in both
+  production builds because its inline handler is what that policy blocks, a
+  4 MB request-body cap at the gateway, and every service, the gateway and the
+  Super Admin bootstrap refusing the repository's published local secrets
+  outside Development - as does the flag that reveals sign-in secrets. What the
+  pass checked and left alone (token validation, password hashing, raw SQL,
+  HTML sinks, CORS) and what it left for later (a CSP nonce, a general API
+  rate limit, upload scanning) is in SECURITY-CHECKLIST.md.
 - **Previously:** 2026-09-20 - **a new module, trust-service: locality-wise
   Trust management, phase 1 (roster only).** One Trust per `(Samaaj,
   Locality)`, with `TrustMember` as its own aggregate so a roster change

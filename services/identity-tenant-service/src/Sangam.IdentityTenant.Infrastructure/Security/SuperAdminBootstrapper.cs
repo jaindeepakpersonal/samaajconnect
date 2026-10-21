@@ -43,6 +43,17 @@ public sealed class SuperAdminBootstrapper(
             return;
         }
 
+        if (IsPublishedDefault(settings.SuperAdminPassword) && !IsDevelopment())
+        {
+            // docker-compose's fallback is readable by anybody with this
+            // repository. On an empty production database it would create the
+            // platform's most powerful account with a password the world knows.
+            logger.LogCritical(
+                "Bootstrap:SuperAdminPassword is the published docker-compose default, which only a "
+                + "Development environment may use. No Super Admin was created - inject a real password.");
+            return;
+        }
+
         var alreadyExists = await dbContext.UserRoles
             .AnyAsync(ur => ur.RoleId == AuthorizationCatalog.RoleIds.SuperAdmin, cancellationToken);
 
@@ -76,4 +87,18 @@ public sealed class SuperAdminBootstrapper(
         logger.LogWarning(
             "Bootstrapped Super Admin {Identifier}. Change this password immediately.", identifier);
     }
+
+    /// <summary>docker-compose's fallback for SUPERADMIN_PASSWORD.</summary>
+    private const string PublishedDefaultPassword = "superadminpassword";
+
+    private static bool IsPublishedDefault(string password) =>
+        string.Equals(password, PublishedDefaultPassword, StringComparison.Ordinal);
+
+    /// <summary>The environment JwtOptions.IsAllowedHere reads, for the same reason.</summary>
+    private static bool IsDevelopment() =>
+        string.Equals(
+            Environment.GetEnvironmentVariable("ASPNETCORE_ENVIRONMENT")
+                ?? Environment.GetEnvironmentVariable("DOTNET_ENVIRONMENT"),
+            "Development",
+            StringComparison.OrdinalIgnoreCase);
 }

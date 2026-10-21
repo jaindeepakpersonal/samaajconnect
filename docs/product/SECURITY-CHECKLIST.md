@@ -371,6 +371,64 @@ is the outer gate and grants nothing on its own.
       they act on a Samaaj, so a tenant-filtered read finds nothing and the
       step-up fails for the one role that most needs it.
 
+## Sign-in, the edges, and default secrets (2026-09-27)
+
+- [x] **Two factors for everyone, and a CAPTCHA on the password.** A correct
+      password on a browser the account does not trust sends a 6-digit code;
+      only the code *with* the challenge that password earned signs in, so the
+      code is a second factor and never a way around the first. A trusted
+      browser skips the code (never the password) for 30 days, and every
+      trusted device is revoked with the account's sessions. Passwordless code
+      sign-in was retired for exactly that reason. The CAPTCHA is drawn by
+      identity-tenant-service itself - no third party learns who signs in -
+      checked before any account is read, single use, and spent on its own
+      connection so a failed password cannot roll it back for another guess.
+      See identity-tenant-service's CLAUDE.md, "Signing in".
+
+- [x] **Security headers at every edge**: the gateway (`SecurityHeadersMiddleware`,
+      on every response it sends or proxies, a 429 as much as a 200), the member
+      portal's Node server and the admin panel's nginx. `nosniff`,
+      `X-Frame-Options: DENY` and `frame-ancestors 'none'` (clickjacking),
+      `Referrer-Policy`, `Permissions-Policy`, `Cross-Origin-Opener-Policy`,
+      and a content security policy - `default-src 'none'` on API responses,
+      and on pages this origin only, with scripts held to `'self'`. Styles keep
+      `'unsafe-inline'` because Angular injects component styles as `<style>`
+      tags; a nonce is the way to drop it. **Critical-CSS inlining is off in
+      both apps' production builds** (`angular.json`): it loads the stylesheet
+      through an inline `onload` handler, which the policy blocks, leaving
+      pages unstyled - found by opening them after the policy went on.
+      `Server` and `X-Powered-By` are removed; nginx names itself without a
+      version. HSTS is sent only where `SecurityHeaders:Hsts` says TLS is
+      terminated in front of the gateway.
+
+- [x] **The gateway reads at most 4 MB of any request body**, twice the
+      largest upload (a 2 MB image). Kestrel's 30 MB default let any anonymous
+      caller make a service read 30 MB before its own validation refused it.
+
+- [x] **The repository's published secrets are refused outside Development.**
+      docker-compose falls back to a local JWT signing key and a Super Admin
+      password that anybody with this repository can read. Every service and
+      the gateway refuse to start with that key unless the environment is
+      Development (`JwtOptions.IsAllowedHere`, in all sixteen copies), and the
+      bootstrapper refuses to create a Super Admin with that password - on an
+      empty production database it would otherwise be the platform's most
+      powerful account under a password the world knows. Verified by starting
+      a built image as Production with the published key: it stops at start-up.
+
+- [x] **`SignInSecurity:RevealSecretsInLogs` cannot be on outside Development.**
+      It writes CAPTCHA answers and sign-in codes to the log - and now echoes the
+      codes in the sign-in response too - which on the compose stack (no SMS or
+      email provider) is how anybody can sign in, and anywhere else would make
+      two-factor sign-in one-factor. identity-tenant-service refuses to start
+      with it on in any other environment.
+
+- [ ] **Not done, and worth doing next:** a CSP nonce, so styles can drop
+      `'unsafe-inline'` and a server-rendered route with event replay can
+      exist under the policy; a general per-client rate limit on the API
+      beyond the credential and registration policies (hard to size while a
+      whole Samaaj may sit behind one NAT address); and virus scanning of
+      uploads (see File handling).
+
 ## File handling
 
 - [ ] Uploaded files (post media, social issue evidence, profile
