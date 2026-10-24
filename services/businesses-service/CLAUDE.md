@@ -23,6 +23,7 @@ tenant query filter like any other service.
 | `Business` | built | Tenant-scoped. `Id` is a fresh id, not the owner's own — unlike Matrimony's `BiodataProfile`, a member may own more than one. |
 | `Product` | built | An owned entity of `Business`, held in its `Products` collection and mutated only through methods on it — never its own aggregate root. |
 | `Order` | built | Tenant-scoped. A peer-to-peer fact between a buyer and a `Business`, not owned by either — the same reasoning that keeps Matrimony's `Proposal` and a Boli's bid history their own records. |
+| `BusinessImage` | built | Tenant-scoped. One image's bytes - the business's photo or a product's. `Business.PhotoId` and `Product.PhotoId` point at it. Cascades with its business |
 
 `Business.CategoryId` is a master-data-service `LookupItem` id,
 `Category = BusinessCategory` — a flat, admin-managed platform-wide list
@@ -41,10 +42,24 @@ is a different act from that member's own base-profile privacy choices, and
 reading those here would let a `Business` write leak a value the member
 chose to keep private elsewhere.
 
-**No photo field.** There is no file storage this service could use, and a
-field nothing can populate is worse than an absent one — the same reasoning
-identity-tenant-service's own `CLAUDE.md` records for a tenant logo before
-upload existed.
+**A business has a photo and each product an image (2026-10-24).** The
+platform hosts image bytes in each service's own database now - events,
+member and child photos, Samaaj logos, group photos - so this service does the
+same: `BusinessImage` holds the bytes, sniffed by `ImageContent` (the fifth
+copy, held identical to the others by `scripts/security-invariants.sh`), and
+the business or product names its image by id. One table serves both, because
+both belong to one business: the foreign key cascades, so the account-erasure
+consumer deleting an owner's businesses takes every image with them without a
+second sweep. Replacing an image removes the old one in the same transaction.
+`photoUrl` carries `?v={imageId}`, so a replaced image is a new URL and the
+portal's `scAuthedSrc` fetches it rather than showing the old one. Reading an
+image follows `GetBusinessQuery`: an inactive business's only to its owner,
+an off-sale product's only to its owner. Uploading or removing one raises no
+event, as no product edit does.
+
+**Where a business is: a street line plus the city or village and locality.**
+`AddressLine` (300 characters, blank means none) was added beside the two ids
+the same day, because a locality says which part of town and not which shop.
 
 `Order.Items` is an owned collection of `OrderItem` (`ProductId`,
 `ProductName`, `UnitPriceInPaise`, `Quantity`) — **snapshotted at placement
@@ -77,6 +92,10 @@ command's own precedent of role-only gating for a purely self-scoped write.
 | `AddProductCommand` | role list above, owner only | built |
 | `UpdateProductCommand` | role list above, owner only | built |
 | `SetProductAvailabilityCommand` | role list above, owner only | built |
+| `UploadBusinessPhotoCommand` | role list above, owner only | built. Replaces any photo |
+| `RemoveBusinessPhotoCommand` | role list above, owner only | built. Twice is success |
+| `UploadProductPhotoCommand` | role list above, owner only | built. 404 on an unknown product |
+| `RemoveProductPhotoCommand` | role list above, owner only | built |
 | `PlaceOrderCommand` | role list above | built |
 | `RespondToOrderCommand` | role list above, business owner only | built |
 | `FulfillOrderCommand` | role list above, business owner only | built |
@@ -101,6 +120,7 @@ volunteer-groups-service's list/get queries.
 | `ListMyBusinessesQuery` | `Members.Read`, caller's own | built |
 | `SearchBusinessesQuery` | `Members.Read` | built |
 | `GetBusinessQuery` | `Members.Read` | built |
+| `GetBusinessImageQuery` | `Members.Read` | built. The business's photo or a product's, under `GetBusinessQuery`'s rule |
 | `ListMyOrdersQuery` | `Members.Read`, caller's own | built |
 | `ListReceivedOrdersQuery` | `Members.Read`, caller's own businesses | built |
 
@@ -175,6 +195,10 @@ service — the only cross-service data flow is this one Kafka consumer.
 | POST | `/v1/businesses/mine/{businessId}/products` | role list above, owner only |
 | PATCH | `/v1/businesses/mine/{businessId}/products/{productId}` | role list above, owner only |
 | POST | `/v1/businesses/mine/{businessId}/products/{productId}/availability` | role list above, owner only |
+| POST, DELETE | `/v1/businesses/mine/{businessId}/photo` | role list above, owner only |
+| POST, DELETE | `/v1/businesses/mine/{businessId}/products/{productId}/photo` | role list above, owner only |
+| GET | `/v1/businesses/{businessId}/photo` | `Members.Read` |
+| GET | `/v1/businesses/{businessId}/products/{productId}/photo` | `Members.Read` |
 | GET | `/v1/businesses` | `Members.Read` |
 | GET | `/v1/businesses/{businessId}` | `Members.Read` |
 | POST | `/v1/businesses/orders` | role list above |
@@ -243,7 +267,11 @@ see their own `CLAUDE.md`s.
   the unavailable-product and own-business refusals, tenant isolation, and
   the `identity.user.erased.v1` consumer removing owned businesses while
   de-identifying placed orders and leaving the other party's own order
-  history intact.
+  history intact. `BusinessPhotoTests` covers the address line, uploading,
+  replacing (one row left, a new URL) and removing a photo, the owner-only
+  writes, bytes refused for what they are rather than what they claim, an
+  off-sale product's image hidden from a buyer, and erasure taking every image
+  with the businesses.
 
 ```
 dotnet test services/businesses-service/Sangam.Businesses.sln

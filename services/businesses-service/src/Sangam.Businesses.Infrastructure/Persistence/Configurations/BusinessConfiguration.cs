@@ -21,6 +21,7 @@ public sealed class BusinessConfiguration : IEntityTypeConfiguration<Business>
         builder.Property(b => b.Name).HasMaxLength(200).IsRequired();
         builder.Property(b => b.CategoryId).IsRequired();
         builder.Property(b => b.Description).HasMaxLength(1000);
+        builder.Property(b => b.AddressLine).HasMaxLength(300);
         builder.Property(b => b.ContactPhone).HasMaxLength(20);
         builder.Property(b => b.ContactEmail).HasMaxLength(200);
         builder.Property(b => b.IsActive).IsRequired();

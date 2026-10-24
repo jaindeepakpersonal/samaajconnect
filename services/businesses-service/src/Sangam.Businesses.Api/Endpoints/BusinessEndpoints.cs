@@ -40,7 +40,7 @@ public static class BusinessEndpoints
             {
                 var command = new CreateBusinessCommand(
                     request.Name, request.CategoryId, request.CityId, request.LocalityId,
-                    request.Description, request.ContactPhone, request.ContactEmail);
+                    request.Description, request.ContactPhone, request.ContactEmail, request.AddressLine);
 
                 var result = await sender.Send(command, cancellationToken);
 
@@ -59,7 +59,7 @@ public static class BusinessEndpoints
             {
                 var command = new UpdateBusinessCommand(
                     businessId, request.Name, request.CategoryId, request.CityId, request.LocalityId,
-                    request.Description, request.ContactPhone, request.ContactEmail);
+                    request.Description, request.ContactPhone, request.ContactEmail, request.AddressLine);
 
                 var result = await sender.Send(command, cancellationToken);
 
@@ -187,7 +187,8 @@ public static class BusinessEndpoints
         string? LocalityId,
         string? Description,
         string? ContactPhone,
-        string? ContactEmail);
+        string? ContactEmail,
+        string? AddressLine);
 
     public sealed record UpdateBusinessRequest(
         string Name,
@@ -196,7 +197,8 @@ public static class BusinessEndpoints
         string? LocalityId,
         string? Description,
         string? ContactPhone,
-        string? ContactEmail);
+        string? ContactEmail,
+        string? AddressLine);
 
     public sealed record SetBusinessStatusRequest(bool Active);
 

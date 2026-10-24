@@ -28,6 +28,11 @@ namespace Sangam.Businesses.Infrastructure.Persistence.Migrations
                         .HasColumnType("uuid")
                         .HasColumnName("id");
 
+                    b.Property<string>("AddressLine")
+                        .HasMaxLength(300)
+                        .HasColumnType("character varying(300)")
+                        .HasColumnName("address_line");
+
                     b.Property<Guid>("CategoryId")
                         .HasColumnType("uuid")
                         .HasColumnName("category_id");
@@ -73,6 +78,10 @@ namespace Sangam.Businesses.Infrastructure.Persistence.Migrations
                         .HasColumnType("uuid")
                         .HasColumnName("owner_member_id");
 
+                    b.Property<Guid?>("PhotoId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("photo_id");
+
                     b.Property<Guid>("TenantId")
                         .HasColumnType("uuid")
                         .HasColumnName("tenant_id");
@@ -88,6 +97,61 @@ namespace Sangam.Businesses.Infrastructure.Persistence.Migrations
                         .HasDatabaseName("ix_businesses_tenant_id_is_active_category_id_locality_id");
 
                     b.ToTable("businesses", (string)null);
+                });
+
+            modelBuilder.Entity("Sangam.Businesses.Domain.Media.BusinessImage", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<Guid>("BusinessId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("business_id");
+
+                    b.Property<int>("ByteSize")
+                        .HasColumnType("integer")
+                        .HasColumnName("byte_size");
+
+                    b.Property<byte[]>("Bytes")
+                        .IsRequired()
+                        .HasColumnType("bytea")
+                        .HasColumnName("bytes");
+
+                    b.Property<string>("ContentHash")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)")
+                        .HasColumnName("content_hash");
+
+                    b.Property<string>("ContentType")
+                        .IsRequired()
+                        .HasMaxLength(50)
+                        .HasColumnType("character varying(50)")
+                        .HasColumnName("content_type");
+
+                    b.Property<Guid>("TenantId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("tenant_id");
+
+                    b.Property<DateTimeOffset>("UploadedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("uploaded_at");
+
+                    b.Property<Guid>("UploadedBy")
+                        .HasColumnType("uuid")
+                        .HasColumnName("uploaded_by");
+
+                    b.HasKey("Id")
+                        .HasName("pk_business_images");
+
+                    b.HasIndex("BusinessId")
+                        .HasDatabaseName("ix_business_images_business_id");
+
+                    b.HasIndex("TenantId", "BusinessId")
+                        .HasDatabaseName("ix_business_images_tenant_id_business_id");
+
+                    b.ToTable("business_images", (string)null);
                 });
 
             modelBuilder.Entity("Sangam.Businesses.Domain.Orders.Order", b =>
@@ -233,6 +297,10 @@ namespace Sangam.Businesses.Infrastructure.Persistence.Migrations
                                 .HasColumnType("character varying(200)")
                                 .HasColumnName("name");
 
+                            b1.Property<Guid?>("PhotoId")
+                                .HasColumnType("uuid")
+                                .HasColumnName("photo_id");
+
                             b1.Property<int>("PriceInPaise")
                                 .HasColumnType("integer")
                                 .HasColumnName("price_in_paise");
@@ -259,6 +327,16 @@ namespace Sangam.Businesses.Infrastructure.Persistence.Migrations
                         });
 
                     b.Navigation("Products");
+                });
+
+            modelBuilder.Entity("Sangam.Businesses.Domain.Media.BusinessImage", b =>
+                {
+                    b.HasOne("Sangam.Businesses.Domain.Businesses.Business", null)
+                        .WithMany()
+                        .HasForeignKey("BusinessId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired()
+                        .HasConstraintName("fk_business_images_businesses_business_id");
                 });
 
             modelBuilder.Entity("Sangam.Businesses.Domain.Orders.Order", b =>

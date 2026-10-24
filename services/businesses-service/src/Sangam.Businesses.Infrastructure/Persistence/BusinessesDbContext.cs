@@ -4,6 +4,7 @@ using Microsoft.EntityFrameworkCore;
 using Sangam.Businesses.Application.Abstractions;
 using Sangam.Businesses.Domain.Businesses;
 using Sangam.Businesses.Domain.Common;
+using Sangam.Businesses.Domain.Media;
 using Sangam.Businesses.Domain.Orders;
 
 namespace Sangam.Businesses.Infrastructure.Persistence;
@@ -18,6 +19,8 @@ public sealed class BusinessesDbContext(
     public DbSet<Business> Businesses => Set<Business>();
 
     public DbSet<Order> Orders => Set<Order>();
+
+    public DbSet<BusinessImage> BusinessImages => Set<BusinessImage>();
 
     public DbSet<OutboxMessage> OutboxMessages => Set<OutboxMessage>();
 

@@ -5,7 +5,10 @@ public sealed record ProductResponse(
     string Name,
     string? Description,
     int PriceInPaise,
-    bool IsAvailable);
+    bool IsAvailable,
+
+    /// <summary>Where to fetch its image - versioned by the image's id, so a replaced one is a new URL. Null when none.</summary>
+    string? PhotoUrl = null);
 
 /// <summary>
 /// A business as either its owner or a directory viewer sees it.
@@ -26,4 +29,10 @@ public sealed record BusinessResponse(
     bool IsActive,
     IReadOnlyList<ProductResponse> Products,
     DateTimeOffset CreatedAt,
-    DateTimeOffset? UpdatedAt);
+    DateTimeOffset? UpdatedAt,
+
+    /// <summary>The street line, in the owner's words. The city or village and locality are the ids above.</summary>
+    string? AddressLine = null,
+
+    /// <summary>Where to fetch the business's photo, versioned like a product's. Null when none.</summary>
+    string? PhotoUrl = null);

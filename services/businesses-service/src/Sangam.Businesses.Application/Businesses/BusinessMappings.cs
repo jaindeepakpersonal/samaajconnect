@@ -4,8 +4,9 @@ namespace Sangam.Businesses.Application.Businesses;
 
 public static class BusinessMappings
 {
-    public static ProductResponse ToResponse(this Product product) =>
-        new(product.Id, product.Name, product.Description, product.PriceInPaise, product.IsAvailable);
+    public static ProductResponse ToResponse(this Product product, Guid businessId) =>
+        new(product.Id, product.Name, product.Description, product.PriceInPaise, product.IsAvailable,
+            product.PhotoId is { } photoId ? $"/v1/businesses/{businessId}/products/{product.Id}/photo?v={photoId:N}" : null);
 
     /// <summary>
     /// <paramref name="onlyAvailableProducts"/> is true for anyone but the
@@ -25,7 +26,9 @@ public static class BusinessMappings
         business.IsActive,
         [.. business.Products
             .Where(p => !onlyAvailableProducts || p.IsAvailable)
-            .Select(p => p.ToResponse())],
+            .Select(p => p.ToResponse(business.Id))],
         business.CreatedAt,
-        business.UpdatedAt);
+        business.UpdatedAt,
+        business.AddressLine,
+        business.PhotoId is { } photoId ? $"/v1/businesses/{business.Id}/photo?v={photoId:N}" : null);
 }

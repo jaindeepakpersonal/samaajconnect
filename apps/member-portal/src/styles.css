@@ -522,3 +522,28 @@ main:focus {
     scroll-behavior: auto !important;
   }
 }
+
+/* A form over the page: the backdrop, and a card that scrolls inside the
+   viewport rather than past it. The admin panel's, copied when the member
+   portal's first popups arrived (Manage business, 2026-10-24) - the two apps
+   share no stylesheet. Escape and the backdrop click are each screen's own. */
+.modal-backdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(23, 32, 42, 0.5);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: var(--space-4);
+  z-index: 200;
+}
+
+.modal-dialog {
+  width: 100%;
+  max-height: 90vh;
+  overflow-y: auto;
+}
+
+.modal-card {
+  max-width: 640px;
+}

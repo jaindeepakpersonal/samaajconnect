@@ -52,6 +52,33 @@ export class BusinessesApi {
     );
   }
 
+  /**
+   * The business's photo, replacing any. Multipart with no Content-Type set by
+   * hand, so the browser writes the boundary; the service reads the format out
+   * of the bytes. Answers the whole business.
+   */
+  uploadPhoto(businessId: string, file: File): Observable<Business> {
+    return this.http.post<Business>(`/v1/businesses/mine/${businessId}/photo`, imageBody(file));
+  }
+
+  /** Takes the business's photo down. Doing it twice is success. */
+  removePhoto(businessId: string): Observable<Business> {
+    return this.http.delete<Business>(`/v1/businesses/mine/${businessId}/photo`);
+  }
+
+  /** A product's image, replacing any. Answers the whole business. */
+  uploadProductPhoto(businessId: string, productId: string, file: File): Observable<Business> {
+    return this.http.post<Business>(
+      `/v1/businesses/mine/${businessId}/products/${productId}/photo`,
+      imageBody(file),
+    );
+  }
+
+  /** Takes a product's image down. Doing it twice is success. */
+  removeProductPhoto(businessId: string, productId: string): Observable<Business> {
+    return this.http.delete<Business>(`/v1/businesses/mine/${businessId}/products/${productId}/photo`);
+  }
+
   search(filters: DirectoryFilters): Observable<Business[]> {
     let params = new HttpParams();
 
@@ -101,4 +128,12 @@ export class BusinessesApi {
   cancelOrder(orderId: string): Observable<Order> {
     return this.http.post<Order>(`/v1/businesses/orders/${orderId}/cancel`, {});
   }
+}
+
+/** One image as the single file part the photo endpoints read. */
+function imageBody(file: File): FormData {
+  const body = new FormData();
+  body.append('file', file);
+
+  return body;
 }

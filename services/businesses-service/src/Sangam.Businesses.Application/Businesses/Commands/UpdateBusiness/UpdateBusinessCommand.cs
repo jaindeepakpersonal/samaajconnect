@@ -21,7 +21,8 @@ public sealed record UpdateBusinessCommand(
     string? LocalityId,
     string? Description,
     string? ContactPhone,
-    string? ContactEmail) : ICommand<BusinessResponse>;
+    string? ContactEmail,
+    string? AddressLine = null) : ICommand<BusinessResponse>;
 
 public sealed class UpdateBusinessCommandValidator : AbstractValidator<UpdateBusinessCommand>
 {
@@ -34,6 +35,7 @@ public sealed class UpdateBusinessCommandValidator : AbstractValidator<UpdateBus
         RuleFor(x => x.CityId).Must(CreateBusinessCommandValidator.BeNullOrAGuid).WithMessage("City is not valid.");
         RuleFor(x => x.LocalityId).Must(CreateBusinessCommandValidator.BeNullOrAGuid).WithMessage("Locality is not valid.");
         RuleFor(x => x.Description).MaximumLength(1000);
+        RuleFor(x => x.AddressLine).MaximumLength(300);
         RuleFor(x => x.ContactPhone).MaximumLength(20);
         RuleFor(x => x.ContactEmail).MaximumLength(200).EmailAddress()
             .When(x => !string.IsNullOrWhiteSpace(x.ContactEmail));
@@ -75,7 +77,8 @@ public sealed class UpdateBusinessCommandHandler(
             ParseGuid(command.LocalityId),
             command.Description,
             command.ContactPhone,
-            command.ContactEmail);
+            command.ContactEmail,
+            command.AddressLine);
 
         business.Update(fields, clock.UtcNow);
 

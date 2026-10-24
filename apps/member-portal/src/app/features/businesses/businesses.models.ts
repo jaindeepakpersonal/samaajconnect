@@ -12,6 +12,8 @@ export interface Product {
   readonly description: string | null;
   readonly priceInPaise: number;
   readonly isAvailable: boolean;
+  /** A path on this platform, fetched with the token (`scAuthedSrc`). Null when there is no image. */
+  readonly photoUrl: string | null;
 }
 
 /**
@@ -26,6 +28,10 @@ export interface Business {
   readonly categoryId: string;
   readonly cityId: string | null;
   readonly localityId: string | null;
+  /** The street line, in the owner's words - "Shop 4, Bapu Bazaar". */
+  readonly addressLine: string | null;
+  /** The business's photo, fetched with the token. Null when there is none. */
+  readonly photoUrl: string | null;
   readonly description: string | null;
   readonly contactPhone: string | null;
   readonly contactEmail: string | null;
@@ -41,6 +47,7 @@ export interface BusinessFields {
   categoryId: string;
   cityId: string | null;
   localityId: string | null;
+  addressLine: string | null;
   description: string | null;
   contactPhone: string | null;
   contactEmail: string | null;

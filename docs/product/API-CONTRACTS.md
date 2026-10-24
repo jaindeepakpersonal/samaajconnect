@@ -487,6 +487,12 @@ key of its own.
 | POST | `/mine/{businessId}/products` | role list above, owner only | Add a product |
 | PATCH | `/mine/{businessId}/products/{productId}` | role list above, owner only | Edit a product's name, description or price |
 | POST | `/mine/{businessId}/products/{productId}/availability` | role list above, owner only | Take a product off sale, or put it back. Never deletes |
+| POST | `/mine/{businessId}/photo` | role list above, owner only | Upload the business's photo (multipart, one file; JPEG/PNG/WebP read from the bytes, 2 MB). Replaces any. Answers the business |
+| DELETE | `/mine/{businessId}/photo` | role list above, owner only | Take the photo down. Twice is success |
+| POST | `/mine/{businessId}/products/{productId}/photo` | role list above, owner only | Upload a product's image, the same way |
+| DELETE | `/mine/{businessId}/products/{productId}/photo` | role list above, owner only | Take a product's image down. Twice is success |
+| GET | `/{businessId}/photo` | `Members.Read` | The photo bytes, for whoever may open the business. `Cache-Control: private` and an ETag |
+| GET | `/{businessId}/products/{productId}/photo` | `Members.Read` | A product's image - an off-sale product's only to its owner |
 | GET | `/` | `Members.Read` | The directory: active businesses in the caller's own Samaaj, filtered by category/location/term, capped at 50 |
 | GET | `/{businessId}` | `Members.Read` | One business's public detail. Every product to its owner, only available ones to anyone else. 404 if inactive-and-not-owner or in a different Samaaj |
 | POST | `/orders` | role list above | Place an order. 409 for an unavailable product, 400 for ordering your own business |
@@ -496,7 +502,9 @@ key of its own.
 | POST | `/orders/{id}/fulfill` | role list above, business owner only | Mark an accepted order fulfilled |
 | POST | `/orders/{id}/cancel` | role list above, buyer or owner | The buyer cancels while Pending; the owner cancels while Accepted |
 
-No photo endpoint — there is no file storage this service could use.
+A business and each product carry `photoUrl` - the GET above, with
+`?v={imageId}` so a replaced image is a new URL - and a business carries
+`addressLine` beside its `cityId`/`localityId` (2026-10-24).
 Directory search and every order are within the caller's own Samaaj only;
 there is no cross-tenant variant. An order's total is computed
 server-side from each product's price at placement time and never

@@ -29,10 +29,10 @@ before translating another screen.
 | Boli detail | `/boli/:id` | `#bolidetail` | built |
 | Boli occasion | `/boli/occasions/:id` | — | built; the wireframe's "View Occasion" had no screen behind it |
 | Notifications | `/notifications` | `#notifications` | built |
-| Businesses directory | `/businesses` | — | built; no wireframe covers a member marketplace |
-| Business detail | `/businesses/:id` | — | built. Products, contact info, and "Place an order" - hidden for the business's own owner |
-| My businesses | `/businesses/mine` | — | built. The caller's own businesses, plus a create form |
-| Manage business | `/businesses/mine/:id` | — | built. Edit fields, activate/deactivate, and product management |
+| Businesses directory | `/businesses` | — | built; no wireframe covers a member marketplace. Listings with the business's photo, category, where it is and who runs it; category, city and locality filters |
+| Business detail | `/businesses/:id` | — | built. A shop front - photo, where it is, the owner, call and email - then products as image tiles with Add and a stepper, beside "Your order" - hidden for the business's own owner |
+| My businesses | `/businesses/mine` | — | built. The caller's own businesses as tiles, plus a register form with the address, city/village and locality, and a photo |
+| Manage business | `/businesses/mine/:id` | — | built. Two tabs, Details and Products, with Edit details and Add/Edit product in popups; the photo, product images, activate/deactivate |
 | Orders | `/businesses/orders` | — | built. Placed/Received tabs |
 | Competitions | `/competitions` | — | built; no wireframe covers this new module. Browse, register, withdraw |
 | Competition detail | `/competitions/:id` | — | built. Rounds and entries, a judging section visible only to an assigned judge, and the published result |
@@ -815,6 +815,25 @@ product's price at the moment the order is placed, and the client's own
 figure is never sent. Placing an order also omits any product left at
 quantity zero, rather than sending a zero-quantity line for every product on
 the business.
+
+**Businesses have photos, product images and a place (2026-10-24).** Every
+picture is fetched with `scAuthedSrc` - the URLs carry the image's id, so a
+replaced one is a new URL. A photo is its own request after the business or
+product exists (the upload needs the id), and a failed upload leaves what was
+saved saved and says so. Where a business is reads "street line · Locality,
+City", resolved by `placeOf` against the City and Locality lists a screen loads
+once. The register and edit forms share `BusinessFieldsComponent`, a
+City/Village -> Locality cascade like My Profile's. Owners are resolved by
+`BusinessOwners` - one `MembersApi.get()` per distinct owner on screen,
+memoized for the session - and shown with their photo, linked to their profile,
+or "a member" when this reader may not see them. These are the member portal's
+first popups: `.modal-backdrop`/`.modal-dialog`/`.modal-card` are in
+`styles.css`, copied from the admin panel.
+
+**The business page's products read like an online shop.** Tiles with the
+image, name and price, an Add button that becomes a − n + stepper, and a "Your
+order" panel beside them (below on a phone) with each line, the total and
+Place order.
 
 **The order form is simply absent from a business's own public page, for
 its own owner.** businesses-service refuses ordering from your own

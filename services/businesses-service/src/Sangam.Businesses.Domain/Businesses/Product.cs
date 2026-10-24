@@ -20,6 +20,9 @@ public sealed class Product
     /// <summary>True from creation; the owner toggles rather than deleting, so past orders still name a real product.</summary>
     public bool IsAvailable { get; private set; }
 
+    /// <summary>The product's image, a <c>BusinessImage</c> of its business. Null when none.</summary>
+    public Guid? PhotoId { get; private set; }
+
     public DateTimeOffset CreatedAt { get; private set; }
 
     public DateTimeOffset? UpdatedAt { get; private set; }
@@ -44,4 +47,14 @@ public sealed class Product
     }
 
     internal void SetAvailability(bool available) => IsAvailable = available;
+
+    /// <summary>Points at an image, or none, and answers the one it replaces.</summary>
+    internal Guid? SetPhoto(Guid? photoId)
+    {
+        var previous = PhotoId;
+
+        PhotoId = photoId;
+
+        return previous;
+    }
 }

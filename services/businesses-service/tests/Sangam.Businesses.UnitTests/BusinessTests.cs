@@ -85,4 +85,48 @@ public sealed class BusinessTests
         changed.Should().BeTrue();
         business.FindProduct(product.Id)!.IsAvailable.Should().BeFalse();
     }
+
+    [Fact]
+    public void A_blank_address_line_is_none()
+    {
+        var business = Business.Create(TenantId, OwnerMemberId, Fields() with { AddressLine = "  Shop 4, Bapu Bazaar " }, Now);
+        business.AddressLine.Should().Be("Shop 4, Bapu Bazaar");
+
+        business.Update(Fields() with { AddressLine = "   " }, Now);
+        business.AddressLine.Should().BeNull();
+    }
+
+    [Fact]
+    public void Setting_a_photo_answers_the_one_it_replaces()
+    {
+        var business = Business.Create(TenantId, OwnerMemberId, Fields(), Now);
+        var (first, second) = (Guid.NewGuid(), Guid.NewGuid());
+
+        business.SetPhoto(first, Now).Should().BeNull();
+        business.SetPhoto(second, Now).Should().Be(first, "the caller removes it");
+        business.PhotoId.Should().Be(second);
+
+        business.RemovePhoto(Now).Should().Be(second);
+        business.RemovePhoto(Now).Should().BeNull("there is nothing left to remove");
+    }
+
+    [Fact]
+    public void A_product_image_is_set_and_removed_on_that_product_only()
+    {
+        var business = Business.Create(TenantId, OwnerMemberId, Fields(), Now);
+        var product = business.AddProduct("Kaju Katli", null, 45000, Now);
+        var other = business.AddProduct("Besan Ladoo", null, 30000, Now);
+        var image = Guid.NewGuid();
+
+        business.SetProductPhoto(product.Id, image, Now, out var previous).Should().BeTrue();
+        previous.Should().BeNull();
+        business.FindProduct(product.Id)!.PhotoId.Should().Be(image);
+        business.FindProduct(other.Id)!.PhotoId.Should().BeNull();
+
+        business.SetProductPhoto(Guid.NewGuid(), image, Now, out _).Should().BeFalse("there is no such product");
+
+        business.RemoveProductPhoto(product.Id, Now, out var removed).Should().BeTrue();
+        removed.Should().Be(image);
+        business.FindProduct(product.Id)!.PhotoId.Should().BeNull();
+    }
 }

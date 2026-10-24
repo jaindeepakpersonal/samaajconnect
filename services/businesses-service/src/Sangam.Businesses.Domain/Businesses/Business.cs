@@ -26,6 +26,16 @@ public sealed class Business : AggregateRoot, ITenantScopedEntity
 
     public Guid? LocalityId { get; private set; }
 
+    /// <summary>
+    /// Where the shop is, in the owner's own words - "Shop 4, Bapu Bazaar". The
+    /// city or village and the locality are the master-data picks beside it;
+    /// this is the line a customer walks to.
+    /// </summary>
+    public string? AddressLine { get; private set; }
+
+    /// <summary>The business's photo, a <see cref="Media.BusinessImage"/>. Null when none.</summary>
+    public Guid? PhotoId { get; private set; }
+
     public string? Description { get; private set; }
 
     /// <summary>
@@ -131,12 +141,80 @@ public sealed class Business : AggregateRoot, ITenantScopedEntity
 
     public Product? FindProduct(Guid productId) => _products.FirstOrDefault(p => p.Id == productId);
 
+    /// <summary>Points at a new photo and answers the one it replaces, for the caller to remove.</summary>
+    public Guid? SetPhoto(Guid photoId, DateTimeOffset now)
+    {
+        var previous = PhotoId;
+
+        PhotoId = photoId;
+        UpdatedAt = now;
+
+        return previous;
+    }
+
+    /// <summary>Takes the photo down and answers its id, or null when there was none.</summary>
+    public Guid? RemovePhoto(DateTimeOffset now)
+    {
+        var previous = PhotoId;
+
+        if (previous is not null)
+        {
+            PhotoId = null;
+            UpdatedAt = now;
+        }
+
+        return previous;
+    }
+
+    /// <summary>
+    /// Points a product at a new image. False when there is no such product;
+    /// otherwise <paramref name="previous"/> is the image it replaces, for the
+    /// caller to remove.
+    /// </summary>
+    public bool SetProductPhoto(Guid productId, Guid photoId, DateTimeOffset now, out Guid? previous)
+    {
+        var product = _products.FirstOrDefault(p => p.Id == productId);
+
+        if (product is null)
+        {
+            previous = null;
+            return false;
+        }
+
+        previous = product.SetPhoto(photoId);
+        UpdatedAt = now;
+
+        return true;
+    }
+
+    /// <summary>Takes a product's image down. False when there is no such product.</summary>
+    public bool RemoveProductPhoto(Guid productId, DateTimeOffset now, out Guid? previous)
+    {
+        var product = _products.FirstOrDefault(p => p.Id == productId);
+
+        if (product is null)
+        {
+            previous = null;
+            return false;
+        }
+
+        previous = product.SetPhoto(null);
+
+        if (previous is not null)
+        {
+            UpdatedAt = now;
+        }
+
+        return true;
+    }
+
     private void ApplyFields(BusinessFields fields)
     {
         Name = fields.Name.Trim();
         CategoryId = fields.CategoryId;
         CityId = fields.CityId;
         LocalityId = fields.LocalityId;
+        AddressLine = Normalize(fields.AddressLine);
         Description = Normalize(fields.Description);
         ContactPhone = Normalize(fields.ContactPhone);
         ContactEmail = Normalize(fields.ContactEmail);
@@ -154,4 +232,5 @@ public sealed record BusinessFields(
     Guid? LocalityId,
     string? Description,
     string? ContactPhone,
-    string? ContactEmail);
+    string? ContactEmail,
+    string? AddressLine = null);

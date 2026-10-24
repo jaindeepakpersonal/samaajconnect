@@ -48,6 +48,7 @@ app.MapGet("/health", () => Results.Ok(new { status = "healthy" }))
     .ExcludeFromDescription();
 
 app.MapBusinessEndpoints();
+app.MapBusinessPhotoEndpoints();
 app.MapOrderEndpoints();
 
 await app.RunAsync();

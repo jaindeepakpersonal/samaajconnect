@@ -22,7 +22,8 @@ public sealed record CreateBusinessCommand(
     string? LocalityId,
     string? Description,
     string? ContactPhone,
-    string? ContactEmail) : ICommand<BusinessResponse>;
+    string? ContactEmail,
+    string? AddressLine = null) : ICommand<BusinessResponse>;
 
 public sealed class CreateBusinessCommandValidator : AbstractValidator<CreateBusinessCommand>
 {
@@ -33,6 +34,7 @@ public sealed class CreateBusinessCommandValidator : AbstractValidator<CreateBus
         RuleFor(x => x.CityId).Must(BeNullOrAGuid).WithMessage("City is not valid.");
         RuleFor(x => x.LocalityId).Must(BeNullOrAGuid).WithMessage("Locality is not valid.");
         RuleFor(x => x.Description).MaximumLength(1000);
+        RuleFor(x => x.AddressLine).MaximumLength(300);
         RuleFor(x => x.ContactPhone).MaximumLength(20);
         RuleFor(x => x.ContactEmail).MaximumLength(200).EmailAddress()
             .When(x => !string.IsNullOrWhiteSpace(x.ContactEmail));
@@ -72,7 +74,8 @@ public sealed class CreateBusinessCommandHandler(
             ParseGuid(command.LocalityId),
             command.Description,
             command.ContactPhone,
-            command.ContactEmail);
+            command.ContactEmail,
+            command.AddressLine);
 
         var now = clock.UtcNow;
         var business = Business.Create(tenantId, memberId, fields, now);

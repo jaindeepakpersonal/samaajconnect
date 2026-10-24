@@ -81,7 +81,7 @@ public sealed class BusinessesApiFactory : WebApplicationFactory<Program>, IAsyn
         var dbContext = scope.ServiceProvider.GetRequiredService<BusinessesDbContext>();
 
         await dbContext.Database.ExecuteSqlRawAsync(
-            "TRUNCATE TABLE order_items, orders, business_products, businesses, outbox_messages RESTART IDENTITY CASCADE;");
+            "TRUNCATE TABLE order_items, orders, business_images, business_products, businesses, outbox_messages RESTART IDENTITY CASCADE;");
     }
 
     public async Task<T> WithDbContextAsync<T>(Func<BusinessesDbContext, Task<T>> action)

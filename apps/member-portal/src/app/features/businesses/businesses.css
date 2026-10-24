@@ -54,19 +54,6 @@
   margin-bottom: var(--space-4);
 }
 
-.product-row {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  gap: var(--space-3);
-  padding: var(--space-2) 0;
-  border-bottom: 1px solid var(--line);
-}
-
-.product-row:last-child {
-  border-bottom: none;
-}
-
 .tabs {
   display: flex;
   flex-wrap: wrap;
@@ -98,8 +85,318 @@
   color: var(--ink);
 }
 
-/* A quantity box is a few digits wide. A class rather than an inline style
-   attribute, which the content security policy does not allow. */
-.qty-input {
-  width: 70px;
+.section-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: var(--space-3);
+  flex-wrap: wrap;
+}
+
+.section-head h2 {
+  margin: 0;
+}
+
+.section-heading {
+  margin: 0 0 var(--space-3);
+}
+
+/* ---- A business as a listing: the directory and My businesses ---------- */
+
+.biz-grid {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+  gap: var(--space-4);
+}
+
+.biz-card {
+  padding: 0;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+}
+
+.biz-cover-link {
+  display: block;
+}
+
+/* A photo, or the business's initials on the accent wash where there is none -
+   the same fallback a member with no photo gets. */
+.biz-cover {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  aspect-ratio: 16 / 9;
+  object-fit: cover;
+  background: var(--soft);
+}
+
+.biz-cover.placeholder,
+.biz-hero-photo.placeholder,
+.product-image.placeholder {
+  background: linear-gradient(135deg, var(--accent), var(--soft));
+  color: #ffffff;
+  font-weight: 700;
+  font-size: 28px;
+  letter-spacing: 1px;
+}
+
+.biz-body {
+  padding: var(--space-4);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  flex: 1;
+}
+
+.biz-name {
+  margin: 0;
+}
+
+.biz-name a {
+  color: inherit;
+  text-decoration: none;
+}
+
+.biz-name a:hover {
+  text-decoration: underline;
+}
+
+.biz-place {
+  margin: 0;
+  color: var(--muted);
+}
+
+/* Three lines of a description, so one long one cannot stretch its row. */
+.biz-description {
+  margin: 0;
+  display: -webkit-box;
+  -webkit-line-clamp: 3;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+.owner-chip {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  margin-top: auto;
+}
+
+.owner-avatar {
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  object-fit: cover;
+  flex-shrink: 0;
+  background: var(--soft);
+}
+
+.owner-avatar.initials {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--accent-ink);
+  font-size: 12px;
+  font-weight: 700;
+}
+
+/* ---- A business's own page: the shop front ----------------------------- */
+
+.biz-hero {
+  padding: 0;
+  overflow: hidden;
+  margin-top: var(--space-3);
+}
+
+.biz-hero-photo {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  height: 240px;
+  object-fit: cover;
+  background: var(--soft);
+}
+
+.biz-hero-body {
+  padding: var(--space-4) var(--space-5) var(--space-5);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  align-items: flex-start;
+}
+
+.biz-hero-body .page-title {
+  margin: 0;
+}
+
+.biz-contact {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-3);
+  margin-top: var(--space-2);
+}
+
+/* The products beside "Your order", which stays in view while the list scrolls. */
+.shop {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 300px;
+  gap: var(--space-5);
+  align-items: start;
+  margin-top: var(--space-5);
+}
+
+.shop.no-cart {
+  grid-template-columns: minmax(0, 1fr);
+}
+
+.cart {
+  position: sticky;
+  top: var(--space-4);
+}
+
+.cart h2 {
+  margin-top: 0;
+}
+
+.cart-lines {
+  list-style: none;
+  margin: 0 0 var(--space-3);
+  padding: 0;
+}
+
+.cart-lines li,
+.cart-total {
+  display: flex;
+  justify-content: space-between;
+  gap: var(--space-3);
+}
+
+.cart-lines li {
+  padding: var(--space-1) 0;
+  border-bottom: 1px solid var(--line);
+}
+
+.cart-total {
+  font-size: 16px;
+  margin: var(--space-2) 0 var(--space-3);
+}
+
+.cart-place {
+  width: 100%;
+  margin-top: var(--space-3);
+}
+
+.product-grid {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(190px, 1fr));
+  gap: var(--space-4);
+}
+
+.product-card {
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-md);
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+}
+
+.product-card.off-sale .product-image {
+  opacity: 0.5;
+}
+
+.product-image {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  aspect-ratio: 1 / 1;
+  object-fit: cover;
+  background: var(--soft);
+}
+
+.product-body {
+  padding: var(--space-3);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  flex: 1;
+}
+
+.product-name {
+  margin: 0;
+  font-size: 15px;
+}
+
+.product-description {
+  margin: 0;
+  color: var(--muted);
+  font-size: 13px;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+.price {
+  margin: var(--space-1) 0;
+  font-size: 18px;
+  font-weight: 700;
+}
+
+.add-btn {
+  margin-top: auto;
+  width: 100%;
+}
+
+.stepper {
+  margin-top: auto;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-2);
+}
+
+.stepper-count {
+  font-weight: 700;
+  min-width: 2ch;
+  text-align: center;
+}
+
+/* The image a product has now, in its edit popup. */
+.product-thumb {
+  display: block;
+  width: 96px;
+  height: 96px;
+  object-fit: cover;
+  border-radius: var(--radius-sm);
+  margin: var(--space-2) 0;
+}
+
+@media (max-width: 860px) {
+  .shop {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .cart {
+    position: static;
+  }
+
+  .biz-hero-photo {
+    height: 160px;
+  }
+
+  .biz-hero-body {
+    padding: var(--space-3) var(--space-4) var(--space-4);
+  }
 }
