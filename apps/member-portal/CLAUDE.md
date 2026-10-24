@@ -18,7 +18,7 @@ before translating another screen.
 | Social Issues | `/issues` | `#issues` | built |
 | Issue detail | `/issues/:id` | — | built; no wireframe covers it, and the workflow is unusable without one |
 | Members | `/members` | `#members` | built |
-| Member detail | `/members/:id` | `#memberdetail` | built |
+| Member detail | `/members/:id` | `#memberdetail` | built - a profile page: cover, photo, name with Gautra, details, and Family (father, mother, household) and Volunteer groups cards |
 | My Family | `/family` | `#family` + `#children` | built as one screen |
 | Celebrities of Samaaj | `/voting` | `#celebrity` | built |
 | Campaign detail | `/voting/:id` | `#celebrity` + `#celebrityresults` | built as one screen |
@@ -43,7 +43,7 @@ before translating another screen.
 | Pathshala events | — | `#pathevents` | not built — no endpoint exists |
 | Set your password | `/activate` | — | built; no wireframe covers redeeming an activation code, and three admin screens told people to do it here |
 | Forgot password | `/forgot`, `/reset` | `#forgot`, `#otp` | built — redeems into a new password, not a session |
-| My Profile | `/profile` | `#profile` | built — five tabs (Basic, Professional, Educational, Address, Photo) since 2026-09-12, see below |
+| My Profile | `/profile` | `#profile` | built — a profile page in view mode since 2026-10-24; Edit profile opens the five tabs (Basic, Professional, Educational, Address, Photo), see below |
 | Change your password | `/change-password` | — | built; no wireframe covers it. Its own screen now, reachable from the top bar's user menu, not a card on My Profile |
 
 ## Where things live

@@ -236,3 +236,30 @@ export const PrivacyLabels: Readonly<Record<PrivacyLevel, string>> = {
   SamaajOnly: 'Anyone in my Samaaj',
   Public: 'Anyone at all',
 };
+
+/** Mirrors `MemberHouseholdResponse`: null when the member is in no household. */
+export interface MemberHousehold {
+  readonly household: Household | null;
+}
+
+export interface Household {
+  readonly familyId: string;
+
+  /** The head's name, or the admin's while there is none - null when this viewer may not see them. */
+  readonly namedAfter: string | null;
+  readonly members: readonly HouseholdPerson[];
+}
+
+/**
+ * One person in a household. `relationshipToAdmin` is how they joined -
+ * Spouse, Parent, Child, Sibling, Other - relative to the household's admin,
+ * and null for the admin themself.
+ */
+export interface HouseholdPerson {
+  readonly memberId: string;
+  readonly fullName: string;
+  readonly photoUrl: string | null;
+  readonly relationshipToAdmin: string | null;
+  readonly isHead: boolean;
+  readonly isAdmin: boolean;
+}

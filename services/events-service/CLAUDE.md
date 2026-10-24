@@ -15,6 +15,7 @@ button on a full event, and both are real states rather than labels.
 |---|---|---|
 | `SamaajEvent` | built | Tenant-scoped. Named this, not `Event`, because `event` is a C# keyword and `Event` beside `IDomainEvent` reads as the wrong thing. Carries an optional `EventTypeId` (a master-data-service `LookupItem`, `Category == EventType`) as of 2026-09-12 - see below. |
 | `EventRegistration` | built | A place, or a place in the queue for one. |
+| `EventPhoto` | built | The event's cover photo, hosted here like a group's. Tenant-scoped; type sniffed from the bytes. |
 | `EventScheduleItem` | built | One programme on the event's schedule: a date, a name, a start and an optional end time. Owned by `SamaajEvent`. See "The schedule" below. |
 
 ## Commands
@@ -28,6 +29,8 @@ button on a full event, and both are real states rather than labels.
 | `AddEventScheduleItemCommand` | `Events.Publish`, an Area Admin only in their locality | built. Refused on a cancelled event |
 | `UpdateEventScheduleItemCommand` | `Events.Publish`, an Area Admin only in their locality | built |
 | `RemoveEventScheduleItemCommand` | `Events.Publish`, an Area Admin only in their locality | built |
+| `UploadEventPhotoCommand` | `Events.Publish`, an Area Admin only in their locality | built. Refused on a cancelled event; answers the whole event |
+| `RemoveEventPhotoCommand` | `Events.Publish`, an Area Admin only in their locality | built. Idempotent |
 | `RegisterForEventCommand` | `Members.Read` | built |
 | `CancelRegistrationCommand` | `Members.Read` | built |
 
@@ -38,6 +41,7 @@ button on a full event, and both are real states rather than labels.
 | `ListEventsQuery` | `Members.Read` | built |
 | `GetEventQuery` | `Members.Read` | built |
 | `GetAttendeesQuery` | `Events.Publish` | built |
+| `GetEventPhotoQuery` | `Members.Read` | built. A draft's photo only to whoever may see the draft |
 
 ## Events published
 
@@ -68,6 +72,9 @@ None. A leaf service, like the other two Phase 2 contexts.
 | POST | `/v1/events/{id}/schedule` | `Events.Publish` |
 | PUT | `/v1/events/{id}/schedule/{itemId}` | `Events.Publish` |
 | DELETE | `/v1/events/{id}/schedule/{itemId}` | `Events.Publish` |
+| POST | `/v1/events/{id}/photo` | `Events.Publish` |
+| GET | `/v1/events/{id}/photo` | `Members.Read` |
+| DELETE | `/v1/events/{id}/photo` | `Events.Publish` |
 | POST | `/v1/events/{id}/registration` | `Members.Read` |
 | DELETE | `/v1/events/{id}/registration` | `Members.Read` |
 | GET | `/health` | anonymous |
@@ -167,6 +174,23 @@ Admin only in their own locality, refused on a cancelled event - and raises
 event's own free text stays off its topics. At most
 `SamaajEvent.MaxScheduleItems` (100) per event: a schedule, not a log.
 `EventScheduleTests` (unit and integration) hold it.
+
+**A programme has to fall on one of its event's own days (2026-10-24).** On
+or after the day it starts and on or before the day it ends - its start day,
+when it has no end. `SamaajEvent.ScheduleDateFits` allows a day's slack either
+side, because a programme's date is on the clock where it happens and this
+service is not told that zone; the admin screen checks the exact local dates,
+and this is the bound nobody gets past through the API. A date outside answers
+400 on `date`.
+
+**An event has a cover photo (2026-10-24)**, hosted here exactly as
+volunteer-groups-service hosts a group's - `EventPhoto`, the fourth verbatim
+`ImageContent` copy that `scripts/security-invariants.sh` holds identical,
+JPEG/PNG/WebP read from the bytes, served `Cache-Control: private`. Setting it
+is editing the event (`Events.Publish`, own locality, not on a cancelled event)
+and raises `events.event.updated.v1`. **A draft's photo is as private as the
+draft**: `GetEventPhotoQuery` applies `GetEventQuery`'s own visibility rule, so a
+guessed id learns nothing from its picture. `EventPhotoTests` holds it.
 
 **Events carry ids and shape, never free text.** Title, description, venue and
 the cancellation reason all stay out of the published events —

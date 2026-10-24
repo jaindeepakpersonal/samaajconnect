@@ -5,6 +5,7 @@ using Sangam.MemberFamily.Application.Members;
 using Sangam.MemberFamily.Application.Members.Commands.CorrectMemberDetails;
 using Sangam.MemberFamily.Application.Members.Commands.UpdateProfile;
 using Sangam.MemberFamily.Application.Members.Queries.GetMember;
+using Sangam.MemberFamily.Application.Members.Queries.GetMemberHousehold;
 using Sangam.MemberFamily.Application.Members.Queries.GetMyData;
 using Sangam.MemberFamily.Application.Members.Queries.GetMyProfile;
 using Sangam.MemberFamily.Application.Members.Queries.GetRegistrationSummary;
@@ -88,6 +89,24 @@ public static class MemberEndpoints
                 "One member of this Samaaj, through the same per-field privacy mapper the "
                 + "directory uses.")
             .Produces<MemberResponse>()
+            .ProducesProblem(StatusCodes.Status403Forbidden)
+            .ProducesProblem(StatusCodes.Status404NotFound);
+
+        group.MapGet("/{id:guid}/household", async (
+                Guid id,
+                ISender sender,
+                CancellationToken cancellationToken) =>
+            {
+                var result = await sender.Send(new GetMemberHouseholdQuery(id), cancellationToken);
+
+                return result.ToApiResult();
+            })
+            .WithName("GetMemberHousehold")
+            .WithSummary(
+                "The household a member belongs to, as their profile page shows it: active members the "
+                + "viewer could find in the directory, never a child's record or the family code. "
+                + "A null household when they are in none.")
+            .Produces<MemberHouseholdResponse>()
             .ProducesProblem(StatusCodes.Status403Forbidden)
             .ProducesProblem(StatusCodes.Status404NotFound);
 

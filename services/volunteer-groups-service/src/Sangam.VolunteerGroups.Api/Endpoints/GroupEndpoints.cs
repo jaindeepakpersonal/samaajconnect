@@ -12,6 +12,7 @@ using Sangam.VolunteerGroups.Application.Groups.Commands.UpdateGroup;
 using Sangam.VolunteerGroups.Application.Groups.Queries.GetApplications;
 using Sangam.VolunteerGroups.Application.Groups.Queries.GetGroup;
 using Sangam.VolunteerGroups.Application.Groups.Queries.ListGroups;
+using Sangam.VolunteerGroups.Application.Groups.Queries.ListMemberGroups;
 
 namespace Sangam.VolunteerGroups.Api.Endpoints;
 
@@ -39,6 +40,22 @@ public static class GroupEndpoints
             .WithSummary("This Samaaj's volunteer groups, each with the asking member's standing.")
             .Produces<IReadOnlyList<GroupResponse>>()
             .ProducesValidationProblem()
+            .ProducesProblem(StatusCodes.Status401Unauthorized)
+            .ProducesProblem(StatusCodes.Status403Forbidden);
+
+        group.MapGet("/members/{memberId:guid}/groups", async (
+                Guid memberId,
+                ISender sender,
+                CancellationToken cancellationToken) =>
+            {
+                var result = await sender.Send(new ListMemberGroupsQuery(memberId), cancellationToken);
+
+                return result.ToApiResult();
+            })
+            .RequireAuthorization()
+            .WithName("ListMemberGroups")
+            .WithSummary("The groups one member belongs to and the role they hold in each - for their profile page.")
+            .Produces<IReadOnlyList<MemberGroupResponse>>()
             .ProducesProblem(StatusCodes.Status401Unauthorized)
             .ProducesProblem(StatusCodes.Status403Forbidden);
 

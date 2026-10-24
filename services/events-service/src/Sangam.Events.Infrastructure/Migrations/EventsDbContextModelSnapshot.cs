@@ -154,6 +154,10 @@ namespace Sangam.Events.Infrastructure.Migrations
                         .HasColumnType("character varying(20)")
                         .HasColumnName("organizer_type");
 
+                    b.Property<Guid?>("PhotoId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("photo_id");
+
                     b.Property<DateTimeOffset?>("PublishedAt")
                         .HasColumnType("timestamp with time zone")
                         .HasColumnName("published_at");
@@ -197,6 +201,61 @@ namespace Sangam.Events.Infrastructure.Migrations
                         .HasDatabaseName("ix_events_tenant_id_status_start_at");
 
                     b.ToTable("events", (string)null);
+                });
+
+            modelBuilder.Entity("Sangam.Events.Domain.Media.EventPhoto", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<int>("ByteSize")
+                        .HasColumnType("integer")
+                        .HasColumnName("byte_size");
+
+                    b.Property<byte[]>("Bytes")
+                        .IsRequired()
+                        .HasColumnType("bytea")
+                        .HasColumnName("bytes");
+
+                    b.Property<string>("ContentHash")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)")
+                        .HasColumnName("content_hash");
+
+                    b.Property<string>("ContentType")
+                        .IsRequired()
+                        .HasMaxLength(50)
+                        .HasColumnType("character varying(50)")
+                        .HasColumnName("content_type");
+
+                    b.Property<Guid>("EventId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("event_id");
+
+                    b.Property<Guid>("TenantId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("tenant_id");
+
+                    b.Property<DateTimeOffset>("UploadedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("uploaded_at");
+
+                    b.Property<Guid>("UploadedBy")
+                        .HasColumnType("uuid")
+                        .HasColumnName("uploaded_by");
+
+                    b.HasKey("Id")
+                        .HasName("pk_event_photos");
+
+                    b.HasIndex("EventId")
+                        .HasDatabaseName("ix_event_photos_event_id");
+
+                    b.HasIndex("TenantId", "EventId")
+                        .HasDatabaseName("ix_event_photos_tenant_id_event_id");
+
+                    b.ToTable("event_photos", (string)null);
                 });
 
             modelBuilder.Entity("Sangam.Events.Infrastructure.Persistence.OutboxMessage", b =>
@@ -272,6 +331,16 @@ namespace Sangam.Events.Infrastructure.Migrations
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired()
                         .HasConstraintName("fk_event_schedule_items_events_event_id");
+                });
+
+            modelBuilder.Entity("Sangam.Events.Domain.Media.EventPhoto", b =>
+                {
+                    b.HasOne("Sangam.Events.Domain.Events.SamaajEvent", null)
+                        .WithMany()
+                        .HasForeignKey("EventId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired()
+                        .HasConstraintName("fk_event_photos_events_event_id");
                 });
 
             modelBuilder.Entity("Sangam.Events.Domain.Events.SamaajEvent", b =>

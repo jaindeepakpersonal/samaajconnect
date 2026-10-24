@@ -2,6 +2,7 @@ using System.Net.Http.Json;
 using System.Text.Json;
 using FluentAssertions;
 using Microsoft.Extensions.DependencyInjection;
+using Sangam.MemberFamily.Domain.Children;
 using Sangam.MemberFamily.Domain.Families;
 using Sangam.MemberFamily.Domain.Members;
 using Sangam.MemberFamily.Infrastructure.Persistence;
@@ -74,6 +75,13 @@ public sealed class DirectoryCardTests(MemberFamilyApiFactory factory)
         }
 
         db.Families.Add(family);
+
+        // A minor's record in the same household - held on Mahesh's consent,
+        // and never something a member page may show.
+        db.ChildProfiles.Add(ChildProfile.Create(
+            Tenant, family.Id, "Anaya Jain", DateOnly.FromDateTime(DateTime.UtcNow).AddYears(-9),
+            Gender.Female, Mahesh, now));
+
         await db.SaveChangesAsync();
     }
 
@@ -194,5 +202,61 @@ public sealed class DirectoryCardTests(MemberFamilyApiFactory factory)
 
         first.Should().Equal("Kavita Mehta");
         second.Should().Equal("Mahesh Jain");
+    }
+
+    // ---- One member's page ---------------------------------------------------
+
+    [Fact]
+    public async Task A_member_page_names_the_parents_by_the_directory_rules()
+    {
+        var asMember = await Member().GetFromJsonAsync<JsonElement>($"/v1/members/{Rahul}");
+        asMember.GetProperty("fatherName").GetString().Should().Be("Mahesh Jain");
+        asMember.GetProperty("motherName").ValueKind.Should().Be(JsonValueKind.Null, "Sunita is unlisted");
+
+        var asAdmin = await Admin().GetFromJsonAsync<JsonElement>($"/v1/members/{Rahul}");
+        asAdmin.GetProperty("motherName").GetString().Should().Be("Sunita Jain");
+    }
+
+    [Fact]
+    public async Task The_household_shows_listed_members_and_never_a_childs_record()
+    {
+        var household = (await Member().GetFromJsonAsync<JsonElement>($"/v1/members/{Rahul}/household"))
+            .GetProperty("household");
+
+        household.GetProperty("namedAfter").GetString().Should().Be("Mahesh Jain", "the admin, while it has no head");
+
+        var people = household.GetProperty("members").EnumerateArray().ToList();
+        people.Select(p => p.GetProperty("fullName").GetString())
+            .Should().BeEquivalentTo(["Mahesh Jain", "Rahul Jain"], "Sunita is unlisted, and Anaya is a child");
+
+        var mahesh = people.Single(p => p.GetProperty("memberId").GetGuid() == Mahesh);
+        mahesh.GetProperty("isAdmin").GetBoolean().Should().BeTrue();
+        mahesh.GetProperty("relationshipToAdmin").ValueKind.Should().Be(JsonValueKind.Null);
+
+        people.Single(p => p.GetProperty("memberId").GetGuid() == Rahul)
+            .GetProperty("relationshipToAdmin").GetString().Should().Be("Child");
+
+        household.GetRawText().Should().NotContain("Anaya").And.NotContain("familyCode");
+    }
+
+    [Fact]
+    public async Task An_administrator_sees_the_whole_household_but_still_no_child()
+    {
+        var people = (await Admin().GetFromJsonAsync<JsonElement>($"/v1/members/{Mahesh}/household"))
+            .GetProperty("household").GetProperty("members").EnumerateArray()
+            .Select(p => p.GetProperty("fullName").GetString());
+
+        people.Should().BeEquivalentTo(["Mahesh Jain", "Sunita Jain", "Rahul Jain"]);
+    }
+
+    [Fact]
+    public async Task A_member_in_no_household_has_a_null_household_and_another_Samaaj_none_at_all()
+    {
+        var none = await Member().GetFromJsonAsync<JsonElement>($"/v1/members/{Kavita}/household");
+        none.GetProperty("household").ValueKind.Should().Be(JsonValueKind.Null);
+
+        var stranger = factory.CreateClientAs(Guid.NewGuid(), Guid.NewGuid(), ["Member"], ["Members.Read"]);
+        (await stranger.GetAsync($"/v1/members/{Rahul}/household")).StatusCode
+            .Should().Be(System.Net.HttpStatusCode.NotFound);
     }
 }

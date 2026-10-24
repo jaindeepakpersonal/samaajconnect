@@ -4,6 +4,7 @@ using Microsoft.EntityFrameworkCore;
 using Sangam.Events.Application.Abstractions;
 using Sangam.Events.Domain.Common;
 using Sangam.Events.Domain.Events;
+using Sangam.Events.Domain.Media;
 
 namespace Sangam.Events.Infrastructure.Persistence;
 
@@ -17,6 +18,8 @@ public sealed class EventsDbContext(
     public DbSet<SamaajEvent> Events => Set<SamaajEvent>();
 
     public DbSet<EventRegistration> Registrations => Set<EventRegistration>();
+
+    public DbSet<EventPhoto> EventPhotos => Set<EventPhoto>();
 
     public DbSet<OutboxMessage> OutboxMessages => Set<OutboxMessage>();
 

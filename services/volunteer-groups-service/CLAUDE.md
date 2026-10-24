@@ -52,6 +52,7 @@ module off takes both away.
 | Query | Policy | Status |
 |---|---|---|
 | `ListGroupsQuery` | `Members.Read` | built |
+| `ListMemberGroupsQuery` | `Members.Read` | built. The groups one member belongs to and their role in each, for their profile page - never what they only applied to |
 | `GetGroupQuery` | `Members.Read` | built |
 | `GetGroupPhotoQuery` | `Members.Read` | built. Bytes, `Cache-Control: private` |
 | `GetApplicationsQuery` | `VolunteerGroups.Lead` + is this group's president | built |
@@ -96,6 +97,7 @@ here and no Kafka in its integration tests.
 | Method | Path | Roles |
 |---|---|---|
 | GET | `/v1/volunteer-groups/groups` | `Members.Read` |
+| GET | `/v1/volunteer-groups/members/{memberId}/groups` | `Members.Read` |
 | POST | `/v1/volunteer-groups/groups` | `VolunteerGroups.Manage` |
 | GET | `/v1/volunteer-groups/groups/{id}` | `Members.Read` |
 | PATCH | `/v1/volunteer-groups/groups/{id}` | `VolunteerGroups.Manage` |

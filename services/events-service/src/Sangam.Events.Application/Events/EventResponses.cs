@@ -53,7 +53,13 @@ public sealed record EventResponse(
     /// last a day). Only the list and the detail read the clock to say so;
     /// anywhere else it is false.
     /// </summary>
-    bool IsHappeningNow = false);
+    bool IsHappeningNow = false,
+
+    /// <summary>
+    /// Where the event's cover photo is fetched from, with the token, or null
+    /// when it has none.
+    /// </summary>
+    string? PhotoUrl = null);
 
 /// <summary>One programme: a date, its name, and wall-clock times - EndTime is optional.</summary>
 public sealed record EventScheduleItemResponse(

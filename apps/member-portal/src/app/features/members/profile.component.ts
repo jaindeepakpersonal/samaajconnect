@@ -3,7 +3,9 @@ import { FormsModule } from '@angular/forms';
 import { RouterLink } from '@angular/router';
 import { AuthedImageDirective, describeError } from '@samaajconnect/shared';
 import { MasterDataApi } from './master-data.api';
+import { MemberCommunityComponent } from './member-community.component';
 import { MembersApi } from './members.api';
+import { ProfileHeaderComponent } from './profile-header.component';
 import { Address, City, Gautra, Gender, LookupItem, Locality, MyProfile, PrivacyLevel } from './members.models';
 
 /**
@@ -92,19 +94,10 @@ type ProfileTab = 'basic' | 'professional' | 'educational' | 'address' | 'photo'
 
 @Component({
   selector: 'app-profile',
-  imports: [AuthedImageDirective, FormsModule, RouterLink],
+  imports: [AuthedImageDirective, FormsModule, RouterLink, ProfileHeaderComponent, MemberCommunityComponent],
   styleUrl: './members.css',
   template: `
     <div class="members-page">
-      <header class="page-head">
-        <div>
-          <h1 class="page-title">My Profile</h1>
-          <p class="subtitle">
-            Your details, and who in your Samaaj can see each one.
-          </p>
-        </div>
-      </header>
-
       @if (error(); as message) {
         <p class="notice error" role="alert">{{ message }}</p>
       }
@@ -114,8 +107,60 @@ type ProfileTab = 'basic' | 'professional' | 'educational' | 'address' | 'photo'
       }
 
       @if (loading()) {
+        <h1 class="page-title">My Profile</h1>
         <p class="notice info" role="status">Loading your profile…</p>
       } @else if (profile(); as me) {
+        <app-profile-header
+          [name]="me.fullName"
+          [gautra]="nameOf(gautras(), me.gautraId)"
+          [photoUrl]="me.photoUrl"
+          [details]="headline(me)"
+        >
+          @if (!editing()) {
+            <button actions class="btn" type="button" (click)="startEditing()">Edit profile</button>
+          }
+        </app-profile-header>
+
+        @if (!editing()) {
+          <!-- View mode: what is on file, read-only, the way a member's page
+               reads to others - except that nothing here is hidden from you. -->
+          <div class="grid2">
+            <div class="card">
+              <h2>About</h2>
+              <dl class="profile">
+                <dt>Mobile</dt>
+                <dd>{{ me.mobile ?? notSet }}</dd>
+                <dt>Email</dt>
+                <dd>{{ me.email ?? notSet }}</dd>
+                <dt>Date of birth</dt>
+                <dd>{{ me.dateOfBirth ? day(me.dateOfBirth) : notSet }}</dd>
+                <dt>Gender</dt>
+                <dd>{{ genderLabel(me.gender) }}</dd>
+                <dt>Gautra</dt>
+                <dd>{{ nameOf(gautras(), me.gautraId) ?? notSet }}</dd>
+                <dt>Profession</dt>
+                <dd>{{ labelOf(professions(), me.professionId) ?? notSet }}</dd>
+                <dt>Qualification</dt>
+                <dd>{{ labelOf(qualifications(), me.qualificationId) ?? notSet }}</dd>
+              </dl>
+              <p class="small">
+                Who in your Samaaj sees each of these is set on
+                <a routerLink="/privacy">Privacy settings</a>.
+              </p>
+            </div>
+
+            <div class="card">
+              <h2>Address</h2>
+              <dl class="profile">
+                <dt>Permanent</dt>
+                <dd>{{ addressText(me.permanentAddress, permanentLocalities()) }}</dd>
+                <dt>Temporary</dt>
+                <dd>{{ me.temporaryAddress ? addressText(me.temporaryAddress, temporaryLocalities()) : notSet }}</dd>
+              </dl>
+            </div>
+          </div>
+
+        } @else {
         <div class="tabs" role="tablist" aria-label="Profile section">
           @for (tab of tabs; track tab.key) {
             <button
@@ -426,8 +471,18 @@ type ProfileTab = 'basic' | 'professional' | 'educational' | 'address' | 'photo'
             <button class="btn" type="submit" [disabled]="saving()">
               {{ saving() ? 'Saving…' : 'Save changes' }}
             </button>
+            <button class="btn secondary" type="button" [disabled]="saving()" (click)="cancelEditing()">
+              Cancel
+            </button>
           </div>
         </form>
+        }
+
+        <!-- Outside the edit switch, so it is created once and stays put while
+             the member edits rather than re-reading on every toggle. -->
+        <div class="grid2 community-grid">
+          <app-member-community [memberId]="me.id" />
+        </div>
       }
     </div>
   `,
@@ -445,6 +500,12 @@ export class ProfileComponent implements OnInit {
   ];
 
   readonly activeTab = signal<ProfileTab>('basic');
+
+  /** View mode until the member asks to edit - a profile is read far more often than changed. */
+  readonly editing = signal(false);
+
+  /** What an empty field reads as on your own profile - unlike someone else's, nothing is hidden from you. */
+  readonly notSet = 'Not set';
 
   readonly profile = signal<MyProfile | null>(null);
   readonly loading = signal(false);
@@ -630,6 +691,67 @@ export class ProfileComponent implements OnInit {
     }
   }
 
+  startEditing(): void {
+    this.saved.set(false);
+    this.error.set(null);
+    this.activeTab.set('basic');
+    this.editing.set(true);
+  }
+
+  /** Back to view mode, putting back what is on file - nothing typed survives a cancel. */
+  cancelEditing(): void {
+    const me = this.profile();
+
+    if (me !== null) {
+      this.fill(me);
+    }
+
+    this.attempted.set(false);
+    this.error.set(null);
+    this.editing.set(false);
+  }
+
+  /** The line under the name: profession and locality, when set. */
+  headline(me: MyProfile): string[] {
+    return [
+      this.labelOf(this.professions(), me.professionId),
+      this.nameOf(this.permanentLocalities(), me.permanentAddress.localityId),
+    ].filter((part): part is string => part !== null);
+  }
+
+  nameOf(list: readonly { id: string; name: string }[], id: string | null): string | null {
+    return id === null ? null : (list.find((item) => item.id === id)?.name ?? null);
+  }
+
+  labelOf(list: readonly LookupItem[], id: string | null): string | null {
+    return id === null ? null : (list.find((item) => item.id === id)?.label ?? null);
+  }
+
+  genderLabel(gender: Gender): string {
+    return this.genders.find((option) => option.value === gender)?.label ?? gender;
+  }
+
+  /** "12 Old Road, Hiran Magri, Udaipur" - whatever parts are set. */
+  addressText(address: Address, localities: readonly Locality[]): string {
+    const parts = [
+      address.line,
+      this.nameOf(localities, address.localityId),
+      this.nameOf(this.cities(), address.cityId),
+    ].filter((part): part is string => typeof part === 'string' && part.trim().length > 0);
+
+    return parts.length === 0 ? this.notSet : parts.join(', ');
+  }
+
+  day(iso: string): string {
+    const [year = 1970, month = 1, date = 1] = iso.slice(0, 10).split('-').map((part) => Number(part));
+
+    return new Date(year, month - 1, date).toLocaleDateString(undefined, {
+      day: '2-digit',
+      month: 'short',
+      year: 'numeric',
+    });
+  }
+
   save(): void {
     this.attempted.set(true);
     this.saved.set(false);
@@ -685,6 +807,7 @@ export class ProfileComponent implements OnInit {
           this.attempted.set(false);
           this.saving.set(false);
           this.saved.set(true);
+          this.editing.set(false);
         },
         error: (failure) => {
           this.error.set(describeError(failure));

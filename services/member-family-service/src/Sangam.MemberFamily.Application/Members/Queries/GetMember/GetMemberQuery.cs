@@ -35,6 +35,7 @@ public sealed record GetMemberQuery(Guid MemberId) : IQuery<MemberResponse>;
 
 public sealed class GetMemberQueryHandler(
     IMemberProfileRepository profiles,
+    IFamilyRepository families,
     ICurrentUser currentUser,
     IAreaScope areaScope)
     : IRequestHandler<GetMemberQuery, Result<MemberResponse>>
@@ -62,6 +63,15 @@ public sealed class GetMemberQueryHandler(
                 || currentUser.IsInRole(Roles.SuperAdmin)
                 || areaScope.AdministersLocality(profile.PermanentAddress.LocalityId));
 
-        return Result.Success(profile.ToDirectoryResponse(viewer));
+        // The member page's Father / Mother lines - the directory card's, by
+        // the same rules (ParentNames).
+        var parents = await ParentNames.ResolveAsync(
+            profiles, families, [profile.Id], viewer.IsSamaajAdmin, cancellationToken);
+
+        var response = profile.ToDirectoryResponse(viewer);
+
+        return Result.Success(parents.TryGetValue(profile.Id, out var named)
+            ? response with { FatherName = named.Father, MotherName = named.Mother }
+            : response);
     }
 }

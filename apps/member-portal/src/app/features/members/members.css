@@ -241,3 +241,137 @@
   display: block;
   margin-bottom: var(--space-3);
 }
+
+/* ---- A profile page: cover, photo, name - My Profile and a member's page -- */
+
+/* No cover photo of its own: the band is the platform's colour, the same for
+   everyone, so it never needs a picture to look finished. */
+.profile-cover {
+  height: 140px;
+  border-radius: var(--radius-lg) var(--radius-lg) 0 0;
+  margin-top: var(--space-3);
+  background: linear-gradient(135deg, var(--accent), var(--soft));
+}
+
+.profile-head {
+  display: flex;
+  gap: var(--space-4);
+  align-items: flex-end;
+  flex-wrap: wrap;
+  padding: 0 var(--space-5) var(--space-4);
+  margin-bottom: var(--space-4);
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-top: 0;
+  border-radius: 0 0 var(--radius-lg) var(--radius-lg);
+}
+
+/* Lifted over the cover's lower edge, like a profile photo on a cover. */
+.profile-avatar {
+  width: 128px;
+  height: 128px;
+  margin-top: -64px;
+  border-radius: 50%;
+  border: 4px solid var(--panel);
+  object-fit: cover;
+  flex-shrink: 0;
+  background: var(--soft);
+}
+
+.profile-avatar.initials {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 2.5rem;
+  font-weight: 700;
+  color: var(--accent-ink);
+}
+
+.profile-head-text {
+  flex: 1 1 240px;
+  min-width: 0;
+  padding-top: var(--space-3);
+}
+
+.profile-head-text .page-title {
+  margin: 0;
+  overflow-wrap: anywhere;
+}
+
+.profile-gautra {
+  font-weight: 400;
+  color: var(--muted);
+}
+
+.profile-actions {
+  display: flex;
+  gap: var(--space-2);
+  align-items: center;
+  padding-top: var(--space-3);
+}
+
+.person-row {
+  display: flex;
+  gap: var(--space-3);
+  align-items: center;
+}
+
+.person-avatar {
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  object-fit: cover;
+  flex-shrink: 0;
+  background: var(--soft);
+}
+
+.person-avatar.square {
+  border-radius: var(--radius-sm);
+}
+
+.person-avatar.initials {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.8rem;
+  font-weight: 700;
+  color: var(--accent-ink);
+}
+
+@media (max-width: 600px) {
+  .profile-cover {
+    height: 96px;
+  }
+
+  .profile-head {
+    padding: 0 var(--space-4) var(--space-4);
+  }
+
+  .profile-avatar {
+    width: 96px;
+    height: 96px;
+    margin-top: -48px;
+  }
+}
+
+/* The Family and Volunteer groups cards, stacked in the page's second column. */
+.community {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+}
+
+.community .card {
+  margin: 0;
+}
+
+/* My Profile: the community cards side by side under About and Address. */
+.community-grid {
+  margin-top: var(--space-4);
+}
+
+/* The community component's two cards lay out in whatever holds them - side by
+   side in My Profile's grid, stacked in a member page's second column. */
+.community-cards {
+  display: contents;
+}

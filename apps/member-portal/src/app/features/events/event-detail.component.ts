@@ -1,6 +1,6 @@
 import { Component, OnInit, computed, inject, signal } from '@angular/core';
 import { ActivatedRoute, RouterLink } from '@angular/router';
-import { describeError } from '@samaajconnect/shared';
+import { AuthedImageDirective, describeError } from '@samaajconnect/shared';
 import { EventsApi } from './events.api';
 import { describeWhen, formatClock, formatScheduleDay, hasPassed } from './events.format';
 import { EventScheduleItem, SamaajEvent } from './events.models';
@@ -33,7 +33,7 @@ import { EventScheduleItem, SamaajEvent } from './events.models';
  */
 @Component({
   selector: 'app-event-detail',
-  imports: [RouterLink],
+  imports: [RouterLink, AuthedImageDirective],
   styleUrl: './events.css',
   template: `
     <div class="events-page">
@@ -48,6 +48,10 @@ import { EventScheduleItem, SamaajEvent } from './events.models';
         </div>
       } @else if (event(); as found) {
         <!-- The cover: a calendar leaf for the day it starts, and the title. -->
+        @if (found.photoUrl; as path) {
+          <img class="event-photo" [scAuthedSrc]="path" alt="" />
+        }
+
         <div class="event-cover" [class.cancelled]="found.status === 'Cancelled'">
           <div class="event-date-badge" aria-hidden="true">
             <span class="event-date-month">{{ badgeMonth(found) }}</span>

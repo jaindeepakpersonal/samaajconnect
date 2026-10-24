@@ -37,7 +37,8 @@ internal static class EventMappings
         samaajEvent.CreatedAt,
         [.. samaajEvent.OrderedSchedule
             .Select(s => new EventScheduleItemResponse(s.Id, s.Date, s.ProgramName, s.StartTime, s.EndTime))],
-        now is { } at && samaajEvent.IsHappeningAt(at));
+        now is { } at && samaajEvent.IsHappeningAt(at),
+        samaajEvent.PhotoId is null ? null : $"/v1/events/{samaajEvent.Id}/photo");
 
     public static IReadOnlyList<AttendeeResponse> ToAttendees(this SamaajEvent samaajEvent) =>
     [

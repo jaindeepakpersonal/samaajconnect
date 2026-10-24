@@ -1,7 +1,10 @@
-import { Component, OnInit, inject, signal } from '@angular/core';
+import { Component, DestroyRef, OnInit, inject, signal } from '@angular/core';
+import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { ActivatedRoute, RouterLink } from '@angular/router';
 import { describeError } from '@samaajconnect/shared';
 import { MasterDataApi } from './master-data.api';
+import { MemberCommunityComponent } from './member-community.component';
+import { ProfileHeaderComponent } from './profile-header.component';
 import { MembersApi } from './members.api';
 import { Gautra, LookupItem, Locality, Member } from './members.models';
 
@@ -29,15 +32,22 @@ import { Gautra, LookupItem, Locality, Member } from './members.models';
  * one call, which is all this screen needs - it shows the id it already has,
  * not a City to pick one by.
  *
- * The wireframe's second card - Family and Volunteer Group - is **not** built.
- * Both live in other services: a household is member-family-service's but is
- * not exposed per member, and a group membership is volunteer-groups-service's
- * with no by-member lookup. Guessing either would mean inventing a
- * relationship, so the card says what it would take instead.
+ * **A profile page since 2026-10-24**, like My Profile's: a cover, the
+ * member's photo and name with Gautra (`ProfileHeaderComponent`), their
+ * details, and their place in the community (`MemberCommunityComponent`) -
+ * father and mother, the household they belong to and the volunteer groups
+ * they are in. The wireframe's second card ("Family: Shah Family", "Volunteer
+ * Group: Seva Group (President)") is that last part; it said "not shown yet"
+ * until member-family-service and volunteer-groups-service could each answer
+ * by member. Every member list in this app links here.
+ *
+ * **It follows the route, not a snapshot of it.** A household or group link
+ * from one member's page to another's reuses this component, so the id is read
+ * from `paramMap` each time it changes.
  */
 @Component({
   selector: 'app-member-detail',
-  imports: [RouterLink],
+  imports: [RouterLink, ProfileHeaderComponent, MemberCommunityComponent],
   styleUrl: './members.css',
   template: `
     <div class="members-page">
@@ -51,14 +61,18 @@ import { Gautra, LookupItem, Locality, Member } from './members.models';
           <button class="btn link" type="button" (click)="load()">Try again</button>
         </div>
       } @else if (member(); as found) {
-        <h1 class="page-title">{{ found.fullName }}</h1>
-        <p class="subtitle">
-          Visible fields only — this respects what {{ firstName(found) }} chose to share.
-        </p>
+        <app-profile-header
+          [name]="found.fullName"
+          [gautra]="found.gautraId ? gautraName(found.gautraId) : null"
+          [photoUrl]="found.photoUrl"
+          [details]="headline(found)"
+        />
+
+        <p class="small">Visible fields only — this respects what {{ firstName(found) }} chose to share.</p>
 
         <div class="grid2">
           <div class="card">
-            <h2>Profile</h2>
+            <h2>About</h2>
 
             <dl class="profile">
               <dt>Gautra</dt>
@@ -87,18 +101,12 @@ import { Gautra, LookupItem, Locality, Member } from './members.models';
             </dl>
           </div>
 
-          <div class="card">
-            <h2>Community</h2>
-
-            <!-- The wireframe shows "Family: Shah Family" and "Volunteer
-                 Group: Seva Group (President)". Neither is fetchable per
-                 member: households are not exposed that way, and
-                 volunteer-groups-service has no by-member lookup. Saying so
-                 beats inventing it. -->
-            <p class="small">
-              Which household and volunteer groups a member belongs to is not shown yet.
-              Neither service exposes it by member, and this screen will not guess.
-            </p>
+          <div class="community">
+            <app-member-community
+              [memberId]="found.id"
+              [fatherName]="found.fatherName"
+              [motherName]="found.motherName"
+            />
           </div>
         </div>
       }
@@ -109,6 +117,7 @@ export class MemberDetailComponent implements OnInit {
   private readonly api = inject(MembersApi);
   private readonly master = inject(MasterDataApi);
   private readonly route = inject(ActivatedRoute);
+  private readonly destroyRef = inject(DestroyRef);
 
   /**
    * The one label for every field the viewer cannot see. Deliberately not
@@ -127,7 +136,9 @@ export class MemberDetailComponent implements OnInit {
   private readonly localities = signal<readonly Locality[]>([]);
 
   ngOnInit(): void {
-    this.load();
+    // A link from one member's household to another's page reuses this
+    // component, so follow the id rather than reading it once.
+    this.route.paramMap.pipe(takeUntilDestroyed(this.destroyRef)).subscribe(() => this.load());
 
     this.master.listGautras().subscribe({ next: (found) => this.gautras.set(found), error: () => {} });
     this.master.listProfessions().subscribe({
@@ -166,6 +177,21 @@ export class MemberDetailComponent implements OnInit {
         this.error.set(describeError(failure));
       },
     });
+  }
+
+  /** The line under the name: profession and locality, where known to this viewer. */
+  headline(member: Member): string[] {
+    const parts: string[] = [];
+
+    if (member.professionId) {
+      parts.push(this.professionName(member.professionId));
+    }
+
+    if (member.permanentAddress.localityId) {
+      parts.push(this.localityName(member.permanentAddress.localityId));
+    }
+
+    return parts.filter((part) => part !== this.notShared);
   }
 
   /** For the subtitle. Falls back to the whole name rather than to nothing. */

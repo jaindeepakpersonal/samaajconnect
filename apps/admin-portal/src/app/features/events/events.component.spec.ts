@@ -418,6 +418,12 @@ describe('EventDetailComponent', () => {
 
   afterEach(() => http.verify());
 
+  /** The page is tabs now; a test about one section opens it first. */
+  function showTab(name: 'about' | 'schedule' | 'going') {
+    component.tab.set(name);
+    fixture.detectChanges();
+  }
+
   const text = () => fixture.nativeElement.textContent as string;
 
   function load(
@@ -466,6 +472,7 @@ describe('EventDetailComponent', () => {
 
   it('lists the schedule with its local dates and wall-clock times', () => {
     load(anEvent({ schedule: [programme(), programme({ id: 's2', programName: 'Pratikraman', startTime: '18:30:00', endTime: null })] }));
+    showTab('schedule');
 
     expect(text()).toContain('Pravachan');
     expect(text()).toContain('10:00 AM');
@@ -476,12 +483,14 @@ describe('EventDetailComponent', () => {
 
   it('says there are no programmes yet', () => {
     load();
+    showTab('schedule');
 
     expect(text()).toContain('No programmes yet');
   });
 
   it('adds a programme from a popup, sending seconds the service expects', () => {
     load();
+    showTab('schedule');
 
     component.openScheduleModal(null);
     fixture.detectChanges();
@@ -516,7 +525,7 @@ describe('EventDetailComponent', () => {
     component.programEnd = '10:00';
 
     expect(component.endsBeforeStart()).toBe(true);
-    expect(component.canSaveScheduleItem()).toBe(false);
+    expect(component.canSaveScheduleItem(component.event()!)).toBe(false);
 
     component.saveScheduleItem(component.event()!);
     http.expectNone((r) => r.method === 'POST');
@@ -524,6 +533,7 @@ describe('EventDetailComponent', () => {
 
   it('edits and removes a programme', () => {
     load(anEvent({ schedule: [programme()] }));
+    showTab('schedule');
 
     component.openScheduleModal(programme());
     expect(component.programStart).toBe('10:00');
@@ -545,8 +555,9 @@ describe('EventDetailComponent', () => {
 
   it('offers no schedule controls on a cancelled event', () => {
     load(anEvent({ status: 'Cancelled', schedule: [programme()] }));
+    showTab('schedule');
 
-    expect(component.canEditSchedule(component.event()!)).toBe(false);
+    expect(component.canEdit(component.event()!)).toBe(false);
     expect(text()).not.toContain('Add a programme');
   });
 
@@ -580,6 +591,7 @@ describe('EventDetailComponent', () => {
         { id: 'm4', fullName: 'Rohan Jain' },
       ],
     );
+    showTab('going');
 
     expect(component.registered().map((a) => a.memberId)).toEqual(['m1']);
     expect(component.waitlisted().map((a) => a.memberId)).toEqual(['m2', 'm3']);
@@ -600,6 +612,7 @@ describe('EventDetailComponent', () => {
         { id: 'm3', fullName: 'Meera Jain' },
       ],
     );
+    showTab('going');
 
     expect(component.waitlisted()[0]!.memberId).toBe('m2');
     expect(text()).toContain('Aarav Jain');
@@ -607,12 +620,14 @@ describe('EventDetailComponent', () => {
 
   it('shows nothing about a waitlist that does not exist', () => {
     load(anEvent(), [attendee()], [{ id: 'm1', fullName: 'Diya Jain' }]);
+    showTab('going');
 
     expect(text()).toContain('Nobody is waiting');
   });
 
   it('says "A member" rather than printing an id it could not resolve', () => {
     load(anEvent(), [attendee({ memberId: 'm9' })], []);
+    showTab('going');
 
     expect(text()).toContain('A member');
     expect(text()).not.toContain('m9');
@@ -626,9 +641,102 @@ describe('EventDetailComponent', () => {
       [attendee()],
       [{ id: 'm1', fullName: 'Diya Jain' }],
     );
+    showTab('going');
 
     expect(text()).toContain('The hall is unavailable.');
     expect(text()).toContain('Diya Jain');
+  });
+
+  // ---- The page: a cover, tabs and an Edit popup -------------------------------
+
+  it('opens on About, with Schedule and Going as tabs', () => {
+    load(anEvent({ schedule: [programme()] }), [attendee()]);
+
+    const tabs = [...fixture.nativeElement.querySelectorAll('[role="tab"]')].map((t) => (t as HTMLElement).textContent?.trim());
+
+    expect(tabs).toEqual(['About', 'Schedule (1)', 'Going (1)']);
+    expect(text()).toContain('Jain Bhavan');
+    expect(fixture.nativeElement.querySelector('.event-date-badge')).not.toBeNull();
+  });
+
+  it('edits the event in a popup and redraws from what the service answers', () => {
+    load();
+
+    component.openEditModal(component.event()!);
+    fixture.detectChanges();
+    expect(fixture.nativeElement.querySelector('[role="dialog"] #edit-title')).not.toBeNull();
+
+    component.title = 'Paryushan Pravachan';
+    component.saveDetails(component.event()!);
+
+    const request = http.expectOne((r) => r.method === 'PATCH' && r.url === `/v1/events/${EVENT_ID}`);
+    expect(request.request.body.title).toBe('Paryushan Pravachan');
+    expect(request.request.body.capacity).toBe(200);
+    request.flush(anEvent({ title: 'Paryushan Pravachan' }));
+    fixture.detectChanges();
+
+    expect(component.editOpen()).toBe(false);
+    expect(text()).toContain('Paryushan Pravachan');
+  });
+
+  it('uploads a photo from the popup, and shows it as the cover', () => {
+    load();
+
+    component.openEditModal(component.event()!);
+    component.editPart.set('photo');
+    fixture.detectChanges();
+
+    const file = new File([new Uint8Array([0x89, 0x50, 0x4e, 0x47])], 'cover.png', { type: 'image/png' });
+    component.choosePhoto(component.event()!, { target: { files: [file], value: '' } } as unknown as Event);
+
+    const upload = http.expectOne((r) => r.method === 'POST' && r.url === `/v1/events/${EVENT_ID}/photo`);
+    expect(upload.request.body instanceof FormData).toBe(true);
+    upload.flush(anEvent({ photoUrl: `/v1/events/${EVENT_ID}/photo` }));
+    fixture.detectChanges();
+
+    for (const photo of http.match(`/v1/events/${EVENT_ID}/photo`)) {
+      photo.flush(new Blob(['x'], { type: 'image/png' }));
+    }
+    fixture.detectChanges();
+
+    expect(fixture.nativeElement.querySelector('img.event-cover-img')).not.toBeNull();
+  });
+
+  it('refuses a programme outside the event days, before asking', () => {
+    // A one-day event with no end takes programmes on its start day only.
+    load(anEvent({ startAt: new Date(2026, 8, 5, 10, 0).toISOString(), endAt: null }));
+
+    component.openScheduleModal(null);
+    expect(component.programDate).toBe('2026-09-05');
+
+    component.programName = 'Pravachan';
+    component.programStart = '10:00';
+    component.programDate = '2026-09-08';
+    showTab('schedule');
+
+    expect(component.dateOutsideEvent(component.event()!)).toBe(true);
+    expect(component.canSaveScheduleItem(component.event()!)).toBe(false);
+    expect(text()).toContain("has to fall on one of the event's own days");
+
+    component.saveScheduleItem(component.event()!);
+    http.expectNone((r) => r.method === 'POST');
+  });
+
+  it('takes a programme on any day of a multi-day event', () => {
+    load(anEvent({ startAt: new Date(2026, 8, 5, 10, 0).toISOString(), endAt: new Date(2026, 8, 7, 18, 0).toISOString() }));
+
+    component.openScheduleModal(null);
+    component.programDate = '2026-09-07';
+
+    expect(component.dateOutsideEvent(component.event()!)).toBe(false);
+    expect(component.dayRange(component.event()!)).toBe('5 Sept 2026 to 7 Sept 2026');
+  });
+
+  it('offers no Edit on a cancelled event', () => {
+    load(anEvent({ status: 'Cancelled', cancellationReason: 'Off.' }));
+
+    expect(component.canEdit(component.event()!)).toBe(false);
+    expect([...fixture.nativeElement.querySelectorAll('button')].some((b) => (b as HTMLElement).textContent?.trim() === 'Edit')).toBe(false);
   });
 
   it('explains a 404 as no such event rather than as an error', () => {

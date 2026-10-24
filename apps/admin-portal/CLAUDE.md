@@ -27,7 +27,7 @@ screen. The spec is `docs/product/wireframes/admin-panel-wireframes.html`.
 | Auctions / Boli | `/boli` | `#boli` + `#publishboli` | built. Occasions - announced and corrected (until closed) in a popup, with a locality - and the publication queue with its confirmation |
 | Occasion detail | `/boli/:id` | — | built; no wireframe covers running an auction. Types, opening a Boli, closing, recording |
 | Events | `/events` | `#events` | built. Drafts and published together, create, publish, cancel |
-| Event detail | `/events/:id` | — | built; no wireframe covers one. Who is going, who is waiting, and in what order |
+| Event detail | `/events/:id` | — | built; no wireframe covers one. A page: a photo cover (or a calendar leaf), tabs - About, Schedule, Going (who is going, who is waiting, and in what order) - and Edit, one popup for the details and the photo |
 | Celebrities / Voting | `/voting` | `#celebrity` | built. Campaigns, setting one up, and editing one (a modal, until voting opens) |
 | Campaign detail | `/voting/:id` | — | built; no wireframe covers running one. Stage, ballot, nominations, tally, result |
 | Competitions | `/competitions` | — | built; no wireframe covers this new module. Competitions; setting one up and correcting one (until registration closes) in a popup, with an optional locality |
@@ -405,7 +405,8 @@ category is free but a *consumer* storing the id still needs a column for
 it. The create form's dropdown and the detail screen's own label both call
 `AdminApi.listLookupItems('EventType')` directly; a Samaaj that has not
 seeded any values yet gets an empty list rather than a broken form — the
-field stays optional for exactly that reason. Cover photos for events were
+field stays optional for exactly that reason. Cover photos for events
+arrived on 2026-10-24 (events-service's `EventPhoto`); at the time they were
 scoped out of this pass: every other stored image on this platform (member
 photos, children's photos, Samaaj logos) needed its own `ImageContent`
 sniffing type, storage table and upload/get endpoints built per service

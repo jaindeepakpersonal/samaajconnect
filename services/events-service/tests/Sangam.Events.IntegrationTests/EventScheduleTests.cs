@@ -19,6 +19,13 @@ public sealed class EventScheduleTests(EventsApiFactory factory)
     private static readonly Guid Hiran = Guid.NewGuid();
     private static readonly Guid Sector14 = Guid.NewGuid();
 
+    /// <summary>When the scheduled events start - a month out, so they are upcoming whenever the suite runs.</summary>
+    private static readonly DateTimeOffset Start = DateTimeOffset.UtcNow.AddDays(30);
+
+    /// <summary>A programme date, counted in days from the start.</summary>
+    private static string Day(int fromStart) =>
+        DateOnly.FromDateTime(Start.UtcDateTime).AddDays(fromStart).ToString("yyyy-MM-dd");
+
     public Task InitializeAsync() => factory.ResetDatabaseAsync();
 
     public Task DisposeAsync() => Task.CompletedTask;
@@ -73,13 +80,13 @@ public sealed class EventScheduleTests(EventsApiFactory factory)
     [Fact]
     public async Task An_organiser_builds_a_schedule_and_every_member_reads_it_in_order()
     {
-        var id = await PublishedAsync(DateTimeOffset.UtcNow.AddDays(30), DateTimeOffset.UtcNow.AddDays(37));
+        var id = await PublishedAsync(Start, Start.AddDays(7));
 
         foreach (var programme in new[]
         {
-            Programme("2026-11-25", "Pratikraman", "18:30:00", null),
-            Programme("2026-11-24", "Pravachan", "10:00:00", "11:30:00"),
-            Programme("2026-11-24", "Prabhat Pheri", "06:00:00", "07:00:00"),
+            Programme(Day(1), "Pratikraman", "18:30:00", null),
+            Programme(Day(0), "Pravachan", "10:00:00", "11:30:00"),
+            Programme(Day(0), "Prabhat Pheri", "06:00:00", "07:00:00"),
         })
         {
             (await Organiser().PostAsJsonAsync($"/v1/events/{id}/schedule", programme))
@@ -91,7 +98,7 @@ public sealed class EventScheduleTests(EventsApiFactory factory)
         ProgrammeNames(read).Should().Equal("Prabhat Pheri", "Pravachan", "Pratikraman");
 
         var pravachan = read.GetProperty("schedule")[1];
-        pravachan.GetProperty("date").GetString().Should().Be("2026-11-24");
+        pravachan.GetProperty("date").GetString().Should().Be(Day(0));
         pravachan.GetProperty("startTime").GetString().Should().Be("10:00:00");
         pravachan.GetProperty("endTime").GetString().Should().Be("11:30:00");
         read.GetProperty("schedule")[2].GetProperty("endTime").ValueKind.Should().Be(JsonValueKind.Null);
@@ -100,15 +107,15 @@ public sealed class EventScheduleTests(EventsApiFactory factory)
     [Fact]
     public async Task A_programme_is_corrected_and_removed()
     {
-        var id = await PublishedAsync(DateTimeOffset.UtcNow.AddDays(30), null);
+        var id = await PublishedAsync(Start, null);
 
         var added = await (await Organiser().PostAsJsonAsync(
-                $"/v1/events/{id}/schedule", Programme("2026-11-24", "Pravachan", "10:00:00", null)))
+                $"/v1/events/{id}/schedule", Programme(Day(0), "Pravachan", "10:00:00", null)))
             .Content.ReadFromJsonAsync<JsonElement>();
         var itemId = added.GetProperty("schedule")[0].GetProperty("id").GetGuid();
 
         var corrected = await Organiser().PutAsJsonAsync(
-            $"/v1/events/{id}/schedule/{itemId}", Programme("2026-11-24", "Pravachan by Muni Shri", "10:30:00", "12:00:00"));
+            $"/v1/events/{id}/schedule/{itemId}", Programme(Day(0), "Pravachan by Muni Shri", "10:30:00", "12:00:00"));
 
         corrected.StatusCode.Should().Be(HttpStatusCode.OK);
         ProgrammeNames(await corrected.Content.ReadFromJsonAsync<JsonElement>()).Should().Equal("Pravachan by Muni Shri");
@@ -123,48 +130,69 @@ public sealed class EventScheduleTests(EventsApiFactory factory)
     [Fact]
     public async Task A_programme_that_ends_before_it_starts_is_refused()
     {
-        var id = await PublishedAsync(DateTimeOffset.UtcNow.AddDays(30), null);
+        var id = await PublishedAsync(Start, null);
 
         (await Organiser().PostAsJsonAsync(
-                $"/v1/events/{id}/schedule", Programme("2026-11-24", "Pravachan", "11:00:00", "10:00:00")))
+                $"/v1/events/{id}/schedule", Programme(Day(0), "Pravachan", "11:00:00", "10:00:00")))
             .StatusCode.Should().Be(HttpStatusCode.BadRequest);
     }
 
     [Fact]
     public async Task A_member_cannot_change_the_schedule()
     {
-        var id = await PublishedAsync(DateTimeOffset.UtcNow.AddDays(30), null);
+        var id = await PublishedAsync(Start, null);
 
-        (await Member().PostAsJsonAsync($"/v1/events/{id}/schedule", Programme("2026-11-24", "Pravachan", "10:00:00", null)))
+        (await Member().PostAsJsonAsync($"/v1/events/{id}/schedule", Programme(Day(0), "Pravachan", "10:00:00", null)))
             .StatusCode.Should().Be(HttpStatusCode.Forbidden);
     }
 
     [Fact]
     public async Task An_Area_Admin_schedules_only_their_own_localitys_events_and_another_Samaaj_none()
     {
-        var own = await PublishedAsync(DateTimeOffset.UtcNow.AddDays(30), null, localityId: Hiran);
-        var elsewhere = await PublishedAsync(DateTimeOffset.UtcNow.AddDays(30), null, localityId: Sector14);
+        var own = await PublishedAsync(Start, null, localityId: Hiran);
+        var elsewhere = await PublishedAsync(Start, null, localityId: Sector14);
 
-        (await AreaAdmin(Hiran).PostAsJsonAsync($"/v1/events/{own}/schedule", Programme("2026-11-24", "Pravachan", "10:00:00", null)))
+        (await AreaAdmin(Hiran).PostAsJsonAsync($"/v1/events/{own}/schedule", Programme(Day(0), "Pravachan", "10:00:00", null)))
             .StatusCode.Should().Be(HttpStatusCode.OK);
 
-        (await AreaAdmin(Hiran).PostAsJsonAsync($"/v1/events/{elsewhere}/schedule", Programme("2026-11-24", "Pravachan", "10:00:00", null)))
+        (await AreaAdmin(Hiran).PostAsJsonAsync($"/v1/events/{elsewhere}/schedule", Programme(Day(0), "Pravachan", "10:00:00", null)))
             .StatusCode.Should().Be(HttpStatusCode.NotFound);
 
-        (await Organiser(OtherTenantId).PostAsJsonAsync($"/v1/events/{own}/schedule", Programme("2026-11-24", "Pravachan", "10:00:00", null)))
+        (await Organiser(OtherTenantId).PostAsJsonAsync($"/v1/events/{own}/schedule", Programme(Day(0), "Pravachan", "10:00:00", null)))
             .StatusCode.Should().Be(HttpStatusCode.NotFound);
     }
 
     [Fact]
     public async Task A_cancelled_events_schedule_cannot_change()
     {
-        var id = await PublishedAsync(DateTimeOffset.UtcNow.AddDays(30), null);
+        var id = await PublishedAsync(Start, null);
 
         (await Organiser().PostAsJsonAsync($"/v1/events/{id}/cancel", new { reason = "Postponed." }))
             .StatusCode.Should().Be(HttpStatusCode.OK);
 
-        (await Organiser().PostAsJsonAsync($"/v1/events/{id}/schedule", Programme("2026-11-24", "Pravachan", "10:00:00", null)))
+        (await Organiser().PostAsJsonAsync($"/v1/events/{id}/schedule", Programme(Day(0), "Pravachan", "10:00:00", null)))
             .StatusCode.Should().Be(HttpStatusCode.Conflict);
+    }
+
+    [Fact]
+    public async Task A_programme_outside_the_events_own_dates_is_refused()
+    {
+        // A one-day event takes programmes on its own day - with a day's slack
+        // for the time zone the service is not told - and on no other.
+        var id = await PublishedAsync(Start, null);
+
+        (await Organiser().PostAsJsonAsync($"/v1/events/{id}/schedule", Programme(Day(5), "Pravachan", "10:00:00", null)))
+            .StatusCode.Should().Be(HttpStatusCode.BadRequest);
+        (await Organiser().PostAsJsonAsync($"/v1/events/{id}/schedule", Programme(Day(-5), "Pravachan", "10:00:00", null)))
+            .StatusCode.Should().Be(HttpStatusCode.BadRequest);
+
+        var added = await (await Organiser().PostAsJsonAsync(
+                $"/v1/events/{id}/schedule", Programme(Day(0), "Pravachan", "10:00:00", null)))
+            .Content.ReadFromJsonAsync<JsonElement>();
+        var itemId = added.GetProperty("schedule")[0].GetProperty("id").GetGuid();
+
+        (await Organiser().PutAsJsonAsync($"/v1/events/{id}/schedule/{itemId}", Programme(Day(9), "Pravachan", "10:00:00", null)))
+            .StatusCode.Should().Be(HttpStatusCode.BadRequest, "a correction is held to the same dates");
     }
 
     // ---- What "upcoming" means ---------------------------------------------

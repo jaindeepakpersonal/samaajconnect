@@ -97,13 +97,83 @@ describe('ProfileComponent', () => {
     http.expectOne((r) => r.url === '/v1/master-data/cities').flush([]);
   }
 
-  function load(me: MyProfile = profile()): void {
+  /** Answers the household and volunteer-group cards the view mode draws under the profile. */
+  function settleCommunity(memberId = 'm1'): void {
+    for (const request of http.match((r) => r.url === '/v1/members/' + memberId + '/household')) {
+      request.flush({ household: null });
+    }
+
+    for (const request of http.match((r) => r.url === '/v1/volunteer-groups/members/' + memberId + '/groups')) {
+      request.flush([]);
+    }
+
+    fixture.detectChanges();
+  }
+
+  /** Loads the profile as a member opening it: view mode, nothing editable. */
+  function loadView(me: MyProfile = profile()): void {
     fixture.detectChanges();
     settleMasterData();
     http.expectOne('/v1/members/me').flush(me);
     fixture.detectChanges();
     settlePhoto();
+    settleCommunity(me.id);
   }
+
+  /**
+   * Loads the profile and presses Edit - every test below this one is about
+   * the form, which since 2026-10-24 appears only after that.
+   */
+  function load(me: MyProfile = profile()): void {
+    loadView(me);
+    component.startEditing();
+    fixture.detectChanges();
+    settlePhoto();
+  }
+
+  // ---- View mode: a profile page first, a form only on Edit -------------------
+
+  it('opens as a profile page with nothing editable until Edit is pressed', () => {
+    loadView(profile({ gautraId: null }));
+
+    const page = fixture.nativeElement as HTMLElement;
+    expect(page.querySelector('app-profile-header')?.textContent).toContain('Ravi Shah');
+    expect(page.querySelector('form')).toBeNull();
+    expect(page.querySelector('input#full-name')).toBeNull();
+    expect(text()).toContain('+919812345678');
+    expect(text()).toContain('Household');
+    expect(text()).toContain('Volunteer groups');
+
+    const edit = Array.from(page.querySelectorAll('button')).find((b) => b.textContent?.trim() === 'Edit profile')!;
+    edit.click();
+    fixture.detectChanges();
+
+    expect(page.querySelector('input#full-name')).not.toBeNull();
+    expect(Array.from(page.querySelectorAll('button')).some((b) => b.textContent?.trim() === 'Edit profile')).toBe(false);
+  });
+
+  it('cancelling puts back what is on file and returns to view mode', () => {
+    load();
+
+    component.form.fullName = 'Somebody Else';
+    component.cancelEditing();
+    fixture.detectChanges();
+
+    expect(component.form.fullName).toBe('Ravi Shah');
+    expect(component.editing()).toBe(false);
+    expect((fixture.nativeElement as HTMLElement).querySelector('form')).toBeNull();
+  });
+
+  it('returns to view mode once a save succeeds', () => {
+    load();
+
+    component.save();
+    http.expectOne('/v1/members/m1').flush(profile({ fullName: 'Ravi Kumar Shah' }));
+    fixture.detectChanges();
+
+    expect(component.editing()).toBe(false);
+    expect(text()).toContain('Ravi Kumar Shah');
+  });
 
   it('fills the form from what the server holds', () => {
     load();
@@ -446,6 +516,9 @@ describe('ProfileComponent', () => {
       .flush(profile({ gautraId: 'g1', professionId: 'p1', qualificationId: 'q1' }));
     fixture.detectChanges();
     settlePhoto();
+    settleCommunity();
+    component.startEditing();
+    fixture.detectChanges();
 
     expect(component.gautras()).toEqual([{ id: 'g1', name: 'Kasliwal', isActive: true }]);
     // Gautra is on the Basic tab, active by default; Professional and

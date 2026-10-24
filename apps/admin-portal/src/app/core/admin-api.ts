@@ -1095,6 +1095,19 @@ export class AdminApi {
    * everyone else — a member reaching one has guessed its id, and confirming it
    * exists is the leak.
    */
+  /** An event's cover photo. Multipart; the service reads the type from the bytes. Answers the whole event. */
+  uploadEventPhoto(eventId: string, file: File): Observable<SamaajEvent> {
+    const body = new FormData();
+    body.append('file', file);
+
+    return this.http.post<SamaajEvent>(`/v1/events/${eventId}/photo`, body);
+  }
+
+  /** Takes an event's photo down. Doing it twice is success. */
+  removeEventPhoto(eventId: string): Observable<SamaajEvent> {
+    return this.http.delete<SamaajEvent>(`/v1/events/${eventId}/photo`);
+  }
+
   /** Adds a programme to an event's schedule; answers the whole event. */
   addEventScheduleItem(eventId: string, item: EventScheduleItemInput): Observable<SamaajEvent> {
     return this.http.post<SamaajEvent>(`/v1/events/${eventId}/schedule`, item);

@@ -50,6 +50,7 @@ app.MapGet("/health", () => Results.Ok(new { status = "healthy" }))
     .ExcludeFromDescription();
 
 app.MapEventEndpoints();
+app.MapEventPhotoEndpoints();
 
 await app.RunAsync();
 

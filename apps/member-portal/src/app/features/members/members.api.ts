@@ -9,6 +9,7 @@ import {
   Member,
   MyProfile,
   Relationship,
+  MemberHousehold,
 } from './members.models';
 
 /**
@@ -72,6 +73,15 @@ export class MembersApi {
   /** One member, through the same per-field privacy mapper the directory uses. */
   get(id: string): Observable<Member> {
     return this.http.get<Member>(`/v1/members/${id}`);
+  }
+
+  /**
+   * The household a member belongs to, as their profile page shows it - only
+   * members this viewer could find in the directory, never a child's record.
+   * `household` is null when they are in none.
+   */
+  household(id: string): Observable<MemberHousehold> {
+    return this.http.get<MemberHousehold>(`/v1/members/${id}/household`);
   }
 
   /** The caller's own profile, complete regardless of their privacy settings. */

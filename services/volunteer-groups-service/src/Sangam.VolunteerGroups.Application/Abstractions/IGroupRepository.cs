@@ -19,5 +19,12 @@ public interface IGroupRepository
     Task<bool> NameExistsAsync(
         string name, Guid? excludingGroupId = null, CancellationToken cancellationToken = default);
 
+    /// <summary>
+    /// The groups this member belongs to, with their members and roles - for
+    /// the member's own profile page. Tenant-filtered like every read here.
+    /// </summary>
+    Task<IReadOnlyList<VolunteerGroup>> ListForMemberAsync(
+        Guid memberId, CancellationToken cancellationToken = default);
+
     void Add(VolunteerGroup group);
 }

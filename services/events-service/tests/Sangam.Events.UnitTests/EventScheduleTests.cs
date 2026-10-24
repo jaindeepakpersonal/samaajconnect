@@ -101,4 +101,24 @@ public sealed class EventScheduleTests
         samaajEvent.IsHappeningAt(Now.AddDays(1)).Should().BeFalse();
         samaajEvent.EndsBy.Should().Be(Now.AddHours(-6).Add(SamaajEvent.UntimedEventLength));
     }
+
+    [Fact]
+    public void A_programme_fits_the_events_own_days_with_a_days_slack_either_side()
+    {
+        var samaajEvent = Published(new DateTimeOffset(2026, 3, 31, 4, 0, 0, TimeSpan.Zero), new DateTimeOffset(2026, 4, 2, 12, 0, 0, TimeSpan.Zero));
+
+        samaajEvent.ScheduleDateFits(new DateOnly(2026, 3, 30)).Should().BeTrue("the day before, in UTC, is the start day further east");
+        samaajEvent.ScheduleDateFits(new DateOnly(2026, 4, 3)).Should().BeTrue();
+        samaajEvent.ScheduleDateFits(new DateOnly(2026, 3, 29)).Should().BeFalse();
+        samaajEvent.ScheduleDateFits(new DateOnly(2026, 4, 4)).Should().BeFalse();
+    }
+
+    [Fact]
+    public void An_event_with_no_end_takes_programmes_on_its_start_day()
+    {
+        var samaajEvent = Published(new DateTimeOffset(2026, 3, 31, 10, 0, 0, TimeSpan.Zero), null);
+
+        samaajEvent.ScheduleDateFits(new DateOnly(2026, 3, 31)).Should().BeTrue();
+        samaajEvent.ScheduleDateFits(new DateOnly(2026, 4, 5)).Should().BeFalse();
+    }
 }

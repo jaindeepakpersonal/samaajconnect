@@ -61,6 +61,9 @@ export interface SamaajEvent {
 
   /** Published, started and not over yet - set by the service, which reads the clock. */
   readonly isHappeningNow?: boolean;
+
+  /** Where the cover photo is fetched from, with the token, or null when there is none. */
+  readonly photoUrl?: string | null;
 }
 
 /**

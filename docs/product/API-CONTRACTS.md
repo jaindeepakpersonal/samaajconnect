@@ -85,7 +85,8 @@ enforced by `TenantAuthorizationBehavior`, not just UI hiding.
 |---|---|---|---|
 | GET | `/members` | Member, SamaajAdmin | Search/filter tenant directory. `term` matches full name; `localityId` is an exact match against the searched member's permanent Locality (a master-data-service id, not a substring — see below). `gautraId` and `professionId` filter exactly too; `professionId` matches only professions the caller could already read on the row (never another member's Private one). `?skip=&take=` paged as `{ items, hasMore }`. Each row carries `fatherName`/`motherName` from the member's household, null where it records none the caller may see. An Area Admin gets the administrator's view (unlisted members, private fields) only when `localityId` is their token's own `locality_id`, and on `/members/{id}` only for a member living there; otherwise the member view |
 | GET | `/members/registration-summary` | `SamaajAdmin`/`SuperAdmin` + `Members.Read` | Registrations in the current 30-day window against the 30 days before it, for the admin Reports & Analytics screen |
-| GET | `/members/{id}` | `Members.Read` | One member, through the same per-field privacy mapper the directory uses |
+| GET | `/members/{id}` | `Members.Read` | One member, through the same per-field privacy mapper the directory uses, with `fatherName`/`motherName` by the directory's rules |
+| GET | `/members/{id}/household` | `Members.Read` | `{ household }` - the household they actively belong to: `namedAfter` (head, or admin) and `members` (`memberId`, `fullName`, `photoUrl`, `relationshipToAdmin`, `isHead`, `isAdmin`) - only people the caller could find in the directory, never a child's record or the family code. `household` is null when they are in none |
 | PATCH | `/members/{id}` | Member, **self only** | Update your own profile. Replaces it whole: `privacy` and `isListedInDirectory` are both **required**, because defaulting either would silently reopen something a member had closed. Also carries `gautraId`, `professionId`, `qualificationId` (all master-data-service ids), `permanentAddress` (`{line, cityId, localityId}`, required) and `temporaryAddress` (same shape, nullable). Takes **no** photo field — see below |
 | PATCH | `/members/{id}/details` | `SamaajAdmin` or `AreaAdmin` (own locality only) + `Members.Write`, never self | Correct somebody else's factual details. The same fields **minus** `privacy` and `isListedInDirectory`, which are the member's own. **409** on your own id: use the profile screen, which can set them |
 | POST | `/members/{id}/photo` | Member (self), `Members.Write` | `multipart/form-data`, one file part. JPEG, PNG or WebP, 2 MB |
@@ -140,6 +141,7 @@ who never passed the check that produced it.
 | Method | Path | Roles | Purpose |
 |---|---|---|---|
 | GET | `/groups` | `Members.Read` | This Samaaj's groups, each with the asking member's standing |
+| GET | `/members/{memberId}/groups` | `Members.Read` | The groups one member belongs to: `groupId`, `name`, `photoUrl`, `roleTitle`, `isPresident`, `joinedAt`. Never a group they only applied to |
 | POST | `/groups` | `VolunteerGroups.Manage` | Create a group. `presidentMemberId` is **optional** (a string, empty or omitted for none): a group may exist before anyone leads it. `localityId` optional; an Area Admin's group is always in their own locality (omitted: filled in; other: **403**) |
 | GET | `/groups/{id}` | `Members.Read` | One group with its members (each with `roleId` and the role's title as `rolePosition`) and its `roles` (title, kind, seats, holder count). `iCanRunElections` says whether the caller may manage roles and elections |
 | PATCH | `/groups/{id}` | `VolunteerGroups.Manage` | Correct the name, description, focus area or locality. Not the president, membership or status — each its own endpoint. An Area Admin: own locality's groups only (**404** otherwise), and cannot move one out (**403**) |
@@ -185,9 +187,12 @@ who never passed the check that produced it.
 | POST | `/{id}/publish` | `Events.Publish` | Tell the Samaaj about it |
 | POST | `/{id}/cancel` | `Events.Publish` | `{reason}`, required — members who were going are told it |
 | GET | `/{id}/attendees` | `Events.Publish` | Who is coming and who is waiting |
-| POST | `/{id}/schedule` | `Events.Publish` (an Area Admin: own locality, **404** otherwise) | Add a programme `{date, programName, startTime, endTime?}` - `date` "yyyy-MM-dd", times "HH:mm:ss", end after start. **409** on a cancelled event. Answers the whole event |
+| POST | `/{id}/schedule` | `Events.Publish` (an Area Admin: own locality, **404** otherwise) | Add a programme `{date, programName, startTime, endTime?}` - `date` "yyyy-MM-dd" on one of the event's own days (**400** otherwise, with a day's slack for time zones), times "HH:mm:ss", end after start. **409** on a cancelled event. Answers the whole event |
 | PUT | `/{id}/schedule/{itemId}` | `Events.Publish` | Correct one programme. Answers the whole event |
 | DELETE | `/{id}/schedule/{itemId}` | `Events.Publish` | Take one off. **404** when it is not there |
+| POST | `/{id}/photo` | `Events.Publish` (own locality) | The event's cover photo, multipart, JPEG/PNG/WebP up to 2 MB. **409** on a cancelled event. Answers the whole event, with `photoUrl` |
+| GET | `/{id}/photo` | `Members.Read` | The bytes, `Cache-Control: private`. A draft's photo answers 404 to anyone who cannot see the draft |
+| DELETE | `/{id}/photo` | `Events.Publish` | Idempotent. Answers the whole event |
 | POST | `/{id}/registration` | `Members.Read` | RSVP, or join the waitlist when full. One call for both; the response says which and, for the waitlist, the position |
 | DELETE | `/{id}/registration` | `Members.Read` | Give up a place or leave the queue. Promotes whoever waited longest |
 

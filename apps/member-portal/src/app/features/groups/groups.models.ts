@@ -278,3 +278,15 @@ export function votingNote(
     ? 'Voting is open, but nobody is on the ballot yet. Nominations have to be approved first.'
     : null;
 }
+
+/** Mirrors `MemberGroupResponse`: one group a member belongs to, from their side. */
+export interface MemberGroup {
+  readonly groupId: string;
+  readonly name: string;
+  readonly focusArea: string | null;
+  readonly status: GroupStatus;
+  readonly photoUrl: string | null;
+  readonly roleTitle: string | null;
+  readonly isPresident: boolean;
+  readonly joinedAt: string;
+}

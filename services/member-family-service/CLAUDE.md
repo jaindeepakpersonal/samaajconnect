@@ -50,7 +50,8 @@ worked example of a cross-service flow with no synchronous call.
 | Query | Policy | Status |
 |---|---|---|
 | `SearchMembersQuery` | `Members.Read` | built |
-| `GetMemberQuery` | `Members.Read` | built |
+| `GetMemberQuery` | `Members.Read` | built. Carries `FatherName`/`MotherName`, by the directory's rules |
+| `GetMemberHouseholdQuery` | `Members.Read` | built. The household on a member's profile page - see below |
 | `GetMyProfileQuery` | any authenticated role | built |
 | `GetMyFamilyQuery` | any member | built |
 | `ListFamilyChildrenQuery` | any member | built |
@@ -95,6 +96,8 @@ here, which looks exactly like a broker problem and is not one.
 | GET | `/v1/members` | `Members.Read` |
 | GET | `/v1/members/registration-summary` | `SamaajAdmin`/`SuperAdmin` + `Members.Read` |
 | GET | `/v1/members/me` | any authenticated role |
+| GET | `/v1/members/{id}` | `Members.Read` |
+| GET | `/v1/members/{id}/household` | `Members.Read` |
 | PATCH | `/v1/members/{id}` | self only |
 | PATCH | `/v1/members/{id}/details` | `SamaajAdmin` + `Members.Write`, never self |
 | POST | `/v1/families` | any member |
@@ -459,6 +462,21 @@ answer is none rather than a guess. A parent is named only where the viewer
 could find them in the directory anyway - listed, or an administrator
 viewing - so someone who unlisted themselves does not reappear on a
 relative's card, and erased profiles (always unlisted) never do.
+
+**A member's profile page shows their household, added 2026-10-24.**
+`GetMemberHouseholdQuery` (`GET /v1/members/{id}/household`) answers with the
+household a member actively belongs to - who is in it, its head and admin, and
+each person's relationship to the admin - for the member portal's profile
+page, where it used to say the household "is not shown yet". Who is in
+somebody's household is other members' data, so it shows less than the family
+screen does: active members only, only those the viewer could find in the
+directory (listed, or an administrator viewing - the `ParentNames` rule), plus
+the member whose page it is. **Never a child's record, never the family code,
+never a pending request**: a minor's name is held on a parent's consent for
+the household, not for the Samaaj's member pages. No household is a null
+`household`, not a 404. `GetMemberQuery` carries `FatherName`/`MotherName` by
+the same `ParentNames` the directory uses. `DirectoryCardTests` holds both, and
+fails if the listing rule is removed.
 
 **Gautra and Profession filter too, and the Profession filter respects the
 field's privacy.** Gautra carries no privacy level, so it filters plainly.

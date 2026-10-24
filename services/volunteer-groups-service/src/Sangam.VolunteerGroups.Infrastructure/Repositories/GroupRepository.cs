@@ -43,5 +43,16 @@ public sealed class GroupRepository(VolunteerGroupsDbContext dbContext) : IGroup
         dbContext.Groups.AnyAsync(
             g => g.Name == name && g.Id != excludingGroupId, cancellationToken);
 
+    public async Task<IReadOnlyList<VolunteerGroup>> ListForMemberAsync(
+        Guid memberId, CancellationToken cancellationToken = default) =>
+        await dbContext.Groups
+            .AsNoTracking()
+            .Include(g => g.Members)
+            .Include(g => g.Roles)
+            .AsSplitQuery()
+            .Where(g => g.Members.Any(m => m.MemberId == memberId))
+            .OrderBy(g => g.Name)
+            .ToListAsync(cancellationToken);
+
     public void Add(VolunteerGroup group) => dbContext.Groups.Add(group);
 }

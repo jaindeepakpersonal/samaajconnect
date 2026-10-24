@@ -75,12 +75,70 @@ public sealed class SamaajEvent : AggregateRoot, ITenantScopedEntity
 
     public IReadOnlyCollection<EventRegistration> Registrations => _registrations.AsReadOnly();
 
+    /// <summary>
+    /// The <see cref="Media.EventPhoto"/> shown as the event page's cover, or
+    /// null. Set by uploading one, never by the edit form.
+    /// </summary>
+    public Guid? PhotoId { get; private set; }
+
+    /// <summary>
+    /// Points the event at a newly stored photo and answers which one it
+    /// replaced, so the handler deletes that in the same transaction.
+    /// </summary>
+    public Guid? SetPhoto(Guid photoId, DateTimeOffset now)
+    {
+        var previous = PhotoId;
+
+        PhotoId = photoId;
+
+        Raise(new EventUpdatedDomainEvent(Id, TenantId, now));
+
+        return previous;
+    }
+
+    /// <summary>Takes the photo down, answering which one it was. Null when there was none.</summary>
+    public Guid? RemovePhoto(DateTimeOffset now)
+    {
+        var removed = PhotoId;
+
+        if (removed is null)
+        {
+            return null;
+        }
+
+        PhotoId = null;
+
+        Raise(new EventUpdatedDomainEvent(Id, TenantId, now));
+
+        return removed;
+    }
+
     /// <summary>The event's programmes, in no particular order - <see cref="OrderedSchedule"/> reads them.</summary>
     public IReadOnlyCollection<EventScheduleItem> Schedule => _schedule.AsReadOnly();
 
     /// <summary>The schedule as it is printed: by date, then by start time.</summary>
     public IReadOnlyList<EventScheduleItem> OrderedSchedule =>
         [.. _schedule.OrderBy(s => s.Date).ThenBy(s => s.StartTime).ThenBy(s => s.ProgramName)];
+
+    /// <summary>
+    /// Whether a programme on this date can belong to this event: on or after
+    /// the day it starts, on or before the day it ends (the day it starts, when
+    /// it has no end).
+    /// </summary>
+    /// <remarks>
+    /// A day's slack either side, because the event is an instant and the
+    /// programme a date on the clock where it happens, and this service is not
+    /// told that clock's zone - an event starting at 1 AM in India begins the
+    /// previous day in UTC. The organiser's screen checks the exact local
+    /// dates; this is the bound nobody can get past by calling the API.
+    /// </remarks>
+    public bool ScheduleDateFits(DateOnly date)
+    {
+        var first = DateOnly.FromDateTime(StartAt.UtcDateTime).AddDays(-1);
+        var last = DateOnly.FromDateTime((EndAt ?? StartAt).UtcDateTime).AddDays(1);
+
+        return date >= first && date <= last;
+    }
 
     /// <summary>The most programmes one event may carry - a schedule, not a log.</summary>
     public const int MaxScheduleItems = 100;

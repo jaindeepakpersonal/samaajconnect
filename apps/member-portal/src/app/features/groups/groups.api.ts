@@ -9,6 +9,7 @@ import {
   GroupDetail,
   NominateResult,
   VolunteerGroup,
+  MemberGroup,
 } from './groups.models';
 
 /**
@@ -32,6 +33,11 @@ export class GroupsApi {
   /** This Samaaj's groups, each with the asking member's standing. */
   list(): Observable<VolunteerGroup[]> {
     return this.http.get<VolunteerGroup[]>('/v1/volunteer-groups/groups');
+  }
+
+  /** The groups one member belongs to and the role they hold in each - for their profile page. */
+  memberGroups(memberId: string): Observable<MemberGroup[]> {
+    return this.http.get<MemberGroup[]>(`/v1/volunteer-groups/members/${memberId}/groups`);
   }
 
   get(id: string): Observable<GroupDetail> {

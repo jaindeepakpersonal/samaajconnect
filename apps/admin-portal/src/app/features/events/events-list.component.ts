@@ -109,7 +109,7 @@ import { ALL_LOCALITIES, LocalityFilterComponent, matchesLocality } from '../../
               <caption class="sr-only">Events, drafts and published together</caption>
               <thead>
                 <tr>
-                  <th>Event</th><th>Organiser</th><th>Date</th><th>RSVP</th>
+                  <th>Event</th><th>Organiser</th><th>Starts</th><th>Ends</th><th>RSVP</th>
                   <th>Status</th><th></th>
                 </tr>
               </thead>
@@ -124,6 +124,13 @@ import { ALL_LOCALITIES, LocalityFilterComponent, matchesLocality } from '../../
                     </td>
                     <td>{{ organiser(event) }}</td>
                     <td>{{ event.startAt | date: 'd MMM y, h:mm a' }}</td>
+                    <td>
+                      @if (event.endAt) {
+                        {{ event.endAt | date: 'd MMM y, h:mm a' }}
+                      } @else {
+                        <span class="muted">No end set</span>
+                      }
+                    </td>
                     <td>
                       {{ rsvp(event) }}
                       @if (event.waitlistedCount > 0) {

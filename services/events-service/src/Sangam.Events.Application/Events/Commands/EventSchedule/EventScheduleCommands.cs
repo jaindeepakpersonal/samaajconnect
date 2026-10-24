@@ -39,6 +39,12 @@ internal static class ScheduleItemRules
 
 internal static class EventForEditing
 {
+    /// <summary>The refusal for a programme dated outside its event - see <c>SamaajEvent.ScheduleDateFits</c>.</summary>
+    public static Error DateOutsideEvent() => Error.Validation(new Dictionary<string, string[]>
+    {
+        ["date"] = ["A programme has to fall within the event's own dates."],
+    });
+
     /// <summary>The event, if this caller may edit it in this Samaaj - else the reason it is refused.</summary>
     public static async Task<(SamaajEvent? Event, Error? Refusal)> FindAsync(
         IEventRepository events,
@@ -114,6 +120,11 @@ public sealed class AddEventScheduleItemCommandHandler(
             return Result.Failure<EventResponse>(refusal!);
         }
 
+        if (!samaajEvent.ScheduleDateFits(command.Date))
+        {
+            return Result.Failure<EventResponse>(EventForEditing.DateOutsideEvent());
+        }
+
         var now = clock.UtcNow;
 
         if (samaajEvent.AddScheduleItem(command.Date, command.ProgramName, command.StartTime, command.EndTime, now) is null)
@@ -176,6 +187,11 @@ public sealed class UpdateEventScheduleItemCommandHandler(
         if (samaajEvent is null)
         {
             return Result.Failure<EventResponse>(refusal!);
+        }
+
+        if (!samaajEvent.ScheduleDateFits(command.Date))
+        {
+            return Result.Failure<EventResponse>(EventForEditing.DateOutsideEvent());
         }
 
         var now = clock.UtcNow;

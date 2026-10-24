@@ -510,6 +510,44 @@ public sealed class GroupEndpointsTests(VolunteerGroupsApiFactory factory)
         return member;
     }
 
+    // ---- A member's groups, for their profile page ------------------------
+
+    [Fact]
+    public async Task A_members_groups_list_what_they_belong_to_with_their_role_and_nothing_they_only_applied_to()
+    {
+        var joined = await CreateGroupAsync("Seva Group");
+        var appliedOnly = await CreateGroupAsync("Yuva Mandal");
+
+        await AcceptedMemberIdAsync(joined);
+        await ApplyAsync(Member(), appliedOnly);
+
+        var groups = await Member(Guid.NewGuid()).GetFromJsonAsync<JsonElement>(
+            $"/v1/volunteer-groups/members/{ApplicantId}/groups");
+
+        var only = groups.EnumerateArray().Should().ContainSingle().Subject;
+        only.GetProperty("groupId").GetGuid().Should().Be(joined);
+        only.GetProperty("name").GetString().Should().Be("Seva Group");
+        only.GetProperty("roleTitle").GetString().Should().Be("Volunteer");
+        only.GetProperty("isPresident").GetBoolean().Should().BeFalse();
+
+        var president = await Member().GetFromJsonAsync<JsonElement>(
+            $"/v1/volunteer-groups/members/{PresidentId}/groups");
+        president.EnumerateArray().Should().HaveCount(2)
+            .And.OnlyContain(g => g.GetProperty("isPresident").GetBoolean());
+    }
+
+    [Fact]
+    public async Task Another_Samaaj_sees_none_of_a_members_groups()
+    {
+        var joined = await CreateGroupAsync();
+        await AcceptedMemberIdAsync(joined);
+
+        var groups = await Member(Guid.NewGuid(), OtherTenantId).GetFromJsonAsync<JsonElement>(
+            $"/v1/volunteer-groups/members/{ApplicantId}/groups");
+
+        groups.EnumerateArray().Should().BeEmpty();
+    }
+
     [Fact]
     public async Task The_president_removes_a_member()
     {

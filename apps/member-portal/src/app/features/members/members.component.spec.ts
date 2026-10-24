@@ -1,12 +1,14 @@
 import { provideHttpClient } from '@angular/common/http';
 import { HttpTestingController, provideHttpClientTesting } from '@angular/common/http/testing';
 import { ComponentFixture, TestBed } from '@angular/core/testing';
-import { ActivatedRoute, provideRouter } from '@angular/router';
+import { ActivatedRoute, convertToParamMap, provideRouter } from '@angular/router';
+import { of } from 'rxjs';
 import { API_CONFIG, CurrentUser } from '@samaajconnect/shared';
 import { FamilyComponent } from './family.component';
 import { MemberDetailComponent } from './member-detail.component';
 import { MembersListComponent } from './members-list.component';
-import { Child, Family, FamilyMember, Member } from './members.models';
+import { Child, Family, FamilyMember, Member, MemberHousehold } from './members.models';
+import { MemberGroup } from '../groups/groups.models';
 
 const ME = 'u1';
 const HEAD = 'h1';
@@ -252,7 +254,10 @@ describe('MemberDetailComponent', () => {
       imports: [MemberDetailComponent],
       providers: [
         ...providers(),
-        { provide: ActivatedRoute, useValue: { snapshot: { paramMap: { get: () => 'm1' } } } },
+        {
+          provide: ActivatedRoute,
+          useValue: { snapshot: { paramMap: { get: () => 'm1' } }, paramMap: of(convertToParamMap({ id: 'm1' })) },
+        },
       ],
     });
 
@@ -274,10 +279,17 @@ describe('MemberDetailComponent', () => {
     http.expectOne((r) => r.url === '/v1/master-data/localities').flush([]);
   }
 
-  function load(found: Member): void {
+  function load(
+    found: Member,
+    household: MemberHousehold = { household: null },
+    groups: MemberGroup[] = [],
+  ): void {
     fixture.detectChanges();
     settleMasterData();
     http.expectOne('/v1/members/m1').flush(found);
+    fixture.detectChanges();
+    http.expectOne('/v1/members/m1/household').flush(household);
+    http.expectOne('/v1/volunteer-groups/members/m1/groups').flush(groups);
     fixture.detectChanges();
   }
 
@@ -307,12 +319,45 @@ describe('MemberDetailComponent', () => {
     expect(notShared).toBeGreaterThanOrEqual(4);
   });
 
-  it('does not invent the family and volunteer group the wireframe showed', () => {
-    // Neither service exposes those per member.
+  it('opens as a profile page: photo or initials, name with Gautra', () => {
     load(member());
 
-    expect(text()).toContain('will not guess');
-    expect(text()).not.toContain('Seva Group');
+    const header = (fixture.nativeElement as HTMLElement).querySelector('app-profile-header')!;
+    expect(header.textContent).toContain('Rajesh Jain');
+    expect(header.querySelector('.profile-avatar.initials')?.textContent?.trim()).toBe('RJ');
+  });
+
+  it('shows the household and volunteer groups, each linking to its own page', () => {
+    load(
+      member({ fatherName: 'Mahesh Jain' }),
+      {
+        household: {
+          familyId: 'f1',
+          namedAfter: 'Mahesh Jain',
+          members: [
+            { memberId: 'h1', fullName: 'Mahesh Jain', photoUrl: null, relationshipToAdmin: null, isHead: true, isAdmin: true },
+            { memberId: 'm1', fullName: 'Rajesh Jain', photoUrl: null, relationshipToAdmin: 'Child', isHead: false, isAdmin: false },
+          ],
+        },
+      },
+      [{ groupId: 'g1', name: 'Seva Group', focusArea: null, status: 'Active', photoUrl: null, roleTitle: 'Secretary', isPresident: false, joinedAt: '2026-01-01T00:00:00Z' }],
+    );
+
+    const page = fixture.nativeElement as HTMLElement;
+    expect(text()).toContain("Mahesh Jain's household");
+    expect(text()).toContain('Child of the family admin');
+    expect(text()).toContain('Father');
+    expect(page.querySelector('a[href="/members/h1"]')).not.toBeNull();
+    expect(page.querySelector('a[href="/groups/g1"]')?.textContent).toContain('Seva Group');
+    expect(text()).toContain('Secretary');
+    expect(text()).not.toContain('is not shown yet');
+  });
+
+  it('says plainly when a member is in no household and no group', () => {
+    load(member());
+
+    expect(text()).toContain('Not in a household on the platform');
+    expect(text()).toContain('Not in any volunteer group');
   });
 
   it('offers a retry when the profile cannot be loaded', () => {

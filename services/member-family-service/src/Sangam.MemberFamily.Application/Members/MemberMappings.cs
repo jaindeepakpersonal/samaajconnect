@@ -21,7 +21,7 @@ public static class MemberMappings
     /// mean configuring a public hostname into a service that has never needed
     /// one.
     /// </remarks>
-    private static string? PhotoPath(Guid memberId, Guid? imageId) =>
+    internal static string? PhotoPath(Guid memberId, Guid? imageId) =>
         imageId is null ? null : $"/v1/members/{memberId}/photo";
 
     /// <summary>
