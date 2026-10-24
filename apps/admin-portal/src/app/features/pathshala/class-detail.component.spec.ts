@@ -158,11 +158,31 @@ describe('ClassDetailComponent', () => {
     expect(fixture.nativeElement.querySelector('[role="alert"]')).toBeNull();
   });
 
+  it('opens on the register, with each section a tab and each form a popup', () => {
+    load();
+
+    const tabs = [...fixture.nativeElement.querySelectorAll('[role="tab"]')].map((t) => (t as HTMLElement).textContent?.trim());
+    expect(tabs).toEqual(['Register', 'Roll', 'Exams', 'Timetable', 'Teachers']);
+    expect(fixture.nativeElement.querySelector('#exam-title')).toBeNull();
+
+    component.tab.set('exams');
+    fixture.detectChanges();
+    const open = [...fixture.nativeElement.querySelectorAll('button')].find(
+      (b) => (b as HTMLElement).textContent?.trim() === 'Set an exam',
+    ) as HTMLButtonElement;
+    open.click();
+    fixture.detectChanges();
+
+    expect(fixture.nativeElement.querySelector('[role="dialog"] #exam-title')).not.toBeNull();
+  });
+
   it('says a class nobody teaches cannot be marked at all', () => {
     // Holding the attendance permission is not enough — the service checks that
     // the caller teaches this class. An empty teacher list is therefore a real
     // blocker, not a cosmetic gap.
     load();
+    component.tab.set('teachers');
+    fixture.detectChanges();
 
     expect(text()).toContain('Nobody teaches this class yet');
   });
@@ -260,6 +280,8 @@ describe('ClassDetailComponent', () => {
         { id: 'kid2', fullName: 'Aarav Jain' },
       ],
     );
+    component.tab.set('exams');
+    fixture.detectChanges();
 
     // Re-recording amends silently, so which of the two a click will do is the
     // thing a teacher needs to know before they type.
@@ -361,6 +383,8 @@ describe('ClassDetailComponent', () => {
         teacher('t2', 'Shri Rajesh Jain'),
       ],
     );
+    component.tab.set('teachers');
+    fixture.detectChanges();
 
     expect(component.assignable().map((t) => t.id)).toEqual(['t2']);
     expect(text()).toContain('Smt. Kavita Jain');

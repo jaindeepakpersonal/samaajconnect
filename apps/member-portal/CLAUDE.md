@@ -24,7 +24,7 @@ before translating another screen.
 | Campaign detail | `/voting/:id` | `#celebrity` + `#celebrityresults` | built as one screen |
 | Your data and privacy | `/privacy` | `#profile`'s privacy card, plus none for the DPDP rights | built - carries `#profile`'s per-field directory privacy card, moved here 2026-09-11, ahead of the three DPDP rights (no wireframe covers those, and endpoints reachable only with curl are not rights a member has). Reachable from the top bar's user menu, not the sidebar |
 | Jain Pathshala | `/pathshala` | `#pathshala` | built |
-| Pathshala enrolment | `/pathshala/:id` | `#myclass` + `#attendance` + `#exams` + `#progress` | built as one screen |
+| Pathshala enrolment | `/pathshala/:id` | `#myclass` + `#attendance` + `#exams` + `#progress` | built as one screen, four tabs since 2026-10-24 - Class, Attendance, Exams, Progress |
 | Auctions / Boli | `/boli` | `#boli` | built |
 | Boli detail | `/boli/:id` | `#bolidetail` | built |
 | Boli occasion | `/boli/occasions/:id` | — | built; the wireframe's "View Occasion" had no screen behind it |

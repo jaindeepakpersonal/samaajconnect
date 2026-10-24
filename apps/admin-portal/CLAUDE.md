@@ -22,7 +22,7 @@ screen. The spec is `docs/product/wireframes/admin-panel-wireframes.html`.
 | Timeline / Moderation | `/moderation` | `#content` | built |
 | Jain Pathshala | `/pathshala` | `#pathshala` | built — the list, as tiles with Open, Edit (a modal) and Stand down |
 | Pathshala detail | `/pathshala/:id` | — | built; no wireframe covers running one. Nine tabs: sessions, classes, teachers, students (with the placement queue), exams, progress report, attendance, donations, announcements |
-| Class detail | `/pathshala/:id/classes/:classId` | — | built. Teachers (picked from the Pathshala's teacher records), timetable, roll, register, exams and results |
+| Class detail | `/pathshala/:id/classes/:classId` | — | built. Five tabs - Register (first), Roll, Exams and results, Timetable, Teachers (picked from the Pathshala's teacher records) - with assigning a teacher, adding a slot and setting an exam in popups. The Pathshala page's own session, class, donation and announcement forms are popups too |
 | Notifications | `/notifications` | `#notifications` | built — compose and recent, without the Audience and Channel dropdowns |
 | Auctions / Boli | `/boli` | `#boli` + `#publishboli` | built. Occasions - announced and corrected (until closed) in a popup, with a locality - and the publication queue with its confirmation |
 | Occasion detail | `/boli/:id` | — | built; no wireframe covers running an auction. Types, opening a Boli, closing, recording |

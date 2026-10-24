@@ -91,40 +91,26 @@ import {
             }
           </p>
         } @else {
-          <!-- My Class --------------------------------------------------- -->
-          @if (myClass(); as found) {
-            <h2 class="section-heading">The class</h2>
+          <div class="tabs" role="tablist" aria-label="Your child's Pathshala">
+            @for (item of tabs; track item.value) {
+              <button
+                type="button"
+                role="tab"
+                [id]="'enrolment-tab-' + item.value"
+                [class.on]="tab() === item.value"
+                [attr.aria-selected]="tab() === item.value"
+                aria-controls="enrolment-tab-panel"
+                (click)="tab.set(item.value)"
+              >
+                {{ item.label }}
+              </button>
+            }
+          </div>
 
-            <div class="card">
-              <p><b>Session</b> {{ found.sessionLabel }}</p>
-
-              @if (found.roomLabel; as room) {
-                <p><b>Room</b> {{ room }}</p>
-              }
-
-              <!-- The wireframe's "Teacher: Smt. Kavita Jain", by name: a
-                   teacher is the Pathshala's own record, so the name comes
-                   with the class rather than from the member directory. -->
-              <p>{{ teachers(found) }}</p>
-              <p>{{ classmates(found) }}</p>
-
-              @if (found.schedule.length > 0) {
-                <h3 class="section-heading">Timetable</h3>
-                <ul class="slots">
-                  @for (slot of found.schedule; track slot.dayOfWeek + slot.startTime) {
-                    <li>
-                      <span class="day">{{ slot.dayOfWeek }}</span>
-                      <span class="time">{{ time(slot) }}</span>
-                    </li>
-                  }
-                </ul>
-              } @else {
-                <p class="small">No timetable has been set for this class yet.</p>
-              }
-            </div>
-          }
-
-          <!-- My Attendance ---------------------------------------------- -->
+          <div id="enrolment-tab-panel" role="tabpanel" [attr.aria-labelledby]="'enrolment-tab-' + tab()">
+          @switch (tab()) {
+          @case ('attendance') {
+                    <!-- My Attendance ---------------------------------------------- -->
           @if (attendance(); as marks) {
             <h2 class="section-heading">Attendance</h2>
 
@@ -179,8 +165,9 @@ import {
               </div>
             }
           }
-
-          <!-- My Exams --------------------------------------------------- -->
+          }
+          @case ('exams') {
+                    <!-- My Exams --------------------------------------------------- -->
           <h2 class="section-heading">Exams</h2>
 
           @if (exams().length === 0) {
@@ -208,8 +195,9 @@ import {
               </table>
             </div>
           }
-
-          <!-- My Progress ------------------------------------------------ -->
+          }
+          @case ('progress') {
+                    <!-- My Progress ------------------------------------------------ -->
           @if (progress(); as summary) {
             <h2 class="section-heading">Progress</h2>
 
@@ -248,6 +236,44 @@ import {
               </div>
             </div>
           }
+          }
+          @default {
+          <!-- My Class --------------------------------------------------- -->
+          @if (myClass(); as found) {
+            <h2 class="section-heading">The class</h2>
+
+            <div class="card">
+              <p><b>Session</b> {{ found.sessionLabel }}</p>
+
+              @if (found.roomLabel; as room) {
+                <p><b>Room</b> {{ room }}</p>
+              }
+
+              <!-- The wireframe's "Teacher: Smt. Kavita Jain", by name: a
+                   teacher is the Pathshala's own record, so the name comes
+                   with the class rather than from the member directory. -->
+              <p>{{ teachers(found) }}</p>
+              <p>{{ classmates(found) }}</p>
+
+              @if (found.schedule.length > 0) {
+                <h3 class="section-heading">Timetable</h3>
+                <ul class="slots">
+                  @for (slot of found.schedule; track slot.dayOfWeek + slot.startTime) {
+                    <li>
+                      <span class="day">{{ slot.dayOfWeek }}</span>
+                      <span class="time">{{ time(slot) }}</span>
+                    </li>
+                  }
+                </ul>
+              } @else {
+                <p class="small">No timetable has been set for this class yet.</p>
+              }
+            </div>
+          }
+
+          }
+          }
+          </div>
         }
       }
     </div>
@@ -258,6 +284,16 @@ export class EnrolmentComponent implements OnInit {
   private readonly route = inject(ActivatedRoute);
 
   readonly enrolment = signal<Enrolment | null>(null);
+
+  readonly tabs: readonly { value: EnrolmentTab; label: string }[] = [
+    { value: 'class', label: 'Class' },
+    { value: 'attendance', label: 'Attendance' },
+    { value: 'exams', label: 'Exams' },
+    { value: 'progress', label: 'Progress' },
+  ];
+
+  /** The class first: who teaches it, where and when - what a parent opens this to check. */
+  readonly tab = signal<EnrolmentTab>('class');
   readonly myClass = signal<MyClass | null>(null);
   readonly attendance = signal<MyAttendance | null>(null);
   readonly exams = signal<readonly MyExam[]>([]);
@@ -479,3 +515,5 @@ export class EnrolmentComponent implements OnInit {
     return value.length >= 5 ? value.slice(0, 5) : value;
   }
 }
+
+type EnrolmentTab = 'class' | 'attendance' | 'exams' | 'progress';

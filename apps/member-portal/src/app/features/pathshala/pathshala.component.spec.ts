@@ -515,6 +515,20 @@ describe('EnrolmentComponent', () => {
     expect(text()).toContain('No teacher has been assigned yet');
   });
 
+  it('opens on the class, with attendance, exams and progress as tabs', () => {
+    loadPlaced({ exams: [exam({ score: 44, maxScore: 50 })] });
+
+    const tabs = Array.from((fixture.nativeElement as HTMLElement).querySelectorAll('[role="tab"]')).map((t) =>
+      t.textContent?.trim(),
+    );
+    expect(tabs).toEqual(['Class', 'Attendance', 'Exams', 'Progress']);
+    expect(text()).not.toContain('44/50');
+
+    component.tab.set('exams');
+    fixture.detectChanges();
+    expect(text()).toContain('44/50');
+  });
+
   it('does not print a nil attendance as zero per cent', () => {
     // A child enrolled last week whose register has never been marked has no
     // percentage. 0% would tell their parent they had missed everything.
@@ -522,6 +536,8 @@ describe('EnrolmentComponent', () => {
       attendance: attendance({ percentage: null, present: 0, absent: 0, excused: 0, days: [] }),
       progress: progress({ attendancePercentage: null, present: 0, absent: 0, excused: 0 }),
     });
+    component.tab.set('attendance');
+    fixture.detectChanges();
 
     expect(text()).toContain('Not yet');
     expect(text()).not.toContain('0%');
@@ -533,6 +549,8 @@ describe('EnrolmentComponent', () => {
     loadPlaced({
       exams: [exam({ examId: 'x2', status: 'AwaitingResult', score: null, grade: null })],
     });
+    component.tab.set('exams');
+    fixture.detectChanges();
 
     expect(text()).toContain('Awaiting result');
     expect(text()).not.toContain('Completed');
@@ -540,6 +558,8 @@ describe('EnrolmentComponent', () => {
 
   it('shows a mark out of the exam maximum, not out of a hundred', () => {
     loadPlaced({ exams: [exam({ score: 44, maxScore: 50 })] });
+    component.tab.set('exams');
+    fixture.detectChanges();
 
     expect(text()).toContain('44/50');
     expect(text()).toContain('88%');
@@ -547,6 +567,8 @@ describe('EnrolmentComponent', () => {
 
   it('prefers a grade over a computed percentage when one was recorded', () => {
     loadPlaced({ exams: [exam({ score: 44, maxScore: 50, grade: 'A' })] });
+    component.tab.set('exams');
+    fixture.detectChanges();
 
     expect(text()).toContain('44/50 • A');
   });
@@ -556,6 +578,8 @@ describe('EnrolmentComponent', () => {
       attendance: attendance({ present: 2, absent: 1, excused: 1, percentage: 67 }),
       progress: progress({ present: 2, absent: 1, excused: 1, attendancePercentage: 67 }),
     });
+    component.tab.set('attendance');
+    fixture.detectChanges();
 
     expect(text()).toContain('Classes missed, and 1 excused');
     expect(text()).not.toContain('missed ,');
@@ -568,6 +592,8 @@ describe('EnrolmentComponent', () => {
       attendance: attendance({ present: 2, absent: 1, excused: 1, percentage: 67 }),
       progress: progress({ present: 2, absent: 1, excused: 1, attendancePercentage: 67 }),
     });
+    component.tab.set('progress');
+    fixture.detectChanges();
 
     expect(text()).toContain('2 present, 1 absent, 1 excused');
     expect(text()).not.toContain('2 of 4');
@@ -575,6 +601,8 @@ describe('EnrolmentComponent', () => {
 
   it('does not claim an average before anything has been marked', () => {
     loadPlaced({ progress: progress({ averageScorePercentage: null, examsSat: 0 }) });
+    component.tab.set('progress');
+    fixture.detectChanges();
 
     expect(text()).toContain('No exams sat so far');
   });

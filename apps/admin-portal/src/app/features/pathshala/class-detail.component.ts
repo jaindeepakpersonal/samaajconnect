@@ -70,9 +70,31 @@ type Mark = AttendanceStatus | '';
         · {{ roll().length }} on the roll
       </p>
 
+      <div class="tabs" role="tablist" aria-label="This class">
+        @for (item of tabs; track item.value) {
+          <button
+            type="button"
+            role="tab"
+            [id]="'class-tab-' + item.value"
+            [class.on]="tab() === item.value"
+            [attr.aria-selected]="tab() === item.value"
+            aria-controls="class-tab-panel"
+            (click)="tab.set(item.value)"
+          >
+            {{ item.label }}
+          </button>
+        }
+      </div>
+
+      <div id="class-tab-panel" role="tabpanel" [attr.aria-labelledby]="'class-tab-' + tab()">
+      @switch (tab()) {
+      @case ('teachers') {
       <!-- Teachers -------------------------------------------------------- -->
-      <div class="card spaced">
-        <h2>Teachers</h2>
+      <div class="card">
+        <div class="section-head">
+          <h2>Teachers</h2>
+          <button class="btn small" type="button" (click)="openPopup('teacher')">Assign a teacher</button>
+        </div>
 
         @if (subject.teacherIds.length === 0) {
           <p class="empty">
@@ -97,33 +119,16 @@ type Mark = AttendanceStatus | '';
           </ul>
         }
 
-        <form (ngSubmit)="setTeacher(chosenTeacher, true)">
-          <h3 class="section-heading">Assign a teacher</h3>
-
-          @if (teachers().length === 0) {
-            <p class="small">
-              This Pathshala has no teachers yet. Add them on its Teachers tab first - a teacher
-              need not be a member of the Samaaj.
-            </p>
-          }
-
-          <label for="teacher">Teacher</label>
-          <select id="teacher" class="input" name="teacher" [(ngModel)]="chosenTeacher">
-            <option value="">Choose a teacher…</option>
-            @for (teacher of assignable(); track teacher.id) {
-              <option [value]="teacher.id">{{ teacher.fullName }}</option>
-            }
-          </select>
-
-          <button class="btn" type="submit" [disabled]="busy() || !chosenTeacher">
-            Assign
-          </button>
-        </form>
       </div>
 
+      }
+      @case ('timetable') {
       <!-- Timetable ------------------------------------------------------- -->
-      <div class="card spaced">
-        <h2>Timetable</h2>
+      <div class="card">
+        <div class="section-head">
+          <h2>Timetable</h2>
+          <button class="btn small" type="button" (click)="openPopup('slot')">Add a slot</button>
+        </div>
 
         @if (subject.schedule.length === 0) {
           <p class="empty">No weekly slots yet.</p>
@@ -135,39 +140,12 @@ type Mark = AttendanceStatus | '';
           </ul>
         }
 
-        <form (ngSubmit)="addSlot()">
-          <h3 class="section-heading">Add a slot</h3>
-
-          <div class="form-grid">
-            <div class="field">
-              <label for="day">Day</label>
-              <select id="day" class="input" name="day" [(ngModel)]="day">
-                @for (name of days; track name) {
-                  <option [value]="name">{{ name }}</option>
-                }
-              </select>
-            </div>
-            <div class="field">
-              <label for="from">From</label>
-              <input id="from" class="input" type="time" name="from" [(ngModel)]="startTime" />
-            </div>
-            <div class="field">
-              <label for="to">To</label>
-              <input id="to" class="input" type="time" name="to" [(ngModel)]="endTime" />
-            </div>
-          </div>
-
-          <p class="small">
-            A slot that overlaps another on the same day is refused — one class cannot meet twice
-            at once.
-          </p>
-
-          <button class="btn" type="submit" [disabled]="busy() || !canAddSlot()">Add slot</button>
-        </form>
       </div>
 
+      }
+      @case ('register') {
       <!-- Register -------------------------------------------------------- -->
-      <div class="card spaced">
+      <div class="card">
         <h2>Register</h2>
 
         @if (roll().length === 0) {
@@ -239,8 +217,10 @@ type Mark = AttendanceStatus | '';
         }
       </div>
 
+      }
+      @case ('roll') {
       <!-- Roll ------------------------------------------------------------ -->
-      <div class="card spaced">
+      <div class="card">
         <h2>Roll</h2>
 
         @if (roll().length === 0) {
@@ -283,9 +263,14 @@ type Mark = AttendanceStatus | '';
         }
       </div>
 
+      }
+      @case ('exams') {
       <!-- Exams ----------------------------------------------------------- -->
-      <div class="card spaced">
-        <h2>Exams</h2>
+      <div class="card">
+        <div class="section-head">
+          <h2>Exams</h2>
+          <button class="btn small" type="button" (click)="openPopup('exam')">Set an exam</button>
+        </div>
 
         @if (exams().length === 0) {
           <p class="empty">No exams set for this class.</p>
@@ -356,34 +341,136 @@ type Mark = AttendanceStatus | '';
           </p>
         }
 
-        <form (ngSubmit)="scheduleExam()">
-          <h3 class="section-heading">Set an exam</h3>
-
-          <div class="form-grid">
-            <div class="field">
-              <label for="exam-title">Title</label>
-              <input id="exam-title" class="input" name="examTitle" [(ngModel)]="examTitle"
-                maxlength="200" placeholder="Half-yearly" />
-            </div>
-
-            <div class="field">
-              <label for="exam-date">Date</label>
-              <input id="exam-date" class="input" type="date" name="examDate"
-                [(ngModel)]="examDate" />
-            </div>
-
-            <div class="field">
-              <label for="exam-max">Out of</label>
-              <input id="exam-max" class="input" type="number" min="1" name="examMax"
-                [(ngModel)]="examMax" />
-            </div>
-          </div>
-
-          <button class="btn" type="submit" [disabled]="busy() || !canScheduleExam()">
-            Set exam
-          </button>
-        </form>
       </div>
+      }
+      }
+      </div>
+
+      @if (popup() === 'teacher') {
+        <div class="modal-backdrop" (click)="popup.set(null)">
+          <div class="card modal-card modal-dialog" role="dialog" aria-modal="true"
+            aria-labelledby="teacher-popup-title" (click)="$event.stopPropagation()" (keydown.escape)="popup.set(null)">
+            <h2 id="teacher-popup-title">Assign a teacher</h2>
+
+            @if (error(); as message) {
+              <p class="notice error" role="alert">{{ message }}</p>
+            }
+
+            <form (ngSubmit)="setTeacher(chosenTeacher, true)">
+
+              @if (teachers().length === 0) {
+                <p class="small">
+                  This Pathshala has no teachers yet. Add them on its Teachers tab first - a teacher
+                  need not be a member of the Samaaj.
+                </p>
+              }
+
+              <label for="teacher">Teacher</label>
+              <select id="teacher" class="input" name="teacher" [(ngModel)]="chosenTeacher">
+                <option value="">Choose a teacher…</option>
+                @for (teacher of assignable(); track teacher.id) {
+                  <option [value]="teacher.id">{{ teacher.fullName }}</option>
+                }
+              </select>
+
+              <div class="actions">
+              <button class="btn" type="submit" [disabled]="busy() || !chosenTeacher">
+                Assign
+              </button>
+              <button class="btn alt" type="button" (click)="popup.set(null)">Cancel</button>
+            </div>
+            </form>
+          </div>
+        </div>
+      }
+
+      @if (popup() === 'slot') {
+        <div class="modal-backdrop" (click)="popup.set(null)">
+          <div class="card modal-card modal-dialog" role="dialog" aria-modal="true"
+            aria-labelledby="slot-popup-title" (click)="$event.stopPropagation()" (keydown.escape)="popup.set(null)">
+            <h2 id="slot-popup-title">Add a slot</h2>
+
+            @if (error(); as message) {
+              <p class="notice error" role="alert">{{ message }}</p>
+            }
+
+            <form (ngSubmit)="addSlot()">
+
+              <div class="form-grid">
+                <div class="field">
+                  <label for="day">Day</label>
+                  <select id="day" class="input" name="day" [(ngModel)]="day">
+                    @for (name of days; track name) {
+                      <option [value]="name">{{ name }}</option>
+                    }
+                  </select>
+                </div>
+                <div class="field">
+                  <label for="from">From</label>
+                  <input id="from" class="input" type="time" name="from" [(ngModel)]="startTime" />
+                </div>
+                <div class="field">
+                  <label for="to">To</label>
+                  <input id="to" class="input" type="time" name="to" [(ngModel)]="endTime" />
+                </div>
+              </div>
+
+              <p class="small">
+                A slot that overlaps another on the same day is refused — one class cannot meet twice
+                at once.
+              </p>
+
+              <div class="actions">
+              <button class="btn" type="submit" [disabled]="busy() || !canAddSlot()">Add slot</button>
+              <button class="btn alt" type="button" (click)="popup.set(null)">Cancel</button>
+            </div>
+            </form>
+          </div>
+        </div>
+      }
+
+      @if (popup() === 'exam') {
+        <div class="modal-backdrop" (click)="popup.set(null)">
+          <div class="card modal-card modal-dialog" role="dialog" aria-modal="true"
+            aria-labelledby="exam-popup-title" (click)="$event.stopPropagation()" (keydown.escape)="popup.set(null)">
+            <h2 id="exam-popup-title">Set an exam</h2>
+
+            @if (error(); as message) {
+              <p class="notice error" role="alert">{{ message }}</p>
+            }
+
+            <form (ngSubmit)="scheduleExam()">
+
+              <div class="form-grid">
+                <div class="field">
+                  <label for="exam-title">Title</label>
+                  <input id="exam-title" class="input" name="examTitle" [(ngModel)]="examTitle"
+                    maxlength="200" placeholder="Half-yearly" />
+                </div>
+
+                <div class="field">
+                  <label for="exam-date">Date</label>
+                  <input id="exam-date" class="input" type="date" name="examDate"
+                    [(ngModel)]="examDate" />
+                </div>
+
+                <div class="field">
+                  <label for="exam-max">Out of</label>
+                  <input id="exam-max" class="input" type="number" min="1" name="examMax"
+                    [(ngModel)]="examMax" />
+                </div>
+              </div>
+
+              <div class="actions">
+              <button class="btn" type="submit" [disabled]="busy() || !canScheduleExam()">
+                Set exam
+              </button>
+              <button class="btn alt" type="button" (click)="popup.set(null)">Cancel</button>
+            </div>
+            </form>
+          </div>
+        </div>
+      }
     }
   `,
   styles: `
@@ -393,6 +480,18 @@ type Mark = AttendanceStatus | '';
 
     .section-heading {
       margin-top: var(--space-5);
+    }
+
+    .section-head {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: var(--space-3);
+      flex-wrap: wrap;
+    }
+
+    .section-head h2 {
+      margin: 0;
     }
 
     .row-actions {
@@ -425,6 +524,25 @@ export class ClassDetailComponent implements OnInit {
   readonly area = inject(AreaScope);
 
   readonly klass = signal<PathshalaClass | null>(null);
+
+  readonly tabs: readonly { value: ClassTab; label: string }[] = [
+    { value: 'register', label: 'Register' },
+    { value: 'roll', label: 'Roll' },
+    { value: 'exams', label: 'Exams' },
+    { value: 'timetable', label: 'Timetable' },
+    { value: 'teachers', label: 'Teachers' },
+  ];
+
+  /** The register first - marking it is what a class page is opened for most. */
+  readonly tab = signal<ClassTab>('register');
+
+  /** Which form is open over the page, if any. */
+  readonly popup = signal<'teacher' | 'slot' | 'exam' | null>(null);
+
+  openPopup(which: 'teacher' | 'slot' | 'exam'): void {
+    this.error.set(null);
+    this.popup.set(which);
+  }
   readonly roll = signal<readonly Enrolment[]>([]);
   readonly exams = signal<readonly ClassExam[]>([]);
   readonly loading = signal(true);
@@ -679,7 +797,10 @@ export class ClassDetailComponent implements OnInit {
     this.act(
       this.api.assignTeacher(this.classId, teacherId, assign),
       assign ? `${who} now teaches this class.` : `${who} no longer teaches this class.`,
-      () => (this.chosenTeacher = ''),
+      () => {
+        this.chosenTeacher = '';
+        this.popup.set(null);
+      },
     );
   }
 
@@ -694,6 +815,7 @@ export class ClassDetailComponent implements OnInit {
       () => {
         this.startTime = '';
         this.endTime = '';
+        this.popup.set(null);
       },
     );
   }
@@ -731,6 +853,7 @@ export class ClassDetailComponent implements OnInit {
       () => {
         this.examTitle = '';
         this.examDate = '';
+        this.popup.set(null);
         this.examMax = null;
       },
     );
@@ -783,3 +906,5 @@ export class ClassDetailComponent implements OnInit {
 function today(): string {
   return new Date().toISOString().slice(0, 10);
 }
+
+type ClassTab = 'register' | 'roll' | 'exams' | 'timetable' | 'teachers';
