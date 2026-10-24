@@ -128,6 +128,22 @@ public static class PathshalaEndpoints
             .ProducesProblem(StatusCodes.Status404NotFound)
             .ProducesProblem(StatusCodes.Status409Conflict);
 
+        group.MapPatch("/pathshalas/{id:guid}/sessions/{sessionId:guid}", async (
+                Guid id, Guid sessionId, OpenSessionRequest request, ISender sender, CancellationToken cancellationToken) =>
+                (await sender.Send(
+                    new UpdateSessionCommand(id, sessionId, request.Label, request.StartDate, request.EndDate),
+                    cancellationToken))
+                .ToApiResult())
+            .RequireAuthorization()
+            .WithName("UpdateSession")
+            .WithSummary("Correct a session's label and dates. Which session is current does not change.")
+            .Produces<PathshalaDetailResponse>()
+            .ProducesValidationProblem()
+            .ProducesProblem(StatusCodes.Status401Unauthorized)
+            .ProducesProblem(StatusCodes.Status403Forbidden)
+            .ProducesProblem(StatusCodes.Status404NotFound)
+            .ProducesProblem(StatusCodes.Status409Conflict);
+
         group.MapDelete("/pathshalas/{id:guid}", async (
                 Guid id, ISender sender, CancellationToken cancellationToken) =>
             {

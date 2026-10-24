@@ -24,6 +24,7 @@ export interface LocalityOption {
 export class LocalityOptions {
   private readonly api = inject(AdminApi);
   private readonly loaded = signal<readonly LocalityOption[] | null>(null);
+  private readonly cityNames = signal<ReadonlyMap<string, string>>(new Map());
   private requested = false;
 
   readonly options = computed(() => this.loaded() ?? []);
@@ -37,13 +38,33 @@ export class LocalityOptions {
     this.requested = true;
 
     forkJoin({ localities: this.api.listLocalities(), cities: this.api.listCities() }).subscribe({
-      next: ({ localities, cities }) => this.loaded.set(labelLocalities(localities, cities)),
+      next: ({ localities, cities }) => {
+        this.cityNames.set(new Map(cities.map((c) => [c.id, c.name])));
+        this.loaded.set(labelLocalities(localities, cities));
+      },
       error: () => {
         // Asked again next time rather than stuck empty for the session.
         this.requested = false;
         this.loaded.set([]);
       },
     });
+  }
+
+  /**
+   * Where an address is, as "Locality, City/Village" - or the city alone when
+   * no locality is picked, and null when neither is (or neither has loaded).
+   * Never a raw id.
+   */
+  place(localityId: string | null | undefined, cityId: string | null | undefined): string | null {
+    if (localityId) {
+      const found = this.options().find((o) => o.id === localityId);
+
+      if (found) {
+        return found.label;
+      }
+    }
+
+    return cityId ? (this.cityNames().get(cityId) ?? null) : null;
   }
 
   /** "Hiran Magri, Udaipur", "Whole Samaaj" for none, and never a raw id. */

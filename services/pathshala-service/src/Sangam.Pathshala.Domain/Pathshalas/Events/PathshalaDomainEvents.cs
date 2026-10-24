@@ -34,6 +34,18 @@ public sealed record AcademicSessionOpenedDomainEvent(
     public string Topic => "pathshala.session.opened.v1";
 }
 
+/// <summary>A session's label or dates were corrected. The label, like its opening; and who did it.</summary>
+public sealed record AcademicSessionUpdatedDomainEvent(
+    Guid PathshalaId,
+    Guid TenantId,
+    Guid SessionId,
+    string Label,
+    Guid UpdatedBy,
+    DateTimeOffset OccurredAt) : IDomainEvent
+{
+    public string Topic => "pathshala.session.updated.v1";
+}
+
 /// <summary>
 /// A Pathshala's name, address or contact person was corrected. Ids only, like
 /// its creation: the new values are in this service's own table.

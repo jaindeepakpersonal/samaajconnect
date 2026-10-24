@@ -7,7 +7,7 @@ import { Observable } from 'rxjs';
 import { AdminApi } from '../../core/admin-api';
 import { AdminScope } from '../../core/admin-scope';
 import { AreaScope } from '../../core/area-scope';
-import { PathshalaDetail } from '../../core/admin.models';
+import { AcademicSession, PathshalaDetail } from '../../core/admin.models';
 import { isNotFound } from '../../core/http-status';
 import { blankToNull } from '../../core/modal-keys';
 import { PathshalaAnnouncementsComponent } from './pathshala-announcements.component';
@@ -134,7 +134,7 @@ const TABS: readonly { value: PathshalaTab; label: string; managersOnly?: true }
                 <div class="section-head">
                   <h2>Academic sessions</h2>
                   @if (canManage()) {
-                    <button class="btn small" type="button" (click)="openPopup('session')">Open a session</button>
+                    <button class="btn small" type="button" (click)="openNewSession()">Open a session</button>
                   }
                 </div>
 
@@ -145,7 +145,7 @@ const TABS: readonly { value: PathshalaTab; label: string; managersOnly?: true }
                     <table>
                       <caption class="sr-only">Academic sessions</caption>
                       <thead>
-                        <tr><th>Session</th><th>Runs</th><th></th></tr>
+                        <tr><th>Session</th><th>Runs</th><th></th><th></th></tr>
                       </thead>
                       <tbody>
                         @for (session of school.sessions; track session.id) {
@@ -158,6 +158,13 @@ const TABS: readonly { value: PathshalaTab; label: string; managersOnly?: true }
                             <td>
                               @if (session.isCurrent) {
                                 <span class="pill ok">Current</span>
+                              }
+                            </td>
+                            <td>
+                              @if (canManage()) {
+                                <button class="btn small alt" type="button" (click)="openSessionEdit(session)">
+                                  Edit<span class="sr-only"> {{ session.label }}</span>
+                                </button>
                               }
                             </td>
                           </tr>
@@ -262,17 +269,27 @@ const TABS: readonly { value: PathshalaTab; label: string; managersOnly?: true }
             <div class="card modal-card modal-dialog" role="dialog" aria-modal="true"
               aria-labelledby="session-popup-title" (click)="$event.stopPropagation()"
               (keydown.escape)="closePopup()">
-              <h2 id="session-popup-title">Open a session</h2>
-              <p class="small">
-                Opening a session makes it the current one. The previous session's classes and
-                records are kept.
-              </p>
+              @if (editingSession(); as editing) {
+                <h2 id="session-popup-title">Edit {{ editing.label }}</h2>
+                <p class="small">
+                  Its classes, students and registers stay with it.
+                  @if (editing.isCurrent) {
+                    It stays the current session.
+                  }
+                </p>
+              } @else {
+                <h2 id="session-popup-title">Open a session</h2>
+                <p class="small">
+                  Opening a session makes it the current one. The previous session's classes and
+                  records are kept.
+                </p>
+              }
 
               @if (error(); as message) {
                 <p class="notice error" role="alert">{{ message }}</p>
               }
 
-              <form (ngSubmit)="openSession()">
+              <form (ngSubmit)="saveSession()">
                 <div class="form-grid">
                   <div class="field">
                     <label for="session-label">Label</label>
@@ -289,12 +306,15 @@ const TABS: readonly { value: PathshalaTab; label: string; managersOnly?: true }
                   <div class="field">
                     <label for="session-end">Ends</label>
                     <input id="session-end" class="input" type="date" name="end"
-                      [(ngModel)]="sessionEnd" />
+                      [(ngModel)]="sessionEnd" [min]="sessionStart"
+                      [attr.aria-invalid]="sessionEnd && sessionStart && sessionEnd <= sessionStart ? 'true' : null" />
                   </div>
                 </div>
 
                 <div class="actions">
-                  <button class="btn" type="submit" [disabled]="busy() || !canOpenSession()">Open session</button>
+                  <button class="btn" type="submit" [disabled]="busy() || !canOpenSession()">
+                    {{ editingSession() ? 'Save' : 'Open session' }}
+                  </button>
                   <button class="btn alt" type="button" (click)="closePopup()">Cancel</button>
                 </div>
               </form>
@@ -378,6 +398,9 @@ export class PathshalaDetailComponent implements OnInit {
 
   /** Which form is open over the page, if any. */
   readonly popup = signal<'session' | 'class' | null>(null);
+
+  /** The session the session form is correcting, or null when it opens a new one. */
+  readonly editingSession = signal<AcademicSession | null>(null);
   readonly notFound = signal(false);
   readonly error = signal<string | null>(null);
   readonly done = signal<string | null>(null);
@@ -433,11 +456,13 @@ export class PathshalaDetailComponent implements OnInit {
     this.tab.set(tab);
   }
 
+  /** The service's own rule: a label, and an end after the start. */
   canOpenSession(): boolean {
     return (
       this.sessionLabel.trim().length > 0 &&
       this.sessionStart.length > 0 &&
-      this.sessionEnd.length > 0
+      this.sessionEnd.length > 0 &&
+      this.sessionEnd > this.sessionStart
     );
   }
 
@@ -476,6 +501,47 @@ export class PathshalaDetailComponent implements OnInit {
 
   closePopup(): void {
     this.popup.set(null);
+  }
+
+  openNewSession(): void {
+    this.editingSession.set(null);
+    this.sessionLabel = '';
+    this.sessionStart = '';
+    this.sessionEnd = '';
+    this.openPopup('session');
+  }
+
+  openSessionEdit(session: AcademicSession): void {
+    this.editingSession.set(session);
+    this.sessionLabel = session.label;
+    this.sessionStart = session.startDate;
+    this.sessionEnd = session.endDate;
+    this.openPopup('session');
+  }
+
+  saveSession(): void {
+    const editing = this.editingSession();
+
+    if (editing === null) {
+      this.openSession();
+
+      return;
+    }
+
+    if (!this.canOpenSession()) {
+      return;
+    }
+
+    const label = this.sessionLabel.trim();
+
+    this.act(
+      this.api.updateSession(this.id, editing.id, label, this.sessionStart, this.sessionEnd),
+      `${label} is saved.`,
+      () => {
+        this.editingSession.set(null);
+        this.popup.set(null);
+      },
+    );
   }
 
   openSession(): void {

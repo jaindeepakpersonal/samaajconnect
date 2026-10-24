@@ -331,6 +331,47 @@ public sealed class PathshalaFlowTests(PathshalaApiFactory factory)
     }
 
     [Fact]
+    public async Task A_session_is_corrected_in_place_and_its_classes_follow_it()
+    {
+        var fixture = await AClassAsync();
+        var sessionUrl = $"/v1/pathshala/pathshalas/{fixture.PathshalaId}/sessions/{fixture.SessionId}";
+
+        var corrected = await Admin().PatchAsJsonAsync(
+            sessionUrl, new { label = "2026-2027", startDate = "2026-03-08", endDate = "2027-03-07" });
+        corrected.StatusCode.Should().Be(HttpStatusCode.OK);
+
+        var detail = await corrected.Content.ReadFromJsonAsync<JsonElement>();
+        var session = detail.GetProperty("sessions").EnumerateArray().Single();
+        session.GetProperty("id").GetGuid().Should().Be(fixture.SessionId, "a correction, not a new session");
+        session.GetProperty("label").GetString().Should().Be("2026-2027");
+        session.GetProperty("startDate").GetString().Should().Be("2026-03-08");
+        session.GetProperty("isCurrent").GetBoolean().Should().BeTrue("which session is current does not change");
+        detail.GetProperty("classes").EnumerateArray().Single().GetProperty("sessionLabel").GetString()
+            .Should().Be("2026-2027", "the class names its session by id");
+
+        (await Admin().PatchAsJsonAsync(sessionUrl, new { label = "2026-2027", startDate = "2026-03-08", endDate = "2026-03-01" }))
+            .StatusCode.Should().Be(HttpStatusCode.BadRequest);
+
+        (await Admin().PostAsJsonAsync(
+                $"/v1/pathshala/pathshalas/{fixture.PathshalaId}/sessions",
+                new { label = "2027-28", startDate = "2027-03-08", endDate = "2028-03-07" }))
+            .StatusCode.Should().Be(HttpStatusCode.OK);
+
+        // Two sessions called "2027-28" would make every record naming one ambiguous.
+        (await Admin().PatchAsJsonAsync(sessionUrl, new { label = "2027-28", startDate = "2026-03-08", endDate = "2027-03-07" }))
+            .StatusCode.Should().Be(HttpStatusCode.Conflict);
+
+        (await Admin().PatchAsJsonAsync(
+                $"/v1/pathshala/pathshalas/{fixture.PathshalaId}/sessions/{Guid.NewGuid()}",
+                new { label = "2026-27", startDate = "2026-03-01", endDate = "2027-02-28" }))
+            .StatusCode.Should().Be(HttpStatusCode.NotFound);
+
+        // Running the Pathshala is Pathshala.Manage; teaching a class is not.
+        (await Teacher().PatchAsJsonAsync(sessionUrl, new { label = "x", startDate = "2026-03-01", endDate = "2027-02-28" }))
+            .StatusCode.Should().Be(HttpStatusCode.Forbidden);
+    }
+
+    [Fact]
     public async Task A_register_is_marked_on_the_teachers_own_calendar_day()
     {
         // 20:00 UTC on 1 March is 01:30 on 2 March in India. The 2nd's class

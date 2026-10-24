@@ -48,6 +48,8 @@ function configure(
           load: () => undefined,
           options: () => [{ id: 'loc1', label: 'Hiran Magri, Udaipur' }],
           label: (id: string | null) => (id === 'loc1' ? 'Hiran Magri, Udaipur' : 'Whole Samaaj'),
+          place: (localityId: string | null, cityId: string | null) =>
+            localityId === 'loc1' ? 'Hiran Magri, Udaipur' : cityId === 'city1' ? 'Bhinder' : null,
         },
       },
       {
@@ -87,6 +89,23 @@ describe('PathshalaListComponent', () => {
   }
 
   afterEach(() => http.verify());
+
+  it('names where each Pathshala is - its locality and city, or the city or village alone', () => {
+    configure(['SamaajAdmin'], 't1');
+    build();
+    load([
+      pathshala({ address: { line: 'Near the Mandir', countryId: null, stateId: null, cityId: 'c9', localityId: 'loc1' } }),
+      pathshala({ id: 'p2', address: { line: null, countryId: null, stateId: null, cityId: 'city1', localityId: null } }),
+      pathshala({ id: 'p3', address: null }),
+    ]);
+
+    const tiles = [...fixture.nativeElement.querySelectorAll('.grid > .card')].map((t) => (t as HTMLElement).textContent!);
+
+    expect(tiles[0]).toContain('Near the Mandir');
+    expect(tiles[0]).toContain('Hiran Magri, Udaipur');
+    expect(tiles[1]).toContain('Bhinder');
+    expect(tiles[2]).not.toContain('Udaipur');
+  });
 
   it('offers a Samaaj Admin no create button', () => {
     // The master record is the platform operator's. Offering it here would be

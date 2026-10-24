@@ -645,6 +645,12 @@ public static class KnownEvents
             EntityName: "AcademicSession",
             EntityIdProperty: "sessionId"),
 
+        ["pathshala.session.updated.v1"] = new(
+            Action: "AcademicSessionUpdated",
+            EntityName: "AcademicSession",
+            EntityIdProperty: "sessionId",
+            ActorIdProperty: "updatedBy"),
+
         ["pathshala.updated.v1"] = new(
             Action: "PathshalaUpdated",
             EntityName: "Pathshala",

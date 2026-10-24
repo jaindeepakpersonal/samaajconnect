@@ -548,6 +548,21 @@ export class AdminApi {
     });
   }
 
+  /** Corrects a session's label and dates. Which session is current does not change. 409 on a label already used. */
+  updateSession(
+    pathshalaId: string,
+    sessionId: string,
+    label: string,
+    startDate: string,
+    endDate: string,
+  ): Observable<PathshalaDetail> {
+    return this.http.patch<PathshalaDetail>(`/v1/pathshala/pathshalas/${pathshalaId}/sessions/${sessionId}`, {
+      label,
+      startDate,
+      endDate,
+    });
+  }
+
   createClass(
     pathshalaId: string,
     sessionId: string,

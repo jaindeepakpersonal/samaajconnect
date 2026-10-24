@@ -283,6 +283,70 @@ describe('PathshalaDetailComponent', () => {
     http.expectNone(`/v1/pathshala/pathshalas/${PATHSHALA_ID}/sessions`);
   });
 
+  it('will not open a session that ends before it starts', () => {
+    asAdmin();
+    load();
+
+    component.openNewSession();
+    component.sessionLabel = '2027-28';
+    component.sessionStart = '2027-03-01';
+    component.sessionEnd = '2027-02-01';
+
+    expect(component.canOpenSession()).toBe(false);
+  });
+
+  it('edits a session in place, from its row, filled with what it holds', () => {
+    asAdmin();
+    load();
+
+    const edit = [...(fixture.nativeElement as HTMLElement).querySelectorAll<HTMLButtonElement>('tbody button')]
+      .find((b) => b.textContent?.trim().startsWith('Edit'))!;
+    edit.click();
+    fixture.detectChanges();
+
+    expect(text()).toContain('Edit 2026-27');
+    expect(text()).toContain('It stays the current session.');
+    expect(component.sessionLabel).toBe('2026-27');
+    expect(component.sessionStart).toBe('2026-03-01');
+    expect(component.sessionEnd).toBe('2027-02-28');
+
+    component.sessionLabel = '2026-2027';
+    component.sessionStart = '2026-03-08';
+    component.saveSession();
+
+    const call = http.expectOne(`/v1/pathshala/pathshalas/${PATHSHALA_ID}/sessions/s1`);
+
+    expect(call.request.method).toBe('PATCH');
+    expect(call.request.body).toEqual({ label: '2026-2027', startDate: '2026-03-08', endDate: '2027-02-28' });
+    http.expectNone(`/v1/pathshala/pathshalas/${PATHSHALA_ID}/sessions`);
+
+    call.flush(detail());
+    reload();
+
+    expect(text()).toContain('2026-2027 is saved.');
+    expect(component.popup()).toBeNull();
+    expect(component.editingSession()).toBeNull();
+  });
+
+  it('opens a new session from a blank form after editing one', () => {
+    asAdmin();
+    load();
+
+    component.openSessionEdit(detail().sessions[0]!);
+    component.closePopup();
+    component.openNewSession();
+
+    expect(component.editingSession()).toBeNull();
+    expect(component.sessionLabel).toBe('');
+  });
+
+  it('gives a teacher no Edit on a session', () => {
+    signIn(['PathshalaTeacher'], ['Pathshala.Teach']);
+    load();
+
+    expect((fixture.nativeElement as HTMLElement).querySelector('tbody button')).toBeNull();
+  });
+
   it('re-reads the Pathshala after every action rather than patching the screen', () => {
     asAdmin();
     load();

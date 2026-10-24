@@ -274,6 +274,13 @@ under Show. Deleting an announcement erases it, asking for nothing, because no
 receipt names it. This replaced Void and a stray Cancel
 that the popup conversion had left in every row.
 
+**An academic session is corrected in place (2026-10-24).** Each row on the
+Sessions tab has Edit, which opens the same popup as "Open a session" filled with
+the session's label and dates. Saving corrects that session - its classes,
+students and registers follow it - and does not change which one is current;
+opening a new session is still the only thing that does. Both forms refuse an
+end date on or before the start, as the service does.
+
 **Withdrawing is on the roll, not the placement queue.** It is the same
 `DELETE /enrollments/{id}` a placement decision does not use, and the screen says
 what it does: the child comes off the roll and their attendance and results
@@ -504,10 +511,12 @@ cascade on 2026-09-12, replacing one free-text field.** Each select is
 populated only once its parent is chosen, the same discipline the Master
 Data screen's own Cities/Localities tabs already apply, and every level is
 optional: a Pathshala can be created with only a free-text address line and
-nothing picked. The Pathshala list card shows only that free-text line, not
-a resolved City or Locality name — resolving one would mean a lookup per
-Pathshala on a screen that lists every one of them, the cost this app avoids
-everywhere else it has a choice between an id and a cheap name.
+nothing picked. The Pathshala list card shows that free-text line and, since
+2026-10-24, where it is - "Locality, City/Village", or the city or village
+alone when no locality is picked. That is not a lookup per Pathshala, which is
+what kept it off the card before: `LocalityOptions` already loads every
+locality and city once per session for the Locality filter, and now keeps the
+city names too, so every tile resolves against one list already in hand.
 
 **The placement queue makes two calls, and the second one is the point.**
 pathshala-service stores a child by id and nothing else, so the queue is a list

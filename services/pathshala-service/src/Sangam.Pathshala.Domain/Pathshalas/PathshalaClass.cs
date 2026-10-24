@@ -31,6 +31,16 @@ public sealed class AcademicSession
     }
 
     internal void StandDown() => IsCurrent = false;
+
+    /// <summary>Corrects the label and dates. Whether it is current is not a detail - opening a session decides that.</summary>
+    internal void Correct(string label, DateOnly startDate, DateOnly endDate)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(label);
+
+        Label = label.Trim();
+        StartDate = startDate;
+        EndDate = endDate;
+    }
 }
 
 /// <summary>

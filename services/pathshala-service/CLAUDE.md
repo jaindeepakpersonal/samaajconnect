@@ -45,6 +45,7 @@ Two entities in DATA-MODEL.md §9 are deliberately absent. See "Decisions".
 | `DeleteDonationCommand` | `Pathshala.Manage` | The admin panel's Delete for an announcement: erases the row. 409 once it has a receipt |
 | `SendAnnouncementCommand` | `Members.Read` or `Pathshala.Teach` + a teacher of it or somebody who runs it | To the parents of every child with a place or a request |
 | `OpenSessionCommand` | `Pathshala.Manage` | Makes the new session current |
+| `UpdateSessionCommand` | `Pathshala.Manage` | Corrects a session's label and dates in place; its classes follow it by id. Which session is current does not change. 409 on a label another session has |
 | `CreateClassCommand` | `Pathshala.Manage` | |
 | `AddClassSlotCommand` | `Pathshala.Manage` | Refuses an overlap |
 | `AssignTeacherCommand` | `Pathshala.Manage` | Assign and remove in one command, by teacher record |
@@ -89,7 +90,7 @@ Two entities in DATA-MODEL.md §9 are deliberately absent. See "Decisions".
 - `pathshala.teacher.added.v1`, `.updated.v1`, `.removed.v1` (ids and who did it)
 - `pathshala.donation.recorded.v1` (ids, amount, whether it is a pledge, who), `.paid.v1` (the receipt number, amount, who), `.updated.v1` and `.voided.v1` (ids and who), `.erased.v1` (ids, amount and who - never the donor, whose row is gone)
 - `pathshala.announcement.sent.v1` (who, and how many) and one `pathshala.announcement.addressed.v1` per parent - see "Teachers, the staff tabs, donations and announcements"
-- `pathshala.session.opened.v1`
+- `pathshala.session.opened.v1`, `pathshala.session.updated.v1` (the label, and who corrected it)
 - `pathshala.deactivated.v1`
 - `pathshala.enrolment.requested.v1`
 - `pathshala.student.enrolled.v1` (SERVICES.md's `StudentEnrolled`)

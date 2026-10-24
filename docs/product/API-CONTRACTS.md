@@ -266,6 +266,7 @@ reviews" in `services/social-issues-service/CLAUDE.md`.
 | GET | `/pathshalas/{id}` | `Members.Read` or `Pathshala.Teach` | Sessions and classes. `?asStaff=true` is 404 unless the caller works here; always so for a caller without `Members.Read` |
 | PATCH | `/pathshalas/{id}` | `Pathshala.Manage` | Correct the name, address and contact person, replacing all three. An Area Admin's blank locality is filled with theirs; naming another is **403** |
 | POST | `/pathshalas/{id}/sessions` | `Pathshala.Manage` | Open an academic session; it becomes current |
+| PATCH | `/pathshalas/{id}/sessions/{sessionId}` | `Pathshala.Manage` | `{label, startDate, endDate}` - corrects a session in place. Which session is current does not change. 409 on a label another session has |
 | DELETE | `/pathshalas/{id}` | `Pathshala.Manage` | Stop the Pathshala operating |
 | POST | `/pathshalas/{id}/classes` | `Pathshala.Manage` | Add a class to a session |
 | POST | `/classes/{id}/schedule` | `Pathshala.Manage` | Add a weekly slot; overlaps refused |

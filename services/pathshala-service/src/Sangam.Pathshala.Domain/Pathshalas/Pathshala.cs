@@ -136,6 +136,33 @@ public sealed class Pathshala : AggregateRoot, ITenantScopedEntity
     }
 
     /// <summary>
+    /// Corrects a session's label and dates (2026-10-24). Returns null when there
+    /// is no such session.
+    /// </summary>
+    /// <remarks>
+    /// A typo in "2026-27" or a term that starts a week later is a correction,
+    /// not a new session: opening another would stand this one down and strand
+    /// its classes. Which session is current does not change here. Its classes,
+    /// enrolments and registers name the session by id, so they follow it.
+    /// </remarks>
+    public AcademicSession? CorrectSession(
+        Guid sessionId, string label, DateOnly startDate, DateOnly endDate, Guid updatedBy, DateTimeOffset now)
+    {
+        var session = FindSession(sessionId);
+
+        if (session is null)
+        {
+            return null;
+        }
+
+        session.Correct(label, startDate, endDate);
+
+        Raise(new AcademicSessionUpdatedDomainEvent(Id, TenantId, session.Id, session.Label, updatedBy, now));
+
+        return session;
+    }
+
+    /// <summary>
     /// Adds a class to a session. Returns null when there is no such session.
     /// </summary>
     public PathshalaClass? AddClass(Guid sessionId, string name, string? roomLabel)

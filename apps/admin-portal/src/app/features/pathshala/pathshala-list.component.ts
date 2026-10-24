@@ -5,6 +5,7 @@ import { AdminApi } from '../../core/admin-api';
 import { AdminScope } from '../../core/admin-scope';
 import { AreaScope } from '../../core/area-scope';
 import { isNotFound } from '../../core/http-status';
+import { LocalityOptions } from '../../core/locality-options';
 import { Pathshala } from '../../core/admin.models';
 import { PathshalaDialogComponent } from './pathshala-dialog.component';
 import { ALL_LOCALITIES, LocalityFilterComponent, matchesLocality } from '../../core/locality-filter.component';
@@ -82,6 +83,10 @@ import { ALL_LOCALITIES, LocalityFilterComponent, matchesLocality } from '../../
 
             @if (item.address?.line; as line) {
               <p class="muted">{{ line }}</p>
+            }
+
+            @if (localities.place(item.address?.localityId, item.address?.cityId); as place) {
+              <p class="muted">{{ place }}</p>
             }
 
             <p>
@@ -190,6 +195,9 @@ export class PathshalaListComponent implements OnInit {
   private readonly auth = inject(AuthService);
   private readonly area = inject(AreaScope);
 
+  /** Names a tile's locality and city/village - the list is loaded once per session. */
+  readonly localities = inject(LocalityOptions);
+
   readonly scope = inject(AdminScope);
 
   readonly pathshalas = signal<readonly Pathshala[]>([]);
@@ -233,6 +241,7 @@ export class PathshalaListComponent implements OnInit {
   );
 
   ngOnInit(): void {
+    this.localities.load();
     this.load();
   }
 

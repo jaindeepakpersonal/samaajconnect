@@ -251,6 +251,72 @@ public sealed class OpenSessionCommandHandler(
     }
 }
 
+/// <summary>
+/// Corrects a session's label and dates. Which session is current is unchanged;
+/// that is what opening one decides.
+/// </summary>
+[RequiresPermission(PermissionKeys.PathshalaManage)]
+public sealed record UpdateSessionCommand(
+    Guid PathshalaId, Guid SessionId, string Label, DateOnly StartDate, DateOnly EndDate)
+    : ICommand<PathshalaDetailResponse>;
+
+public sealed class UpdateSessionCommandValidator : AbstractValidator<UpdateSessionCommand>
+{
+    public UpdateSessionCommandValidator()
+    {
+        RuleFor(x => x.PathshalaId).NotEmpty();
+        RuleFor(x => x.SessionId).NotEmpty();
+        RuleFor(x => x.Label).NotEmpty().MaximumLength(50);
+
+        RuleFor(x => x.EndDate)
+            .GreaterThan(x => x.StartDate)
+            .WithMessage("A session cannot end before it starts.");
+    }
+}
+
+public sealed class UpdateSessionCommandHandler(
+    IPathshalaRepository pathshalas,
+    IUnitOfWork unitOfWork,
+    ICurrentUser currentUser,
+    ITenantContext tenantContext,
+    IAreaScope areaScope,
+    IDateTimeProvider clock)
+    : IRequestHandler<UpdateSessionCommand, Result<PathshalaDetailResponse>>
+{
+    public async Task<Result<PathshalaDetailResponse>> Handle(
+        UpdateSessionCommand command, CancellationToken cancellationToken)
+    {
+        var pathshala = await pathshalas.GetByIdAsync(command.PathshalaId, cancellationToken);
+
+        if (!pathshala.IsInTenant(tenantContext.TenantId) || !pathshala.IsAdministeredBy(areaScope))
+        {
+            return Result.Failure<PathshalaDetailResponse>(PathshalaAccess.NoSuchPathshala);
+        }
+
+        // The same rule as opening one, leaving this session out of it.
+        if (pathshala!.Sessions.Any(s => s.Id != command.SessionId && string.Equals(
+                s.Label, command.Label.Trim(), StringComparison.OrdinalIgnoreCase)))
+        {
+            return Result.Failure<PathshalaDetailResponse>(Error.Conflict(
+                "Session.Duplicate", "This Pathshala already has a session with that label."));
+        }
+
+        var session = pathshala.CorrectSession(
+            command.SessionId, command.Label, command.StartDate, command.EndDate,
+            currentUser.UserId ?? Guid.Empty, clock.UtcNow);
+
+        if (session is null)
+        {
+            return Result.Failure<PathshalaDetailResponse>(Error.NotFound(
+                "Session.NotFound", "This Pathshala has no session with that id."));
+        }
+
+        await unitOfWork.SaveChangesAsync(cancellationToken);
+
+        return Result.Success(pathshala.ToDetail(new Dictionary<Guid, int>()));
+    }
+}
+
 // ---- Classes -----------------------------------------------------------------
 
 /// <summary>Adds a class to a session.</summary>
