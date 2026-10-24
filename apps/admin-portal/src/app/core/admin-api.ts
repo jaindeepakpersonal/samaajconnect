@@ -1700,6 +1700,19 @@ export class AdminApi {
     return this.http.post<Competition>('/v1/competitions', competition);
   }
 
+  /** The competition's cover photo, replacing any - at any stage. Answers the competition. */
+  uploadCompetitionPhoto(competitionId: string, file: File): Observable<Competition> {
+    const body = new FormData();
+    body.append('file', file);
+
+    return this.http.post<Competition>(`/v1/competitions/${competitionId}/photo`, body);
+  }
+
+  /** Takes the competition's photo down. Doing it twice is success. */
+  removeCompetitionPhoto(competitionId: string): Observable<Competition> {
+    return this.http.delete<Competition>(`/v1/competitions/${competitionId}/photo`);
+  }
+
   /**
    * Moves a competition on one stage.
    *

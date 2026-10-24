@@ -32,6 +32,7 @@ public static class DependencyInjection
 
         services.AddScoped<IUnitOfWork, UnitOfWork>();
         services.AddScoped<ICompetitionRepository, CompetitionRepository>();
+        services.AddScoped<ICompetitionPhotoStore, CompetitionPhotoStore>();
         services.AddScoped<IEntryRepository, EntryRepository>();
         services.AddScoped<IScoreRepository, ScoreRepository>();
         services.AddScoped<IRoundResultRepository, RoundResultRepository>();

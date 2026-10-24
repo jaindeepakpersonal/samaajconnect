@@ -79,7 +79,7 @@ public sealed class CompetitionApiFactory : WebApplicationFactory<Program>, IAsy
 
         await dbContext.Database.ExecuteSqlRawAsync(
             "TRUNCATE TABLE round_results, scores, entries, rounds, competition_judges, "
-            + "competition_registrations, competitions, outbox_messages RESTART IDENTITY CASCADE;");
+            + "competition_photos, competition_registrations, competitions, outbox_messages RESTART IDENTITY CASCADE;");
     }
 
     public async Task<T> WithDbContextAsync<T>(Func<CompetitionDbContext, Task<T>> action)

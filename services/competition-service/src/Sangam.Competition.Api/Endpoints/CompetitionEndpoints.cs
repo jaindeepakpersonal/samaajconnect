@@ -47,7 +47,9 @@ public static class CompetitionEndpoints
                     request.CompetitionTypeId,
                     request.RegistrationStartAt,
                     request.RegistrationEndAt,
-                    request.LocalityId);
+                    request.LocalityId,
+                    request.Venue,
+                    request.CityId);
 
                 var result = await sender.Send(command, cancellationToken);
 
@@ -72,7 +74,9 @@ public static class CompetitionEndpoints
                     request.CompetitionTypeId,
                     request.LocalityId,
                     request.RegistrationStartAt,
-                    request.RegistrationEndAt);
+                    request.RegistrationEndAt,
+                    request.Venue,
+                    request.CityId);
 
                 var result = await sender.Send(command, cancellationToken);
 
@@ -302,7 +306,9 @@ public static class CompetitionEndpoints
         string? CompetitionTypeId,
         DateTimeOffset RegistrationStartAt,
         DateTimeOffset RegistrationEndAt,
-        string? LocalityId = null);
+        string? LocalityId = null,
+        string? Venue = null,
+        string? CityId = null);
 
     /// <summary>RegistrationOpen, RegistrationClosed, InProgress or Closed.</summary>
     public sealed record MoveRequest(string Status);

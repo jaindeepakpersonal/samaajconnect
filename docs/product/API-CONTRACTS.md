@@ -521,9 +521,12 @@ does need a genuine organiser-vs-participant split.
 | Method | Path | Roles | Purpose |
 |---|---|---|---|
 | GET | `/` | `Members.Read` | This Samaaj's competitions, each with the caller's own registration status. `?localityId=` narrows to one locality |
-| POST | `/` | `Competition.Manage` | Set a competition up. Starts `Draft`. Optional `localityId` |
+| POST | `/` | `Competition.Manage` | Set a competition up. Starts `Draft`. Optional `localityId`, `venue` (300) and `cityId` |
 | PATCH | `/{id}` | `Competition.Manage` | Correct the details, locality included. Draft or taking registrations only; 409 after |
-| GET | `/{id}` | `Members.Read` | Rounds, registration count, judges, and the currently-registered member ids an organiser picks entries from |
+| GET | `/{id}` | `Members.Read` | Rounds, registration count, judges, and the currently-registered member ids an organiser picks entries from - and the member portal's Participants tab |
+| POST | `/{id}/photo` | `Competition.Manage` | Upload the cover photo (multipart, one file; JPEG/PNG/WebP read from the bytes, 2 MB). Replaces any; any stage. Answers the competition |
+| DELETE | `/{id}/photo` | `Competition.Manage` | Take the photo down. Twice is success |
+| GET | `/{id}/photo` | `Members.Read` | The photo bytes. `Cache-Control: private` and an ETag. A competition carries `photoUrl`, with `?v={photoId}` |
 | POST | `/{id}/status` | `Competition.Manage` | Strictly forward: Draft → RegistrationOpen → RegistrationClosed → InProgress → Closed |
 | POST | `/{id}/registrations` | `Members.Read` | Register the caller. Only while registration is open. A repeat registration is success with `registered: false` |
 | DELETE | `/{id}/registrations/mine` | `Members.Read` | The caller's own withdrawal. Registering again later reactivates the same row |

@@ -42,6 +42,18 @@ public sealed class Competition : AggregateRoot, ITenantScopedEntity
     /// </summary>
     public Guid? LocalityId { get; private set; }
 
+    /// <summary>
+    /// Where it is held, in the organiser's own words - "Mahavir Bhawan, Hall 2".
+    /// The city or village and the locality are the master-data picks beside it.
+    /// </summary>
+    public string? Venue { get; private set; }
+
+    /// <summary>The city or village, a master-data-service id. Null when not given.</summary>
+    public Guid? CityId { get; private set; }
+
+    /// <summary>The competition's photo, a <see cref="Media.CompetitionPhoto"/>. Null when none.</summary>
+    public Guid? PhotoId { get; private set; }
+
     public DateTimeOffset RegistrationStartAt { get; private set; }
     public DateTimeOffset RegistrationEndAt { get; private set; }
 
@@ -64,7 +76,9 @@ public sealed class Competition : AggregateRoot, ITenantScopedEntity
         DateTimeOffset registrationEndAt,
         Guid createdByMemberId,
         DateTimeOffset now,
-        Guid? localityId = null)
+        Guid? localityId = null,
+        string? venue = null,
+        Guid? cityId = null)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(title);
 
@@ -76,6 +90,8 @@ public sealed class Competition : AggregateRoot, ITenantScopedEntity
             Description = string.IsNullOrWhiteSpace(description) ? null : description.Trim(),
             CompetitionTypeId = competitionTypeId,
             LocalityId = localityId,
+            Venue = string.IsNullOrWhiteSpace(venue) ? null : venue.Trim(),
+            CityId = cityId,
             RegistrationStartAt = registrationStartAt,
             RegistrationEndAt = registrationEndAt,
             Status = CompetitionStatus.Draft,
@@ -99,7 +115,9 @@ public sealed class Competition : AggregateRoot, ITenantScopedEntity
         DateTimeOffset registrationStartAt,
         DateTimeOffset registrationEndAt,
         Guid updatedBy,
-        DateTimeOffset now)
+        DateTimeOffset now,
+        string? venue = null,
+        Guid? cityId = null)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(title);
 
@@ -112,12 +130,36 @@ public sealed class Competition : AggregateRoot, ITenantScopedEntity
         Description = string.IsNullOrWhiteSpace(description) ? null : description.Trim();
         CompetitionTypeId = competitionTypeId;
         LocalityId = localityId;
+        Venue = string.IsNullOrWhiteSpace(venue) ? null : venue.Trim();
+        CityId = cityId;
         RegistrationStartAt = registrationStartAt;
         RegistrationEndAt = registrationEndAt;
 
         Raise(new CompetitionUpdatedDomainEvent(Id, TenantId, updatedBy, now));
 
         return true;
+    }
+
+    /// <summary>
+    /// Points at a new photo and answers the one it replaces, for the caller to
+    /// remove. A photo is not one of the details members registered against, so
+    /// it can change at any stage, unlike <see cref="Update"/>.
+    /// </summary>
+    public Guid? SetPhoto(Guid photoId)
+    {
+        var previous = PhotoId;
+        PhotoId = photoId;
+
+        return previous;
+    }
+
+    /// <summary>Takes the photo down and answers its id, or null when there was none.</summary>
+    public Guid? RemovePhoto()
+    {
+        var previous = PhotoId;
+        PhotoId = null;
+
+        return previous;
     }
 
     public bool AcceptsRegistrations(DateTimeOffset now) =>

@@ -2,10 +2,11 @@ import { DatePipe } from '@angular/common';
 import { Component, OnInit, computed, inject, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { ActivatedRoute, RouterLink } from '@angular/router';
-import { describeError } from '@samaajconnect/shared';
+import { AuthedImageDirective, describeError } from '@samaajconnect/shared';
 import { AdminApi } from '../../core/admin-api';
 import { AdminScope } from '../../core/admin-scope';
 import {
+  City,
   Competition,
   CompetitionDetail,
   CompetitionResult,
@@ -13,6 +14,7 @@ import {
   RoundDetail,
 } from '../../core/admin.models';
 import { isNotFound } from '../../core/http-status';
+import { LocalityOptions } from '../../core/locality-options';
 
 /**
  * One competition: its stage, its judges, its rounds, and a selected round's
@@ -27,7 +29,7 @@ import { isNotFound } from '../../core/http-status';
  */
 @Component({
   selector: 'app-competition-detail',
-  imports: [DatePipe, FormsModule, RouterLink],
+  imports: [DatePipe, FormsModule, RouterLink, AuthedImageDirective],
   template: `
     <p><a class="btn link" routerLink="/competitions">← All competitions</a></p>
 
@@ -44,11 +46,19 @@ import { isNotFound } from '../../core/http-status';
     } @else if (notFound()) {
       <p class="notice">No such competition in {{ scope.label() }}.</p>
     } @else if (competition(); as subject) {
+      @if (subject.photoUrl; as path) {
+        <img class="competition-cover" [scAuthedSrc]="path" alt="" />
+      }
+
       <h1 class="title">{{ subject.title }}</h1>
       <p class="sub">
         {{ subject.status }} · {{ subject.registrationCount }} registered ·
         {{ detail()?.rounds?.length ?? 0 }} round(s)
       </p>
+
+      @if (whereHeld(subject); as where) {
+        <p class="small">{{ where }}</p>
+      }
 
       @if (subject.description) {
         <p>{{ subject.description }}</p>
@@ -74,6 +84,25 @@ import { isNotFound } from '../../core/http-status';
           </button>
         } @else {
           <p class="empty">Closed. This competition is finished.</p>
+        }
+      </div>
+
+      <!-- Photo ------------------------------------------------------------ -->
+      <div class="card spaced">
+        <h2>Photo</h2>
+        <p class="small">
+          The cover across the top of the competition's page, in both portals. It can change at
+          any stage. JPEG, PNG or WebP, up to 2 MB; a wide picture suits a cover best.
+        </p>
+        <label for="competition-photo">{{ subject.photoUrl ? 'Change the photo' : 'Add a photo' }}</label>
+        <input id="competition-photo" class="input" type="file" accept="image/jpeg,image/png,image/webp"
+          [disabled]="busy()" (change)="uploadPhoto($event)" />
+        @if (subject.photoUrl) {
+          <div class="actions">
+            <button class="btn small alt" type="button" [disabled]="busy()" (click)="removePhoto()">
+              Remove the photo
+            </button>
+          </div>
         }
       </div>
 
@@ -266,6 +295,16 @@ import { isNotFound } from '../../core/http-status';
       margin-top: var(--space-4);
     }
 
+    /* The organiser sees the cover members will see. */
+    .competition-cover {
+      display: block;
+      width: 100%;
+      max-height: 240px;
+      object-fit: cover;
+      border-radius: var(--radius-md);
+      margin-bottom: var(--space-3);
+    }
+
     .section-heading {
       margin-top: 0;
     }
@@ -293,6 +332,12 @@ export class CompetitionDetailComponent implements OnInit {
   private readonly route = inject(ActivatedRoute);
 
   readonly scope = inject(AdminScope);
+
+  /** Names a locality "Name, City" - loaded once per session. */
+  readonly localities = inject(LocalityOptions);
+
+  /** Every active city or village, to name the one it is held in. */
+  readonly cities = signal<readonly City[]>([]);
 
   readonly detail = signal<CompetitionDetail | null>(null);
   readonly loading = signal(true);
@@ -353,7 +398,39 @@ export class CompetitionDetailComponent implements OnInit {
   }
 
   ngOnInit(): void {
+    this.localities.load();
+    this.api.listCities().subscribe({ next: (found) => this.cities.set(found), error: () => {} });
     this.load();
+  }
+
+  /**
+   * Where it is held, as one line: the venue, then the locality ("Name, City")
+   * or the city or village alone. Null when none of them is known.
+   */
+  whereHeld(subject: Competition): string | null {
+    const area = subject.localityId
+      ? this.localities.place(subject.localityId, subject.cityId)
+      : (this.cities().find((c) => c.id === subject.cityId)?.name ?? null);
+
+    const parts = [subject.venue, area].filter((part): part is string => !!part);
+
+    return parts.length > 0 ? parts.join(' · ') : null;
+  }
+
+  uploadPhoto(event: Event): void {
+    const input = event.target as HTMLInputElement;
+    const file = input.files?.[0];
+
+    if (!file) {
+      return;
+    }
+
+    this.act(this.api.uploadCompetitionPhoto(this.id, file), 'Photo saved.');
+    input.value = '';
+  }
+
+  removePhoto(): void {
+    this.act(this.api.removeCompetitionPhoto(this.id), 'Photo removed.');
   }
 
   memberName(memberId: string): string {

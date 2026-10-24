@@ -6,7 +6,7 @@ import { Observable } from 'rxjs';
 import { MasterDataApi } from '../members/master-data.api';
 import { City, Locality, LookupItem } from '../members/members.models';
 import { BusinessFieldsComponent } from './business-fields.component';
-import { initialsOf } from './business-owners';
+import { initialsOf } from '../members/member-lookup';
 import { placeOf } from './business-place';
 import { BusinessesApi } from './businesses.api';
 import { Business, BusinessFields, Product, ProductFields } from './businesses.models';

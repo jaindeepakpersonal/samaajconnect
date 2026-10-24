@@ -28,6 +28,10 @@ namespace Sangam.Competition.Infrastructure.Migrations
                         .HasColumnType("uuid")
                         .HasColumnName("id");
 
+                    b.Property<Guid?>("CityId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("city_id");
+
                     b.Property<Guid?>("CompetitionTypeId")
                         .HasColumnType("uuid")
                         .HasColumnName("competition_type_id");
@@ -48,6 +52,10 @@ namespace Sangam.Competition.Infrastructure.Migrations
                     b.Property<Guid?>("LocalityId")
                         .HasColumnType("uuid")
                         .HasColumnName("locality_id");
+
+                    b.Property<Guid?>("PhotoId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("photo_id");
 
                     b.Property<DateTimeOffset>("RegistrationEndAt")
                         .HasColumnType("timestamp with time zone")
@@ -72,6 +80,11 @@ namespace Sangam.Competition.Infrastructure.Migrations
                         .HasMaxLength(200)
                         .HasColumnType("character varying(200)")
                         .HasColumnName("title");
+
+                    b.Property<string>("Venue")
+                        .HasMaxLength(300)
+                        .HasColumnType("character varying(300)")
+                        .HasColumnName("venue");
 
                     b.HasKey("Id")
                         .HasName("pk_competitions");
@@ -309,6 +322,61 @@ namespace Sangam.Competition.Infrastructure.Migrations
                     b.ToTable("scores", (string)null);
                 });
 
+            modelBuilder.Entity("Sangam.Competition.Domain.Media.CompetitionPhoto", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<int>("ByteSize")
+                        .HasColumnType("integer")
+                        .HasColumnName("byte_size");
+
+                    b.Property<byte[]>("Bytes")
+                        .IsRequired()
+                        .HasColumnType("bytea")
+                        .HasColumnName("bytes");
+
+                    b.Property<Guid>("CompetitionId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("competition_id");
+
+                    b.Property<string>("ContentHash")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)")
+                        .HasColumnName("content_hash");
+
+                    b.Property<string>("ContentType")
+                        .IsRequired()
+                        .HasMaxLength(50)
+                        .HasColumnType("character varying(50)")
+                        .HasColumnName("content_type");
+
+                    b.Property<Guid>("TenantId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("tenant_id");
+
+                    b.Property<DateTimeOffset>("UploadedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("uploaded_at");
+
+                    b.Property<Guid>("UploadedBy")
+                        .HasColumnType("uuid")
+                        .HasColumnName("uploaded_by");
+
+                    b.HasKey("Id")
+                        .HasName("pk_competition_photos");
+
+                    b.HasIndex("CompetitionId")
+                        .HasDatabaseName("ix_competition_photos_competition_id");
+
+                    b.HasIndex("TenantId", "CompetitionId")
+                        .HasDatabaseName("ix_competition_photos_tenant_id_competition_id");
+
+                    b.ToTable("competition_photos", (string)null);
+                });
+
             modelBuilder.Entity("Sangam.Competition.Infrastructure.Persistence.OutboxMessage", b =>
                 {
                     b.Property<Guid>("Id")
@@ -385,6 +453,16 @@ namespace Sangam.Competition.Infrastructure.Migrations
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired()
                         .HasConstraintName("fk_rounds_competitions_competition_id");
+                });
+
+            modelBuilder.Entity("Sangam.Competition.Domain.Media.CompetitionPhoto", b =>
+                {
+                    b.HasOne("Sangam.Competition.Domain.Competitions.Competition", null)
+                        .WithMany()
+                        .HasForeignKey("CompetitionId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired()
+                        .HasConstraintName("fk_competition_photos_competitions_competition_id");
                 });
 
             modelBuilder.Entity("Sangam.Competition.Domain.Competitions.Competition", b =>

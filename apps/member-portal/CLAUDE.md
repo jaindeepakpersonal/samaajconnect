@@ -35,7 +35,7 @@ before translating another screen.
 | Manage business | `/businesses/mine/:id` | — | built. Two tabs, Details and Products, with Edit details and Add/Edit product in popups; the photo, product images, activate/deactivate |
 | Orders | `/businesses/orders` | — | built. Placed/Received tabs |
 | Competitions | `/competitions` | — | built; no wireframe covers this new module. Browse, register, withdraw |
-| Competition detail | `/competitions/:id` | — | built. Rounds and entries, a judging section visible only to an assigned judge, and the published result |
+| Competition detail | `/competitions/:id` | — | built. A page since 2026-10-24: cover photo, title, where it is held, stage, Register/Withdraw, then three tabs - Details (about, the window, the judges), Participants (who is registered, by name, a page at a time), Rounds (entries, a judging section visible only to an assigned judge, the published result) |
 | Samaaj Panch | `/panch` | — | built; no wireframe covers it. Who sits on the Panch, and the elections |
 | Panch election | `/panch/:id` | — | built. Nominate somebody by name, cast one final ballot of up to ten, read the result |
 | Trusts | `/trust` | — | built; no wireframe covers this new module. Our Samaaj's locality Trusts, read-only, with a "What you owe" card above them when a Boli the member won has fallen due to a Trust |
@@ -824,9 +824,14 @@ saved saved and says so. Where a business is reads "street line · Locality,
 City", resolved by `placeOf` against the City and Locality lists a screen loads
 once. The register and edit forms share `BusinessFieldsComponent`, a
 City/Village -> Locality cascade like My Profile's. Owners are resolved by
-`BusinessOwners` - one `MembersApi.get()` per distinct owner on screen,
-memoized for the session - and shown with their photo, linked to their profile,
-or "a member" when this reader may not see them. These are the member portal's
+`MemberLookup` (`features/members/member-lookup.ts`) - one `MembersApi.get()`
+per distinct member on screen, memoized for the session - and shown with their
+photo, linked to their profile, or "a member" when this reader may not see
+them. A competition's participants, judges and entrants use the same lookup,
+its Participants tab a page of 48 at a time, so a large competition is never a
+lookup per registrant on opening a tab. Competition names used to be "A member"
+for everyone but the reader; resolving the ones on screen is the bounded lookup
+the rule below allows. These are the member portal's
 first popups: `.modal-backdrop`/`.modal-dialog`/`.modal-card` are in
 `styles.css`, copied from the admin panel.
 

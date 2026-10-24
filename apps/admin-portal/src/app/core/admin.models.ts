@@ -1448,6 +1448,10 @@ export interface CompetitionInput {
   readonly description: string | null;
   readonly competitionTypeId: string | null;
   readonly localityId: string | null;
+  /** Where it is held, in the organiser's words - "Mahavir Bhawan, Hall 2". */
+  readonly venue: string | null;
+  /** The city or village, a master-data id. */
+  readonly cityId: string | null;
   readonly registrationStartAt: string;
   readonly registrationEndAt: string;
 }
@@ -1463,6 +1467,12 @@ export interface Competition {
 
   /** Null for the whole Samaaj. */
   readonly localityId: string | null;
+
+  readonly venue: string | null;
+  readonly cityId: string | null;
+
+  /** The cover photo, fetched with the token (`scAuthedSrc`). Versioned, so a replaced one is a new URL. Null when none. */
+  readonly photoUrl: string | null;
 
   /** Right now: the status says so *and* the clock agrees. */
   readonly acceptsRegistrations: boolean;

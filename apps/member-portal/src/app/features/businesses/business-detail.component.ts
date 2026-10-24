@@ -4,7 +4,7 @@ import { ActivatedRoute, RouterLink } from '@angular/router';
 import { AuthService, AuthedImageDirective, describeError, formatRupees } from '@samaajconnect/shared';
 import { MasterDataApi } from '../members/master-data.api';
 import { City, Locality, LookupItem } from '../members/members.models';
-import { BusinessOwners, initialsOf } from './business-owners';
+import { MemberLookup, initialsOf } from '../members/member-lookup';
 import { placeOf } from './business-place';
 import { BusinessesApi } from './businesses.api';
 import { Business, PlaceOrderItem, Product } from './businesses.models';
@@ -64,7 +64,7 @@ import { Business, PlaceOrderItem, Product } from './businesses.models';
 
             <div class="biz-contact">
               <div class="owner-chip">
-                @let owner = owners.owner(found.ownerMemberId);
+                @let owner = owners.member(found.ownerMemberId);
                 @if (owner?.photoUrl; as path) {
                   <img class="owner-avatar" [scAuthedSrc]="path" alt="" />
                 } @else {
@@ -191,7 +191,7 @@ export class BusinessDetailComponent implements OnInit {
   private readonly auth = inject(AuthService);
   private readonly masterData = inject(MasterDataApi);
 
-  readonly owners = inject(BusinessOwners);
+  readonly owners = inject(MemberLookup);
 
   private readonly me = computed(() => this.auth.user()?.userId ?? null);
 

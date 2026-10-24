@@ -30,8 +30,8 @@ screen. The spec is `docs/product/wireframes/admin-panel-wireframes.html`.
 | Event detail | `/events/:id` | — | built; no wireframe covers one. A page: a photo cover (or a calendar leaf), tabs - About, Schedule, Going (who is going, who is waiting, and in what order) - and Edit, one popup for the details and the photo |
 | Celebrities / Voting | `/voting` | `#celebrity` | built. Campaigns, setting one up, and editing one (a modal, until voting opens) |
 | Campaign detail | `/voting/:id` | — | built; no wireframe covers running one. Stage, ballot, nominations, tally, result |
-| Competitions | `/competitions` | — | built; no wireframe covers this new module. Competitions; setting one up and correcting one (until registration closes) in a popup, with an optional locality |
-| Competition detail | `/competitions/:id` | — | built; no wireframe covers running one. Stage, judges, rounds, entries, publish results |
+| Competitions | `/competitions` | — | built; no wireframe covers this new module. Competitions; setting one up and correcting one (until registration closes) in a popup, with a venue, city or village, and an optional locality |
+| Competition detail | `/competitions/:id` | — | built; no wireframe covers running one. The cover photo (add, change, remove - at any stage), where it is held, stage, judges, rounds, entries, publish results |
 | Samaaj Panch | `/panch` | — | built; no wireframe covers it. The seated Panch with Remove, and the elections list with a create modal |
 | Panch election | `/panch/:id` | — | built. Stage, approving nominations, the tally, publishing (which replaces the Panch) |
 | Volunteer Groups | `/groups` | `#groups` (member-facing) | built. Create (president optional), set a president later, and stand one down |

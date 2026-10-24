@@ -200,21 +200,147 @@ describe('CompetitionDetailComponent', () => {
       ],
     });
 
+    URL.createObjectURL = () => 'blob:test';
+    URL.revokeObjectURL = () => undefined;
+
     fixture = TestBed.createComponent(CompetitionDetailComponent);
     component = fixture.componentInstance;
     http = TestBed.inject(HttpTestingController);
   });
 
-  afterEach(() => http.verify());
+  afterEach(() => {
+    settlePeople();
+    http.verify();
+  });
 
   function load(found: CompetitionDetail): void {
     fixture.detectChanges();
 
+    http.expectOne((r) => r.url === '/v1/master-data/cities')
+      .flush([{ id: 'udr', countryId: 'in', name: 'Udaipur', isActive: true }]);
+    http.expectOne((r) => r.url === '/v1/master-data/localities')
+      .flush([{ id: 'loc1', cityId: 'udr', name: 'Hiran Magri', isActive: true }]);
     http.expectOne('/v1/identity/me').flush(currentUser);
     http.expectOne('/v1/competitions/comp1').flush(found);
 
     fixture.detectChanges();
   }
+
+  /**
+   * Answers every member lookup - "hidden" as one this reader may not see,
+   * anybody else as a named member with a photo - and the photo fetches
+   * `scAuthedSrc` then makes.
+   */
+  function settlePeople(): void {
+    for (const request of http.match((r) => r.url.startsWith('/v1/members/'))) {
+      const id = request.request.url.split('/').pop()!;
+
+      if (id === 'hidden') {
+        request.flush({}, { status: 404, statusText: 'Not Found' });
+      } else {
+        request.flush({ id, fullName: `Member ${id}`, photoUrl: `/v1/members/${id}/photo` });
+      }
+    }
+
+    fixture.detectChanges();
+
+    for (const request of http.match((r) => r.url.includes('/photo') && r.method === 'GET')) {
+      request.flush(new Blob(['x']));
+    }
+
+    fixture.detectChanges();
+  }
+
+  function showTab(label: string): void {
+    [...(fixture.nativeElement as HTMLElement).querySelectorAll<HTMLButtonElement>('[role="tab"]')]
+      .find((t) => t.textContent?.trim().startsWith(label))!
+      .click();
+    fixture.detectChanges();
+  }
+
+  // ---- The page -------------------------------------------------------------
+
+  it('opens like a page: cover, title, where it is held, and its stage', () => {
+    load(detail({
+      photoUrl: '/v1/competitions/comp1/photo?v=1',
+      venue: 'Mahavir Bhawan, Hall 2',
+      localityId: 'loc1',
+      cityId: 'udr',
+    }));
+    settlePeople();
+
+    expect((fixture.nativeElement as HTMLElement).querySelector('img.comp-cover')).not.toBeNull();
+    expect(text()).toContain('Rangoli Contest 2026');
+    expect(text()).toContain('Mahavir Bhawan, Hall 2 · Hiran Magri, Udaipur');
+    expect(text()).toContain('2 registered');
+  });
+
+  it('shows initials where there is no photo', () => {
+    load(detail());
+
+    expect((fixture.nativeElement as HTMLElement).querySelector('.comp-cover.placeholder')!.textContent!.trim())
+      .toBe('RC');
+  });
+
+  it('opens on Details, with the window and the judges by name', () => {
+    load({ ...detail(), judges: [{ id: 'j1', memberId: 'm7', assignedAt: SOON }] });
+    settlePeople();
+
+    expect(component.tab()).toBe('details');
+    expect(text()).toContain('Registration opens');
+    expect(text()).toContain('Member m7');
+    expect((fixture.nativeElement as HTMLElement).querySelector('a[href="/members/m7"]')).not.toBeNull();
+  });
+
+  it('lists who is registered on Participants, by name, linked to their profile', () => {
+    load({ ...detail(), registeredMemberIds: [ME, 'm2', 'hidden'] });
+
+    showTab('Participants');
+    settlePeople();
+
+    const people = [...(fixture.nativeElement as HTMLElement).querySelectorAll('.person-card')]
+      .map((p) => p.textContent!.trim());
+
+    expect(people.length).toBe(3);
+    expect(people[0]).toContain('You');
+    expect(people[1]).toContain('Member m2');
+    expect(people[2]).toContain('A member');
+    const tab = (fixture.nativeElement as HTMLElement).querySelector('#competition-tab-participants')!;
+    expect(tab.textContent!.replace(/\s+/g, ' ').trim()).toBe('Participants (3)');
+  });
+
+  it('looks participants up a page at a time', () => {
+    const many = Array.from({ length: 60 }, (_, i) => `p${i}`);
+    load({ ...detail(), registeredMemberIds: many });
+
+    showTab('Participants');
+
+    expect(http.match((r) => r.url.startsWith('/v1/members/')).length).toBe(48);
+    expect(text()).toContain('Show more (12 more)');
+
+    component.showMoreParticipants();
+
+    expect(http.match((r) => r.url.startsWith('/v1/members/')).length).toBe(12);
+  });
+
+  it('says nobody has registered rather than an empty list', () => {
+    load({ ...detail(), registeredMemberIds: [] });
+
+    showTab('Participants');
+
+    expect(text()).toContain('Nobody has registered yet');
+  });
+
+  it('opens the Rounds tab when a round is chosen', () => {
+    load(detail());
+
+    component.selectRound(component.detail()!.rounds[0]!);
+    http.expectOne('/v1/competitions/comp1/rounds/round1').flush(roundDetail());
+    fixture.detectChanges();
+
+    expect(component.tab()).toBe('rounds');
+    expect(text()).toContain('Final');
+  });
 
   function text(): string {
     return (fixture.nativeElement as HTMLElement).textContent ?? '';
@@ -435,10 +561,14 @@ describe('CompetitionDetailComponent', () => {
 
   // ---- Names it cannot resolve -------------------------------------------------
 
-  it('names the reader but nobody else', () => {
-    load(detail());
+  it('names the reader "You", a resolved member by name, and anybody else "A member"', () => {
+    load({ ...detail(), registeredMemberIds: ['m2', 'hidden'] });
+    showTab('Participants');
+    settlePeople();
 
     expect(component.nameFor(ME)).toBe('You');
-    expect(component.nameFor('other')).toBe('A member');
+    expect(component.nameFor('m2')).toBe('Member m2');
+    expect(component.nameFor('hidden')).toBe('A member');
+    expect(component.nameFor('never-asked')).toBe('A member');
   });
 });

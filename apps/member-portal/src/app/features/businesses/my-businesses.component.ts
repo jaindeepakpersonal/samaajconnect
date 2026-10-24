@@ -5,7 +5,7 @@ import { AuthedImageDirective, describeError } from '@samaajconnect/shared';
 import { MasterDataApi } from '../members/master-data.api';
 import { LookupItem } from '../members/members.models';
 import { BusinessFieldsComponent } from './business-fields.component';
-import { initialsOf } from './business-owners';
+import { initialsOf } from '../members/member-lookup';
 import { BusinessesApi } from './businesses.api';
 import { Business, BusinessFields } from './businesses.models';
 

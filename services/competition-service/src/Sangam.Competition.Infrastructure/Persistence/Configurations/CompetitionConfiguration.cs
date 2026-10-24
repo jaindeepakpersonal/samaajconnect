@@ -16,6 +16,7 @@ public sealed class CompetitionConfiguration : IEntityTypeConfiguration<Competit
 
         builder.Property(c => c.Title).IsRequired().HasMaxLength(200);
         builder.Property(c => c.Description).HasMaxLength(2000);
+        builder.Property(c => c.Venue).HasMaxLength(300);
         builder.Property(c => c.Status).HasConversion<string>().HasMaxLength(30);
 
         builder.HasIndex(c => new { c.TenantId, c.Status });

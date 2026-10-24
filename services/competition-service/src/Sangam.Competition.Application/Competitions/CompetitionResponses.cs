@@ -20,7 +20,15 @@ public sealed record CompetitionResponse(
     DateTimeOffset CreatedAt,
 
     /// <summary>Null for the whole Samaaj.</summary>
-    Guid? LocalityId);
+    Guid? LocalityId,
+
+    /// <summary>Where it is held, in the organiser's words. The city or village and locality are the ids beside it.</summary>
+    string? Venue = null,
+
+    Guid? CityId = null,
+
+    /// <summary>Where to fetch its photo - versioned by the photo's id, so a replaced one is a new URL. Null when none.</summary>
+    string? PhotoUrl = null);
 
 public sealed record JudgeResponse(Guid Id, Guid MemberId, DateTimeOffset AssignedAt);
 

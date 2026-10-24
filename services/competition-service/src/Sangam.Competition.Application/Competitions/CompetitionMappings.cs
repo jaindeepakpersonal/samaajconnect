@@ -21,7 +21,10 @@ internal static class CompetitionMappings
             memberId is { } id ? competition.FindRegistration(id)?.Status.ToString() : null,
             memberId is { } judgeId && competition.IsJudge(judgeId),
             competition.CreatedAt,
-            competition.LocalityId);
+            competition.LocalityId,
+            competition.Venue,
+            competition.CityId,
+            competition.PhotoId is { } photoId ? $"/v1/competitions/{competition.Id}/photo?v={photoId:N}" : null);
 
     public static RoundResponse ToResponse(this Round round, int entryCount, bool hasPublishedResult) =>
         new(

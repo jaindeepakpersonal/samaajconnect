@@ -25,8 +25,18 @@ function competition(overrides: Partial<Competition> = {}): Competition {
     isJudge: false,
     createdAt: '2026-07-01T00:00:00Z',
     localityId: null,
+    venue: null,
+    cityId: null,
+    photoUrl: null,
     ...overrides,
   };
+}
+
+/** Answers every outstanding city list - the dialog and the detail page each ask for their own. */
+function settleCities(http: HttpTestingController) {
+  for (const request of http.match((r) => r.url === '/v1/master-data/cities')) {
+    request.flush([{ id: 'udr', countryId: 'in', stateId: null, name: 'Udaipur', isActive: true }]);
+  }
 }
 
 function round(overrides: Partial<Round> = {}): Round {
@@ -101,6 +111,8 @@ describe('CompetitionListComponent', () => {
   }
 
   function dialog(): CompetitionDialogComponent {
+    settleCities(http);
+
     return fixture.debugElement.query((el) => el.componentInstance instanceof CompetitionDialogComponent)
       .componentInstance as CompetitionDialogComponent;
   }
@@ -144,6 +156,8 @@ describe('CompetitionListComponent', () => {
     form.registrationStartAt = '2026-08-01T00:00';
     form.registrationEndAt = '2026-08-20T00:00';
     form.localityId = 'loc1';
+    form.venue = ' Mahavir Bhawan, Hall 2 ';
+    form.cityId = 'udr';
     form.save();
 
     const call = http.expectOne('/v1/competitions');
@@ -153,6 +167,8 @@ describe('CompetitionListComponent', () => {
     expect(body['title']).toBe('Rangoli Contest 2026');
     expect(body['description']).toBeNull();
     expect(body['localityId']).toBe('loc1');
+    expect(body['venue']).toBe('Mahavir Bhawan, Hall 2');
+    expect(body['cityId']).toBe('udr');
 
     call.flush(competition());
     http.expectOne('/v1/competitions').flush([competition({ localityId: 'loc1' })]);
@@ -242,6 +258,15 @@ describe('CompetitionDetailComponent', () => {
     fixture.detectChanges();
     http.expectOne(`/v1/competitions/${COMPETITION_ID}`).flush(subject);
     http.expectOne('/v1/members?take=100').flush({ items: MEMBERS, hasMore: false });
+    http.expectOne((r) => r.url === '/v1/master-data/localities')
+      .flush([{ id: 'loc1', cityId: 'udr', name: 'Hiran Magri', isActive: true }]);
+    settleCities(http);
+    fixture.detectChanges();
+
+    for (const request of http.match((r) => r.url.includes('/photo') && r.method === 'GET')) {
+      request.flush(new Blob(['x']));
+    }
+
     fixture.detectChanges();
   }
 
@@ -250,6 +275,50 @@ describe('CompetitionDetailComponent', () => {
     http.expectOne('/v1/members?take=100').flush({ items: MEMBERS, hasMore: false });
     fixture.detectChanges();
   }
+
+  it('names where it is held, and shows the cover members will see', () => {
+    URL.createObjectURL = () => 'blob:test';
+    URL.revokeObjectURL = () => undefined;
+
+    load(detail({ competition: competition({
+      venue: 'Mahavir Bhawan, Hall 2',
+      localityId: 'loc1',
+      cityId: 'udr',
+      photoUrl: '/v1/competitions/comp1/photo?v=1',
+    }) }));
+
+    expect(text()).toContain('Mahavir Bhawan, Hall 2 · Hiran Magri, Udaipur');
+    expect(fixture.nativeElement.querySelector('img.competition-cover')).not.toBeNull();
+  });
+
+  it('names the city or village alone when no locality is picked', () => {
+    load(detail({ competition: competition({ cityId: 'udr' }) }));
+
+    expect(component.whereHeld(component.competition()!)).toBe('Udaipur');
+  });
+
+  it('uploads and removes the photo, then re-reads the competition', () => {
+    load();
+
+    const file = new File(['x'], 'cover.png', { type: 'image/png' });
+    component.uploadPhoto({ target: { files: [file], value: 'cover.png' } } as unknown as Event);
+
+    const upload = http.expectOne(`/v1/competitions/${COMPETITION_ID}/photo`);
+
+    expect(upload.request.method).toBe('POST');
+    expect((upload.request.body as FormData).get('file')).toBe(file);
+    upload.flush(competition());
+    reload();
+
+    component.removePhoto();
+    const removal = http.expectOne(`/v1/competitions/${COMPETITION_ID}/photo`);
+
+    expect(removal.request.method).toBe('DELETE');
+    removal.flush(competition());
+    reload();
+
+    expect(text()).toContain('Photo removed.');
+  });
 
   it('offers the one stage the competition can move to', () => {
     load(detail({ competition: competition({ status: 'Draft' }) }));
@@ -411,6 +480,8 @@ describe('CompetitionDetailComponent', () => {
     http
       .expectOne(`/v1/competitions/${COMPETITION_ID}`)
       .flush({}, { status: 404, statusText: 'Not Found' });
+    http.expectOne((r) => r.url === '/v1/master-data/localities').flush([]);
+    settleCities(http);
     fixture.detectChanges();
 
     expect(text()).toContain('No such competition');

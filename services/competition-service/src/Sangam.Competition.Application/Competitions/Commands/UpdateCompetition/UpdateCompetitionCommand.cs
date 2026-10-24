@@ -19,7 +19,9 @@ public sealed record UpdateCompetitionCommand(
     string? CompetitionTypeId,
     string? LocalityId,
     DateTimeOffset RegistrationStartAt,
-    DateTimeOffset RegistrationEndAt) : ICommand<CompetitionResponse>;
+    DateTimeOffset RegistrationEndAt,
+    string? Venue = null,
+    string? CityId = null) : ICommand<CompetitionResponse>;
 
 public sealed class UpdateCompetitionCommandValidator : AbstractValidator<UpdateCompetitionCommand>
 {
@@ -30,6 +32,8 @@ public sealed class UpdateCompetitionCommandValidator : AbstractValidator<Update
         RuleFor(x => x.Description).MaximumLength(2000);
         RuleFor(x => x.CompetitionTypeId).Must(BeNullOrAGuid).WithMessage("Competition type must be a valid id.");
         RuleFor(x => x.LocalityId).Must(BeNullOrAGuid).WithMessage("Locality must be a valid id.");
+        RuleFor(x => x.CityId).Must(BeNullOrAGuid).WithMessage("City must be a valid id.");
+        RuleFor(x => x.Venue).MaximumLength(300);
 
         RuleFor(x => x.RegistrationEndAt)
             .GreaterThan(x => x.RegistrationStartAt)
@@ -71,7 +75,9 @@ public sealed class UpdateCompetitionCommandHandler(
             command.RegistrationStartAt,
             command.RegistrationEndAt,
             actorId,
-            clock.UtcNow);
+            clock.UtcNow,
+            command.Venue,
+            command.CityId is { } cityId ? Guid.Parse(cityId) : null);
 
         if (!updated)
         {

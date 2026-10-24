@@ -17,7 +17,9 @@ public sealed record CreateCompetitionCommand(
     DateTimeOffset RegistrationEndAt,
 
     /// <summary>A string, validated as a Guid; null for the whole Samaaj.</summary>
-    string? LocalityId = null) : ICommand<CompetitionResponse>;
+    string? LocalityId = null,
+    string? Venue = null,
+    string? CityId = null) : ICommand<CompetitionResponse>;
 
 public sealed class CreateCompetitionCommandValidator : AbstractValidator<CreateCompetitionCommand>
 {
@@ -33,6 +35,12 @@ public sealed class CreateCompetitionCommandValidator : AbstractValidator<Create
         RuleFor(x => x.LocalityId)
             .Must(BeNullOrAGuid)
             .WithMessage("Locality must be a valid id.");
+
+        RuleFor(x => x.CityId)
+            .Must(BeNullOrAGuid)
+            .WithMessage("City must be a valid id.");
+
+        RuleFor(x => x.Venue).MaximumLength(300);
 
         RuleFor(x => x.RegistrationEndAt)
             .GreaterThan(x => x.RegistrationStartAt)
@@ -75,7 +83,9 @@ public sealed class CreateCompetitionCommandHandler(
             command.RegistrationEndAt,
             actorId,
             clock.UtcNow,
-            command.LocalityId is { } localityId ? Guid.Parse(localityId) : null);
+            command.LocalityId is { } localityId ? Guid.Parse(localityId) : null,
+            command.Venue,
+            command.CityId is { } cityId ? Guid.Parse(cityId) : null);
 
         competitions.Add(competition);
 

@@ -4,7 +4,7 @@ import { RouterLink } from '@angular/router';
 import { AuthedImageDirective, describeError } from '@samaajconnect/shared';
 import { MasterDataApi } from '../members/master-data.api';
 import { City, Locality, LookupItem } from '../members/members.models';
-import { BusinessOwners, initialsOf } from './business-owners';
+import { MemberLookup, initialsOf } from '../members/member-lookup';
 import { placeOf } from './business-place';
 import { BusinessesApi } from './businesses.api';
 import { Business, DirectoryFilters } from './businesses.models';
@@ -18,7 +18,7 @@ import { Business, DirectoryFilters } from './businesses.models';
  *
  * **A listing shows the business's photo, where it is and who runs it**
  * (2026-10-24). Where it is resolves against the City and Locality lists loaded
- * once; the owner's name and photo come from `BusinessOwners`, one lookup per
+ * once; the owner's name and photo come from `MemberLookup`, one lookup per
  * owner on screen and linked to their profile, and say "A member" for one this
  * reader may not see.
  */
@@ -120,7 +120,7 @@ import { Business, DirectoryFilters } from './businesses.models';
                 }
 
                 <div class="owner-chip">
-                  @let owner = owners.owner(business.ownerMemberId);
+                  @let owner = owners.member(business.ownerMemberId);
                   @if (owner?.photoUrl; as path) {
                     <img class="owner-avatar" [scAuthedSrc]="path" alt="" />
                   } @else {
@@ -149,7 +149,7 @@ export class BusinessesDirectoryComponent implements OnInit {
   private readonly api = inject(BusinessesApi);
   private readonly masterData = inject(MasterDataApi);
 
-  readonly owners = inject(BusinessOwners);
+  readonly owners = inject(MemberLookup);
 
   readonly loading = signal(true);
   readonly error = signal<string | null>(null);

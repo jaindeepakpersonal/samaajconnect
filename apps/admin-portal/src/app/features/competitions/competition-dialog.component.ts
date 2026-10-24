@@ -2,7 +2,7 @@ import { AfterViewInit, Component, ElementRef, OnInit, ViewChild, inject, input,
 import { FormsModule } from '@angular/forms';
 import { describeError } from '@samaajconnect/shared';
 import { AdminApi } from '../../core/admin-api';
-import { Competition, CompetitionInput } from '../../core/admin.models';
+import { Competition, CompetitionInput, City } from '../../core/admin.models';
 import { LocalityOptions } from '../../core/locality-options';
 import { blankToNull, modalKeydown } from '../../core/modal-keys';
 
@@ -46,6 +46,18 @@ import { blankToNull, modalKeydown } from '../../core/modal-keys';
           <label for="competition-description">Description</label>
           <textarea id="competition-description" class="input" name="description" rows="3"
             [(ngModel)]="description" maxlength="2000"></textarea>
+
+          <label for="competition-venue">Venue</label>
+          <input id="competition-venue" class="input" name="venue" [(ngModel)]="venue"
+            maxlength="300" placeholder="Mahavir Bhawan, Hall 2" />
+
+          <label for="competition-city">City or village</label>
+          <select id="competition-city" class="input" name="city" [(ngModel)]="cityId">
+            <option value="">Not specified</option>
+            @for (city of cities(); track city.id) {
+              <option [value]="city.id">{{ city.name }}</option>
+            }
+          </select>
 
           <label for="competition-locality">Locality</label>
           <select id="competition-locality" class="input" name="locality" [(ngModel)]="localityId">
@@ -104,13 +116,19 @@ export class CompetitionDialogComponent implements OnInit, AfterViewInit {
   title = '';
   description = '';
   localityId = '';
+  venue = '';
+  cityId = '';
   registrationStartAt = '';
+
+  /** Every active city or village, for where it is held. */
+  readonly cities = signal<readonly City[]>([]);
   registrationEndAt = '';
 
   @ViewChild('firstField') private readonly firstFieldRef?: ElementRef<HTMLInputElement>;
 
   ngOnInit(): void {
     this.localities.load();
+    this.api.listCities().subscribe({ next: (found) => this.cities.set(found), error: () => {} });
 
     const existing = this.competition();
 
@@ -118,6 +136,8 @@ export class CompetitionDialogComponent implements OnInit, AfterViewInit {
       this.title = existing.title;
       this.description = existing.description ?? '';
       this.localityId = existing.localityId ?? '';
+      this.venue = existing.venue ?? '';
+      this.cityId = existing.cityId ?? '';
       this.registrationStartAt = toLocalInput(existing.registrationStartAt);
       this.registrationEndAt = toLocalInput(existing.registrationEndAt);
     }
@@ -159,6 +179,8 @@ export class CompetitionDialogComponent implements OnInit, AfterViewInit {
       description: blankToNull(this.description),
       competitionTypeId: existing?.competitionTypeId ?? null,
       localityId: this.localityId || null,
+      venue: blankToNull(this.venue),
+      cityId: this.cityId || null,
       registrationStartAt: new Date(this.registrationStartAt).toISOString(),
       registrationEndAt: new Date(this.registrationEndAt).toISOString(),
     };

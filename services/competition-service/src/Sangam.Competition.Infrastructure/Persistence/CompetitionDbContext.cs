@@ -25,6 +25,8 @@ public sealed class CompetitionDbContext(
 
     public DbSet<OutboxMessage> OutboxMessages => Set<OutboxMessage>();
 
+    public DbSet<Domain.Media.CompetitionPhoto> CompetitionPhotos => Set<Domain.Media.CompetitionPhoto>();
+
     /// <summary>
     /// Backing value for the global tenant query filter. Public because the
     /// filter expression reads it off this context instance, and EF

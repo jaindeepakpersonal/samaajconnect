@@ -48,6 +48,7 @@ app.MapGet("/health", () => Results.Ok(new { status = "healthy" }))
     .ExcludeFromDescription();
 
 app.MapCompetitionEndpoints();
+app.MapCompetitionPhotoEndpoints();
 
 await app.RunAsync();
 

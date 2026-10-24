@@ -25,6 +25,7 @@ with no dependency on events-service and no change to it.
 | `Entry` | One participant's place in one round. A separate, tenant-scoped aggregate - not owned by `Competition` or `Round` - for the same "don't let the busy child balloon the parent" reasoning that keeps businesses-service's `Order` its own aggregate |
 | `Score` | One judge's mark for one entry. Also separate and never loaded by a parent, the same reasoning as `Vote`/`Bid` - but unlike those, an **upsert** while its round is open, since correcting a mark before judging closes is the ordinary case here, not ballot-stuffing |
 | `RoundResult` | A round's frozen ranking: entry ids in rank order, stored as `jsonb`. Mirrors `CampaignResult` |
+| `CompetitionPhoto` | A competition's cover photo bytes. `Competition.PhotoId` points at it; it cascades with the competition |
 
 `Competition.CompetitionTypeId` is a master-data-service `LookupItem` id,
 `Category = CompetitionType` - a flat, admin-managed platform-wide list
@@ -53,6 +54,8 @@ already has (an organiser permission, not a new platform role).
 | `CreateEntryCommand` | `Competition.Manage` | Refuses a participant who is not currently registered, a duplicate entry in the same round, and a closed round |
 | `RecordScoreCommand` | `Members.Read`, caller must be an assigned judge for this competition | Upsert while the round is open |
 | `PublishRoundResultsCommand` | `Competition.Manage` | Only from a closed round. Computes once, then freezes; publishing again returns the same frozen result |
+| `UploadCompetitionPhotoCommand` | `Competition.Manage` | The cover photo, replacing any. At any stage - a picture is not a detail members registered against. 404 for another Samaaj's |
+| `RemoveCompetitionPhotoCommand` | `Competition.Manage` | Twice is success |
 
 ## Queries
 
@@ -66,6 +69,7 @@ already take.
 | `GetCompetitionQuery` | `Members.Read` | Rounds, registration count, judges, and whether the caller may manage it |
 | `GetRoundQuery` | `Members.Read` | A round's entries. Marks are visible only to the organiser or an assigned judge - never to an ordinary member, before or after publication |
 | `GetRoundResultQuery` | `Members.Read` | The published ranking. 404 until a result exists |
+| `GetCompetitionPhotoQuery` | `Members.Read` | The cover photo bytes, for any signed-in member of the Samaaj |
 
 ## Events published
 
@@ -136,6 +140,25 @@ Added 2026-09-27. A competition may name the locality it is held for
 event's), or none for the whole Samaaj. It bounds nobody - every member may
 register for any competition - and exists for the admin panel's locality
 filter (`GET /v1/competitions?localityId=`).
+
+## Venue, city and photo
+
+Added 2026-10-24 (the user's request). `Venue` is where it is held in the
+organiser's words (300 characters, blank means none) and `CityId` the city or
+village, a master-data id beside the existing `LocalityId`; both are set and
+corrected with the rest of the details, under `UpdateCompetitionCommand`'s
+"until registration closes" rule.
+
+The cover photo is `CompetitionPhoto`, events-service's `EventPhoto`
+copied: the bytes in this service's own database, sniffed by `ImageContent`
+(the sixth copy, held identical to the others by
+`scripts/security-invariants.sh`), served `Cache-Control: private` with an
+ETag. Unlike the details it can change at any stage. Replacing one removes the
+old in the same transaction, and `photoUrl` carries `?v={photoId}` so a
+replaced photo is a new URL. The upload and removal re-check the competition's
+tenant themselves rather than trusting the query filter (root CLAUDE.md
+section 6). Neither raises an event, as no other detail edit beyond
+`CompetitionUpdatedDomainEvent` does. `CompetitionPhotoTests` covers it.
 
 ## Dependencies
 

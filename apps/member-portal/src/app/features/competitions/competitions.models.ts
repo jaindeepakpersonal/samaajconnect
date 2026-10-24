@@ -41,6 +41,18 @@ export interface Competition {
   /** Whether this member is one of this competition's assigned judges. */
   readonly isJudge: boolean;
   readonly createdAt: string;
+
+  /** The locality it is held for, a master-data id; null for the whole Samaaj. */
+  readonly localityId?: string | null;
+
+  /** Where it is held, in the organiser's words - "Mahavir Bhawan, Hall 2". */
+  readonly venue?: string | null;
+
+  /** The city or village, a master-data id. */
+  readonly cityId?: string | null;
+
+  /** The cover photo, fetched with the token (`scAuthedSrc`). Null when there is none. */
+  readonly photoUrl?: string | null;
 }
 
 export interface Round {
@@ -64,6 +76,9 @@ export interface CompetitionDetail {
   readonly competition: Competition;
   readonly rounds: readonly Round[];
   readonly judges: readonly CompetitionJudge[];
+
+  /** Who is registered, in the order they registered. Every member of the Samaaj may see it. */
+  readonly registeredMemberIds?: readonly string[];
 }
 
 /**
