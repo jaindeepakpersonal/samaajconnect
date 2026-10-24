@@ -268,9 +268,10 @@ asks which: paid now (with its mode, and a receipt number), or announced to be
 paid later (no mode, no receipt). Each row has Edit and Delete, and an
 announcement also has Mark paid, which is what issues its receipt. The ledger
 shows what was received and what is still to come, and a Show filter narrows it
-to paid, not paid yet, or deleted. Delete keeps the row in the service - a
-receipt number is never issued twice - so a deleted entry is under Show, and
-deleting one with a receipt asks why. This replaced Void and a stray Cancel
+to paid, not paid yet, or deleted. Deleting a paid entry asks why and keeps
+the row in the service - a receipt number is never issued twice - so it is
+under Show. Deleting an announcement erases it, asking for nothing, because no
+receipt names it. This replaced Void and a stray Cancel
 that the popup conversion had left in every row.
 
 **Withdrawing is on the roll, not the placement queue.** It is the same

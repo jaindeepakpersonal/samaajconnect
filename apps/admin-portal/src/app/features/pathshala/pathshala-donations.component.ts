@@ -21,10 +21,11 @@ import { blankToNull } from '../../core/modal-keys';
  * totals (received, and announced but not yet paid) come from the service
  * rather than being summed here.
  *
- * **Delete takes an entry off the ledger, and the service keeps the row.** A
- * receipt number has been written on a slip somebody holds, so it is never
- * issued again and a reason is asked for; an announcement needs none. Deleted
- * entries stay one choice away, under Show.
+ * **Deleting a paid entry keeps its row; deleting an announcement erases it.**
+ * A receipt number has been written on a slip somebody holds, so a paid entry
+ * is voided with a reason, its number is never issued again, and it stays one
+ * choice away under Show. An announcement has no receipt, so Delete erases it
+ * outright and asks for nothing.
  *
  * Amounts are integer paise on the wire; `parseRupees`/`formatRupees` in
  * `libs/shared` are the only conversion.
@@ -188,11 +189,8 @@ import { blankToNull } from '../../core/modal-keys';
                 } @else {
                   <p>
                     The announcement of {{ rupees(open.donation.amount) }} from <b>{{ open.donation.donorName }}</b>
-                    leaves the ledger. No receipt was issued for it.
+                    is erased. No receipt was issued for it, so nothing of it is kept. This cannot be undone.
                   </p>
-                  <label for="delete-reason">Why (optional)</label>
-                  <input id="delete-reason" class="input" name="deleteReason" [(ngModel)]="deleteReason"
-                    maxlength="500" placeholder="Will not be paid" />
                 }
 
                 <div class="actions">
@@ -530,11 +528,20 @@ export class PathshalaDonationsComponent implements OnInit {
 
     const donation = open.donation;
 
+    // An announcement is erased outright; a receipt is on a slip, so that
+    // entry is voided with its reason and stays under "Deleted".
+    if (donation.receiptNumber === null) {
+      this.run(
+        this.api.deleteDonation(donation.id),
+        () => `The announcement from ${donation.donorName} is erased.`,
+      );
+
+      return;
+    }
+
     this.run(
-      this.api.deleteDonation(donation.id, blankToNull(this.deleteReason)),
-      () => donation.receiptNumber === null
-        ? `The announcement from ${donation.donorName} is deleted.`
-        : `Receipt ${donation.receiptNumber} is deleted.`,
+      this.api.voidDonation(donation.id, this.deleteReason.trim()),
+      () => `Receipt ${donation.receiptNumber} is deleted.`,
     );
   }
 
@@ -552,7 +559,7 @@ export class PathshalaDonationsComponent implements OnInit {
   }
 
   /** Sends one change; on success closes the popup, says what happened and re-reads the ledger. */
-  private run(work: Observable<PathshalaDonation>, message: (saved: PathshalaDonation) => string): void {
+  private run<T>(work: Observable<T>, message: (saved: T) => string): void {
     this.busy.set(true);
     this.error.set(null);
     this.done.set(null);

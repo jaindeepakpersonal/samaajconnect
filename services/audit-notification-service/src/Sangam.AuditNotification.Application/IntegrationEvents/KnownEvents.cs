@@ -685,6 +685,14 @@ public static class KnownEvents
             EntityIdProperty: "donationId",
             ActorIdProperty: "paidBy"),
 
+        // The announcement's row is gone; this is the one record that it
+        // existed and who removed it. Ids and the amount, never the donor.
+        ["pathshala.donation.erased.v1"] = new(
+            Action: "DonationErased",
+            EntityName: "PathshalaDonation",
+            EntityIdProperty: "donationId",
+            ActorIdProperty: "erasedBy"),
+
         ["pathshala.donation.updated.v1"] = new(
             Action: "DonationUpdated",
             EntityName: "PathshalaDonation",

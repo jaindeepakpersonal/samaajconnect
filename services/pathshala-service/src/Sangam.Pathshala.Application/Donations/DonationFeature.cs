@@ -341,20 +341,21 @@ public sealed class MarkDonationPaidCommandHandler(
 // ---- Delete ------------------------------------------------------------------
 
 /// <summary>
-/// Deletes an entry from the ledger: it leaves the totals and the ledger's
-/// default view. The row stays, because a receipt number that was handed to
-/// somebody keeps pointing at something - so once there is a receipt a reason is
-/// required, and the number is never issued again. A pledge needs none.
+/// Deletes a paid entry from the ledger: it leaves the totals and the ledger's
+/// default view, with a reason. The row stays, because a receipt number that
+/// was handed to somebody keeps pointing at something, and the number is never
+/// issued again. An announcement has no receipt and is erased instead -
+/// <see cref="DeleteDonationCommand"/>.
 /// </summary>
 [RequiresPermission(PermissionKeys.PathshalaManage)]
-public sealed record VoidDonationCommand(Guid DonationId, string? Reason) : ICommand<DonationResponse>;
+public sealed record VoidDonationCommand(Guid DonationId, string Reason) : ICommand<DonationResponse>;
 
 public sealed class VoidDonationCommandValidator : AbstractValidator<VoidDonationCommand>
 {
     public VoidDonationCommandValidator()
     {
         RuleFor(x => x.DonationId).NotEmpty();
-        RuleFor(x => x.Reason).MaximumLength(500);
+        RuleFor(x => x.Reason).NotEmpty().MaximumLength(500);
     }
 }
 
@@ -384,12 +385,9 @@ public sealed class VoidDonationCommandHandler(
             return Result.Failure<DonationResponse>(DonationRules.Deleted);
         }
 
-        if (donation.ReceiptNumber is not null && string.IsNullOrWhiteSpace(command.Reason))
+        if (donation.ReceiptNumber is null)
         {
-            return Result.Failure<DonationResponse>(Error.Validation(new Dictionary<string, string[]>
-            {
-                ["reason"] = [$"Receipt {donation.ReceiptNumber} has been issued, so say why it is being deleted."],
-            }));
+            return Result.Failure<DonationResponse>(DonationRules.IsAnnouncement);
         }
 
         donation.Void(command.Reason, currentUser.UserId ?? Guid.Empty, clock.UtcNow);
@@ -397,6 +395,58 @@ public sealed class VoidDonationCommandHandler(
         await unitOfWork.SaveChangesAsync(cancellationToken);
 
         return Result.Success(donation.ToResponse());
+    }
+}
+
+/// <summary>
+/// Erases an announcement - a donation announced and not yet paid - outright
+/// (the user's choice, 2026-10-24). No receipt names it, so there is nothing to
+/// keep; the audit trail records its id, amount and who removed it, never the
+/// donor's name. 409 once it has a receipt: that entry is voided, with a reason.
+/// </summary>
+[RequiresPermission(PermissionKeys.PathshalaManage)]
+public sealed record DeleteDonationCommand(Guid DonationId) : ICommand<Guid>;
+
+public sealed class DeleteDonationCommandValidator : AbstractValidator<DeleteDonationCommand>
+{
+    public DeleteDonationCommandValidator()
+    {
+        RuleFor(x => x.DonationId).NotEmpty();
+    }
+}
+
+public sealed class DeleteDonationCommandHandler(
+    IPathshalaRepository pathshalas,
+    IDonationRepository donations,
+    IUnitOfWork unitOfWork,
+    ICurrentUser currentUser,
+    ITenantContext tenantContext,
+    IAreaScope areaScope,
+    IDateTimeProvider clock)
+    : IRequestHandler<DeleteDonationCommand, Result<Guid>>
+{
+    public async Task<Result<Guid>> Handle(DeleteDonationCommand command, CancellationToken cancellationToken)
+    {
+        var donation = await DonationRules.FindAsync(
+            command.DonationId, pathshalas, donations, tenantContext, areaScope, cancellationToken);
+
+        if (donation is null)
+        {
+            return Result.Failure<Guid>(DonationRules.NoSuchDonation);
+        }
+
+        if (!donation.Erase(currentUser.UserId ?? Guid.Empty, clock.UtcNow))
+        {
+            return Result.Failure<Guid>(Error.Conflict(
+                "Donation.HasReceipt",
+                $"Receipt {donation.ReceiptNumber} has been issued, so the entry is kept: delete it with a reason instead."));
+        }
+
+        donations.Remove(donation);
+
+        await unitOfWork.SaveChangesAsync(cancellationToken);
+
+        return Result.Success(donation.Id);
     }
 }
 
@@ -445,6 +495,9 @@ internal static class DonationRules
 
     public static readonly Error Deleted =
         Error.Conflict("Donation.Deleted", "This donation has been deleted from the ledger.");
+
+    public static readonly Error IsAnnouncement =
+        Error.Conflict("Donation.IsAnnouncement", "An announcement has no receipt to keep, so it is erased rather than voided.");
 
     public static readonly string ModeMessage =
         $"Mode must be one of: {string.Join(", ", Enum.GetNames<DonationMode>())}.";

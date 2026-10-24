@@ -81,24 +81,41 @@ public sealed class PathshalaDonationTests
     }
 
     [Fact]
-    public void Deleting_an_entry_with_a_receipt_needs_a_reason_and_an_announcement_does_not()
+    public void Voiding_an_entry_with_a_receipt_needs_a_reason()
     {
-        var paid = APaidDonation();
+        var act = () => APaidDonation().Void(" ", Guid.NewGuid(), Now);
 
-        var act = () => paid.Void(null, Guid.NewGuid(), Now);
         act.Should().Throw<ArgumentException>();
-
-        APledge().Void(null, Guid.NewGuid(), Now).Should().BeTrue();
     }
 
     [Fact]
-    public void A_deleted_entry_is_neither_corrected_nor_paid()
+    public void An_announcement_is_erased_never_voided()
     {
         var pledge = APledge();
-        pledge.Void("Will not be paid", Guid.NewGuid(), Now);
 
-        pledge.MarkPaid(1, DonationMode.Cash, Day, Guid.NewGuid(), Now).Should().BeFalse();
-        pledge.Correct("X", 1, Day, null, null, null, Guid.NewGuid(), Now).Should().BeFalse();
-        pledge.Void("Again", Guid.NewGuid(), Now).Should().BeFalse();
+        var voiding = () => pledge.Void("Will not be paid", Guid.NewGuid(), Now);
+        voiding.Should().Throw<InvalidOperationException>();
+
+        pledge.Erase(Guid.NewGuid(), Now).Should().BeTrue();
+        pledge.DomainEvents.OfType<DonationErasedDomainEvent>().Should().ContainSingle();
+    }
+
+    [Fact]
+    public void An_entry_with_a_receipt_is_never_erased()
+    {
+        var paid = APaidDonation();
+
+        paid.Erase(Guid.NewGuid(), Now).Should().BeFalse("its receipt number is on a slip");
+        paid.DomainEvents.OfType<DonationErasedDomainEvent>().Should().BeEmpty();
+    }
+
+    [Fact]
+    public void A_voided_entry_is_neither_corrected_nor_voided_again()
+    {
+        var paid = APaidDonation();
+        paid.Void("Entered twice", Guid.NewGuid(), Now);
+
+        paid.Correct("X", 1, Day, DonationMode.Cash, Day, null, Guid.NewGuid(), Now).Should().BeFalse();
+        paid.Void("Again", Guid.NewGuid(), Now).Should().BeFalse();
     }
 }

@@ -446,6 +446,8 @@ public sealed class DonationRepository(PathshalaDbContext dbContext) : IDonation
             .MaxAsync(d => (int?)d.ReceiptNumber, cancellationToken) ?? 0) + 1;
 
     public void Add(Domain.Donations.PathshalaDonation donation) => dbContext.Donations.Add(donation);
+
+    public void Remove(Domain.Donations.PathshalaDonation donation) => dbContext.Donations.Remove(donation);
 }
 
 public sealed class AnnouncementRepository(PathshalaDbContext dbContext) : IAnnouncementRepository

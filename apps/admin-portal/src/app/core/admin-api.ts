@@ -1401,12 +1401,17 @@ export class AdminApi {
   }
 
   /**
-   * Deletes an entry from the ledger and its totals. The service keeps the row,
-   * so its receipt number is never reissued; a reason is required once one was
-   * issued, and optional on an announcement.
+   * Deletes a paid entry from the ledger and its totals, with a reason. The
+   * service keeps the row, so its receipt number is never reissued. 409 on an
+   * announcement - erase that with `deleteDonation`.
    */
-  deleteDonation(donationId: string, reason: string | null): Observable<PathshalaDonation> {
+  voidDonation(donationId: string, reason: string): Observable<PathshalaDonation> {
     return this.http.post<PathshalaDonation>(`/v1/pathshala/donations/${donationId}/void`, { reason });
+  }
+
+  /** Erases an announcement not yet paid; answers its id. 409 once it has a receipt. */
+  deleteDonation(donationId: string): Observable<string> {
+    return this.http.delete<string>(`/v1/pathshala/donations/${donationId}`);
   }
 
   announcements(pathshalaId: string): Observable<PathshalaAnnouncement[]> {

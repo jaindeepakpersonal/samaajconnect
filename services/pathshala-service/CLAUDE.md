@@ -20,7 +20,7 @@ everything else is the Samaaj's to run.
 | `ClassSchedule` | A weekly slot. Overlapping slots on one day are refused |
 | `Teacher` | Owned by the Pathshala. Name, phone, email, qualification, and an optional linked login - need not be a member |
 | `TeacherAssignment` | Which teacher record teaches a class. Unique per (class, teacher) |
-| `PathshalaDonation` | Aggregate root. One entry in the donation ledger: paid (receipt-numbered) or announced and still to be paid (no receipt yet). Deleting keeps the row |
+| `PathshalaDonation` | Aggregate root. One entry in the donation ledger: paid (receipt-numbered) or announced and still to be paid (no receipt yet). A paid one is voided, never removed; an announcement is erased |
 | `PathshalaAnnouncement` | Aggregate root. A message to the parents; its text stays here |
 | `StudentEnrolment` | Aggregate root. One child's place: requested, then placed |
 | `AttendanceEntry` | One mark. Written directly, unique per (enrolment, date) |
@@ -41,7 +41,8 @@ Two entities in DATA-MODEL.md §9 are deliberately absent. See "Decisions".
 | `RecordDonationCommand` | `Pathshala.Manage` | Paid: issues the next receipt number. `paid: false`: an announcement, with no receipt or mode |
 | `UpdateDonationCommand` | `Pathshala.Manage` | Corrects an entry. A paid one needs its mode and paid date; a pledge stays a pledge. 409 once deleted |
 | `MarkDonationPaidCommand` | `Pathshala.Manage` | An announcement was paid: issues the next receipt number. 409 once paid or deleted |
-| `VoidDonationCommand` | `Pathshala.Manage` | The admin panel's Delete: off the ledger and out of the totals, the row kept. A reason is required once a receipt was issued |
+| `VoidDonationCommand` | `Pathshala.Manage` | The admin panel's Delete for a paid entry: off the ledger and out of the totals with a reason, the row kept. 409 on an announcement |
+| `DeleteDonationCommand` | `Pathshala.Manage` | The admin panel's Delete for an announcement: erases the row. 409 once it has a receipt |
 | `SendAnnouncementCommand` | `Members.Read` or `Pathshala.Teach` + a teacher of it or somebody who runs it | To the parents of every child with a place or a request |
 | `OpenSessionCommand` | `Pathshala.Manage` | Makes the new session current |
 | `CreateClassCommand` | `Pathshala.Manage` | |
@@ -86,7 +87,7 @@ Two entities in DATA-MODEL.md §9 are deliberately absent. See "Decisions".
 - `pathshala.created.v1`
 - `pathshala.updated.v1` (ids only, like its creation)
 - `pathshala.teacher.added.v1`, `.updated.v1`, `.removed.v1` (ids and who did it)
-- `pathshala.donation.recorded.v1` (ids, amount, whether it is a pledge, who), `.paid.v1` (the receipt number, amount, who), `.updated.v1` and `.voided.v1` (ids and who)
+- `pathshala.donation.recorded.v1` (ids, amount, whether it is a pledge, who), `.paid.v1` (the receipt number, amount, who), `.updated.v1` and `.voided.v1` (ids and who), `.erased.v1` (ids, amount and who - never the donor, whose row is gone)
 - `pathshala.announcement.sent.v1` (who, and how many) and one `pathshala.announcement.addressed.v1` per parent - see "Teachers, the staff tabs, donations and announcements"
 - `pathshala.session.opened.v1`
 - `pathshala.deactivated.v1`
@@ -227,12 +228,17 @@ received, and announced but not yet paid. Every donation recorded before this
 was received, and the `DonationPledges` migration made each one Paid on the day
 it was given; `DonationPledgesMigrationTests` runs it against a legacy row.
 
-**Deleting takes an entry off the ledger and keeps the row.** The admin panel
-calls it Delete (the user asked for Edit and Delete rather than Void); the
-service still voids. A receipt number handed to a donor has to keep pointing at
-something, so a deleted entry leaves the totals and the ledger's default view,
-keeps its reason - required once a receipt exists, optional on an announcement
-nobody holds a slip for - and its number is never issued again. Receipt numbers
+**Deleting a paid entry keeps its row; deleting an announcement erases it.**
+The admin panel calls both Delete (the user asked for Edit and Delete rather
+than Void). A receipt number handed to a donor has to keep pointing at
+something, so a paid entry is voided: it leaves the totals and the ledger's
+default view, keeps its required reason, and its number is never issued again.
+An announcement has no receipt and no slip points at it, so
+`DeleteDonationCommand` removes the row outright (the user's choice) and
+`pathshala.donation.erased.v1` is the one record that it existed - ids, the
+amount and who removed it, never the donor's name, which would otherwise outlive
+the row in the append-only audit log. Neither command does the other's job: the
+aggregate refuses to erase a receipt or void an announcement. Receipt numbers
 are one more than the highest ever issued; the unique index on (Pathshala,
 ReceiptNumber) is what holds when two are issued at once, and Postgres lets any
 number of pledges share its null. Correcting an entry is `UpdateDonationCommand`,

@@ -282,7 +282,8 @@ reviews" in `services/social-issues-service/CLAUDE.md`.
 | POST | `/pathshalas/{id}/donations` | `Pathshala.Manage` | `{donorName, donorMemberId, amount (paise), donatedOn, mode, purpose, paid}` - paid (the default) issues the next receipt number; `paid: false` records an announcement with no mode and no receipt |
 | PATCH | `/donations/{id}` | `Pathshala.Manage` | `{donorName, amount, donatedOn, mode, paidOn, purpose}` - corrects an entry; a paid one needs `mode` and `paidOn`, a pledge ignores both. 409 once deleted |
 | POST | `/donations/{id}/paid` | `Pathshala.Manage` | `{mode, paidOn}` - an announcement was paid; issues the next receipt number. 409 once paid or deleted |
-| POST | `/donations/{id}/void` | `Pathshala.Manage` | `{reason}` - the admin panel's Delete: off the ledger and its totals, the row kept so a receipt number is never reissued. `reason` is required once a receipt was issued |
+| POST | `/donations/{id}/void` | `Pathshala.Manage` | `{reason}` (required) - the admin panel's Delete for a paid entry: off the ledger and its totals, the row kept so a receipt number is never reissued. 409 on an announcement |
+| DELETE | `/donations/{id}` | `Pathshala.Manage` | The admin panel's Delete for an announcement: erases it, answering its id. 409 once it has a receipt |
 | GET | `/pathshalas/{id}/announcements` | `Members.Read` or `Pathshala.Teach` + staff | What it has sent |
 | POST | `/pathshalas/{id}/announcements` | `Members.Read` or `Pathshala.Teach` + a teacher of it or somebody who runs it | `{title, body}` to the parents of every child with a place or a request; each gets an in-app notification. **409** with nobody to send to |
 | GET | `/announcements` | `Members.Read` | Announcements from every Pathshala where the caller has a child with a place or a request |

@@ -26,11 +26,17 @@ namespace Sangam.Pathshala.Domain.Donations;
 /// trust-service's ledger keeps.
 /// </para>
 /// <para>
-/// <b>Deleting takes an entry off the ledger; it does not erase it.</b> A receipt
-/// number that was handed to somebody has to keep pointing at something, and
-/// "what happened to receipt 42?" needs an answer - so a deleted entry keeps its
-/// row (and its reason, required once a receipt exists), leaves the totals and
-/// the ledger's default view, and its number is never issued again.
+/// <b>Deleting a paid entry takes it off the ledger; it does not erase it.</b> A
+/// receipt number that was handed to somebody has to keep pointing at something,
+/// and "what happened to receipt 42?" needs an answer - so a deleted paid entry
+/// keeps its row and its reason, leaves the totals and the ledger's default
+/// view, and its number is never issued again (<see cref="Void"/>).
+/// </para>
+/// <para>
+/// <b>Deleting an announcement erases it</b> (the user's choice, 2026-10-24).
+/// No receipt names it and no slip points at it, so nothing is left to keep:
+/// <see cref="Erase"/> raises an ids-only event for the audit trail and the row
+/// goes. An announcement that was paid has a receipt, and is voided instead.
 /// </para>
 /// </remarks>
 public sealed class PathshalaDonation : AggregateRoot, ITenantScopedEntity
@@ -194,14 +200,17 @@ public sealed class PathshalaDonation : AggregateRoot, ITenantScopedEntity
     }
 
     /// <summary>
-    /// Takes the entry off the ledger and out of the totals. False when it
-    /// already is. The reason is optional on a pledge, which no receipt names.
+    /// Takes a paid entry off the ledger and out of the totals, keeping its row
+    /// because its receipt number is on a slip. False when it already is.
+    /// An announcement is erased rather than voided - see <see cref="Erase"/>.
     /// </summary>
-    public bool Void(string? reason, Guid voidedBy, DateTimeOffset now)
+    public bool Void(string reason, Guid voidedBy, DateTimeOffset now)
     {
-        if (ReceiptNumber is not null)
+        ArgumentException.ThrowIfNullOrWhiteSpace(reason);
+
+        if (ReceiptNumber is null)
         {
-            ArgumentException.ThrowIfNullOrWhiteSpace(reason);
+            throw new InvalidOperationException("An announcement has no receipt to keep; it is erased, not voided.");
         }
 
         if (IsVoid)
@@ -211,9 +220,26 @@ public sealed class PathshalaDonation : AggregateRoot, ITenantScopedEntity
 
         VoidedAt = now;
         VoidedBy = voidedBy;
-        VoidReason = string.IsNullOrWhiteSpace(reason) ? null : reason.Trim();
+        VoidReason = reason.Trim();
 
-        Raise(new DonationVoidedDomainEvent(Id, TenantId, PathshalaId, ReceiptNumber, voidedBy, now));
+        Raise(new DonationVoidedDomainEvent(Id, TenantId, PathshalaId, ReceiptNumber!.Value, voidedBy, now));
+
+        return true;
+    }
+
+    /// <summary>
+    /// Readies an announcement to be erased: raises the ids-only record that it
+    /// existed and who removed it, for the caller to delete the row with. False
+    /// once it has a receipt - that entry is voided, never erased.
+    /// </summary>
+    public bool Erase(Guid erasedBy, DateTimeOffset now)
+    {
+        if (ReceiptNumber is not null)
+        {
+            return false;
+        }
+
+        Raise(new DonationErasedDomainEvent(Id, TenantId, PathshalaId, Amount, erasedBy, now));
 
         return true;
     }
@@ -308,12 +334,27 @@ public sealed record DonationUpdatedDomainEvent(
     public string Topic => "pathshala.donation.updated.v1";
 }
 
-/// <summary>An entry was deleted from the ledger. The reason stays here; the event carries ids.</summary>
+/// <summary>
+/// An announcement was erased. Ids and the amount, never the donor's name: the
+/// row is gone, and the append-only audit log is not where a name should outlive it.
+/// </summary>
+public sealed record DonationErasedDomainEvent(
+    Guid DonationId,
+    Guid TenantId,
+    Guid PathshalaId,
+    long Amount,
+    Guid ErasedBy,
+    DateTimeOffset OccurredAt) : IDomainEvent
+{
+    public string Topic => "pathshala.donation.erased.v1";
+}
+
+/// <summary>A paid entry was deleted from the ledger. The reason stays here; the event carries ids.</summary>
 public sealed record DonationVoidedDomainEvent(
     Guid DonationId,
     Guid TenantId,
     Guid PathshalaId,
-    int? ReceiptNumber,
+    int ReceiptNumber,
     Guid VoidedBy,
     DateTimeOffset OccurredAt) : IDomainEvent
 {

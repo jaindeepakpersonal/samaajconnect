@@ -185,13 +185,23 @@ public static class StaffEndpoints
             .ProducesProblem(StatusCodes.Status404NotFound)
             .ProducesProblem(StatusCodes.Status409Conflict);
 
+        group.MapDelete("/donations/{donationId:guid}", async (
+                Guid donationId, ISender sender, CancellationToken cancellationToken) =>
+                (await sender.Send(new DeleteDonationCommand(donationId), cancellationToken)).ToApiResult())
+            .RequireAuthorization()
+            .WithName("DeleteDonation")
+            .WithSummary("Erase an announcement not yet paid. 409 once it has a receipt - void that instead.")
+            .Produces<Guid>()
+            .ProducesProblem(StatusCodes.Status404NotFound)
+            .ProducesProblem(StatusCodes.Status409Conflict);
+
         group.MapPost("/donations/{donationId:guid}/void", async (
                 Guid donationId, VoidRequest request, ISender sender, CancellationToken cancellationToken) =>
                 (await sender.Send(new VoidDonationCommand(donationId, request.Reason), cancellationToken))
                 .ToApiResult())
             .RequireAuthorization()
             .WithName("VoidDonation")
-            .WithSummary("Delete an entry from the ledger and its totals. The row is kept, so a receipt number is never reissued; a reason is required once one was issued.")
+            .WithSummary("Delete a paid entry from the ledger and its totals, with a reason. The row is kept, so its receipt number is never reissued. 409 on an announcement - erase that instead.")
             .Produces<DonationResponse>()
             .ProducesValidationProblem()
             .ProducesProblem(StatusCodes.Status404NotFound)
@@ -241,7 +251,7 @@ public static class StaffEndpoints
 
     public sealed record PaidRequest(string Mode, DateOnly PaidOn);
 
-    public sealed record VoidRequest(string? Reason);
+    public sealed record VoidRequest(string Reason);
 
     public sealed record AnnouncementRequest(string Title, string Body);
 }

@@ -208,6 +208,9 @@ public interface IDonationRepository
     Task<int> NextReceiptNumberAsync(Guid pathshalaId, CancellationToken cancellationToken = default);
 
     void Add(Domain.Donations.PathshalaDonation donation);
+
+    /// <summary>Erases an announcement. A donation with a receipt is voided, never removed.</summary>
+    void Remove(Domain.Donations.PathshalaDonation donation);
 }
 
 /// <summary>Announcements from Pathshalas to parents.</summary>

@@ -367,7 +367,7 @@ public sealed class StaffTabsTests(PathshalaApiFactory factory)
     }
 
     [Fact]
-    public async Task Deleting_needs_a_reason_once_a_receipt_was_issued_and_never_reuses_its_number()
+    public async Task Deleting_an_announcement_erases_it_and_a_paid_entry_keeps_its_receipt()
     {
         var school = await ASchoolAsync();
         var url = $"/v1/pathshala/pathshalas/{school.PathshalaId}/donations";
@@ -382,23 +382,39 @@ public sealed class StaffTabsTests(PathshalaApiFactory factory)
             donorName = "Shri Rakesh Jain", amount = 50_000L, donatedOn = "2026-03-01", paid = false,
         })).Content.ReadFromJsonAsync<JsonElement>()).GetProperty("id").GetGuid();
 
-        // Nobody holds a slip for an announcement, so no reason is needed.
-        (await Admin().PostAsJsonAsync($"/v1/pathshala/donations/{pledgeId}/void", new { }))
-            .StatusCode.Should().Be(HttpStatusCode.OK);
+        // Nobody holds a slip for an announcement, so nothing of it is kept.
+        (await Admin().DeleteAsync($"/v1/pathshala/donations/{pledgeId}")).StatusCode.Should().Be(HttpStatusCode.OK);
+        (await Admin().DeleteAsync($"/v1/pathshala/donations/{pledgeId}")).StatusCode.Should().Be(HttpStatusCode.NotFound);
 
-        // Receipt 1 is on a slip somewhere: say why.
+        var ledger = await Admin().GetFromJsonAsync<JsonElement>(url);
+        ledger.GetProperty("donations").EnumerateArray().Select(d => d.GetProperty("id").GetGuid())
+            .Should().Equal([paidId], "the announcement is gone, not hidden");
+        ledger.GetProperty("outstandingAmount").GetInt64().Should().Be(0L);
+
+        // The audit trail is told it existed and who removed it - never by whom it was promised.
+        var erased = await factory.WithDbContextAsync(db => db.OutboxMessages
+            .Where(m => m.Topic == "pathshala.donation.erased.v1")
+            .Select(m => m.Payload)
+            .ToListAsync());
+        erased.Should().ContainSingle().Which.Should().Contain(pledgeId.ToString()).And.NotContain("Rakesh");
+
+        // Receipt 1 is on a slip somewhere: it cannot be erased, and voiding it needs a reason.
+        (await Admin().DeleteAsync($"/v1/pathshala/donations/{paidId}")).StatusCode.Should().Be(HttpStatusCode.Conflict);
         (await Admin().PostAsJsonAsync($"/v1/pathshala/donations/{paidId}/void", new { }))
             .StatusCode.Should().Be(HttpStatusCode.BadRequest);
         (await Admin().PostAsJsonAsync($"/v1/pathshala/donations/{paidId}/void", new { reason = "Entered twice" }))
             .StatusCode.Should().Be(HttpStatusCode.OK);
 
-        // A deleted entry is not edited or paid.
-        (await Admin().PostAsJsonAsync($"/v1/pathshala/donations/{pledgeId}/paid", new { mode = "Cash", paidOn = "2026-03-01" }))
+        // A deleted paid entry is not edited.
+        (await Admin().PatchAsJsonAsync($"/v1/pathshala/donations/{paidId}", new
+            {
+                donorName = "Anonymous", amount = 110_000L, donatedOn = "2026-03-01", mode = "Cash", paidOn = "2026-03-01",
+            }))
             .StatusCode.Should().Be(HttpStatusCode.Conflict);
 
-        var ledger = await Admin().GetFromJsonAsync<JsonElement>(url);
+        ledger = await Admin().GetFromJsonAsync<JsonElement>(url);
         ledger.GetProperty("totalAmount").GetInt64().Should().Be(0L);
-        ledger.GetProperty("outstandingAmount").GetInt64().Should().Be(0L);
+        ledger.GetProperty("donations").GetArrayLength().Should().Be(1, "the voided receipt stays on the ledger");
 
         var next = await (await Admin().PostAsJsonAsync(url, new
         {

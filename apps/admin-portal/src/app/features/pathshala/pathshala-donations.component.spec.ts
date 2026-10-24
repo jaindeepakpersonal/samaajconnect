@@ -262,7 +262,7 @@ describe('PathshalaDonationsComponent', () => {
     reload();
   });
 
-  it('asks why before deleting an entry with a receipt, and not for an announcement', () => {
+  it('asks why before deleting an entry with a receipt, and erases an announcement', () => {
     load(ledgerOf(donation(), pledge()));
 
     component.openDelete(donation());
@@ -285,14 +285,23 @@ describe('PathshalaDonationsComponent', () => {
 
     expect(text()).toContain('Receipt 1 is deleted');
 
+    // An announcement has no receipt to keep: no reason asked, and it is erased.
     component.openDelete(pledge());
+    fixture.detectChanges();
+
+    expect(text()).toContain('is erased');
+    expect(fixture.nativeElement.querySelector('#delete-reason')).toBeNull();
     expect(component.canDelete(pledge())).toBe(true);
+
     component.deleteDonation();
 
-    const announced = http.expectOne('/v1/pathshala/donations/d2/void');
+    const announced = http.expectOne('/v1/pathshala/donations/d2');
 
-    expect(announced.request.body).toEqual({ reason: null });
-    announced.flush(pledge({ isVoid: true }));
+    expect(announced.request.method).toBe('DELETE');
+    http.expectNone('/v1/pathshala/donations/d2/void');
+    announced.flush('d2');
     reload();
+
+    expect(text()).toContain('The announcement from Smt. Kavita Jain is erased.');
   });
 });
