@@ -21,13 +21,16 @@ public static class MemberEndpoints
         group.MapGet("/", async (
                 string? term,
                 Guid? localityId,
+                Guid? gautraId,
+                Guid? professionId,
                 int? skip,
                 int? take,
                 ISender sender,
                 CancellationToken cancellationToken) =>
             {
                 var result = await sender.Send(
-                    new SearchMembersQuery(term, localityId, skip ?? 0, take ?? 20), cancellationToken);
+                    new SearchMembersQuery(term, localityId, skip ?? 0, take ?? 20, gautraId, professionId),
+                    cancellationToken);
 
                 return result.ToApiResult();
             })

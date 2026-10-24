@@ -43,5 +43,23 @@ public sealed class FamilyRepository(MemberFamilyDbContext dbContext) : IFamilyR
                     && m.Status != FamilyMemberStatus.Rejected),
                 cancellationToken);
 
+    public async Task<IReadOnlyList<Family>> ListForMembersAsync(
+        IReadOnlyCollection<Guid> memberProfileIds, CancellationToken cancellationToken = default)
+    {
+        if (memberProfileIds.Count == 0)
+        {
+            return [];
+        }
+
+        // Through Families, which carry the tenant filter - never FamilyMembers
+        // directly, which have no tenant of their own.
+        return await dbContext.Families
+            .AsNoTracking()
+            .Include(f => f.Members)
+            .Where(f => f.Members.Any(m =>
+                memberProfileIds.Contains(m.MemberProfileId) && m.Status == FamilyMemberStatus.Active))
+            .ToListAsync(cancellationToken);
+    }
+
     public void Add(Family family) => dbContext.Families.Add(family);
 }

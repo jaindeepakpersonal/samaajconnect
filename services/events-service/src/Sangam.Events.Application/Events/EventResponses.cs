@@ -43,7 +43,25 @@ public sealed record EventResponse(
     string? MyRegistrationStatus,
     DateTimeOffset? CancelledAt,
     string? CancellationReason,
-    DateTimeOffset CreatedAt);
+    DateTimeOffset CreatedAt,
+
+    /// <summary>The programmes, by date then start time. Empty when the event has no schedule.</summary>
+    IReadOnlyList<EventScheduleItemResponse>? Schedule = null,
+
+    /// <summary>
+    /// Published, started and not yet over (an event with no end is taken to
+    /// last a day). Only the list and the detail read the clock to say so;
+    /// anywhere else it is false.
+    /// </summary>
+    bool IsHappeningNow = false);
+
+/// <summary>One programme: a date, its name, and wall-clock times - EndTime is optional.</summary>
+public sealed record EventScheduleItemResponse(
+    Guid Id,
+    DateOnly Date,
+    string ProgramName,
+    TimeOnly StartTime,
+    TimeOnly? EndTime);
 
 /// <summary>
 /// One attendee, for the organiser's list.

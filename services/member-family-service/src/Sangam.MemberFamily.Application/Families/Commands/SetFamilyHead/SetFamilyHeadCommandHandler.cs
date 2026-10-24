@@ -60,8 +60,8 @@ public sealed class SetFamilyHeadCommandHandler(
 
         await unitOfWork.SaveChangesAsync(cancellationToken);
 
-        var memberProfiles = await profiles.SearchAsync(
-            null, null, 0, 200, includeUnlisted: true, cancellationToken);
+        var memberProfiles = await profiles.ListByIdsAsync(
+            [.. family.Members.Select(m => m.MemberProfileId)], cancellationToken);
 
         return Result.Success(family.ToResponse(memberId, memberProfiles));
     }

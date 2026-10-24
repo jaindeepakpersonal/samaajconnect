@@ -17,6 +17,13 @@ public interface IFamilyRepository
     Task<Family?> GetForConsumerAsync(
         Guid memberProfileId, CancellationToken cancellationToken = default);
 
+    /// <summary>
+    /// The households these members actively belong to, with their members -
+    /// one query for a whole directory page rather than one per row.
+    /// </summary>
+    Task<IReadOnlyList<Family>> ListForMembersAsync(
+        IReadOnlyCollection<Guid> memberProfileIds, CancellationToken cancellationToken = default);
+
     void Add(Family family);
 
 }

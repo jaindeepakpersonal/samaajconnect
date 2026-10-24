@@ -63,6 +63,43 @@ namespace Sangam.Events.Infrastructure.Migrations
                     b.ToTable("event_registrations", (string)null);
                 });
 
+            modelBuilder.Entity("Sangam.Events.Domain.Events.EventScheduleItem", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<DateOnly>("Date")
+                        .HasColumnType("date")
+                        .HasColumnName("date");
+
+                    b.Property<TimeOnly?>("EndTime")
+                        .HasColumnType("time without time zone")
+                        .HasColumnName("end_time");
+
+                    b.Property<Guid>("EventId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("event_id");
+
+                    b.Property<string>("ProgramName")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)")
+                        .HasColumnName("program_name");
+
+                    b.Property<TimeOnly>("StartTime")
+                        .HasColumnType("time without time zone")
+                        .HasColumnName("start_time");
+
+                    b.HasKey("Id")
+                        .HasName("pk_event_schedule_items");
+
+                    b.HasIndex("EventId", "Date", "StartTime")
+                        .HasDatabaseName("ix_event_schedule_items_event_id_date_start_time");
+
+                    b.ToTable("event_schedule_items", (string)null);
+                });
+
             modelBuilder.Entity("Sangam.Events.Domain.Events.SamaajEvent", b =>
                 {
                     b.Property<Guid>("Id")
@@ -227,9 +264,21 @@ namespace Sangam.Events.Infrastructure.Migrations
                         .HasConstraintName("fk_event_registrations_events_event_id");
                 });
 
+            modelBuilder.Entity("Sangam.Events.Domain.Events.EventScheduleItem", b =>
+                {
+                    b.HasOne("Sangam.Events.Domain.Events.SamaajEvent", null)
+                        .WithMany("Schedule")
+                        .HasForeignKey("EventId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired()
+                        .HasConstraintName("fk_event_schedule_items_events_event_id");
+                });
+
             modelBuilder.Entity("Sangam.Events.Domain.Events.SamaajEvent", b =>
                 {
                     b.Navigation("Registrations");
+
+                    b.Navigation("Schedule");
                 });
 #pragma warning restore 612, 618
         }

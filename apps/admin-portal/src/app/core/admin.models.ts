@@ -626,6 +626,32 @@ export interface SamaajEvent {
   readonly cancelledAt: string | null;
   readonly cancellationReason: string | null;
   readonly createdAt: string;
+
+  /** The programmes, by date then start time. Optional only because fixtures predate it. */
+  readonly schedule?: readonly EventScheduleItem[];
+
+  /** Published, started and not over yet - the "Happening now" pill. */
+  readonly isHappeningNow?: boolean;
+}
+
+/**
+ * One programme on an event's schedule. `date` is "yyyy-MM-dd", the times
+ * "HH:mm:ss" on the clock where it happens; `endTime` may be null.
+ */
+export interface EventScheduleItem {
+  readonly id: string;
+  readonly date: string;
+  readonly programName: string;
+  readonly startTime: string;
+  readonly endTime: string | null;
+}
+
+/** The body of adding or correcting one programme. */
+export interface EventScheduleItemInput {
+  readonly date: string;
+  readonly programName: string;
+  readonly startTime: string;
+  readonly endTime: string | null;
 }
 
 /**
@@ -847,6 +873,9 @@ export interface VolunteerGroup {
   readonly presidentMemberId: string | null;
   readonly status: GroupStatus;
   readonly memberCount: number;
+
+  /** Where the banner photo is fetched from (with the token), or null when there is none. */
+  readonly photoUrl?: string | null;
 }
 
 // ---- Volunteer group elections -------------------------------------------
@@ -1227,6 +1256,9 @@ export interface AdminMember {
   readonly professionId: string | null;
   readonly qualificationId: string | null;
   readonly gender: string;
+  /** From the member's household - only the directory search sets these. */
+  readonly fatherName?: string | null;
+  readonly motherName?: string | null;
 }
 
 /** The body of `PATCH /v1/members/{id}/details`. No privacy fields, by design. */

@@ -58,6 +58,12 @@ export interface Member {
   readonly professionId: string | null;
   readonly qualificationId: string | null;
   readonly gender: Gender;
+  /**
+   * From the member's household - only the directory search sets these, and
+   * only where the household records a parent the viewer may see.
+   */
+  readonly fatherName?: string | null;
+  readonly motherName?: string | null;
 }
 
 export interface FieldPrivacy {

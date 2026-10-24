@@ -1,7 +1,7 @@
 import { Component, OnInit, computed, inject, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { ActivatedRoute, RouterLink } from '@angular/router';
-import { AuthService, describeError } from '@samaajconnect/shared';
+import { AuthService, AuthedImageDirective, describeError } from '@samaajconnect/shared';
 import { Observable } from 'rxjs';
 import { MembersApi } from '../members/members.api';
 import { GroupsApi } from './groups.api';
@@ -60,6 +60,14 @@ import {
  * ballot of several picks - ticked, then cast once, because a ballot is final.
  * `group.iCanRunElections` is the service's own answer to who may do all this.
  *
+ * **Laid out like a page since 2026-10-24.** The group's photo is a cover
+ * across the top (its initials when there is none), the name, count, focus and
+ * president sit under it with the one action the reader has - Join group, or
+ * where their application stands - and the sections are tabs: About (with the
+ * application form), Members, Applications for whoever decides them, Roles and
+ * Elections. The photo is set from the admin panel and fetched here through
+ * `AuthedImageDirective`, because it is only served to a signed-in member.
+ *
  * The nominee picker is a `<select>` built from this group's own roster
  * (`found.members`), not a name search: unlike Celebrities of Samaaj's
  * Samaaj-wide ballot, a group's roster is already loaded and small, so there
@@ -68,7 +76,7 @@ import {
  */
 @Component({
   selector: 'app-group-detail',
-  imports: [FormsModule, RouterLink],
+  imports: [FormsModule, RouterLink, AuthedImageDirective],
   styleUrl: './groups.css',
   template: `
     <div class="groups-page">
@@ -82,14 +90,41 @@ import {
           <button class="btn link" type="button" (click)="load()">Try again</button>
         </div>
       } @else if (detail(); as found) {
-        <h1 class="page-title">{{ found.group.name }}</h1>
-        <p class="subtitle">
-          {{ found.group.memberCount }}
-          {{ found.group.memberCount === 1 ? 'member' : 'members' }}
-          @if (found.group.focusArea; as area) {
-            • {{ area }}
+        <!-- The cover, like a page: the photo across the top, then the name
+             and the one thing the reader can do about this group. -->
+        <div class="group-cover">
+          @if (found.group.photoUrl; as path) {
+            <img class="group-cover-img" [scAuthedSrc]="path" alt="" />
+          } @else {
+            <div class="group-cover-img placeholder" aria-hidden="true">{{ initials(found.group.name) }}</div>
           }
-        </p>
+        </div>
+
+        <div class="group-head">
+          <div class="group-head-text">
+            <h1 class="page-title">{{ found.group.name }}</h1>
+            <p class="subtitle">
+              {{ found.group.memberCount }}
+              {{ found.group.memberCount === 1 ? 'member' : 'members' }}
+              @if (found.group.focusArea; as area) {
+                • {{ area }}
+              }
+              @if (found.group.presidentMemberId; as president) {
+                • President: {{ nameFor(president, found) }}
+              }
+            </p>
+          </div>
+
+          <div class="group-head-actions">
+            @if (canApply(found)) {
+              <button class="btn" type="button" [disabled]="busy()" (click)="startApply()">
+                Join group
+              </button>
+            } @else {
+              <span class="pill" [class]="standingClass(found)">{{ standing(found) }}</span>
+            }
+          </div>
+        </div>
 
         @if (found.group.status === 'Inactive') {
           <p class="notice info" role="status">
@@ -98,6 +133,25 @@ import {
           </p>
         }
 
+        <div class="tabs" role="tablist" aria-label="This group">
+          @for (item of tabsFor(found); track item.value) {
+            <button
+              type="button"
+              role="tab"
+              [id]="'group-tab-' + item.value"
+              [class.on]="tab() === item.value"
+              [attr.aria-selected]="tab() === item.value"
+              aria-controls="group-tab-panel"
+              (click)="tab.set(item.value)"
+            >
+              {{ item.label }}
+            </button>
+          }
+        </div>
+
+        <div id="group-tab-panel" role="tabpanel" [attr.aria-labelledby]="'group-tab-' + tab()">
+        @switch (tab()) {
+        @case ('about') {
         <div class="grid2">
           <!-- About ----------------------------------------------------- -->
           <div class="card">
@@ -113,13 +167,9 @@ import {
               <p class="notice error" role="alert">{{ message }}</p>
             }
 
-            <div class="actions">
-              @if (canApply(found)) {
-                <button class="btn" type="button" [disabled]="busy()" (click)="showApply.set(true)">
-                  Apply to join
-                </button>
-              }
-            </div>
+            @if (canApply(found) && !showApply()) {
+              <p class="small">Use <b>Join group</b> above to ask the president to let you in.</p>
+            }
 
             @if (showApply() && canApply(found)) {
               <form class="apply" (ngSubmit)="apply()">
@@ -168,6 +218,8 @@ import {
           </div>
         </div>
 
+        }
+        @case ('members') {
         <!-- Members ----------------------------------------------------- -->
         <h2 class="section-heading">Members</h2>
 
@@ -246,6 +298,8 @@ import {
           </div>
         }
 
+        }
+        @case ('applications') {
         <!-- The queue: the president's, or an admin's while there is none --- -->
         @if (found.group.iCanLead) {
           <h2 class="section-heading">Applications</h2>
@@ -299,6 +353,8 @@ import {
           }
         }
 
+        }
+        @case ('roles') {
         @if (found.group.presidentMemberId === null) {
           <p class="notice info" role="status">
             This group has no president yet. A Samaaj admin accepts its joiners and can set a
@@ -390,6 +446,8 @@ import {
           </form>
         }
 
+        }
+        @case ('elections') {
         <!-- Elections, one per role ------------------------------------ -->
         <h2 class="section-heading">Elections</h2>
 
@@ -729,6 +787,9 @@ import {
             }
           </div>
         }
+        }
+        }
+        </div>
       }
     </div>
   `,
@@ -748,6 +809,9 @@ export class GroupDetailComponent implements OnInit {
 
   readonly busy = signal(false);
   readonly showApply = signal(false);
+
+  /** Which section of the page is showing - About first, like a page's own landing tab. */
+  readonly tab = signal<GroupTab>('about');
   readonly applyError = signal<string | null>(null);
 
   /** Per-application failures, so one refusal does not blank the queue. */
@@ -1448,6 +1512,37 @@ export class GroupDetailComponent implements OnInit {
 
   // ---- Rendering --------------------------------------------------------
 
+  /** The tabs this reader has something on. Applications only for whoever decides them. */
+  tabsFor(detail: GroupDetail): readonly { value: GroupTab; label: string }[] {
+    const waiting = this.applications().filter((application) => application.status === 'Pending').length;
+
+    return [
+      { value: 'about', label: 'About' },
+      { value: 'members', label: `Members (${detail.members.length})` },
+      ...(detail.group.iCanLead
+        ? [{ value: 'applications' as const, label: waiting > 0 ? `Applications (${waiting})` : 'Applications' }]
+        : []),
+      { value: 'roles', label: 'Roles' },
+      { value: 'elections', label: 'Elections' },
+    ];
+  }
+
+  /** The header's Join group: the application form lives on the About tab. */
+  startApply(): void {
+    this.tab.set('about');
+    this.showApply.set(true);
+  }
+
+  /** Up to two initials, for a cover with no photo. */
+  initials(name: string): string {
+    return name
+      .split(/\s+/)
+      .filter((part) => part.length > 0)
+      .slice(0, 2)
+      .map((part) => part[0]!.toUpperCase())
+      .join('');
+  }
+
   /**
    * What to call somebody. The reader is named "You". Everyone else's real
    * name comes from `resolveNames()` once it has loaded; until then, or if
@@ -1529,3 +1624,6 @@ function toLocalInputValue(iso: string): string {
     `T${pad(date.getHours())}:${pad(date.getMinutes())}`
   );
 }
+
+/** The page's sections. */
+type GroupTab = 'about' | 'members' | 'applications' | 'roles' | 'elections';

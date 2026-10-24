@@ -311,6 +311,12 @@ describe('GroupDetailComponent', () => {
     fixture.detectChanges();
   }
 
+  /** Each section of the page is a tab now; a test about one opens it first. */
+  function showTab(name: 'about' | 'members' | 'applications' | 'roles' | 'elections'): void {
+    component.tab.set(name);
+    fixture.detectChanges();
+  }
+
   function text(): string {
     return (fixture.nativeElement as HTMLElement).textContent ?? '';
   }
@@ -336,8 +342,49 @@ describe('GroupDetailComponent', () => {
     load(detail());
 
     expect(component.canApply(component.detail()!)).toBe(true);
-    expect(buttonSaying('Apply to join')).toBeDefined();
+    expect(buttonSaying('Join group')).toBeDefined();
     expect(text()).toContain('No application submitted yet');
+  });
+
+  // ---- The page: a cover, a header and tabs --------------------------------
+
+  it('opens on the group photo as a cover, fetched with the token', () => {
+    load(detail({ photoUrl: '/v1/volunteer-groups/groups/g1/photo' }));
+
+    http.expectOne('/v1/volunteer-groups/groups/g1/photo').flush(new Blob(['x'], { type: 'image/png' }));
+
+    expect((fixture.nativeElement as HTMLElement).querySelector('img.group-cover-img')).not.toBeNull();
+  });
+
+  it('shows the group initials on the cover when there is no photo', () => {
+    load(detail());
+
+    const placeholder = (fixture.nativeElement as HTMLElement).querySelector('.group-cover-img.placeholder');
+
+    expect(placeholder?.textContent?.trim()).toBe(component.initials(component.detail()!.group.name));
+  });
+
+  it('offers Applications as a tab only to whoever decides them', () => {
+    load(detail());
+
+    const tabs = () =>
+      Array.from((fixture.nativeElement as HTMLElement).querySelectorAll('[role="tab"]')).map((tab) =>
+        tab.textContent?.trim(),
+      );
+
+    expect(tabs()).not.toContain('Applications');
+    expect(tabs()[0]).toBe('About');
+  });
+
+  it("puts Join group in the header, and it opens the application on the About tab", () => {
+    load(detail());
+    showTab('members');
+
+    buttonSaying('Join group')!.click();
+    fixture.detectChanges();
+
+    expect(component.tab()).toBe('about');
+    expect((fixture.nativeElement as HTMLElement).querySelector('#apply-note')).not.toBeNull();
   });
 
   it('does not offer it to a member, a president, or an outstanding applicant', () => {
@@ -418,6 +465,7 @@ describe('GroupDetailComponent', () => {
 
   it('tells everybody a group has no president yet, and says how one gets set', () => {
     load(detail({ presidentMemberId: null, iAmAMember: true }));
+    showTab('roles');
 
     expect(text()).toContain('This group has no president yet');
   });
@@ -442,6 +490,7 @@ describe('GroupDetailComponent', () => {
       detail({ presidentMemberId: null, iAmThePresident: false, iCanLead: true, iCanRunElections: true }),
       [],
     );
+    showTab('elections');
 
     component.openElectionForm(component.detail()!);
     fixture.detectChanges();
@@ -454,6 +503,7 @@ describe('GroupDetailComponent', () => {
 
   it('offers the president every role but Volunteer, and picks none for them', async () => {
     load(detail({ iAmThePresident: true, iAmAMember: true }), []);
+    showTab('elections');
 
     component.openElectionForm(component.detail()!);
     fixture.detectChanges();
@@ -482,6 +532,7 @@ describe('GroupDetailComponent', () => {
 
   it('accepting carries no position - that comes from an election, or a later assignment', () => {
     load(detail({ iAmThePresident: true, iAmAMember: true }), [application()]);
+    showTab('applications');
 
     component.decide(component.pending()[0]!, true);
 
@@ -583,6 +634,7 @@ describe('GroupDetailComponent', () => {
       ]),
       [],
     );
+    showTab('members');
     await fixture.whenStable();
 
     expect(fixture.nativeElement.querySelector(`#role-${PRESIDENT}`)).toBeNull();
@@ -600,6 +652,7 @@ describe('GroupDetailComponent', () => {
     load(detail({ iAmAMember: true }, [
       { memberId: 'm9', rolePosition: 'Secretary', roleId: 'rs', joinedAt: new Date().toISOString() },
     ]));
+    showTab('roles');
 
     expect(text()).toContain('Volunteer roles');
     expect(text()).toContain('No limit');
@@ -653,6 +706,7 @@ describe('GroupDetailComponent', () => {
       ]),
       [],
     );
+    showTab('members');
 
     expect(buttonSaying('Remove')).toBeDefined();
   });
@@ -735,6 +789,7 @@ describe('GroupDetailComponent', () => {
     load(detail({ iAmThePresident: true, iAmAMember: true }), [
       application({ memberId: 'm9' }),
     ]);
+    showTab('applications');
 
     expect(component.names()['m9']).toBe('Some Member');
     expect(text()).toContain('Some Member');
@@ -755,6 +810,7 @@ describe('GroupDetailComponent', () => {
       ]),
       [],
     );
+    showTab('members');
 
     expect(component.names()['m9']).toBe('Some Member');
     expect(component.names()['u1']).toBeUndefined();
@@ -777,6 +833,7 @@ describe('GroupDetailComponent', () => {
 
   it('lists elections with their stage', () => {
     load(detail({ iAmThePresident: true, iAmAMember: true }), [], [election()]);
+    showTab('elections');
 
     expect(text()).toContain('Secretary');
     expect(text()).toContain('Nominations open');
@@ -790,6 +847,7 @@ describe('GroupDetailComponent', () => {
       [],
       [election({ status: 'Published', winnerMemberIds: ['m9'], publishedAt: new Date().toISOString() })],
     );
+    showTab('elections');
 
     expect(text()).toContain('Elected:');
     expect(text()).toContain('Some Member');
@@ -797,6 +855,7 @@ describe('GroupDetailComponent', () => {
 
   it('lets the president open an election for a position', () => {
     load(detail({ iAmThePresident: true, iAmAMember: true }), [], []);
+    showTab('elections');
 
     component.showOpenElection.set(true);
     component.roleId = 'rs';
@@ -822,6 +881,7 @@ describe('GroupDetailComponent', () => {
 
   it('offers Edit only while nominations can still be reopened', () => {
     load(detail({ iAmThePresident: true, iAmAMember: true }), [], [election({ status: 'Draft' })]);
+    showTab('elections');
 
     expect(buttonSaying('Edit')).toBeDefined();
 
@@ -832,6 +892,7 @@ describe('GroupDetailComponent', () => {
 
   it('fills the edit form with the election as it stands', async () => {
     load(detail({ iAmThePresident: true, iAmAMember: true }), [], [election()]);
+    showTab('elections');
 
     buttonExactly('Edit')!.click();
     fixture.detectChanges();
@@ -870,6 +931,7 @@ describe('GroupDetailComponent', () => {
 
   it('keeps the form open and shows the refusal once voting has opened', () => {
     load(detail({ iAmThePresident: true, iAmAMember: true }), [], [election({ status: 'VotingOpen' })]);
+    showTab('elections');
 
     // canEditElection already hides the button in the template; calling the
     // handler directly exercises what the service itself would refuse.
@@ -890,6 +952,7 @@ describe('GroupDetailComponent', () => {
     // nominate or be nominated - so the picker would be empty for the one person
     // who reached this screen to run the election.
     load(detail({ iAmThePresident: false, iAmAMember: false, iCanLead: true }, []), [], [election()]);
+    showTab('elections');
 
     component.toggleElection('e1');
     http.expectOne('/v1/volunteer-groups/elections/e1').flush(electionDetail());
@@ -909,6 +972,7 @@ describe('GroupDetailComponent', () => {
       null,
       [election()],
     );
+    showTab('elections');
 
     component.toggleElection('e1');
     http.expectOne('/v1/volunteer-groups/elections/e1').flush(electionDetail());
@@ -936,6 +1000,7 @@ describe('GroupDetailComponent', () => {
       [election(electionOverrides)],
     );
 
+    showTab('elections');
     component.toggleElection('e1');
     http.expectOne('/v1/volunteer-groups/elections/e1').flush(electionDetail(electionOverrides, candidates));
     fixture.detectChanges();
@@ -1086,6 +1151,7 @@ describe('GroupDetailComponent', () => {
       [],
       [election({ status: 'VotingOpen', acceptsNominations: false, acceptsVotes: true })],
     );
+    showTab('elections');
 
     component.toggleElection('e1');
     http

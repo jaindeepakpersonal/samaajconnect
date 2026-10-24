@@ -32,10 +32,9 @@ export class MembersApi {
    *
    * The service takes a name term and a Locality id - exact, not a
    * substring, since Locality is a master-data-service pick now rather than
-   * text somebody typed. It does **not** filter on profession, because
-   * profession carries a privacy level and a server-side filter on it would
-   * let a caller confirm a private value one query at a time. See the list
-   * screen for what that costs the wireframe.
+   * text somebody typed. Gautra and Profession filter too (`searchPage`); the
+   * Profession filter only ever matches professions this viewer could already
+   * read on the row, so it cannot confirm one somebody kept Private.
    */
   search(term?: string | null, localityId?: string | null): Observable<readonly Member[]> {
     return this.searchPage(term, localityId, 0, 50).pipe(map((page) => page.items));
@@ -47,8 +46,17 @@ export class MembersApi {
     localityId: string | null | undefined,
     skip: number,
     take: number,
+    more: { readonly gautraId?: string | null; readonly professionId?: string | null } = {},
   ): Observable<Paged<Member>> {
     let params = new HttpParams().set('skip', skip).set('take', take);
+
+    if (more.gautraId) {
+      params = params.set('gautraId', more.gautraId);
+    }
+
+    if (more.professionId) {
+      params = params.set('professionId', more.professionId);
+    }
 
     if (term && term.length > 0) {
       params = params.set('term', term);

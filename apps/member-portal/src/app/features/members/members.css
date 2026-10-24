@@ -42,6 +42,76 @@
   margin-bottom: 0;
 }
 
+/* ---- The directory, as cards ------------------------------------------ */
+
+.member-cards {
+  list-style: none;
+  margin: 0 0 var(--space-4);
+  padding: 0;
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+  gap: var(--space-4);
+}
+
+.member-card {
+  display: flex;
+  gap: var(--space-3);
+  align-items: flex-start;
+  margin: 0;
+}
+
+.member-photo {
+  width: 72px;
+  height: 72px;
+  border-radius: 50%;
+  object-fit: cover;
+  flex-shrink: 0;
+  background: var(--soft);
+}
+
+/* Initials stand in for a member with no photo to show. */
+.member-photo.initials {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1.4rem;
+  font-weight: 700;
+  color: var(--accent-ink);
+}
+
+.member-body {
+  min-width: 0;
+}
+
+.member-name {
+  font-size: 1rem;
+  margin: 0 0 var(--space-2);
+  overflow-wrap: anywhere;
+}
+
+.member-gautra {
+  font-weight: 400;
+  color: var(--muted);
+}
+
+.member-facts {
+  display: grid;
+  grid-template-columns: max-content 1fr;
+  gap: 2px var(--space-3);
+  margin: 0;
+  font-size: 14px;
+}
+
+.member-facts dt {
+  font-weight: 600;
+}
+
+.member-facts dd {
+  margin: 0;
+  color: var(--muted);
+  overflow-wrap: anywhere;
+}
+
 .badges {
   display: flex;
   flex-wrap: wrap;

@@ -11,7 +11,7 @@ namespace Sangam.Events.Application.Events.Queries.GetEvent;
 public sealed record GetEventQuery(Guid EventId) : IQuery<EventResponse>;
 
 public sealed class GetEventQueryHandler(
-    IEventRepository events, ICurrentUser currentUser, IAreaScope areaScope)
+    IEventRepository events, ICurrentUser currentUser, IAreaScope areaScope, IDateTimeProvider clock)
     : IRequestHandler<GetEventQuery, Result<EventResponse>>
 {
     public async Task<Result<EventResponse>> Handle(
@@ -39,7 +39,7 @@ public sealed class GetEventQueryHandler(
                 && areaScope.MayAdminister(found.LocalityId));
 
         return maySee
-            ? Result.Success(found.ToResponse(memberId))
+            ? Result.Success(found.ToResponse(memberId, clock.UtcNow))
             : Result.Failure<EventResponse>(
                 Error.NotFound("Event.NotFound", "No such event in this Samaaj."));
     }

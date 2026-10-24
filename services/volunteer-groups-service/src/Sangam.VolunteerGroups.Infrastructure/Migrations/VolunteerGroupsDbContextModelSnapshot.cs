@@ -353,6 +353,10 @@ namespace Sangam.VolunteerGroups.Infrastructure.Migrations
                         .HasColumnType("character varying(150)")
                         .HasColumnName("name");
 
+                    b.Property<Guid?>("PhotoId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("photo_id");
+
                     b.Property<Guid?>("PresidentMemberId")
                         .HasColumnType("uuid")
                         .HasColumnName("president_member_id");
@@ -378,6 +382,61 @@ namespace Sangam.VolunteerGroups.Infrastructure.Migrations
                         .HasDatabaseName("ix_volunteer_groups_tenant_id_status");
 
                     b.ToTable("volunteer_groups", (string)null);
+                });
+
+            modelBuilder.Entity("Sangam.VolunteerGroups.Domain.Media.GroupPhoto", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<int>("ByteSize")
+                        .HasColumnType("integer")
+                        .HasColumnName("byte_size");
+
+                    b.Property<byte[]>("Bytes")
+                        .IsRequired()
+                        .HasColumnType("bytea")
+                        .HasColumnName("bytes");
+
+                    b.Property<string>("ContentHash")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)")
+                        .HasColumnName("content_hash");
+
+                    b.Property<string>("ContentType")
+                        .IsRequired()
+                        .HasMaxLength(50)
+                        .HasColumnType("character varying(50)")
+                        .HasColumnName("content_type");
+
+                    b.Property<Guid>("GroupId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("group_id");
+
+                    b.Property<Guid>("TenantId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("tenant_id");
+
+                    b.Property<DateTimeOffset>("UploadedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("uploaded_at");
+
+                    b.Property<Guid>("UploadedBy")
+                        .HasColumnType("uuid")
+                        .HasColumnName("uploaded_by");
+
+                    b.HasKey("Id")
+                        .HasName("pk_group_photos");
+
+                    b.HasIndex("GroupId")
+                        .HasDatabaseName("ix_group_photos_group_id");
+
+                    b.HasIndex("TenantId", "GroupId")
+                        .HasDatabaseName("ix_group_photos_tenant_id_group_id");
+
+                    b.ToTable("group_photos", (string)null);
                 });
 
             modelBuilder.Entity("Sangam.VolunteerGroups.Infrastructure.Persistence.OutboxMessage", b =>
@@ -485,6 +544,16 @@ namespace Sangam.VolunteerGroups.Infrastructure.Migrations
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired()
                         .HasConstraintName("fk_group_roles_volunteer_groups_group_id");
+                });
+
+            modelBuilder.Entity("Sangam.VolunteerGroups.Domain.Media.GroupPhoto", b =>
+                {
+                    b.HasOne("Sangam.VolunteerGroups.Domain.Groups.VolunteerGroup", null)
+                        .WithMany()
+                        .HasForeignKey("GroupId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired()
+                        .HasConstraintName("fk_group_photos_groups_group_id");
                 });
 
             modelBuilder.Entity("Sangam.VolunteerGroups.Domain.Elections.GroupElection", b =>

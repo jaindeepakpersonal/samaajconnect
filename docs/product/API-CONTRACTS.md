@@ -83,7 +83,7 @@ enforced by `TenantAuthorizationBehavior`, not just UI hiding.
 
 | Method | Path | Roles | Purpose |
 |---|---|---|---|
-| GET | `/members` | Member, SamaajAdmin | Search/filter tenant directory. `term` matches full name; `localityId` is an exact match against the searched member's permanent Locality (a master-data-service id, not a substring — see below). An Area Admin gets the administrator's view (unlisted members, private fields) only when `localityId` is their token's own `locality_id`, and on `/members/{id}` only for a member living there; otherwise the member view |
+| GET | `/members` | Member, SamaajAdmin | Search/filter tenant directory. `term` matches full name; `localityId` is an exact match against the searched member's permanent Locality (a master-data-service id, not a substring — see below). `gautraId` and `professionId` filter exactly too; `professionId` matches only professions the caller could already read on the row (never another member's Private one). `?skip=&take=` paged as `{ items, hasMore }`. Each row carries `fatherName`/`motherName` from the member's household, null where it records none the caller may see. An Area Admin gets the administrator's view (unlisted members, private fields) only when `localityId` is their token's own `locality_id`, and on `/members/{id}` only for a member living there; otherwise the member view |
 | GET | `/members/registration-summary` | `SamaajAdmin`/`SuperAdmin` + `Members.Read` | Registrations in the current 30-day window against the 30 days before it, for the admin Reports & Analytics screen |
 | GET | `/members/{id}` | `Members.Read` | One member, through the same per-field privacy mapper the directory uses |
 | PATCH | `/members/{id}` | Member, **self only** | Update your own profile. Replaces it whole: `privacy` and `isListedInDirectory` are both **required**, because defaulting either would silently reopen something a member had closed. Also carries `gautraId`, `professionId`, `qualificationId` (all master-data-service ids), `permanentAddress` (`{line, cityId, localityId}`, required) and `temporaryAddress` (same shape, nullable). Takes **no** photo field — see below |
@@ -144,6 +144,9 @@ who never passed the check that produced it.
 | GET | `/groups/{id}` | `Members.Read` | One group with its members (each with `roleId` and the role's title as `rolePosition`) and its `roles` (title, kind, seats, holder count). `iCanRunElections` says whether the caller may manage roles and elections |
 | PATCH | `/groups/{id}` | `VolunteerGroups.Manage` | Correct the name, description, focus area or locality. Not the president, membership or status — each its own endpoint. An Area Admin: own locality's groups only (**404** otherwise), and cannot move one out (**403**) |
 | PATCH | `/groups/{id}/status` | `VolunteerGroups.Manage` | Activate or deactivate. A deactivated group keeps its members |
+| POST | `/groups/{id}/photo` | `VolunteerGroups.Manage` (an Area Admin: own locality, **404** otherwise) | The group's banner photo. `multipart/form-data`, one file part. JPEG, PNG or WebP, 2 MB; replaces any photo. `photoUrl` on the group then points here |
+| GET | `/groups/{id}/photo` | `Members.Read` | The bytes. `ETag` + `Cache-Control: private` |
+| DELETE | `/groups/{id}/photo` | `VolunteerGroups.Manage` | Idempotent |
 | POST | `/groups/{id}/applications` | `Members.Read` | Ask to join |
 | GET | `/groups/{id}/applications` | `VolunteerGroups.Lead` + this group's president, or a Samaaj admin while it has none | The review queue |
 | POST | `/groups/{id}/applications/{applicationId}/decide` | `VolunteerGroups.Lead` + president, or a Samaaj admin while it has none | `{accept}`. An accepted member starts as a Volunteer |
@@ -182,6 +185,9 @@ who never passed the check that produced it.
 | POST | `/{id}/publish` | `Events.Publish` | Tell the Samaaj about it |
 | POST | `/{id}/cancel` | `Events.Publish` | `{reason}`, required — members who were going are told it |
 | GET | `/{id}/attendees` | `Events.Publish` | Who is coming and who is waiting |
+| POST | `/{id}/schedule` | `Events.Publish` (an Area Admin: own locality, **404** otherwise) | Add a programme `{date, programName, startTime, endTime?}` - `date` "yyyy-MM-dd", times "HH:mm:ss", end after start. **409** on a cancelled event. Answers the whole event |
+| PUT | `/{id}/schedule/{itemId}` | `Events.Publish` | Correct one programme. Answers the whole event |
+| DELETE | `/{id}/schedule/{itemId}` | `Events.Publish` | Take one off. **404** when it is not there |
 | POST | `/{id}/registration` | `Members.Read` | RSVP, or join the waitlist when full. One call for both; the response says which and, for the waitlist, the position |
 | DELETE | `/{id}/registration` | `Members.Read` | Give up a place or leave the queue. Promotes whoever waited longest |
 

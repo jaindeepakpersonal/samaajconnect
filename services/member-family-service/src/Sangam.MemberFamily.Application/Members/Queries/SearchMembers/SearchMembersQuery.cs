@@ -15,5 +15,11 @@ namespace Sangam.MemberFamily.Application.Members.Queries.SearchMembers;
     Roles.SamaajAdmin,
     Roles.SuperAdmin)]
 [RequiresPermission(PermissionKeys.MembersRead)]
-public sealed record SearchMembersQuery(string? Term, Guid? LocalityId, int Skip = 0, int Take = 20)
+public sealed record SearchMembersQuery(
+    string? Term,
+    Guid? LocalityId,
+    int Skip = 0,
+    int Take = 20,
+    Guid? GautraId = null,
+    Guid? ProfessionId = null)
     : IQuery<PagedResult<MemberResponse>>;

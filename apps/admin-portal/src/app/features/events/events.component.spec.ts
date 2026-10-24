@@ -5,7 +5,7 @@ import { ActivatedRoute, provideRouter } from '@angular/router';
 import { API_CONFIG, AuthService } from '@samaajconnect/shared';
 import { EventDetailComponent } from './event-detail.component';
 import { EventsListComponent } from './events-list.component';
-import { Attendee, OrganizerGroup, SamaajEvent } from '../../core/admin.models';
+import { Attendee, EventScheduleItem, OrganizerGroup, SamaajEvent } from '../../core/admin.models';
 import { LocalityOptions } from '../../core/locality-options';
 
 const EVENT_ID = 'e1';
@@ -451,6 +451,103 @@ describe('EventDetailComponent', () => {
 
     // http.verify() in afterEach is the other half: no attendee call was made.
     expect(text()).toContain('another locality');
+  });
+
+  // ---- The schedule ----------------------------------------------------------
+
+  const programme = (overrides: Partial<EventScheduleItem> = {}): EventScheduleItem => ({
+    id: 's1',
+    date: '2026-09-05',
+    programName: 'Pravachan',
+    startTime: '10:00:00',
+    endTime: '11:30:00',
+    ...overrides,
+  });
+
+  it('lists the schedule with its local dates and wall-clock times', () => {
+    load(anEvent({ schedule: [programme(), programme({ id: 's2', programName: 'Pratikraman', startTime: '18:30:00', endTime: null })] }));
+
+    expect(text()).toContain('Pravachan');
+    expect(text()).toContain('10:00 AM');
+    expect(text()).toContain('11:30 AM');
+    expect(text()).toContain('6:30 PM');
+    expect(text()).toContain('Sat, 5 Sep 2026');
+  });
+
+  it('says there are no programmes yet', () => {
+    load();
+
+    expect(text()).toContain('No programmes yet');
+  });
+
+  it('adds a programme from a popup, sending seconds the service expects', () => {
+    load();
+
+    component.openScheduleModal(null);
+    fixture.detectChanges();
+    expect(fixture.nativeElement.querySelector('[role="dialog"] #programme-name')).not.toBeNull();
+
+    component.programName = '  Prabhat Pheri ';
+    component.programDate = '2026-09-05';
+    component.programStart = '06:00';
+    component.programEnd = '07:00';
+    component.saveScheduleItem(component.event()!);
+
+    const request = http.expectOne((r) => r.method === 'POST' && r.url === `/v1/events/${EVENT_ID}/schedule`);
+    expect(request.request.body).toEqual({
+      date: '2026-09-05',
+      programName: 'Prabhat Pheri',
+      startTime: '06:00:00',
+      endTime: '07:00:00',
+    });
+    request.flush(anEvent({ schedule: [programme({ programName: 'Prabhat Pheri' })] }));
+    fixture.detectChanges();
+
+    expect(component.scheduleModal()).toBeNull();
+    expect(text()).toContain('Prabhat Pheri');
+  });
+
+  it('refuses a programme that ends before it starts, before asking', () => {
+    load();
+
+    component.openScheduleModal(null);
+    component.programName = 'Pravachan';
+    component.programStart = '11:00';
+    component.programEnd = '10:00';
+
+    expect(component.endsBeforeStart()).toBe(true);
+    expect(component.canSaveScheduleItem()).toBe(false);
+
+    component.saveScheduleItem(component.event()!);
+    http.expectNone((r) => r.method === 'POST');
+  });
+
+  it('edits and removes a programme', () => {
+    load(anEvent({ schedule: [programme()] }));
+
+    component.openScheduleModal(programme());
+    expect(component.programStart).toBe('10:00');
+    component.programName = 'Pravachan by Muni Shri';
+    component.saveScheduleItem(component.event()!);
+
+    http
+      .expectOne((r) => r.method === 'PUT' && r.url === `/v1/events/${EVENT_ID}/schedule/s1`)
+      .flush(anEvent({ schedule: [programme({ programName: 'Pravachan by Muni Shri' })] }));
+
+    component.removeScheduleItem(component.event()!, programme());
+    http
+      .expectOne((r) => r.method === 'DELETE' && r.url === `/v1/events/${EVENT_ID}/schedule/s1`)
+      .flush(anEvent());
+    fixture.detectChanges();
+
+    expect(text()).toContain('No programmes yet');
+  });
+
+  it('offers no schedule controls on a cancelled event', () => {
+    load(anEvent({ status: 'Cancelled', schedule: [programme()] }));
+
+    expect(component.canEditSchedule(component.event()!)).toBe(false);
+    expect(text()).not.toContain('Add a programme');
   });
 
   it('asks the service for the one event rather than filtering the list', () => {

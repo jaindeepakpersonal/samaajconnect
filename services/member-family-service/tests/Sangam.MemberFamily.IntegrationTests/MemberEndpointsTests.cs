@@ -199,9 +199,11 @@ public sealed class MemberEndpointsTests(MemberFamilyApiFactory factory)
     {
         // Locality moved from free text to a master-data-service pick, so
         // there is no longer a string to search toward - only a value to
-        // filter on.
+        // filter on. The largest page: every test in this class seeds another
+        // Ravi and Meera in the same locality, so the newest are not
+        // necessarily on the first twenty.
         var directory = await MemberClient(_ravi, TenantA)
-            .GetFromJsonAsync<JsonElement>("/v1/members?localityId=" + UdaipurLocalityId);
+            .GetFromJsonAsync<JsonElement>($"/v1/members?take=100&localityId={UdaipurLocalityId}");
 
         var names = directory.GetProperty("items").EnumerateArray()
             .Select(m => m.GetProperty("fullName").GetString())

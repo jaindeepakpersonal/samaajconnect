@@ -44,7 +44,13 @@ public sealed record GroupResponse(
     /// Whether the asking member may define roles, assign them, and run
     /// elections: the president, or an administrator of this group at any time.
     /// </summary>
-    bool ICanRunElections);
+    bool ICanRunElections,
+
+    /// <summary>
+    /// Where the group's banner photo is fetched from, or null when it has
+    /// none. Relative, and served only with a token - see GetGroupPhotoQuery.
+    /// </summary>
+    string? PhotoUrl = null);
 
 /// <remarks><c>RolePosition</c> is the role's title, kept under its old name for the screens that read it.</remarks>
 public sealed record GroupMemberResponse(

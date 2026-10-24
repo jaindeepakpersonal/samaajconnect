@@ -48,11 +48,43 @@ export function describeWhen(event: SamaajEvent): string {
     .join(' • ');
 }
 
-/** Whether the event has already happened, as of now. */
-export function hasPassed(event: SamaajEvent, now: number = Date.now()): boolean {
-  const end = parse(event.endAt) ?? parse(event.startAt);
+/**
+ * How long an event with no end time is taken to last - the same day
+ * events-service uses (`SamaajEvent.UntimedEventLength`), so the list the
+ * service sends and the "already happened" this screen draws agree.
+ */
+export const UNTIMED_EVENT_MS = 24 * 60 * 60 * 1000;
 
-  return end !== null && end.getTime() < now;
+/** Whether the event is over, as of now: past its end, or a day past its start when it has none. */
+export function hasPassed(event: SamaajEvent, now: number = Date.now()): boolean {
+  const end = parse(event.endAt);
+
+  if (end !== null) {
+    return end.getTime() < now;
+  }
+
+  const start = parse(event.startAt);
+
+  return start !== null && start.getTime() + UNTIMED_EVENT_MS < now;
+}
+
+/** "18:30:00" as the reader's own clock format, e.g. "6:30 PM". Wall-clock: never shifted between zones. */
+export function formatClock(time: string): string {
+  const [hours = 0, minutes = 0] = time.split(':').map((part) => Number(part));
+
+  return new Date(2000, 0, 1, hours, minutes).toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit' });
+}
+
+/** A schedule's "2026-11-24" as "Tue, 24 Nov 2026" - read as a local date, not UTC midnight. */
+export function formatScheduleDay(date: string): string {
+  const [year = 1970, month = 1, day = 1] = date.split('-').map((part) => Number(part));
+
+  return new Date(year, month - 1, day).toLocaleDateString(undefined, {
+    weekday: 'short',
+    day: '2-digit',
+    month: 'short',
+    year: 'numeric',
+  });
 }
 
 function parse(iso: string | null): Date | null {

@@ -2,6 +2,13 @@ using Sangam.MemberFamily.Domain.Members;
 
 namespace Sangam.MemberFamily.Application.Abstractions;
 
+/// <summary>What the directory can be searched by. Every part is optional.</summary>
+public sealed record MemberSearchFilter(
+    string? Term = null,
+    Guid? LocalityId = null,
+    Guid? GautraId = null,
+    Guid? ProfessionId = null);
+
 public interface IMemberProfileRepository
 {
     /// <summary>Tenant-filtered. Used by everything reachable over HTTP.</summary>
@@ -20,14 +27,15 @@ public interface IMemberProfileRepository
 
     /// <summary>
     /// The Samaaj directory. Tenant-filtered, so it cannot cross Samaaj.
-    /// Matching is on name (substring) and locality (exact) only - searching
-    /// by someone's private mobile number would leak it one guess at a time.
+    /// Matching is on name (substring) and on Locality, Gautra and Profession
+    /// (exact master-data ids) only - searching by someone's private mobile
+    /// number would leak it one guess at a time.
     /// </summary>
-    /// <param name="localityId">
-    /// An exact match against the permanent address's Locality, not a
-    /// substring - Locality moved from a free-text field to a
-    /// master-data-service pick, so there is no longer a string to search
-    /// toward, only a value to filter on.
+    /// <param name="filter">
+    /// Locality is an exact match against the permanent address's Locality -
+    /// it is a master-data-service pick, so there is no string to search
+    /// toward, only a value to filter on. Gautra carries no privacy level and
+    /// filters plainly; Profession is narrowed by <paramref name="viewer"/>.
     /// </param>
     /// <param name="includeUnlisted">
     /// True only for a Samaaj administrator. A member who has taken themselves
@@ -40,13 +48,28 @@ public interface IMemberProfileRepository
     /// page actually holds, so it can tell whether there is a next page
     /// without a second `COUNT(*)` query.
     /// </param>
+    /// <param name="viewer">
+    /// Decides what the Profession filter may match. Profession carries a
+    /// privacy level, so a filter on it matches only members whose profession
+    /// this viewer could already see on the row - their own, anybody's for an
+    /// administrator, and otherwise only where it is not Private. Matching a
+    /// Private one would confirm it one query at a time.
+    /// </param>
     Task<IReadOnlyList<MemberProfile>> SearchAsync(
-        string? term,
-        Guid? localityId,
+        MemberSearchFilter filter,
+        ProfileViewer viewer,
         int skip,
         int limit,
         bool includeUnlisted,
         CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// These profiles, tenant-filtered, listed or not - for reading a known set
+    /// of people (a household, a page's parents) rather than searching for
+    /// them. Missing ids are simply absent.
+    /// </summary>
+    Task<IReadOnlyList<MemberProfile>> ListByIdsAsync(
+        IReadOnlyCollection<Guid> ids, CancellationToken cancellationToken = default);
 
     /// <summary>Bypasses the tenant filter, for consumers. See ExistsAsync.</summary>
     Task<MemberProfile?> GetForConsumerAsync(Guid id, CancellationToken cancellationToken = default);

@@ -2,8 +2,8 @@ import { Component, OnInit, computed, inject, signal } from '@angular/core';
 import { ActivatedRoute, RouterLink } from '@angular/router';
 import { describeError } from '@samaajconnect/shared';
 import { EventsApi } from './events.api';
-import { describeWhen, hasPassed } from './events.format';
-import { SamaajEvent } from './events.models';
+import { describeWhen, formatClock, formatScheduleDay, hasPassed } from './events.format';
+import { EventScheduleItem, SamaajEvent } from './events.models';
 
 /**
  * Event detail, from the member-portal wireframe's `#eventdetail` screen.
@@ -18,6 +18,13 @@ import { SamaajEvent } from './events.models';
  * the waitlist are the same call for the same reason: choosing between them
  * client-side would mean racing the count and sometimes asking for the wrong
  * one.
+ *
+ * **A page since 2026-10-24**: a cover with a calendar leaf for the day it
+ * starts (events carry no photo), a "Happening now" pill from the service's
+ * own `isHappeningNow`, and the schedule day by day - Day 1, Day 2 - each
+ * programme with its wall-clock times. A schedule date is read as a local
+ * day, never as UTC midnight, or it would show the day before west of
+ * Greenwich.
  *
  * The wireframe's "You'll receive a notification reminder 24 hours before" is
  * **not** reproduced. There is no notification channel on this platform yet
@@ -40,8 +47,25 @@ import { SamaajEvent } from './events.models';
           <button class="btn link" type="button" (click)="load()">Try again</button>
         </div>
       } @else if (event(); as found) {
-        <h1 class="page-title">{{ found.title }}</h1>
-        <p class="subtitle">{{ when(found) }}</p>
+        <!-- The cover: a calendar leaf for the day it starts, and the title. -->
+        <div class="event-cover" [class.cancelled]="found.status === 'Cancelled'">
+          <div class="event-date-badge" aria-hidden="true">
+            <span class="event-date-month">{{ badgeMonth(found) }}</span>
+            <span class="event-date-day">{{ badgeDay(found) }}</span>
+          </div>
+          <div class="event-cover-text">
+            <h1 class="page-title">{{ found.title }}</h1>
+            <p class="subtitle">{{ when(found) }}</p>
+            <p class="badges">
+              @if (found.isHappeningNow) {
+                <span class="pill ok">Happening now</span>
+              }
+              @if (scheduleDays(found).length > 1) {
+                <span class="pill">{{ scheduleDays(found).length }} days</span>
+              }
+            </p>
+          </div>
+        </div>
 
         @if (found.status === 'Cancelled') {
           <div class="notice error" role="alert">
@@ -158,6 +182,36 @@ import { SamaajEvent } from './events.models';
             }
           </div>
         </div>
+
+        <!-- Schedule, day by day ------------------------------------------- -->
+        <h2 class="section-heading">Schedule</h2>
+
+        @if (scheduleDays(found).length === 0) {
+          <p class="small">The organisers have not posted a programme schedule for this event.</p>
+        } @else {
+          <div class="schedule">
+            @for (day of scheduleDays(found); track day.date; let i = $index) {
+              <section class="card schedule-day" [attr.aria-labelledby]="'day-' + day.date">
+                <h3 [id]="'day-' + day.date">
+                  @if (scheduleDays(found).length > 1) {
+                    <span class="schedule-day-number">Day {{ i + 1 }}</span>
+                  }
+                  {{ dayLabel(day.date) }}
+                </h3>
+                <ol class="schedule-items">
+                  @for (item of day.items; track item.id) {
+                    <li>
+                      <span class="schedule-time">
+                        {{ clock(item.startTime) }}@if (item.endTime; as end) { – {{ clock(end) }} }
+                      </span>
+                      <span class="schedule-name">{{ item.programName }}</span>
+                    </li>
+                  }
+                </ol>
+              </section>
+            }
+          </div>
+        }
       }
     </div>
   `,
@@ -278,6 +332,44 @@ export class EventDetailComponent implements OnInit {
 
   when(event: SamaajEvent): string {
     return describeWhen(event);
+  }
+
+  /** The schedule grouped by day, in the order the service sends it (date, then start). */
+  scheduleDays(event: SamaajEvent): readonly { date: string; items: readonly EventScheduleItem[] }[] {
+    const days: { date: string; items: EventScheduleItem[] }[] = [];
+
+    for (const item of event.schedule ?? []) {
+      const last = days[days.length - 1];
+
+      if (last?.date === item.date) {
+        last.items.push(item);
+      } else {
+        days.push({ date: item.date, items: [item] });
+      }
+    }
+
+    return days;
+  }
+
+  dayLabel(date: string): string {
+    return formatScheduleDay(date);
+  }
+
+  clock(time: string): string {
+    return formatClock(time);
+  }
+
+  /** "NOV" on the cover's calendar leaf, in the reader's own language. */
+  badgeMonth(event: SamaajEvent): string {
+    const start = new Date(event.startAt);
+
+    return Number.isNaN(start.getTime()) ? '' : start.toLocaleDateString(undefined, { month: 'short' });
+  }
+
+  badgeDay(event: SamaajEvent): string {
+    const start = new Date(event.startAt);
+
+    return Number.isNaN(start.getTime()) ? '' : String(start.getDate());
   }
 
   isGoing(event: SamaajEvent): boolean {

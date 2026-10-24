@@ -37,6 +37,17 @@ public sealed class EventConfiguration : IEntityTypeConfiguration<SamaajEvent>
         builder.Metadata.FindNavigation(nameof(SamaajEvent.Registrations))!
             .SetPropertyAccessMode(PropertyAccessMode.Field);
 
+        builder.HasMany(e => e.Schedule)
+            .WithOne()
+            .HasForeignKey(s => s.EventId)
+            .OnDelete(DeleteBehavior.Cascade);
+
+        builder.Metadata.FindNavigation(nameof(SamaajEvent.Schedule))!
+            .SetPropertyAccessMode(PropertyAccessMode.Field);
+
+        builder.Ignore(e => e.OrderedSchedule);
+        builder.Ignore(e => e.EndsBy);
+
         builder.Ignore(e => e.DomainEvents);
     }
 }
@@ -57,5 +68,22 @@ public sealed class EventRegistrationConfiguration : IEntityTypeConfiguration<Ev
 
         // The waitlist is read in registration order.
         builder.HasIndex(r => new { r.EventId, r.Status, r.RegisteredAt });
+    }
+}
+
+public sealed class EventScheduleItemConfiguration : IEntityTypeConfiguration<EventScheduleItem>
+{
+    public void Configure(EntityTypeBuilder<EventScheduleItem> builder)
+    {
+        builder.ToTable("event_schedule_items");
+        builder.HasKey(s => s.Id);
+
+        // Domain-assigned. Left as EF's default, an item added to a tracked
+        // event comes back Modified rather than Added and the save fails.
+        builder.Property(s => s.Id).ValueGeneratedNever();
+
+        builder.Property(s => s.ProgramName).IsRequired().HasMaxLength(200);
+
+        builder.HasIndex(s => new { s.EventId, s.Date, s.StartTime });
     }
 }

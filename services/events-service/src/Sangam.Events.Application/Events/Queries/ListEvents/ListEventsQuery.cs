@@ -43,10 +43,12 @@ public sealed class ListEventsQueryHandler(
         var includeDrafts =
             query.IncludeDrafts && currentUser.HasPermission(PermissionKeys.EventsPublish);
 
+        var now = clock.UtcNow;
+
         var found = await events.ListAsync(
             publishedOnly: !includeDrafts,
             upcomingOnly: !query.IncludePast,
-            clock.UtcNow,
+            now,
             cancellationToken);
 
         // Published events are the whole Samaaj's, an Area Admin's included;
@@ -55,7 +57,7 @@ public sealed class ListEventsQueryHandler(
         [
             .. found
                 .Where(e => e.Status != EventStatus.Draft || areaScope.MayAdminister(e.LocalityId))
-                .Select(e => e.ToResponse(memberId)),
+                .Select(e => e.ToResponse(memberId, now)),
         ];
 
         return Result.Success(results);

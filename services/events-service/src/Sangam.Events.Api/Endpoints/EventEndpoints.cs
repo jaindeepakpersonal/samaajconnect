@@ -4,6 +4,7 @@ using Sangam.Events.Application.Events;
 using Sangam.Events.Application.Events.Commands.CancelEvent;
 using Sangam.Events.Application.Events.Commands.CancelRegistration;
 using Sangam.Events.Application.Events.Commands.CreateEvent;
+using Sangam.Events.Application.Events.Commands.EventSchedule;
 using Sangam.Events.Application.Events.Commands.PublishEvent;
 using Sangam.Events.Application.Events.Commands.RegisterForEvent;
 using Sangam.Events.Application.Events.Commands.UpdateEvent;
@@ -211,6 +212,70 @@ public static class EventEndpoints
             .ProducesProblem(StatusCodes.Status401Unauthorized)
             .ProducesProblem(StatusCodes.Status404NotFound);
 
+        // ---- The schedule: an event's programmes --------------------------
+
+        group.MapPost("/{id:guid}/schedule", async (
+                Guid id,
+                ScheduleItemRequest request,
+                ISender sender,
+                CancellationToken cancellationToken) =>
+            {
+                var result = await sender.Send(
+                    new AddEventScheduleItemCommand(id, request.Date, request.ProgramName, request.StartTime, request.EndTime),
+                    cancellationToken);
+
+                return result.ToApiResult();
+            })
+            .RequireAuthorization()
+            .WithName("AddEventScheduleItem")
+            .WithSummary("Add a programme to an event's schedule: a date, its name, a start and an optional end time.")
+            .Produces<EventResponse>()
+            .ProducesValidationProblem()
+            .ProducesProblem(StatusCodes.Status403Forbidden)
+            .ProducesProblem(StatusCodes.Status404NotFound)
+            .ProducesProblem(StatusCodes.Status409Conflict);
+
+        group.MapPut("/{id:guid}/schedule/{itemId:guid}", async (
+                Guid id,
+                Guid itemId,
+                ScheduleItemRequest request,
+                ISender sender,
+                CancellationToken cancellationToken) =>
+            {
+                var result = await sender.Send(
+                    new UpdateEventScheduleItemCommand(
+                        id, itemId, request.Date, request.ProgramName, request.StartTime, request.EndTime),
+                    cancellationToken);
+
+                return result.ToApiResult();
+            })
+            .RequireAuthorization()
+            .WithName("UpdateEventScheduleItem")
+            .WithSummary("Correct one programme on an event's schedule.")
+            .Produces<EventResponse>()
+            .ProducesValidationProblem()
+            .ProducesProblem(StatusCodes.Status403Forbidden)
+            .ProducesProblem(StatusCodes.Status404NotFound)
+            .ProducesProblem(StatusCodes.Status409Conflict);
+
+        group.MapDelete("/{id:guid}/schedule/{itemId:guid}", async (
+                Guid id,
+                Guid itemId,
+                ISender sender,
+                CancellationToken cancellationToken) =>
+            {
+                var result = await sender.Send(new RemoveEventScheduleItemCommand(id, itemId), cancellationToken);
+
+                return result.ToApiResult();
+            })
+            .RequireAuthorization()
+            .WithName("RemoveEventScheduleItem")
+            .WithSummary("Take a programme off an event's schedule.")
+            .Produces<EventResponse>()
+            .ProducesProblem(StatusCodes.Status403Forbidden)
+            .ProducesProblem(StatusCodes.Status404NotFound)
+            .ProducesProblem(StatusCodes.Status409Conflict);
+
         return app;
     }
 
@@ -245,4 +310,14 @@ public static class EventEndpoints
         bool RegistrationEnabled,
         int? Capacity,
         string? LocalityId = null);
+
+    /// <summary>
+    /// One programme. <c>Date</c> is "yyyy-MM-dd", the times "HH:mm:ss" on the
+    /// clock where it happens; <c>EndTime</c> may be null.
+    /// </summary>
+    public sealed record ScheduleItemRequest(
+        DateOnly Date,
+        string ProgramName,
+        TimeOnly StartTime,
+        TimeOnly? EndTime);
 }

@@ -391,12 +391,12 @@ in directory" checkbox, which had no field behind it until now.
 `GetByIdAsync` still returns them, and has to: a volunteer group's president
 needs to see who applied, a timeline post has an author, a household has
 members. Making an unlisted profile 404 would break all three and would turn a
-listing preference into an access control it was never meant to be. Three of
-the four `SearchAsync` callers therefore pass `includeUnlisted: true` - the
-household ones and the DPDP s.11 export - and only the directory itself passes
-false. A Samaaj admin passes true as well, for the same reason they see through
-privacy levels: a member an administrator cannot find is a member nobody can
-help.
+listing preference into an access control it was never meant to be. The
+household reads and the DPDP s.11 export therefore load profiles by id
+(`ListByIdsAsync`, listed or not), and only the directory search filters on the
+flag. A Samaaj admin's search includes unlisted members too, for the same reason
+they see through privacy levels: a member an administrator cannot find is a
+member nobody can help.
 
 **The setting is required on update, not defaulted.** `UpdateProfileCommand`
 takes `bool?` and the validator refuses null, exactly like `Privacy`. Defaulting
@@ -430,12 +430,47 @@ known without a second `COUNT(*)` query - cheaper than an exact total, and
 every backend-paginated screen in this pass only ever needed "is there a
 next page," never a precise count. `GET /v1/members` now answers
 `{ items, hasMore }` instead of a bare
-array; the three internal callers that fetch a whole household
-(`GetMyFamilyQueryHandler`, `GetMyDataQuery`, `DecideJoinRequestCommandHandler`)
-pass `skip: 0, take: 200` unchanged - they read every member of one family,
-not a page of the directory, so pagination does not apply to them.
+array.
 
-**Search matches names by substring and Locality by exact id.** Never contact
+**And until 2026-10-24 `Skip` was accepted and never applied.** The repository
+took the parameter and ordered by name, then `Take` - so "Next" on either
+portal's directory showed page one again, for five weeks, with every test
+passing because none asked for a second page. It orders by name then id now,
+so a page boundary between two people with one name is stable, and
+`DirectoryCardTests` asks for page two.
+
+**The household reads were a directory search in disguise, and fixed the same
+day.** `GetMyFamilyQueryHandler`, `GetMyDataQuery`, `DecideJoinRequestCommandHandler`
+and `SetFamilyHeadCommandHandler` each fetched the first 200 profiles of the
+whole Samaaj, alphabetically, to find their household's names among them - so
+in a Samaaj past 200 members a relative outside that first slice came back
+unnamed. They load exactly the household's profiles by id now
+(`ListByIdsAsync`), and `SearchAsync` has one caller: the directory.
+
+**The directory is cards with a father and mother, added 2026-10-24.**
+`SearchMembersQuery` sets `FatherName`/`MotherName` on each row from the
+member's household, three queries for the whole page. A relationship is
+recorded **relative to the family admin** (the join form asks "your
+relationship to them"), so `Family.ParentsOf` can name parents in three cases
+only: the admin's own and a sibling's are whoever joined as the admin's Parent,
+a Child's are the admin and the admin's Spouse; gender decides which is the
+father. Anybody else's parents the household simply does not record, and the
+answer is none rather than a guess. A parent is named only where the viewer
+could find them in the directory anyway - listed, or an administrator
+viewing - so someone who unlisted themselves does not reappear on a
+relative's card, and erased profiles (always unlisted) never do.
+
+**Gautra and Profession filter too, and the Profession filter respects the
+field's privacy.** Gautra carries no privacy level, so it filters plainly.
+Profession can be Private, which is why there was no filter on it before: a
+match would confirm the value one query at a time. The filter now matches only
+professions the viewer could already read on the row - the same rule as
+`MemberProfile.IsVisibleTo`: anybody's for an administrator, their own, and
+otherwise only where it is not Private. `DirectoryCardTests` holds both
+halves, and fails if the privacy clause is removed.
+
+**Search matches names by substring and Locality, Gautra and Profession by exact
+id.** Never contact
 details, whatever their privacy level says — matching on a private mobile
 number would let anyone confirm one digit-guess at a time, and the filtering
 afterwards would be beside the point. Locality stopped being a free-text

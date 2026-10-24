@@ -56,6 +56,13 @@ public sealed class VolunteerGroup : AggregateRoot, ITenantScopedEntity
 
     public bool HasNoPresident => PresidentMemberId is null;
 
+    /// <summary>
+    /// The <see cref="Media.GroupPhoto"/> shown as the group page's banner, or
+    /// null. Set by uploading one, never by the edit form - two acts, as with a
+    /// member's photo.
+    /// </summary>
+    public Guid? PhotoId { get; private set; }
+
     public GroupStatus Status { get; private set; }
     public DateTimeOffset CreatedAt { get; private set; }
 
@@ -141,6 +148,40 @@ public sealed class VolunteerGroup : AggregateRoot, ITenantScopedEntity
         LocalityId = localityId;
 
         Raise(new GroupUpdatedDomainEvent(Id, TenantId, now));
+    }
+
+    /// <summary>
+    /// Points the group at a newly stored photo and answers which one it
+    /// replaced, so the handler can delete it in the same transaction - the
+    /// aggregate does not know about the photos table, and silently orphaning
+    /// the old row would leave a picture nothing refers to.
+    /// </summary>
+    public Guid? SetPhoto(Guid photoId, DateTimeOffset now)
+    {
+        var previous = PhotoId;
+
+        PhotoId = photoId;
+
+        Raise(new GroupUpdatedDomainEvent(Id, TenantId, now));
+
+        return previous;
+    }
+
+    /// <summary>Takes the photo down, answering which one it was. Null when there was none.</summary>
+    public Guid? RemovePhoto(DateTimeOffset now)
+    {
+        var removed = PhotoId;
+
+        if (removed is null)
+        {
+            return null;
+        }
+
+        PhotoId = null;
+
+        Raise(new GroupUpdatedDomainEvent(Id, TenantId, now));
+
+        return removed;
     }
 
     public bool IsPresident(Guid memberId) => PresidentMemberId == memberId;

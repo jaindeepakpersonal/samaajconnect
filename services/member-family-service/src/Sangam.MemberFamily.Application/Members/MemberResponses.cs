@@ -35,7 +35,12 @@ public sealed record MemberResponse(
     AddressResponse? TemporaryAddress,
     Guid? ProfessionId,
     Guid? QualificationId,
-    string Gender);
+    string Gender,
+    // The directory card's Father / Mother line, worked out from the member's
+    // household (Family.ParentsOf). Null when the household does not record
+    // one - and always null outside the directory search.
+    string? FatherName = null,
+    string? MotherName = null);
 
 public sealed record FieldPrivacyResponse(
     string Mobile,

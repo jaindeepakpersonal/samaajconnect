@@ -8,7 +8,7 @@ namespace Sangam.Events.Application.Events;
 /// </summary>
 internal static class EventMappings
 {
-    public static EventResponse ToResponse(this SamaajEvent samaajEvent, Guid viewerId) => new(
+    public static EventResponse ToResponse(this SamaajEvent samaajEvent, Guid viewerId, DateTimeOffset? now = null) => new(
         samaajEvent.Id,
         samaajEvent.Title,
         samaajEvent.Description,
@@ -34,7 +34,10 @@ internal static class EventMappings
             : null,
         samaajEvent.CancelledAt,
         samaajEvent.CancellationReason,
-        samaajEvent.CreatedAt);
+        samaajEvent.CreatedAt,
+        [.. samaajEvent.OrderedSchedule
+            .Select(s => new EventScheduleItemResponse(s.Id, s.Date, s.ProgramName, s.StartTime, s.EndTime))],
+        now is { } at && samaajEvent.IsHappeningAt(at));
 
     public static IReadOnlyList<AttendeeResponse> ToAttendees(this SamaajEvent samaajEvent) =>
     [

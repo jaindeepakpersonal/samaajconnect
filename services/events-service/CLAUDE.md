@@ -15,6 +15,7 @@ button on a full event, and both are real states rather than labels.
 |---|---|---|
 | `SamaajEvent` | built | Tenant-scoped. Named this, not `Event`, because `event` is a C# keyword and `Event` beside `IDomainEvent` reads as the wrong thing. Carries an optional `EventTypeId` (a master-data-service `LookupItem`, `Category == EventType`) as of 2026-09-12 - see below. |
 | `EventRegistration` | built | A place, or a place in the queue for one. |
+| `EventScheduleItem` | built | One programme on the event's schedule: a date, a name, a start and an optional end time. Owned by `SamaajEvent`. See "The schedule" below. |
 
 ## Commands
 
@@ -24,6 +25,9 @@ button on a full event, and both are real states rather than labels.
 | `UpdateEventCommand` | `Events.Publish` | built |
 | `PublishEventCommand` | `Events.Publish` | built |
 | `CancelEventCommand` | `Events.Publish` | built |
+| `AddEventScheduleItemCommand` | `Events.Publish`, an Area Admin only in their locality | built. Refused on a cancelled event |
+| `UpdateEventScheduleItemCommand` | `Events.Publish`, an Area Admin only in their locality | built |
+| `RemoveEventScheduleItemCommand` | `Events.Publish`, an Area Admin only in their locality | built |
 | `RegisterForEventCommand` | `Members.Read` | built |
 | `CancelRegistrationCommand` | `Members.Read` | built |
 
@@ -44,7 +48,7 @@ button on a full event, and both are real states rather than labels.
 | `EventCapacityReachedDomainEvent` | `events.capacity.reached.v1` | `SamaajEvent.Register` |
 | `EventWaitlistPromotedDomainEvent` | `events.waitlist.promoted.v1` | `SamaajEvent.CancelRegistration` |
 | `EventCancelledDomainEvent` | `events.event.cancelled.v1` | `SamaajEvent.Cancel` |
-| `EventUpdatedDomainEvent` | `events.event.updated.v1` | `SamaajEvent.Update` |
+| `EventUpdatedDomainEvent` | `events.event.updated.v1` | `SamaajEvent.Update`, and every change to the schedule |
 
 ## Events consumed
 
@@ -61,6 +65,9 @@ None. A leaf service, like the other two Phase 2 contexts.
 | POST | `/v1/events/{id}/publish` | `Events.Publish` |
 | POST | `/v1/events/{id}/cancel` | `Events.Publish` |
 | GET | `/v1/events/{id}/attendees` | `Events.Publish` |
+| POST | `/v1/events/{id}/schedule` | `Events.Publish` |
+| PUT | `/v1/events/{id}/schedule/{itemId}` | `Events.Publish` |
+| DELETE | `/v1/events/{id}/schedule/{itemId}` | `Events.Publish` |
 | POST | `/v1/events/{id}/registration` | `Members.Read` |
 | DELETE | `/v1/events/{id}/registration` | `Members.Read` |
 | GET | `/health` | anonymous |
@@ -138,6 +145,28 @@ who never registered.
 **Cancelled events stay in the upcoming list until they would have happened.**
 Somebody who planned around one should see that it is off, not find it simply
 gone.
+
+**"Upcoming" means not over yet, since 2026-10-24 - it used to mean not
+started.** The list filtered on `StartAt >= now`, so an event dropped off
+both portals the minute it began and could only be found again by ticking
+"Show events that have already happened" - the one moment people most need
+to find it. It keeps an event now until its `EndAt`, or, with no end time,
+for `SamaajEvent.UntimedEventLength` (a day) after it starts. The response
+carries `isHappeningNow` - published, started, not over - for a "Happening
+now" pill; only the list and the detail read the clock to set it.
+
+**The schedule, added 2026-10-24.** An event can carry a schedule of
+programmes - "24 Nov, 6:00-7:00, Prabhat Pheri" - each a date, a name, a start
+time and an optional end. Dates and wall-clock times rather than instants: a
+schedule is read the way a pamphlet prints it, and nothing compares a
+programme's time across time zones. `EventResponse.Schedule` lists them by date
+then start time, whatever order they were entered in. Changing one is editing
+the event, so it is gated like `UpdateEventCommand` - `Events.Publish`, an Area
+Admin only in their own locality, refused on a cancelled event - and raises
+`events.event.updated.v1` carrying no programme names, for the reason the
+event's own free text stays off its topics. At most
+`SamaajEvent.MaxScheduleItems` (100) per event: a schedule, not a log.
+`EventScheduleTests` (unit and integration) hold it.
 
 **Events carry ids and shape, never free text.** Title, description, venue and
 the cancellation reason all stay out of the published events —

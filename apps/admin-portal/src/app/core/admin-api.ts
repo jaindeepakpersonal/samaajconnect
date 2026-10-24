@@ -82,6 +82,7 @@ import {
   Round,
   RoundDetail,
   SamaajEvent,
+  EventScheduleItemInput,
   SecurityPolicy,
   SocialIssue,
   State,
@@ -155,6 +156,19 @@ export class AdminApi {
   /** Takes a logo down. Doing it twice is success. */
   removeTenantLogo(tenantId: string): Observable<void> {
     return this.http.delete<void>(`/v1/identity/tenants/${tenantId}/logo`);
+  }
+
+  /** A volunteer group's banner photo. Multipart, like a logo; the service reads the type from the bytes. */
+  uploadGroupPhoto(groupId: string, file: File): Observable<void> {
+    const body = new FormData();
+    body.append('file', file);
+
+    return this.http.post<void>(`/v1/volunteer-groups/groups/${groupId}/photo`, body);
+  }
+
+  /** Takes a group's photo down. Doing it twice is success. */
+  removeGroupPhoto(groupId: string): Observable<void> {
+    return this.http.delete<void>(`/v1/volunteer-groups/groups/${groupId}/photo`);
   }
 
   /**
@@ -380,8 +394,17 @@ export class AdminApi {
     localityId: string | null,
     skip = 0,
     take = 20,
+    more: { readonly gautraId?: string | null; readonly professionId?: string | null } = {},
   ): Observable<Paged<AdminMember>> {
     let params = new HttpParams().set('skip', skip).set('take', take);
+
+    if (more.gautraId) {
+      params = params.set('gautraId', more.gautraId);
+    }
+
+    if (more.professionId) {
+      params = params.set('professionId', more.professionId);
+    }
 
     if (term && term.trim() !== '') {
       params = params.set('term', term.trim());
@@ -1072,6 +1095,21 @@ export class AdminApi {
    * everyone else — a member reaching one has guessed its id, and confirming it
    * exists is the leak.
    */
+  /** Adds a programme to an event's schedule; answers the whole event. */
+  addEventScheduleItem(eventId: string, item: EventScheduleItemInput): Observable<SamaajEvent> {
+    return this.http.post<SamaajEvent>(`/v1/events/${eventId}/schedule`, item);
+  }
+
+  /** Corrects one programme; answers the whole event. */
+  updateEventScheduleItem(eventId: string, itemId: string, item: EventScheduleItemInput): Observable<SamaajEvent> {
+    return this.http.put<SamaajEvent>(`/v1/events/${eventId}/schedule/${itemId}`, item);
+  }
+
+  /** Takes one programme off; answers the whole event. */
+  removeEventScheduleItem(eventId: string, itemId: string): Observable<SamaajEvent> {
+    return this.http.delete<SamaajEvent>(`/v1/events/${eventId}/schedule/${itemId}`);
+  }
+
   event(id: string): Observable<SamaajEvent> {
     return this.http.get<SamaajEvent>(`/v1/events/${id}`);
   }

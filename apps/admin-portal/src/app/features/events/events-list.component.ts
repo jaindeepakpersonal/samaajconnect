@@ -89,7 +89,7 @@ import { ALL_LOCALITIES, LocalityFilterComponent, matchesLocality } from '../../
         <label class="inline-check">
           <input type="checkbox" name="includePast" [ngModel]="includePast()"
             (ngModelChange)="setIncludePast($event)" />
-          Show events that have already happened
+          Show events that are over
         </label>
 
         <app-locality-filter [(value)]="localityFilter" inputId="events-locality" />
@@ -134,6 +134,9 @@ import { ALL_LOCALITIES, LocalityFilterComponent, matchesLocality } from '../../
                       <span class="pill" [class.warn]="event.status === 'Draft'">
                         {{ event.status }}
                       </span>
+                      @if (event.isHappeningNow) {
+                        <span class="pill ok">Happening now</span>
+                      }
                       @if (event.status === 'Cancelled' && event.cancellationReason) {
                         <div class="muted">{{ event.cancellationReason }}</div>
                       }

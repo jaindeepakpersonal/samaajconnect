@@ -2,7 +2,7 @@ import { provideHttpClient } from '@angular/common/http';
 import { HttpTestingController, provideHttpClientTesting } from '@angular/common/http/testing';
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { ActivatedRoute, provideRouter } from '@angular/router';
-import { API_CONFIG } from '@samaajconnect/shared';
+import { API_CONFIG, AuthService } from '@samaajconnect/shared';
 import {
   GroupApplication,
   GroupDetail,
@@ -163,6 +163,13 @@ describe('GroupElectionsComponent', () => {
     fixture.detectChanges();
   }
 
+
+  /** Each section of the page is a tab now; a test about one opens it first. */
+  function showTab(name: 'about' | 'members' | 'requests' | 'roles' | 'elections') {
+    component.tab.set(name);
+    fixture.detectChanges();
+  }
+
   it('explains a 404 as no such group rather than as an error', () => {
     fixture.detectChanges();
     http.expectOne(GROUP_URL).flush({}, { status: 404, statusText: 'Not Found' });
@@ -174,6 +181,7 @@ describe('GroupElectionsComponent', () => {
 
   it('tells an administrator a president-less group is theirs to run an election for', () => {
     load(detail({ presidentMemberId: null, iCanLead: true }));
+    showTab('elections');
 
     expect(text()).toContain('This group has no president');
     expect(buttonSaying('Open an election')).toBeDefined();
@@ -183,6 +191,7 @@ describe('GroupElectionsComponent', () => {
     // Changed 2026-09-26: an administrator runs any role's election at any
     // time. Join requests are still the president's, so the queue is not asked for.
     load(detail({ presidentMemberId: 'm1', iCanLead: false, iCanRunElections: true }));
+    showTab('elections');
 
     expect(buttonSaying('Open an election')).toBeDefined();
     expect(text()).not.toContain('Join requests');
@@ -191,6 +200,7 @@ describe('GroupElectionsComponent', () => {
   it('offers no way to open an election to somebody who cannot run them', () => {
     // The service refuses it, so the screen does not draw a control that answers 404.
     load(detail({ presidentMemberId: 'm1', iCanLead: false, iCanRunElections: false }));
+    showTab('elections');
 
     expect(text()).toContain('Diya Jain is this group');
     expect(buttonSaying('Open')).toBeUndefined();
@@ -230,6 +240,7 @@ describe('GroupElectionsComponent', () => {
 
   it('opens the election as a draft and re-reads', () => {
     load();
+    showTab('elections');
 
     component.roleId = 'rp';
     component.nominationStartAt = '2026-08-01T00:00';
@@ -269,6 +280,7 @@ describe('GroupElectionsComponent', () => {
     load(detail({ presidentMemberId: 'm1', iCanLead: false, iCanRunElections: false }), [
       election({ positionTitle: 'Secretary', status: 'Draft' }),
     ]);
+    showTab('elections');
 
     expect(buttonSaying('Edit')).toBeUndefined();
   });
@@ -281,6 +293,7 @@ describe('GroupElectionsComponent', () => {
         nominationEndAt: '2026-08-20T09:00:00Z',
       }),
     ]);
+    showTab('elections');
 
     // The election's own Edit, not a role's - the roles table has its own.
     const editButtons = [...fixture.nativeElement.querySelectorAll('.election button')].filter(
@@ -356,6 +369,7 @@ describe('GroupElectionsComponent', () => {
 
   it('offers the one next stage, and moves it', () => {
     load(detail(), [election({ status: 'Draft' })]);
+    showTab('elections');
 
     expect(component.nextStatus(election({ status: 'Draft' }))).toBe('NominationsOpen');
 
@@ -372,6 +386,7 @@ describe('GroupElectionsComponent', () => {
     load(detail({ presidentMemberId: 'm1', iCanLead: false, iCanRunElections: false }), [
       election({ positionTitle: 'Secretary', status: 'Draft' }),
     ]);
+    showTab('elections');
 
     expect(buttonSaying('Open nominations')).toBeUndefined();
     expect(buttonSaying('View ballot')).toBeDefined();
@@ -381,6 +396,7 @@ describe('GroupElectionsComponent', () => {
     const e = election({ status: 'VotingOpen' });
 
     load(detail(), [e]);
+    showTab('elections');
     ballot(e, [candidate({ status: 'Approved', votes: 4 })]);
 
     expect(text()).toContain('Diya Jain');
@@ -393,6 +409,7 @@ describe('GroupElectionsComponent', () => {
     const e = election({ status: 'NominationsOpen' });
 
     load(detail(), [e]);
+    showTab('elections');
     ballot(e, [candidate()]);
 
     buttonSaying('Approve')!.click();
@@ -409,6 +426,7 @@ describe('GroupElectionsComponent', () => {
     const e = election({ status: 'VotingOpen' });
 
     load(detail(), [e]);
+    showTab('elections');
     ballot(e, [candidate({ status: 'Approved', votes: 1 })]);
 
     expect(buttonSaying('Approve')).toBeUndefined();
@@ -419,6 +437,7 @@ describe('GroupElectionsComponent', () => {
     const e = election({ status: 'Closed' });
 
     load(detail(), [e]);
+    showTab('elections');
 
     buttonSaying('Publish the result')!.click();
     fixture.detectChanges();
@@ -431,6 +450,7 @@ describe('GroupElectionsComponent', () => {
     const e = election({ status: 'Closed' });
 
     load(detail(), [e]);
+    showTab('elections');
     component.publish(e);
 
     const request = http.expectOne('/v1/volunteer-groups/elections/e1/publish');
@@ -450,6 +470,7 @@ describe('GroupElectionsComponent', () => {
     load(detail(), [
       election({ positionTitle: 'Secretary', roleId: 'rs', seats: 2, status: 'Published', winnerMemberIds: ['m1', 'm2'] }),
     ]);
+    showTab('elections');
 
     expect(text()).toContain('Elected: Diya Jain, Aarav Jain');
     expect(text()).toContain('2 seats');
@@ -459,6 +480,7 @@ describe('GroupElectionsComponent', () => {
 
   it('lists the roles with their seats and holders', () => {
     load();
+    showTab('roles');
 
     expect(text()).toContain('Volunteer roles');
     expect(text()).toContain('No limit');
@@ -492,6 +514,7 @@ describe('GroupElectionsComponent', () => {
 
   it('offers no edit or removal of the built-in roles, and no removal of a held one', () => {
     load();
+    showTab('roles');
 
     // Only Secretary is editable; it has a holder, so Remove is drawn disabled.
     const remove = buttonSaying('Remove') as HTMLButtonElement;
@@ -541,6 +564,7 @@ describe('GroupElectionsComponent', () => {
 
   it('shows who is waiting to join, so an administrator can admit the first members', () => {
     load(detail({ iCanLead: true }), [], [application(), application({ id: 'a2', status: 'Accepted' })]);
+    showTab('requests');
 
     expect(text()).toContain('Join requests');
     expect(text()).toContain('Diya Jain');
@@ -550,6 +574,7 @@ describe('GroupElectionsComponent', () => {
 
   it('explains that a group with no members has nobody to nominate until joiners are accepted', () => {
     load({ ...detail(), members: [] });
+    showTab('requests');
 
     expect(text()).toContain('no members until somebody accepts its first joiners');
     expect(text()).toContain('Nobody is waiting');
@@ -582,6 +607,118 @@ describe('GroupElectionsComponent', () => {
     load(detail({ presidentMemberId: 'm1', iCanLead: false }));
 
     expect(text()).not.toContain('Join requests');
+  });
+
+  // ---- Tabs, popups and the photo -------------------------------------------
+
+  it('offers a Join requests tab only to whoever decides them, with how many are waiting', () => {
+    load(detail({ iCanLead: true }), [], [application()]);
+
+    const tabs = [...fixture.nativeElement.querySelectorAll('[role="tab"]')].map((t) =>
+      (t as HTMLElement).textContent?.trim(),
+    );
+
+    expect(tabs).toEqual(['About', 'Members', 'Join requests (1)', 'Roles', 'Elections']);
+  });
+
+  it('adds a role from a popup, which closes once it is saved', () => {
+    load();
+    showTab('roles');
+
+    buttonSaying('Add a role')!.click();
+    fixture.detectChanges();
+
+    expect(fixture.nativeElement.querySelector('[role="dialog"] #new-role-title')).not.toBeNull();
+
+    component.newRoleTitle = 'Treasurer';
+    component.defineRole(component.detail()!);
+    http.expectOne((r) => r.method === 'POST' && r.url === `${GROUP_URL}/roles`).flush(detail());
+    reload();
+
+    expect(component.roleModal()).toBeNull();
+    expect(fixture.nativeElement.querySelector('[role="dialog"]')).toBeNull();
+  });
+
+  it('edits an election in a popup, and shows a refusal inside it', () => {
+    load(detail(), [election()]);
+    showTab('elections');
+
+    component.toggleEditForm(election());
+    fixture.detectChanges();
+
+    expect(fixture.nativeElement.querySelector('[role="dialog"] #edit-role-e1')).not.toBeNull();
+
+    component.saveEdit(election());
+    http
+      .expectOne((r) => r.method === 'PATCH')
+      .flush({ title: 'Election.NotEditable' }, { status: 409, statusText: 'Conflict' });
+    fixture.detectChanges();
+
+    expect(fixture.nativeElement.querySelector('[role="dialog"] [role="alert"]')).not.toBeNull();
+  });
+
+  /** Signs in as somebody holding these permissions, before the component reads them. */
+  function signInWith(permissions: string[], areaLocalityId: string | null = null) {
+    TestBed.inject(AuthService).ensureCurrentUser().subscribe();
+    http.expectOne('/v1/identity/me').flush({
+      userId: 'admin-1',
+      tenantId: 't1',
+      tenantSlug: 'seva',
+      mobileOrEmail: 'admin@example.com',
+      fullName: 'An Admin',
+      status: 'Active',
+      isContactVerified: true,
+      lastLoginAt: null,
+      roles: ['Member', 'SamaajAdmin'],
+      permissions,
+      areaLocalityId,
+    });
+  }
+
+  it('shows the photo as a banner, fetched with the token', () => {
+    load(detail({ photoUrl: `${GROUP_URL}/photo` }));
+
+    http.expectOne(`${GROUP_URL}/photo`).flush(new Blob(['x'], { type: 'image/png' }));
+
+    expect(fixture.nativeElement.querySelector('img.group-banner')).not.toBeNull();
+  });
+
+  it('lets an administrator who manages groups upload a photo from the About tab', () => {
+    signInWith(['Members.Read', 'VolunteerGroups.Manage']);
+    load();
+    showTab('about');
+
+    expect(fixture.nativeElement.querySelector('#group-photo')).not.toBeNull();
+
+    const file = new File([new Uint8Array([0x89, 0x50, 0x4e, 0x47])], 'banner.png', { type: 'image/png' });
+    component.choosePhoto(component.detail()!, { target: { files: [file], value: '' } } as unknown as Event);
+
+    const request = http.expectOne((r) => r.method === 'POST' && r.url === `${GROUP_URL}/photo`);
+    expect(request.request.body instanceof FormData).toBe(true);
+    request.flush(null);
+    reload();
+
+    expect(text()).toContain('Seva Sangh has a new photo');
+  });
+
+  it('offers no photo controls without VolunteerGroups.Manage, or outside an Area Admin locality', () => {
+    signInWith(['Members.Read']);
+    load();
+    showTab('about');
+
+    expect(fixture.nativeElement.querySelector('#group-photo')).toBeNull();
+    expect(component.canManagePhoto(component.detail()!)).toBe(false);
+  });
+
+  it('refuses a photo over 2 MB before uploading it', () => {
+    signInWith(['Members.Read', 'VolunteerGroups.Manage']);
+    load();
+
+    const big = new File([new Uint8Array(2 * 1024 * 1024 + 1)], 'huge.png', { type: 'image/png' });
+    component.choosePhoto(component.detail()!, { target: { files: [big], value: '' } } as unknown as Event);
+
+    http.expectNone(`${GROUP_URL}/photo`);
+    expect(component.error()).toContain('2 MB');
   });
 
   it('says "A member" rather than printing an id it cannot resolve', () => {

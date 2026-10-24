@@ -112,18 +112,13 @@ describe('MembersListComponent', () => {
 
   const surajpole = { id: 'loc-surajpole', cityId: 'city-1', name: 'Surajpole', isActive: true };
   const hiranMagri = { id: 'loc-hiran-magri', cityId: 'city-1', name: 'Hiran Magri', isActive: true };
+  const kothari = { id: 'g-kothari', name: 'Kothari', isActive: true };
 
-  function memberIn(locality: typeof surajpole | null, overrides: Partial<Member> = {}): Member {
-    return member({
-      permanentAddress: { line: null, cityId: null, localityId: locality?.id ?? null },
-      ...overrides,
-    });
-  }
-
-  /** Answers the platform's full Locality and Profession lists, then the directory search. */
+  /** Answers the Locality, Gautra and Profession lists, then the directory search. */
   function load(members: Member[]): void {
     fixture.detectChanges();
     http.expectOne((r) => r.url === '/v1/master-data/localities').flush([surajpole, hiranMagri]);
+    http.expectOne((r) => r.url === '/v1/master-data/gautras').flush([kothari]);
     http
       .expectOne((r) => r.url === '/v1/master-data/lookup-items' && r.params.get('category') === 'ProfessionType')
       .flush([{ id: 'prof-business', category: 'ProfessionType', code: 'BIZ', label: 'Business', sortOrder: 1, isActive: true }]);
@@ -135,11 +130,44 @@ describe('MembersListComponent', () => {
     return (fixture.nativeElement as HTMLElement).textContent ?? '';
   }
 
-  it('lists the directory', () => {
-    load([member(), memberIn(surajpole, { id: 'm2', fullName: 'Neha Jain' })]);
+  function cards(): HTMLElement[] {
+    return Array.from((fixture.nativeElement as HTMLElement).querySelectorAll<HTMLElement>('.member-card'));
+  }
 
-    expect(text()).toContain('Rajesh Jain');
-    expect(text()).toContain('Neha Jain');
+  it('shows each member as a card: name with Gautra, father, mother, profession and locality', () => {
+    load([
+      member({ gautraId: kothari.id, fatherName: 'Mahesh Jain', motherName: 'Sunita Jain' }),
+      member({ id: 'm2', fullName: 'Neha Jain', permanentAddress: { line: null, cityId: null, localityId: surajpole.id } }),
+    ]);
+
+    expect(cards().length).toBe(2);
+
+    const first = cards()[0]!.textContent ?? '';
+    expect(first).toContain('Rajesh Jain');
+    expect(first).toContain('(Kothari)');
+    expect(first).toContain('Mahesh Jain');
+    expect(first).toContain('Sunita Jain');
+    expect(first).toContain('Business');
+    expect(first).toContain('Hiran Magri');
+
+    expect(cards()[1]!.textContent).toContain('Surajpole');
+  });
+
+  it('leaves the father and mother lines off when the household records neither', () => {
+    load([member()]);
+
+    expect(cards()[0]!.textContent).not.toContain('Father');
+    expect(cards()[0]!.textContent).not.toContain('Mother');
+  });
+
+  it('shows the photo through the authed image directive, and initials without one', () => {
+    load([member({ photoUrl: '/v1/members/m1/photo' }), member({ id: 'm2', fullName: 'Neha Jain' })]);
+
+    // The photo is fetched with the token; answer it so nothing is left open.
+    http.expectOne('/v1/members/m1/photo').flush(new Blob(['x'], { type: 'image/png' }));
+
+    expect(cards()[0]!.querySelector('img.member-photo')).not.toBeNull();
+    expect(cards()[1]!.querySelector('.member-photo.initials')?.textContent?.trim()).toBe('NJ');
   });
 
   it('says a withheld field is not shared rather than claiming there is none', () => {
@@ -150,69 +178,68 @@ describe('MembersListComponent', () => {
     expect(text()).toContain('Not shared');
   });
 
-  it('offers no profession filter, because profession can be private', () => {
-    // A server-side filter on it would let anybody confirm a private value one
-    // query at a time - the same reason the service refuses to match a search
-    // term against a private mobile number.
-    load([member()]);
-
-    const labels = Array.from(
-      (fixture.nativeElement as HTMLElement).querySelectorAll('label'),
-    ).map((l) => l.textContent?.trim());
-
-    expect(labels).toContain('Search by name');
-    expect(labels).toContain('Locality');
-    expect(labels).not.toContain('Profession');
-  });
-
-  it('builds the locality list from the data, not the wireframe three', () => {
-    load([
-      memberIn(surajpole),
-      memberIn(hiranMagri, { id: 'm2' }),
-      memberIn(null, { id: 'm3' }),
-    ]);
-
-    expect(component.localityOptions()).toEqual([hiranMagri, surajpole]);
-  });
-
-  it('keeps localities a narrower search filtered out', () => {
-    // Otherwise choosing a locality would empty the very list that offered it.
-    load([memberIn(surajpole), memberIn(hiranMagri, { id: 'm2' })]);
-
-    component.localityId = surajpole.id;
-    component.load();
-    http.expectOne((r) => r.url === '/v1/members').flush({ items: [memberIn(surajpole)], hasMore: false });
-    fixture.detectChanges();
-
-    expect(component.localityOptions()).toEqual([hiranMagri, surajpole]);
-  });
-
-  it('sends the search term and locality id to the service', () => {
+  it('filters by name, Gautra, Locality and Profession', () => {
     load([]);
 
-    component.term = 'Neha';
+    const labels = Array.from((fixture.nativeElement as HTMLElement).querySelectorAll('label')).map((l) =>
+      l.textContent?.trim(),
+    );
+    expect(labels).toEqual(['Name', 'Gautra', 'Locality', 'Profession']);
+
+    component.term = ' Neha ';
+    component.gautraId = kothari.id;
     component.localityId = surajpole.id;
+    component.professionId = 'prof-business';
     component.load();
 
     const request = http.expectOne((r) => r.url === '/v1/members');
 
     expect(request.request.params.get('term')).toBe('Neha');
+    expect(request.request.params.get('gautraId')).toBe(kothari.id);
     expect(request.request.params.get('localityId')).toBe(surajpole.id);
+    expect(request.request.params.get('professionId')).toBe('prof-business');
 
     request.flush({ items: [], hasMore: false });
   });
 
-  it('tells an empty search apart from an empty directory', () => {
+  it('offers every Locality, not only ones on the current page', () => {
+    // The directory pages, so "values seen so far" would hide page five's.
+    load([member()]);
+
+    expect(component.localities()).toEqual([hiranMagri, surajpole]);
+  });
+
+  it('asks the service for the next page', () => {
+    fixture.detectChanges();
+    http.expectOne((r) => r.url === '/v1/master-data/localities').flush([]);
+    http.expectOne((r) => r.url === '/v1/master-data/gautras').flush([]);
+    http.expectOne((r) => r.url === '/v1/master-data/lookup-items').flush([]);
+    http.expectOne((r) => r.url === '/v1/members').flush({ items: [member()], hasMore: true });
+    fixture.detectChanges();
+
+    component.goTo(2);
+
+    const request = http.expectOne((r) => r.url === '/v1/members');
+    expect(request.request.params.get('skip')).toBe('20');
+    request.flush({ items: [], hasMore: false });
+  });
+
+  it('tells an empty search apart from an empty directory, and clears back to everyone', () => {
     load([]);
 
     expect(text()).toContain('directory is empty');
 
-    component.term = 'Nobody';
+    component.gautraId = kothari.id;
     component.load();
     http.expectOne((r) => r.url === '/v1/members').flush({ items: [], hasMore: false });
     fixture.detectChanges();
 
     expect(text()).toContain('Nobody matches that');
+
+    component.clear();
+    const cleared = http.expectOne((r) => r.url === '/v1/members');
+    expect(cleared.request.params.has('gautraId')).toBe(false);
+    cleared.flush({ items: [], hasMore: false });
   });
 });
 

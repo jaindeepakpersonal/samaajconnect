@@ -48,6 +48,12 @@ export interface VolunteerGroup {
    * president, or an administrator of the group at any time.
    */
   readonly iCanRunElections: boolean;
+
+  /**
+   * Where the group's photo - its page banner - is fetched from, with the
+   * token, or null when it has none. Optional only because fixtures predate it.
+   */
+  readonly photoUrl?: string | null;
 }
 
 export interface GroupMember {

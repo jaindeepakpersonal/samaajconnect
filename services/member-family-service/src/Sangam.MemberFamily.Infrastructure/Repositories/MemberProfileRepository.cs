@@ -17,14 +17,31 @@ public sealed class MemberProfileRepository(MemberFamilyDbContext dbContext) : I
             .IgnoreQueryFilters()
             .AnyAsync(p => p.Id == id, cancellationToken);
 
+    public async Task<IReadOnlyList<MemberProfile>> ListByIdsAsync(
+        IReadOnlyCollection<Guid> ids, CancellationToken cancellationToken = default)
+    {
+        if (ids.Count == 0)
+        {
+            return [];
+        }
+
+        // Tenant-filtered: an id from another Samaaj is simply not found.
+        return await dbContext.MemberProfiles
+            .AsNoTracking()
+            .Where(p => ids.Contains(p.Id))
+            .ToListAsync(cancellationToken);
+    }
+
     public async Task<IReadOnlyList<MemberProfile>> SearchAsync(
-        string? term,
-        Guid? localityId,
+        MemberSearchFilter filter,
+        ProfileViewer viewer,
         int skip,
         int limit,
         bool includeUnlisted,
         CancellationToken cancellationToken = default)
     {
+        var (term, localityId, gautraId, professionId) = filter;
+
         // Tenant-filtered, never IgnoreQueryFilters: this is the one query a
         // signed-in member can drive with their own input.
         var query = dbContext.MemberProfiles.AsNoTracking();
@@ -56,8 +73,35 @@ public sealed class MemberProfileRepository(MemberFamilyDbContext dbContext) : I
             query = query.Where(p => p.PermanentAddress.LocalityId == id);
         }
 
+        if (gautraId is { } gautra)
+        {
+            // No privacy level to respect: Gautra is shown on every row, like
+            // the name (MemberMappings.ToDirectoryResponse).
+            query = query.Where(p => p.GautraId == gautra);
+        }
+
+        if (professionId is { } profession)
+        {
+            query = query.Where(p => p.ProfessionId == profession);
+
+            // Only professions this viewer could already read on the row -
+            // the same rule as MemberProfile.IsVisibleTo. Without it, asking
+            // for "CA" and seeing who comes back would confirm a Private value.
+            if (!viewer.IsSamaajAdmin)
+            {
+                var self = viewer.UserId;
+
+                query = query.Where(p => p.Privacy.Profession != PrivacyLevel.Private || p.Id == self);
+            }
+        }
+
         return await query
             .OrderBy(p => p.FullName)
+            // Id breaks ties between two people with one name, so a page
+            // boundary between them is stable rather than whatever order
+            // Postgres happens to return.
+            .ThenBy(p => p.Id)
+            .Skip(skip)
             .Take(limit)
             .ToListAsync(cancellationToken);
     }

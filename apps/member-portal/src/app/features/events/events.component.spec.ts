@@ -5,7 +5,8 @@ import { ActivatedRoute, provideRouter } from '@angular/router';
 import { API_CONFIG } from '@samaajconnect/shared';
 import { EventDetailComponent } from './event-detail.component';
 import { EventsListComponent } from './events-list.component';
-import { SamaajEvent } from './events.models';
+import { EventScheduleItem, SamaajEvent } from './events.models';
+import { hasPassed } from './events.format';
 
 /** Two days out, so it is upcoming whenever the suite runs. */
 const SOON = new Date(Date.now() + 2 * 86400000).toISOString();
@@ -219,6 +220,67 @@ describe('EventDetailComponent', () => {
       | undefined;
   }
 
+  // ---- The page: a cover and a schedule ------------------------------------
+
+  const programme = (overrides: Partial<EventScheduleItem> = {}): EventScheduleItem => ({
+    id: 's1',
+    date: '2026-11-24',
+    programName: 'Pravachan',
+    startTime: '10:00:00',
+    endTime: '11:30:00',
+    ...overrides,
+  });
+
+  it('lays the schedule out day by day, numbering the days of a multi-day event', () => {
+    load(
+      event({
+        schedule: [
+          programme({ id: 's1', programName: 'Prabhat Pheri', startTime: '06:00:00', endTime: '07:00:00' }),
+          programme({ id: 's2', programName: 'Pravachan' }),
+          programme({ id: 's3', date: '2026-11-25', programName: 'Pratikraman', startTime: '18:30:00', endTime: null }),
+        ],
+      }),
+    );
+
+    const days = Array.from((fixture.nativeElement as HTMLElement).querySelectorAll('.schedule-day'));
+
+    expect(days.length).toBe(2);
+    expect(days[0]!.textContent).toContain('Day 1');
+    expect(days[0]!.querySelectorAll('li').length).toBe(2);
+    expect(days[1]!.textContent).toContain('Day 2');
+    expect(days[1]!.textContent).toContain('Pratikraman');
+    expect(text()).toContain('2 days');
+  });
+
+  it('reads a schedule date as a local day, not as UTC midnight', () => {
+    load(event());
+
+    // The day of the month must survive whatever zone the suite runs in.
+    expect(component.dayLabel('2026-11-24')).toContain('24');
+  });
+
+  it('says when no schedule has been posted', () => {
+    load(event());
+
+    expect(text()).toContain('have not posted a programme schedule');
+  });
+
+  it('marks an event under way as happening now, and does not call it over', () => {
+    const startedThisMorning = new Date(Date.now() - 3 * 3600000).toISOString();
+
+    load(event({ startAt: startedThisMorning, endAt: null, isHappeningNow: true }));
+
+    expect(text()).toContain('Happening now');
+    expect(text()).not.toContain('already happened');
+    expect(buttonSaying('RSVP')).toBeDefined();
+  });
+
+  it('shows the day the event starts on its calendar leaf', () => {
+    load(event({ startAt: new Date(2026, 10, 24, 10, 0).toISOString() }));
+
+    expect((fixture.nativeElement as HTMLElement).querySelector('.event-date-day')?.textContent?.trim()).toBe('24');
+  });
+
   // ---- The capacity bar ---------------------------------------------------
 
   it('shows the real capacity and registered count, not the prototype numbers', () => {
@@ -406,5 +468,21 @@ describe('EventDetailComponent', () => {
 
     expect(text()).not.toContain('24 hours');
     expect(text()).not.toContain('reminder');
+  });
+});
+
+describe('hasPassed', () => {
+  const now = Date.UTC(2026, 10, 24, 12, 0);
+
+  it('is over once its end has gone', () => {
+    expect(hasPassed(event({ startAt: '2026-11-24T08:00:00Z', endAt: '2026-11-24T11:00:00Z' }), now)).toBe(true);
+    expect(hasPassed(event({ startAt: '2026-11-24T08:00:00Z', endAt: '2026-11-24T14:00:00Z' }), now)).toBe(false);
+  });
+
+  it('takes an event with no end to run for a day, as events-service does', () => {
+    // Treating the start as the end made an event "already happened" the
+    // minute it began - while the service was still listing it as upcoming.
+    expect(hasPassed(event({ startAt: '2026-11-24T08:00:00Z', endAt: null }), now)).toBe(false);
+    expect(hasPassed(event({ startAt: '2026-11-23T08:00:00Z', endAt: null }), now)).toBe(true);
   });
 });

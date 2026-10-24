@@ -202,6 +202,48 @@ public sealed class Family : AggregateRoot, ITenantScopedEntity
     /// join is not somebody a household can be handed to, and not somebody whose
     /// presence should stop the last real member leaving.
     /// </remarks>
+    /// <summary>
+    /// The household members who are this member's parents, as far as the
+    /// household records it - for the directory's Father / Mother line.
+    /// </summary>
+    /// <remarks>
+    /// <see cref="FamilyMember.Relationship"/> is each member's relationship
+    /// <b>to the family admin</b> (the join form asks "your relationship to
+    /// them"; the admin's own row is <see cref="Relationship.Other"/>). So a
+    /// member's parents are knowable in exactly three cases: the admin's own,
+    /// and a sibling's, are whoever joined as the admin's Parent; a Child's are
+    /// the admin and whoever joined as the admin's Spouse. Anybody else - a
+    /// spouse, a parent, "other" - has parents this household does not record,
+    /// and the answer is none rather than a guess. Which of the two is the
+    /// father is the caller's to decide, from each profile's gender.
+    /// </remarks>
+    public IReadOnlyList<Guid> ParentsOf(Guid memberProfileId)
+    {
+        var active = _members.Where(m => m.Status == FamilyMemberStatus.Active).ToList();
+        var member = active.FirstOrDefault(m => m.MemberProfileId == memberProfileId);
+
+        if (member is null)
+        {
+            return [];
+        }
+
+        if (member.MemberProfileId == FamilyAdminMemberId || member.Relationship == Relationship.Sibling)
+        {
+            return [.. active
+                .Where(m => m.Relationship == Relationship.Parent && m.MemberProfileId != FamilyAdminMemberId)
+                .Select(m => m.MemberProfileId)];
+        }
+
+        if (member.Relationship == Relationship.Child)
+        {
+            return [.. active
+                .Where(m => m.MemberProfileId == FamilyAdminMemberId || m.Relationship == Relationship.Spouse)
+                .Select(m => m.MemberProfileId)];
+        }
+
+        return [];
+    }
+
     public IReadOnlyList<FamilyMember> ActiveMembers() =>
         [.. _members
             .Where(m => m.Status == FamilyMemberStatus.Active)

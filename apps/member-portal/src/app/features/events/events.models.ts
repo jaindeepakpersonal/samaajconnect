@@ -55,6 +55,24 @@ export interface SamaajEvent {
   readonly cancelledAt: string | null;
   readonly cancellationReason: string | null;
   readonly createdAt: string;
+
+  /** The programmes, by date then start time. Optional only because fixtures predate it. */
+  readonly schedule?: readonly EventScheduleItem[];
+
+  /** Published, started and not over yet - set by the service, which reads the clock. */
+  readonly isHappeningNow?: boolean;
+}
+
+/**
+ * One programme on an event's schedule. `date` is "yyyy-MM-dd" and the times
+ * "HH:mm:ss", on the clock where it happens - never converted between zones.
+ */
+export interface EventScheduleItem {
+  readonly id: string;
+  readonly date: string;
+  readonly programName: string;
+  readonly startTime: string;
+  readonly endTime: string | null;
 }
 
 /**

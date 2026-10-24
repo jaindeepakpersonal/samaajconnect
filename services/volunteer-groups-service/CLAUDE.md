@@ -17,6 +17,7 @@ module off takes both away.
 | `GroupApplication` | built | A request and its outcome. Kept after the decision. |
 | `GroupMember` | built | Somebody who is in the group, holding exactly one of its roles. |
 | `GroupRole` | built | One of the group's volunteer roles and its seats. Volunteer and President are built in; the group defines the rest. See "Volunteer roles" below. |
+| `GroupPhoto` | built | The group's banner photo, hosted here. Tenant-scoped; the type is sniffed from the bytes. See "The group photo" below. |
 | `GroupElection` | built | Aggregate root. An election for one of the group's roles, filling its seats - nominate, approve, vote, close, publish. See "Elections" below. |
 | `ElectionCandidate` | built | Owned by `GroupElection`. Nominated, then Approved onto the ballot. |
 | `Vote` | built | One pick on one member's ballot; a ballot is up to the role's seats of them. Written directly, outside the aggregate - see "Elections" below. |
@@ -28,6 +29,8 @@ module off takes both away.
 | `CreateGroupCommand` | `VolunteerGroups.Manage` | built |
 | `UpdateGroupCommand` | `VolunteerGroups.Manage` | built. Corrects the name, description or focus area - not the president, membership or status, each its own command |
 | `ChangeGroupStatusCommand` | `VolunteerGroups.Manage` | built |
+| `UploadGroupPhotoCommand` | `VolunteerGroups.Manage`, an Area Admin only in their locality | built. Replaces any photo in the same transaction |
+| `RemoveGroupPhotoCommand` | `VolunteerGroups.Manage`, an Area Admin only in their locality | built. Idempotent |
 | `ApplyToGroupCommand` | `Members.Read` | built |
 | `DecideApplicationCommand` | `VolunteerGroups.Lead` + is this group's president | built |
 | `DefineGroupRoleCommand` | `VolunteerGroups.Lead` + president or administrator of this group | built |
@@ -50,6 +53,7 @@ module off takes both away.
 |---|---|---|
 | `ListGroupsQuery` | `Members.Read` | built |
 | `GetGroupQuery` | `Members.Read` | built |
+| `GetGroupPhotoQuery` | `Members.Read` | built. Bytes, `Cache-Control: private` |
 | `GetApplicationsQuery` | `VolunteerGroups.Lead` + is this group's president | built |
 | `ListElectionsQuery` | `Members.Read` | built |
 | `GetElectionQuery` | `Members.Read` | built |
@@ -96,6 +100,9 @@ here and no Kafka in its integration tests.
 | GET | `/v1/volunteer-groups/groups/{id}` | `Members.Read` |
 | PATCH | `/v1/volunteer-groups/groups/{id}` | `VolunteerGroups.Manage` |
 | PATCH | `/v1/volunteer-groups/groups/{id}/status` | `VolunteerGroups.Manage` |
+| POST | `/v1/volunteer-groups/groups/{id}/photo` | `VolunteerGroups.Manage` |
+| GET | `/v1/volunteer-groups/groups/{id}/photo` | `Members.Read` |
+| DELETE | `/v1/volunteer-groups/groups/{id}/photo` | `VolunteerGroups.Manage` |
 | POST | `/v1/volunteer-groups/groups/{id}/applications` | `Members.Read` |
 | GET | `/v1/volunteer-groups/groups/{id}/applications` | `VolunteerGroups.Lead` + president |
 | POST | `/v1/volunteer-groups/groups/{id}/applications/{applicationId}/decide` | `VolunteerGroups.Lead` + president |
@@ -265,6 +272,41 @@ never advanced `Status`; `AcceptsNominations` is already false with nothing
 to walk back, so pushing the date out again is the whole fix. Nothing here
 moves `Status` itself, so this is not a backdoor around "strictly forward" -
 an election already at `VotingOpen` or later is refused before the write.
+
+## The group photo
+
+Added 2026-10-24: a group has one photo, shown as the banner across the top of
+its page in the member portal and set from its page in the admin panel.
+
+**The platform hosts it**, the same way member-family-service hosts member
+photos and identity-tenant-service Samaaj logos, and for their reason: a
+URL somebody typed would have every member who opens the page fetch the
+picture from whatever host it names. The bytes live in `group_photos` in this
+service's own database, inside the tenant filter and the backup dump.
+
+**`ImageContent` is the third verbatim copy** (namespace aside) -
+`scripts/security-invariants.sh` holds all three identical. JPEG, PNG and WebP
+only, read from the bytes; the upload's declared type is never consulted, and
+SVG stays out because it can carry script and would be served from the
+platform's own origin.
+
+**Setting it is editing the group**, so it is gated exactly like
+`UpdateGroupCommand` - `VolunteerGroups.Manage`, an Area Admin only for a group
+in their own locality, everyone else told there is no such group. Not the
+president: a group's name and description are the Samaaj's to correct, and
+its public face is the same kind of thing.
+
+**Reading it needs a signed-in member of the Samaaj**, the same people who can
+open the group (`GetGroupQuery`), and it is served `Cache-Control: private`.
+Unlike a logo it is often a photograph of people. `GroupResponse.PhotoUrl` is
+the relative path, null when there is none; both portals load it through
+`AuthedImageDirective` so the token travels with the request.
+
+Replacing a photo deletes the old row in the same transaction -
+`VolunteerGroup.SetPhoto` hands back the id it replaced rather than deleting
+anything itself. Setting or removing one raises
+`volunteer-groups.group.updated.v1`, like any other edit to the group.
+`GroupPhotoTests` holds all of it.
 
 ## Decisions worth knowing before you change this service
 

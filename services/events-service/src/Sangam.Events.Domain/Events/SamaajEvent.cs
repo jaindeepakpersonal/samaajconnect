@@ -24,6 +24,8 @@ public sealed class SamaajEvent : AggregateRoot, ITenantScopedEntity
 {
     private readonly List<EventRegistration> _registrations = [];
 
+    private readonly List<EventScheduleItem> _schedule = [];
+
     public Guid Id { get; private set; }
     public Guid TenantId { get; private set; }
     public string Title { get; private set; } = null!;
@@ -72,6 +74,86 @@ public sealed class SamaajEvent : AggregateRoot, ITenantScopedEntity
     public string? CancellationReason { get; private set; }
 
     public IReadOnlyCollection<EventRegistration> Registrations => _registrations.AsReadOnly();
+
+    /// <summary>The event's programmes, in no particular order - <see cref="OrderedSchedule"/> reads them.</summary>
+    public IReadOnlyCollection<EventScheduleItem> Schedule => _schedule.AsReadOnly();
+
+    /// <summary>The schedule as it is printed: by date, then by start time.</summary>
+    public IReadOnlyList<EventScheduleItem> OrderedSchedule =>
+        [.. _schedule.OrderBy(s => s.Date).ThenBy(s => s.StartTime).ThenBy(s => s.ProgramName)];
+
+    /// <summary>The most programmes one event may carry - a schedule, not a log.</summary>
+    public const int MaxScheduleItems = 100;
+
+    /// <summary>
+    /// Adds a programme to the schedule. Null when the event is cancelled or
+    /// its schedule is full - the handler says which.
+    /// </summary>
+    public EventScheduleItem? AddScheduleItem(
+        DateOnly date, string programName, TimeOnly startTime, TimeOnly? endTime, DateTimeOffset now)
+    {
+        if (Status == EventStatus.Cancelled || _schedule.Count >= MaxScheduleItems)
+        {
+            return null;
+        }
+
+        var item = new EventScheduleItem(Id, date, programName, startTime, endTime);
+        _schedule.Add(item);
+
+        Raise(new EventUpdatedDomainEvent(Id, TenantId, now));
+
+        return item;
+    }
+
+    /// <summary>Corrects one programme. False when there is no such programme, or the event is cancelled.</summary>
+    public bool UpdateScheduleItem(
+        Guid itemId, DateOnly date, string programName, TimeOnly startTime, TimeOnly? endTime, DateTimeOffset now)
+    {
+        var item = _schedule.FirstOrDefault(s => s.Id == itemId);
+
+        if (item is null || Status == EventStatus.Cancelled)
+        {
+            return false;
+        }
+
+        item.Set(date, programName, startTime, endTime);
+
+        Raise(new EventUpdatedDomainEvent(Id, TenantId, now));
+
+        return true;
+    }
+
+    /// <summary>Takes a programme off the schedule. False when there is no such programme.</summary>
+    public bool RemoveScheduleItem(Guid itemId, DateTimeOffset now)
+    {
+        var item = _schedule.FirstOrDefault(s => s.Id == itemId);
+
+        if (item is null)
+        {
+            return false;
+        }
+
+        _schedule.Remove(item);
+
+        Raise(new EventUpdatedDomainEvent(Id, TenantId, now));
+
+        return true;
+    }
+
+    /// <summary>
+    /// Whether the event is under way now: started, and not yet over. An event
+    /// with no end time is taken to run for a day after it starts - long enough
+    /// that a morning event is still listed in the evening, short enough that
+    /// it does not linger into next week.
+    /// </summary>
+    public bool IsHappeningAt(DateTimeOffset now) =>
+        Status == EventStatus.Published && StartAt <= now && now <= EndsBy;
+
+    /// <summary>When the event is over for listing purposes: its end, or a day after it starts.</summary>
+    public DateTimeOffset EndsBy => EndAt ?? StartAt.Add(UntimedEventLength);
+
+    /// <summary>How long an event with no end time is taken to last.</summary>
+    public static readonly TimeSpan UntimedEventLength = TimeSpan.FromDays(1);
 
     private SamaajEvent() { }   // EF Core
 

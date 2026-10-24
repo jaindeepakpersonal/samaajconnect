@@ -5,6 +5,7 @@ using Sangam.VolunteerGroups.Application.Abstractions;
 using Sangam.VolunteerGroups.Domain.Common;
 using Sangam.VolunteerGroups.Domain.Elections;
 using Sangam.VolunteerGroups.Domain.Groups;
+using Sangam.VolunteerGroups.Domain.Media;
 
 namespace Sangam.VolunteerGroups.Infrastructure.Persistence;
 
@@ -26,6 +27,8 @@ public sealed class VolunteerGroupsDbContext(
     public DbSet<ElectionCandidate> ElectionCandidates => Set<ElectionCandidate>();
 
     public DbSet<Vote> Votes => Set<Vote>();
+
+    public DbSet<GroupPhoto> GroupPhotos => Set<GroupPhoto>();
 
     public DbSet<OutboxMessage> OutboxMessages => Set<OutboxMessage>();
 

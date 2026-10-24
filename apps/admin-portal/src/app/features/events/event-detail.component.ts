@@ -1,11 +1,12 @@
 import { DatePipe } from '@angular/common';
 import { Component, OnInit, computed, inject, signal } from '@angular/core';
+import { FormsModule } from '@angular/forms';
 import { ActivatedRoute, RouterLink } from '@angular/router';
 import { describeError } from '@samaajconnect/shared';
 import { AdminApi } from '../../core/admin-api';
 import { AdminScope } from '../../core/admin-scope';
 import { AreaScope } from '../../core/area-scope';
-import { Attendee, LookupItem, SamaajEvent } from '../../core/admin.models';
+import { Attendee, EventScheduleItem, LookupItem, SamaajEvent } from '../../core/admin.models';
 import { isNotFound } from '../../core/http-status';
 
 /**
@@ -29,7 +30,7 @@ import { isNotFound } from '../../core/http-status';
  */
 @Component({
   selector: 'app-event-detail',
-  imports: [DatePipe, RouterLink],
+  imports: [DatePipe, FormsModule, RouterLink],
   template: `
     <p><a class="btn link" routerLink="/events">← All events</a></p>
 
@@ -62,6 +63,107 @@ import { isNotFound } from '../../core/http-status';
 
       @if (subject.description) {
         <p>{{ subject.description }}</p>
+      }
+
+      <!-- Schedule -------------------------------------------------------- -->
+      <div class="card">
+        <div class="section-head">
+          <h2>Schedule</h2>
+          @if (canEditSchedule(subject)) {
+            <button class="btn small" type="button" (click)="openScheduleModal(null)">Add a programme</button>
+          }
+        </div>
+
+        @if (schedule(subject).length === 0) {
+          <p class="empty">
+            No programmes yet.
+            @if (canEditSchedule(subject)) {
+              Add one for each session - a date, its name, and when it starts and ends.
+            }
+          </p>
+        } @else {
+          <div class="table-wrap">
+            <table>
+              <caption class="sr-only">The programmes of {{ subject.title }}, by date</caption>
+              <thead>
+                <tr><th>Date</th><th>Programme</th><th>Start</th><th>End</th><th></th></tr>
+              </thead>
+              <tbody>
+                @for (item of schedule(subject); track item.id) {
+                  <tr>
+                    <td>{{ localDay(item.date) | date: 'EEE, d MMM y' }}</td>
+                    <td><b>{{ item.programName }}</b></td>
+                    <td>{{ clock(item.startTime) }}</td>
+                    <td>{{ item.endTime ? clock(item.endTime) : '—' }}</td>
+                    <td>
+                      @if (canEditSchedule(subject)) {
+                        <div class="row-actions">
+                          <button class="btn small alt" type="button" [disabled]="busy()"
+                            (click)="openScheduleModal(item)">
+                            Edit<span class="sr-only"> {{ item.programName }}</span>
+                          </button>
+                          <button class="btn small alt" type="button" [disabled]="busy()"
+                            (click)="removeScheduleItem(subject, item)">
+                            Remove<span class="sr-only"> {{ item.programName }}</span>
+                          </button>
+                        </div>
+                      }
+                    </td>
+                  </tr>
+                }
+              </tbody>
+            </table>
+          </div>
+        }
+      </div>
+
+      @if (scheduleModal(); as mode) {
+        <div class="modal-backdrop" (click)="closeScheduleModal()">
+          <div class="card modal-card modal-dialog" role="dialog" aria-modal="true"
+            aria-labelledby="schedule-modal-title" (click)="$event.stopPropagation()"
+            (keydown.escape)="closeScheduleModal()">
+            <h2 id="schedule-modal-title">{{ mode === 'add' ? 'Add a programme' : 'Edit the programme' }}</h2>
+
+            @if (scheduleError(); as message) {
+              <p class="notice error" role="alert">{{ message }}</p>
+            }
+
+            <form (ngSubmit)="saveScheduleItem(subject)">
+              <div class="form-grid">
+                <div class="field span-all">
+                  <label for="programme-name">Programme name</label>
+                  <input id="programme-name" class="input" name="programName" [(ngModel)]="programName"
+                    maxlength="200" placeholder="Pravachan" />
+                </div>
+                <div class="field">
+                  <label for="programme-date">Date</label>
+                  <input id="programme-date" class="input" type="date" name="programDate" [(ngModel)]="programDate" />
+                </div>
+                <div class="field">
+                  <label for="programme-start">Start time</label>
+                  <input id="programme-start" class="input" type="time" name="programStart" [(ngModel)]="programStart" />
+                </div>
+                <div class="field">
+                  <label for="programme-end">End time</label>
+                  <input id="programme-end" class="input" type="time" name="programEnd" [(ngModel)]="programEnd"
+                    [attr.aria-invalid]="endsBeforeStart() ? 'true' : null" />
+                  <p class="small">Optional.</p>
+                </div>
+
+                @if (endsBeforeStart()) {
+                  <p class="notice span-all" role="alert">A programme cannot end before it starts.</p>
+                }
+              </div>
+
+              <div class="actions">
+                <button class="btn" type="submit" [disabled]="busy() || !canSaveScheduleItem()">
+                  {{ mode === 'add' ? 'Add' : 'Save' }}
+                </button>
+                <button class="btn alt" type="button" (click)="closeScheduleModal()">Cancel</button>
+              </div>
+            </form>
+          </div>
+        </div>
       }
 
       @if (!area.administers(subject.localityId)) {
@@ -176,6 +278,24 @@ import { isNotFound } from '../../core/http-status';
     .spaced {
       margin-top: var(--space-4);
     }
+
+    .section-head {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: var(--space-3);
+      flex-wrap: wrap;
+    }
+
+    .section-head h2 {
+      margin: 0;
+    }
+
+    .row-actions {
+      display: flex;
+      gap: var(--space-2);
+      flex-wrap: wrap;
+    }
   `,
 })
 export class EventDetailComponent implements OnInit {
@@ -212,6 +332,136 @@ export class EventDetailComponent implements OnInit {
 
   memberName(memberId: string): string {
     return this.names().get(memberId) ?? 'A member';
+  }
+
+  // ---- The schedule ---------------------------------------------------------
+
+  /** Add, edit the one `editingItemId` names, or neither. */
+  readonly scheduleModal = signal<'add' | 'edit' | null>(null);
+  readonly scheduleError = signal<string | null>(null);
+  readonly busy = signal(false);
+  private editingItemId: string | null = null;
+
+  programName = '';
+  programDate = '';
+  programStart = '';
+  programEnd = '';
+
+  schedule(subject: SamaajEvent): readonly EventScheduleItem[] {
+    return subject.schedule ?? [];
+  }
+
+  /**
+   * The service's own rule, asked here so the controls are not ones that always
+   * refuse: an event in this caller's locality that is not cancelled.
+   */
+  canEditSchedule(subject: SamaajEvent): boolean {
+    return subject.status !== 'Cancelled' && this.area.administers(subject.localityId);
+  }
+
+  /**
+   * A schedule date as a local Date. DatePipe would read "2026-11-24" as UTC
+   * midnight, which is the 23rd anywhere west of Greenwich.
+   */
+  localDay(date: string): Date {
+    const [year = 1970, month = 1, day = 1] = date.split('-').map((part) => Number(part));
+
+    return new Date(year, month - 1, day);
+  }
+
+  /** "18:30:00" as "6:30 PM" - wall-clock time, never converted between zones. */
+  clock(time: string): string {
+    const [hours = 0, minutes = 0] = time.split(':').map((part) => Number(part));
+    const suffix = hours < 12 ? 'AM' : 'PM';
+    const hour12 = hours % 12 === 0 ? 12 : hours % 12;
+
+    return `${hour12}:${minutes.toString().padStart(2, '0')} ${suffix}`;
+  }
+
+  openScheduleModal(item: EventScheduleItem | null): void {
+    this.scheduleError.set(null);
+    this.editingItemId = item?.id ?? null;
+    this.programName = item?.programName ?? '';
+    this.programDate = item?.date ?? this.defaultDate();
+    this.programStart = item?.startTime.slice(0, 5) ?? '';
+    this.programEnd = item?.endTime?.slice(0, 5) ?? '';
+    this.scheduleModal.set(item ? 'edit' : 'add');
+  }
+
+  closeScheduleModal(): void {
+    this.scheduleModal.set(null);
+    this.editingItemId = null;
+  }
+
+  endsBeforeStart(): boolean {
+    return this.programStart !== '' && this.programEnd !== '' && this.programEnd <= this.programStart;
+  }
+
+  canSaveScheduleItem(): boolean {
+    return (
+      this.programName.trim().length > 0 &&
+      this.programDate !== '' &&
+      this.programStart !== '' &&
+      !this.endsBeforeStart()
+    );
+  }
+
+  saveScheduleItem(subject: SamaajEvent): void {
+    if (!this.canSaveScheduleItem()) {
+      return;
+    }
+
+    // `<input type="time">` gives "HH:mm"; the service takes "HH:mm:ss".
+    const item = {
+      date: this.programDate,
+      programName: this.programName.trim(),
+      startTime: `${this.programStart}:00`,
+      endTime: this.programEnd ? `${this.programEnd}:00` : null,
+    };
+
+    const work = this.editingItemId
+      ? this.api.updateEventScheduleItem(subject.id, this.editingItemId, item)
+      : this.api.addEventScheduleItem(subject.id, item);
+
+    this.busy.set(true);
+    this.scheduleError.set(null);
+
+    work.subscribe({
+      next: (updated) => {
+        this.event.set(updated);
+        this.busy.set(false);
+        this.closeScheduleModal();
+      },
+      error: (failure: unknown) => {
+        this.scheduleError.set(describeError(failure));
+        this.busy.set(false);
+      },
+    });
+  }
+
+  removeScheduleItem(subject: SamaajEvent, item: EventScheduleItem): void {
+    this.busy.set(true);
+    this.error.set(null);
+
+    this.api.removeEventScheduleItem(subject.id, item.id).subscribe({
+      next: (updated) => {
+        this.event.set(updated);
+        this.busy.set(false);
+      },
+      error: (failure: unknown) => {
+        this.error.set(describeError(failure));
+        this.busy.set(false);
+      },
+    });
+  }
+
+  /** The event's own start date, as "yyyy-MM-dd" in local time - where most programmes land. */
+  private defaultDate(): string {
+    const start = this.event()?.startAt;
+    const date = start ? new Date(start) : new Date();
+    const pad = (n: number) => n.toString().padStart(2, '0');
+
+    return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}`;
   }
 
   /** Null when the event has none, or the type has since been deactivated. */

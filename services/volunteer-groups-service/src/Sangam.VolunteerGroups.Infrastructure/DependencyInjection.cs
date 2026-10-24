@@ -32,6 +32,7 @@ public static class DependencyInjection
 
         services.AddScoped<IUnitOfWork, UnitOfWork>();
         services.AddScoped<IGroupRepository, GroupRepository>();
+        services.AddScoped<IGroupPhotoStore, GroupPhotoStore>();
         services.AddScoped<IElectionRepository, ElectionRepository>();
         services.AddScoped<IVoteRepository, VoteRepository>();
         services.AddSingleton<IDateTimeProvider, SystemDateTimeProvider>();

@@ -30,7 +30,8 @@ internal static class GroupMappings
         group.IsPresident(viewerId),
         group.CanLead(viewerId, viewerIsGroupAdmin),
         group.CreatedAt,
-        group.CanRunElections(viewerId, viewerIsGroupAdmin));
+        group.CanRunElections(viewerId, viewerIsGroupAdmin),
+        group.PhotoId is null ? null : $"/v1/volunteer-groups/groups/{group.Id}/photo");
 
     public static GroupDetailResponse ToDetail(
         this VolunteerGroup group, Guid viewerId, bool viewerIsGroupAdmin = false) => new(

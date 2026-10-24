@@ -29,6 +29,126 @@
   color: var(--muted);
 }
 
+/* ---- One event's page: a cover, then details, then the schedule ---------- */
+
+/* Events carry no photo, so the cover is the day itself: a calendar leaf on
+   the platform's own colour, which every event shares and none has to supply. */
+.event-cover {
+  display: flex;
+  gap: var(--space-4);
+  align-items: center;
+  padding: var(--space-5);
+  margin: var(--space-3) 0 var(--space-4);
+  border-radius: var(--radius-lg);
+  background: linear-gradient(135deg, var(--soft), var(--panel));
+}
+
+.event-cover.cancelled {
+  background: var(--danger-soft);
+}
+
+.event-cover-text {
+  min-width: 0;
+}
+
+.event-cover-text .page-title {
+  margin: 0;
+  overflow-wrap: anywhere;
+}
+
+.event-date-badge {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  flex-shrink: 0;
+  width: 72px;
+  border-radius: var(--radius-md);
+  overflow: hidden;
+  background: var(--panel);
+  border: 1px solid var(--line);
+}
+
+.event-date-month {
+  display: block;
+  width: 100%;
+  padding: 2px 0;
+  text-align: center;
+  font-size: 0.75rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  color: var(--panel);
+  background: var(--accent);
+}
+
+.event-date-day {
+  padding: var(--space-1) 0 var(--space-2);
+  font-size: 1.8rem;
+  font-weight: 700;
+  line-height: 1.1;
+}
+
+.badges {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+  margin: var(--space-2) 0 0;
+}
+
+.schedule {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+
+.schedule-day h3 {
+  font-size: 1rem;
+  margin: 0 0 var(--space-3);
+}
+
+.schedule-day-number {
+  color: var(--accent-ink);
+  margin-right: var(--space-2);
+}
+
+.schedule-items {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.schedule-items li {
+  display: grid;
+  grid-template-columns: 11rem 1fr;
+  gap: var(--space-3);
+  padding: var(--space-2) 0;
+  border-top: 1px solid var(--line);
+}
+
+.schedule-items li:first-child {
+  border-top: 0;
+}
+
+.schedule-time {
+  color: var(--muted);
+  font-variant-numeric: tabular-nums;
+}
+
+.schedule-name {
+  font-weight: 600;
+  overflow-wrap: anywhere;
+}
+
+@media (max-width: 600px) {
+  .event-cover {
+    padding: var(--space-4);
+  }
+
+  .schedule-items li {
+    grid-template-columns: 1fr;
+    gap: 2px;
+  }
+}
+
 /* Preserves the line breaks an organiser typed without letting a long word
    widen the card past the page. */
 .event-body {

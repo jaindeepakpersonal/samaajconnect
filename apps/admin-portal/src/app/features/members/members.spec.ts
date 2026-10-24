@@ -50,10 +50,18 @@ describe('MemberListComponent', () => {
 
   const text = () => fixture.nativeElement.textContent as string;
 
-  function load(members: AdminMember[] = [member()]) {
-    fixture.detectChanges();
+  /** Answers the Locality, Profession and Gautra lists the screen fetches once. */
+  function settleLists(): void {
     http.expectOne((r) => r.url === '/v1/master-data/localities')
       .flush([{ id: 'loc-udaipur', cityId: 'city-1', name: 'Udaipur', isActive: true }]);
+    http.expectOne((r) => r.url === '/v1/master-data/lookup-items')
+      .flush([{ id: 'prof-ca', category: 'ProfessionType', code: 'CA', label: 'Chartered Accountant', sortOrder: 1, isActive: true }]);
+    http.expectOne((r) => r.url === '/v1/master-data/gautras').flush([{ id: 'g-kothari', name: 'Kothari', isActive: true }]);
+  }
+
+  function load(members: AdminMember[] = [member()]) {
+    fixture.detectChanges();
+    settleLists();
     http.expectOne((r) => r.url === '/v1/members').flush({ items: members, hasMore: false });
     fixture.detectChanges();
   }
@@ -144,12 +152,36 @@ describe('MemberListComponent', () => {
     expect(text()).toContain('Nobody in this Samaaj matches that');
   });
 
-  it('explains why profession cannot be searched', () => {
-    // The absence is member-family-service's privacy decision, and a screen
-    // that simply left the box out would read as an oversight.
+  it('shows each member as a card with Gautra, parents, profession and contact details', () => {
+    load([member({ gautraId: 'g-kothari', professionId: 'prof-ca', fatherName: 'Mahesh Shah', motherName: 'Sunita Shah' })]);
+
+    const card = fixture.nativeElement.querySelector('.member-card') as HTMLElement;
+    expect(card.textContent).toContain('Meera Shah');
+    expect(card.textContent).toContain('(Kothari)');
+    expect(card.textContent).toContain('Mahesh Shah');
+    expect(card.textContent).toContain('Sunita Shah');
+    expect(card.textContent).toContain('Chartered Accountant');
+    expect(card.textContent).toContain('Udaipur');
+    expect(card.textContent).toContain('+919812345678');
+  });
+
+  it('filters by Gautra and Profession as well as name and Locality', () => {
     load();
 
-    expect(text()).toContain('carries a privacy level');
+    component.gautraId = 'g-kothari';
+    component.professionId = 'prof-ca';
+    component.search();
+
+    const request = http.expectOne((r) => r.url === '/v1/members');
+    expect(request.request.params.get('gautraId')).toBe('g-kothari');
+    expect(request.request.params.get('professionId')).toBe('prof-ca');
+    request.flush({ items: [], hasMore: false });
+
+    component.clear();
+    const cleared = http.expectOne((r) => r.url === '/v1/members');
+    expect(cleared.request.params.has('gautraId')).toBe(false);
+    expect(cleared.request.params.has('professionId')).toBe(false);
+    cleared.flush({ items: [], hasMore: false });
   });
 
   const pagerButtons = () =>
@@ -165,7 +197,7 @@ describe('MemberListComponent', () => {
 
   it('asks for the next page by skipping the ones already shown', () => {
     fixture.detectChanges();
-    http.expectOne((r) => r.url === '/v1/master-data/localities').flush([]);
+    settleLists();
     http
       .expectOne((r) => r.url === '/v1/members')
       .flush({ items: Array.from({ length: 20 }, (_, i) => member({ id: 'm' + i })), hasMore: true });
