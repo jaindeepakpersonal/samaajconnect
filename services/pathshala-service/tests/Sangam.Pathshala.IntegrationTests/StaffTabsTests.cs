@@ -301,6 +301,113 @@ public sealed class StaffTabsTests(PathshalaApiFactory factory)
         (await Teacher().GetAsync(url)).StatusCode.Should().Be(HttpStatusCode.Forbidden);
     }
 
+    [Fact]
+    public async Task An_announced_donation_has_no_receipt_until_it_is_paid()
+    {
+        var school = await ASchoolAsync();
+        var url = $"/v1/pathshala/pathshalas/{school.PathshalaId}/donations";
+
+        var paid = await (await Admin().PostAsJsonAsync(url, new
+        {
+            donorName = "Shri Mahendra Kothari", amount = 500_000L, donatedOn = "2026-03-01", mode = "Upi",
+        })).Content.ReadFromJsonAsync<JsonElement>();
+
+        // Announced at the Paryushan gathering, to be paid later: no mode, no receipt.
+        var announced = await Admin().PostAsJsonAsync(url, new
+        {
+            donorName = "Smt. Kavita Jain", amount = 210_000L, donatedOn = "2026-03-01", paid = false, purpose = "Books",
+        });
+        announced.StatusCode.Should().Be(HttpStatusCode.Created);
+        var pledge = await announced.Content.ReadFromJsonAsync<JsonElement>();
+        var pledgeId = pledge.GetProperty("id").GetGuid();
+
+        pledge.GetProperty("status").GetString().Should().Be("Pledged");
+        pledge.GetProperty("receiptNumber").ValueKind.Should().Be(JsonValueKind.Null, "a receipt means money received");
+        pledge.GetProperty("mode").ValueKind.Should().Be(JsonValueKind.Null);
+
+        var ledger = await Admin().GetFromJsonAsync<JsonElement>(url);
+        ledger.GetProperty("totalAmount").GetInt64().Should().Be(500_000L, "only what has come in");
+        ledger.GetProperty("outstandingAmount").GetInt64().Should().Be(210_000L);
+
+        // Corrected while still a pledge: it stays one, and asks for no mode.
+        (await Admin().PatchAsJsonAsync($"/v1/pathshala/donations/{pledgeId}", new
+            {
+                donorName = "Smt. Kavita Jain", amount = 250_000L, donatedOn = "2026-03-01", purpose = "Books",
+            }))
+            .StatusCode.Should().Be(HttpStatusCode.OK);
+
+        // Paid before it was announced is not a date anybody means.
+        (await Admin().PostAsJsonAsync($"/v1/pathshala/donations/{pledgeId}/paid", new { mode = "Cash", paidOn = "2026-02-27" }))
+            .StatusCode.Should().Be(HttpStatusCode.BadRequest);
+
+        factory.Clock.Advance(TimeSpan.FromDays(5));
+        var markedPaid = await Admin().PostAsJsonAsync(
+            $"/v1/pathshala/donations/{pledgeId}/paid", new { mode = "Cash", paidOn = "2026-03-06" });
+        markedPaid.StatusCode.Should().Be(HttpStatusCode.OK);
+        var nowPaid = await markedPaid.Content.ReadFromJsonAsync<JsonElement>();
+
+        nowPaid.GetProperty("status").GetString().Should().Be("Paid");
+        nowPaid.GetProperty("receiptNumber").GetInt32().Should().Be(
+            paid.GetProperty("receiptNumber").GetInt32() + 1, "the next number, issued on payment");
+        nowPaid.GetProperty("paidOn").GetString().Should().Be("2026-03-06");
+
+        (await Admin().PostAsJsonAsync($"/v1/pathshala/donations/{pledgeId}/paid", new { mode = "Cash", paidOn = "2026-03-06" }))
+            .StatusCode.Should().Be(HttpStatusCode.Conflict, "paid once");
+
+        ledger = await Admin().GetFromJsonAsync<JsonElement>(url);
+        ledger.GetProperty("totalAmount").GetInt64().Should().Be(750_000L);
+        ledger.GetProperty("outstandingAmount").GetInt64().Should().Be(0L);
+
+        // A paid entry corrected needs how and when it was paid.
+        (await Admin().PatchAsJsonAsync($"/v1/pathshala/donations/{pledgeId}", new
+            {
+                donorName = "Smt. Kavita Jain", amount = 250_000L, donatedOn = "2026-03-01",
+            }))
+            .StatusCode.Should().Be(HttpStatusCode.BadRequest);
+    }
+
+    [Fact]
+    public async Task Deleting_needs_a_reason_once_a_receipt_was_issued_and_never_reuses_its_number()
+    {
+        var school = await ASchoolAsync();
+        var url = $"/v1/pathshala/pathshalas/{school.PathshalaId}/donations";
+
+        var paidId = (await (await Admin().PostAsJsonAsync(url, new
+        {
+            donorName = "Anonymous", amount = 110_000L, donatedOn = "2026-03-01", mode = "Cash",
+        })).Content.ReadFromJsonAsync<JsonElement>()).GetProperty("id").GetGuid();
+
+        var pledgeId = (await (await Admin().PostAsJsonAsync(url, new
+        {
+            donorName = "Shri Rakesh Jain", amount = 50_000L, donatedOn = "2026-03-01", paid = false,
+        })).Content.ReadFromJsonAsync<JsonElement>()).GetProperty("id").GetGuid();
+
+        // Nobody holds a slip for an announcement, so no reason is needed.
+        (await Admin().PostAsJsonAsync($"/v1/pathshala/donations/{pledgeId}/void", new { }))
+            .StatusCode.Should().Be(HttpStatusCode.OK);
+
+        // Receipt 1 is on a slip somewhere: say why.
+        (await Admin().PostAsJsonAsync($"/v1/pathshala/donations/{paidId}/void", new { }))
+            .StatusCode.Should().Be(HttpStatusCode.BadRequest);
+        (await Admin().PostAsJsonAsync($"/v1/pathshala/donations/{paidId}/void", new { reason = "Entered twice" }))
+            .StatusCode.Should().Be(HttpStatusCode.OK);
+
+        // A deleted entry is not edited or paid.
+        (await Admin().PostAsJsonAsync($"/v1/pathshala/donations/{pledgeId}/paid", new { mode = "Cash", paidOn = "2026-03-01" }))
+            .StatusCode.Should().Be(HttpStatusCode.Conflict);
+
+        var ledger = await Admin().GetFromJsonAsync<JsonElement>(url);
+        ledger.GetProperty("totalAmount").GetInt64().Should().Be(0L);
+        ledger.GetProperty("outstandingAmount").GetInt64().Should().Be(0L);
+
+        var next = await (await Admin().PostAsJsonAsync(url, new
+        {
+            donorName = "Shri Mahendra Kothari", amount = 100_000L, donatedOn = "2026-03-01", mode = "Upi",
+        })).Content.ReadFromJsonAsync<JsonElement>();
+
+        next.GetProperty("receiptNumber").GetInt32().Should().Be(2, "receipt 1 still names the deleted entry");
+    }
+
     // ---- Announcements -------------------------------------------------------
 
     [Fact]

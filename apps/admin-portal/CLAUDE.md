@@ -263,6 +263,16 @@ today on the browser's own calendar, says which days the class meets, and names
 the problem with Submit disabled. A class with no timetable meets any day, as
 the service has it.
 
+**A Pathshala's donations are paid or announced (2026-10-24).** Recording one
+asks which: paid now (with its mode, and a receipt number), or announced to be
+paid later (no mode, no receipt). Each row has Edit and Delete, and an
+announcement also has Mark paid, which is what issues its receipt. The ledger
+shows what was received and what is still to come, and a Show filter narrows it
+to paid, not paid yet, or deleted. Delete keeps the row in the service - a
+receipt number is never issued twice - so a deleted entry is under Show, and
+deleting one with a receipt asks why. This replaced Void and a stray Cancel
+that the popup conversion had left in every row.
+
 **Withdrawing is on the roll, not the placement queue.** It is the same
 `DELETE /enrollments/{id}` a placement decision does not use, and the screen says
 what it does: the child comes off the roll and their attendance and results

@@ -679,6 +679,18 @@ public static class KnownEvents
             EntityIdProperty: "donationId",
             ActorIdProperty: "recordedBy"),
 
+        ["pathshala.donation.paid.v1"] = new(
+            Action: "DonationPaid",
+            EntityName: "PathshalaDonation",
+            EntityIdProperty: "donationId",
+            ActorIdProperty: "paidBy"),
+
+        ["pathshala.donation.updated.v1"] = new(
+            Action: "DonationUpdated",
+            EntityName: "PathshalaDonation",
+            EntityIdProperty: "donationId",
+            ActorIdProperty: "updatedBy"),
+
         ["pathshala.donation.voided.v1"] = new(
             Action: "DonationVoided",
             EntityName: "PathshalaDonation",

@@ -357,26 +357,42 @@ export interface ExamOverview {
 
 export type DonationMode = 'Cash' | 'Upi' | 'Cheque' | 'BankTransfer' | 'Other';
 
-/** Mirrors `DonationResponse`. `amount` is integer paise. */
+/** `Pledged` is announced and not yet paid. */
+export type DonationStatus = 'Pledged' | 'Paid';
+
+/**
+ * Mirrors `DonationResponse`. `amount` is integer paise. A pledge has no
+ * receipt number, mode or paid date until it is marked paid. `isVoid` is a
+ * deleted entry, kept because its receipt number is never issued again.
+ */
 export interface PathshalaDonation {
   readonly id: string;
-  readonly receiptNumber: number;
+  readonly status: DonationStatus;
+  readonly receiptNumber: number | null;
   readonly donorName: string;
   readonly donorMemberId: string | null;
   readonly amount: number;
+  /** The day it was given or, for a pledge, announced. */
   readonly donatedOn: string;
-  readonly mode: DonationMode;
+  readonly mode: DonationMode | null;
+  readonly paidOn: string | null;
   readonly purpose: string | null;
   readonly recordedBy: string;
   readonly recordedAt: string;
+  readonly updatedAt: string | null;
   readonly isVoid: boolean;
   readonly voidReason: string | null;
 }
 
-/** Mirrors `DonationLedgerResponse`. The total leaves voided entries out. */
+/**
+ * Mirrors `DonationLedgerResponse`. `totalAmount` is what has been received,
+ * `outstandingAmount` what is announced and not yet paid; both leave deleted
+ * entries out.
+ */
 export interface DonationLedger {
   readonly donations: readonly PathshalaDonation[];
   readonly totalAmount: number;
+  readonly outstandingAmount: number;
 }
 
 export interface DonationInput {
@@ -384,7 +400,20 @@ export interface DonationInput {
   readonly donorMemberId: string | null;
   readonly amount: number;
   readonly donatedOn: string;
-  readonly mode: DonationMode;
+  /** Null when `paid` is false - nobody knows yet. */
+  readonly mode: DonationMode | null;
+  readonly purpose: string | null;
+  /** False for a gift announced and still to be paid: no receipt yet. */
+  readonly paid: boolean;
+}
+
+/** A correction. A paid entry needs `mode` and `paidOn`; a pledge sends neither. */
+export interface DonationCorrection {
+  readonly donorName: string;
+  readonly amount: number;
+  readonly donatedOn: string;
+  readonly mode: DonationMode | null;
+  readonly paidOn: string | null;
   readonly purpose: string | null;
 }
 

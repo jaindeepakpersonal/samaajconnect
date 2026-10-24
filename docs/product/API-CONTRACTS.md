@@ -278,9 +278,11 @@ reviews" in `services/social-issues-service/CLAUDE.md`.
 | GET | `/pathshalas/{id}/progress` | `Members.Read` or `Pathshala.Teach` + staff | Every placed child's attendance and exam average, as percentages |
 | GET | `/pathshalas/{id}/attendance` | `Members.Read` or `Pathshala.Teach` + staff | Per class: days marked and the tally |
 | GET | `/pathshalas/{id}/exams` | `Members.Read` or `Pathshala.Teach` + staff | Every exam, with results recorded and the average |
-| GET | `/pathshalas/{id}/donations` | `Pathshala.Manage` | The ledger and its total, voided entries out of it |
-| POST | `/pathshalas/{id}/donations` | `Pathshala.Manage` | `{donorName, donorMemberId, amount (paise), donatedOn, mode, purpose}` - issues the next receipt number |
-| POST | `/donations/{id}/void` | `Pathshala.Manage` | `{reason}` - out of the totals, never deleted |
+| GET | `/pathshalas/{id}/donations` | `Pathshala.Manage` | The ledger, newest first, with `totalAmount` (received) and `outstandingAmount` (announced, not yet paid); deleted entries are in neither |
+| POST | `/pathshalas/{id}/donations` | `Pathshala.Manage` | `{donorName, donorMemberId, amount (paise), donatedOn, mode, purpose, paid}` - paid (the default) issues the next receipt number; `paid: false` records an announcement with no mode and no receipt |
+| PATCH | `/donations/{id}` | `Pathshala.Manage` | `{donorName, amount, donatedOn, mode, paidOn, purpose}` - corrects an entry; a paid one needs `mode` and `paidOn`, a pledge ignores both. 409 once deleted |
+| POST | `/donations/{id}/paid` | `Pathshala.Manage` | `{mode, paidOn}` - an announcement was paid; issues the next receipt number. 409 once paid or deleted |
+| POST | `/donations/{id}/void` | `Pathshala.Manage` | `{reason}` - the admin panel's Delete: off the ledger and its totals, the row kept so a receipt number is never reissued. `reason` is required once a receipt was issued |
 | GET | `/pathshalas/{id}/announcements` | `Members.Read` or `Pathshala.Teach` + staff | What it has sent |
 | POST | `/pathshalas/{id}/announcements` | `Members.Read` or `Pathshala.Teach` + a teacher of it or somebody who runs it | `{title, body}` to the parents of every child with a place or a request; each gets an in-app notification. **409** with nobody to send to |
 | GET | `/announcements` | `Members.Read` | Announcements from every Pathshala where the caller has a child with a place or a request |

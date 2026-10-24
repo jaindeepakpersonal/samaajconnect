@@ -16,10 +16,12 @@ public sealed class PathshalaDonationConfiguration : IEntityTypeConfiguration<Pa
         builder.Property(d => d.Purpose).HasMaxLength(200);
         builder.Property(d => d.VoidReason).HasMaxLength(500);
         builder.Property(d => d.Mode).HasConversion<string>().HasMaxLength(20);
+        builder.Property(d => d.Status).HasConversion<string>().HasMaxLength(20);
 
         // A receipt number is handed to a donor and has to point at exactly one
         // entry. The handler takes the next one; this is what holds when two
-        // donations are recorded at once.
+        // donations are recorded at once. A pledge has none yet, and Postgres
+        // lets any number of nulls share a unique index.
         builder.HasIndex(d => new { d.PathshalaId, d.ReceiptNumber }).IsUnique();
 
         builder.HasIndex(d => new { d.PathshalaId, d.DonatedOn });

@@ -94,10 +94,13 @@ namespace Sangam.Pathshala.Infrastructure.Migrations
                         .HasColumnName("donor_name");
 
                     b.Property<string>("Mode")
-                        .IsRequired()
                         .HasMaxLength(20)
                         .HasColumnType("character varying(20)")
                         .HasColumnName("mode");
+
+                    b.Property<DateOnly?>("PaidOn")
+                        .HasColumnType("date")
+                        .HasColumnName("paid_on");
 
                     b.Property<Guid>("PathshalaId")
                         .HasColumnType("uuid")
@@ -108,7 +111,7 @@ namespace Sangam.Pathshala.Infrastructure.Migrations
                         .HasColumnType("character varying(200)")
                         .HasColumnName("purpose");
 
-                    b.Property<int>("ReceiptNumber")
+                    b.Property<int?>("ReceiptNumber")
                         .HasColumnType("integer")
                         .HasColumnName("receipt_number");
 
@@ -120,9 +123,23 @@ namespace Sangam.Pathshala.Infrastructure.Migrations
                         .HasColumnType("uuid")
                         .HasColumnName("recorded_by");
 
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)")
+                        .HasColumnName("status");
+
                     b.Property<Guid>("TenantId")
                         .HasColumnType("uuid")
                         .HasColumnName("tenant_id");
+
+                    b.Property<DateTimeOffset?>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("updated_at");
+
+                    b.Property<Guid?>("UpdatedBy")
+                        .HasColumnType("uuid")
+                        .HasColumnName("updated_by");
 
                     b.Property<string>("VoidReason")
                         .HasMaxLength(500)

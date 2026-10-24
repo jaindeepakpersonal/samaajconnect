@@ -20,7 +20,7 @@ everything else is the Samaaj's to run.
 | `ClassSchedule` | A weekly slot. Overlapping slots on one day are refused |
 | `Teacher` | Owned by the Pathshala. Name, phone, email, qualification, and an optional linked login - need not be a member |
 | `TeacherAssignment` | Which teacher record teaches a class. Unique per (class, teacher) |
-| `PathshalaDonation` | Aggregate root. One entry in the donation ledger, receipt-numbered, voided rather than deleted |
+| `PathshalaDonation` | Aggregate root. One entry in the donation ledger: paid (receipt-numbered) or announced and still to be paid (no receipt yet). Deleting keeps the row |
 | `PathshalaAnnouncement` | Aggregate root. A message to the parents; its text stays here |
 | `StudentEnrolment` | Aggregate root. One child's place: requested, then placed |
 | `AttendanceEntry` | One mark. Written directly, unique per (enrolment, date) |
@@ -38,8 +38,10 @@ Two entities in DATA-MODEL.md §9 are deliberately absent. See "Decisions".
 | `AddTeacherCommand` | `Pathshala.Manage` | A teacher record - need not be a member. `userId` links their login, if any |
 | `UpdateTeacherCommand` | `Pathshala.Manage` | Details or login. One login is one teacher per Pathshala |
 | `RemoveTeacherCommand` | `Pathshala.Manage` | Takes them off every class; the registers they marked are kept |
-| `RecordDonationCommand` | `Pathshala.Manage` | Issues the next receipt number |
-| `VoidDonationCommand` | `Pathshala.Manage` | Out of the totals, with a reason. Never a delete |
+| `RecordDonationCommand` | `Pathshala.Manage` | Paid: issues the next receipt number. `paid: false`: an announcement, with no receipt or mode |
+| `UpdateDonationCommand` | `Pathshala.Manage` | Corrects an entry. A paid one needs its mode and paid date; a pledge stays a pledge. 409 once deleted |
+| `MarkDonationPaidCommand` | `Pathshala.Manage` | An announcement was paid: issues the next receipt number. 409 once paid or deleted |
+| `VoidDonationCommand` | `Pathshala.Manage` | The admin panel's Delete: off the ledger and out of the totals, the row kept. A reason is required once a receipt was issued |
 | `SendAnnouncementCommand` | `Members.Read` or `Pathshala.Teach` + a teacher of it or somebody who runs it | To the parents of every child with a place or a request |
 | `OpenSessionCommand` | `Pathshala.Manage` | Makes the new session current |
 | `CreateClassCommand` | `Pathshala.Manage` | |
@@ -75,7 +77,7 @@ Two entities in DATA-MODEL.md §9 are deliberately absent. See "Decisions".
 | `GetProgressReportQuery` | `Members.Read` or `Pathshala.Teach` + staff | Every placed child's attendance and exam average |
 | `GetAttendanceOverviewQuery` | `Members.Read` or `Pathshala.Teach` + staff | Per class: days marked and the tally |
 | `ListPathshalaExamsQuery` | `Members.Read` or `Pathshala.Teach` + staff | Every exam, with how far marking has got |
-| `ListDonationsQuery` | `Pathshala.Manage` | The ledger and its total |
+| `ListDonationsQuery` | `Pathshala.Manage` | The ledger, what was received and what is announced and not yet paid |
 | `ListAnnouncementsQuery` | `Members.Read` or `Pathshala.Teach` + staff | What this Pathshala has sent |
 | `ListMyAnnouncementsQuery` | `Members.Read` | From every Pathshala where the caller has a child with a place or a request |
 
@@ -84,7 +86,7 @@ Two entities in DATA-MODEL.md §9 are deliberately absent. See "Decisions".
 - `pathshala.created.v1`
 - `pathshala.updated.v1` (ids only, like its creation)
 - `pathshala.teacher.added.v1`, `.updated.v1`, `.removed.v1` (ids and who did it)
-- `pathshala.donation.recorded.v1`, `pathshala.donation.voided.v1` (ids, amount, who)
+- `pathshala.donation.recorded.v1` (ids, amount, whether it is a pledge, who), `.paid.v1` (the receipt number, amount, who), `.updated.v1` and `.voided.v1` (ids and who)
 - `pathshala.announcement.sent.v1` (who, and how many) and one `pathshala.announcement.addressed.v1` per parent - see "Teachers, the staff tabs, donations and announcements"
 - `pathshala.session.opened.v1`
 - `pathshala.deactivated.v1`
@@ -213,12 +215,29 @@ form that says so rather than looked up in member-family-service - a lookup
 would have let anybody holding `Pathshala.Manage` read the private phone of any
 member id. Requests made before this carry none, and the tab says so.
 
-**The donation ledger is record-keeping only, and voided rather than
-deleted.** A receipt number handed to a donor has to keep pointing at something,
-so a mistake leaves the totals with a reason and stays in the ledger. Receipt
-numbers are one more than the highest; the unique index on (Pathshala,
-ReceiptNumber) is what holds when two are recorded at once. Teachers do not see
-it - who gave how much is the administrators' to keep. Amounts are integer paise.
+**The donation ledger is record-keeping only.** Teachers do not see it - who
+gave how much is the administrators' to keep. Amounts are integer paise.
+
+**An announcement and a receipt are two steps (2026-10-24).** Members often
+announce a gift and pay later (the user's requirement), so a donation is
+recorded paid or `Pledged`. A pledge has no receipt number, mode or paid date;
+`MarkDonationPaidCommand` gives it all three. A number on a slip therefore always
+means money received - trust-service's rule. The ledger reports both totals:
+received, and announced but not yet paid. Every donation recorded before this
+was received, and the `DonationPledges` migration made each one Paid on the day
+it was given; `DonationPledgesMigrationTests` runs it against a legacy row.
+
+**Deleting takes an entry off the ledger and keeps the row.** The admin panel
+calls it Delete (the user asked for Edit and Delete rather than Void); the
+service still voids. A receipt number handed to a donor has to keep pointing at
+something, so a deleted entry leaves the totals and the ledger's default view,
+keeps its reason - required once a receipt exists, optional on an announcement
+nobody holds a slip for - and its number is never issued again. Receipt numbers
+are one more than the highest ever issued; the unique index on (Pathshala,
+ReceiptNumber) is what holds when two are issued at once, and Postgres lets any
+number of pledges share its null. Correcting an entry is `UpdateDonationCommand`,
+which never turns a pledge into a payment - that issues a receipt, and is its
+own act.
 
 **Announcements keep their text here.** `SendAnnouncementCommand` stores the
 title and body and raises ids only: `pathshala.announcement.sent.v1` (who sent

@@ -435,7 +435,9 @@ public sealed class DonationRepository(PathshalaDbContext dbContext) : IDonation
         await dbContext.Donations
             .AsNoTracking()
             .Where(d => d.PathshalaId == pathshalaId)
-            .OrderByDescending(d => d.ReceiptNumber)
+            // Newest first by when it was written down: a pledge has no receipt
+            // number to sort by.
+            .OrderByDescending(d => d.RecordedAt)
             .ToListAsync(cancellationToken);
 
     public async Task<int> NextReceiptNumberAsync(Guid pathshalaId, CancellationToken cancellationToken = default) =>

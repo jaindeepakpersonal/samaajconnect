@@ -49,6 +49,8 @@ import {
   DonationLedger,
   PathshalaDonation,
   DonationInput,
+  DonationCorrection,
+  DonationMode,
   PathshalaAnnouncement,
   Broadcast,
   BroadcastResult,
@@ -1380,13 +1382,30 @@ export class AdminApi {
     return this.http.get<DonationLedger>(`/v1/pathshala/pathshalas/${pathshalaId}/donations`);
   }
 
-  /** Records a donation and issues its receipt number. `amount` is integer paise. */
+  /**
+   * Records a donation - paid, with its receipt number, or announced
+   * (`paid: false`) with none until it is marked paid. `amount` is integer paise.
+   */
   recordDonation(pathshalaId: string, donation: DonationInput): Observable<PathshalaDonation> {
     return this.http.post<PathshalaDonation>(`/v1/pathshala/pathshalas/${pathshalaId}/donations`, donation);
   }
 
-  /** Takes a mistaken entry out of the totals. Never a delete. */
-  voidDonation(donationId: string, reason: string): Observable<PathshalaDonation> {
+  /** Corrects an entry. A pledge stays a pledge; a paid one needs its mode and paid date. */
+  updateDonation(donationId: string, correction: DonationCorrection): Observable<PathshalaDonation> {
+    return this.http.patch<PathshalaDonation>(`/v1/pathshala/donations/${donationId}`, correction);
+  }
+
+  /** An announced donation was paid: issues its receipt number. 409 once paid. */
+  markDonationPaid(donationId: string, mode: DonationMode, paidOn: string): Observable<PathshalaDonation> {
+    return this.http.post<PathshalaDonation>(`/v1/pathshala/donations/${donationId}/paid`, { mode, paidOn });
+  }
+
+  /**
+   * Deletes an entry from the ledger and its totals. The service keeps the row,
+   * so its receipt number is never reissued; a reason is required once one was
+   * issued, and optional on an announcement.
+   */
+  deleteDonation(donationId: string, reason: string | null): Observable<PathshalaDonation> {
     return this.http.post<PathshalaDonation>(`/v1/pathshala/donations/${donationId}/void`, { reason });
   }
 

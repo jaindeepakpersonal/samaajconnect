@@ -132,7 +132,7 @@ public static class StaffEndpoints
                 (await sender.Send(new ListDonationsQuery(id), cancellationToken)).ToApiResult())
             .RequireAuthorization()
             .WithName("ListDonations")
-            .WithSummary("The Pathshala's donation ledger and its total, voided entries left out of it.")
+            .WithSummary("The Pathshala's donation ledger, what has been received and what is announced and not yet paid, deleted entries left out of both.")
             .Produces<DonationLedgerResponse>()
             .ProducesProblem(StatusCodes.Status403Forbidden)
             .ProducesProblem(StatusCodes.Status404NotFound);
@@ -143,7 +143,7 @@ public static class StaffEndpoints
                 var result = await sender.Send(
                     new RecordDonationCommand(
                         id, request.DonorName, request.DonorMemberId, request.Amount, request.DonatedOn,
-                        request.Mode, request.Purpose),
+                        request.Mode, request.Purpose, request.Paid ?? true),
                     cancellationToken);
 
                 return result.ToApiResult(created =>
@@ -151,11 +151,39 @@ public static class StaffEndpoints
             })
             .RequireAuthorization()
             .WithName("RecordDonation")
-            .WithSummary("Record a donation and issue its receipt number. Amounts are integer paise.")
+            .WithSummary("Record a donation - paid, with its receipt number, or announced (paid: false) and paid later. Amounts are integer paise.")
             .Produces<DonationResponse>(StatusCodes.Status201Created)
             .ProducesValidationProblem()
             .ProducesProblem(StatusCodes.Status403Forbidden)
             .ProducesProblem(StatusCodes.Status404NotFound);
+
+        group.MapPatch("/donations/{donationId:guid}", async (
+                Guid donationId, DonationCorrection request, ISender sender, CancellationToken cancellationToken) =>
+                (await sender.Send(
+                    new UpdateDonationCommand(
+                        donationId, request.DonorName, request.Amount, request.DonatedOn, request.Mode,
+                        request.PaidOn, request.Purpose),
+                    cancellationToken))
+                .ToApiResult())
+            .RequireAuthorization()
+            .WithName("UpdateDonation")
+            .WithSummary("Correct an entry. A paid one needs its mode and paid date; a pledge stays a pledge.")
+            .Produces<DonationResponse>()
+            .ProducesValidationProblem()
+            .ProducesProblem(StatusCodes.Status404NotFound)
+            .ProducesProblem(StatusCodes.Status409Conflict);
+
+        group.MapPost("/donations/{donationId:guid}/paid", async (
+                Guid donationId, PaidRequest request, ISender sender, CancellationToken cancellationToken) =>
+                (await sender.Send(new MarkDonationPaidCommand(donationId, request.Mode, request.PaidOn), cancellationToken))
+                .ToApiResult())
+            .RequireAuthorization()
+            .WithName("MarkDonationPaid")
+            .WithSummary("An announced donation was paid: issues its receipt number. 409 once paid.")
+            .Produces<DonationResponse>()
+            .ProducesValidationProblem()
+            .ProducesProblem(StatusCodes.Status404NotFound)
+            .ProducesProblem(StatusCodes.Status409Conflict);
 
         group.MapPost("/donations/{donationId:guid}/void", async (
                 Guid donationId, VoidRequest request, ISender sender, CancellationToken cancellationToken) =>
@@ -163,7 +191,7 @@ public static class StaffEndpoints
                 .ToApiResult())
             .RequireAuthorization()
             .WithName("VoidDonation")
-            .WithSummary("Take a mistaken entry out of the totals, with a reason. Never a delete.")
+            .WithSummary("Delete an entry from the ledger and its totals. The row is kept, so a receipt number is never reissued; a reason is required once one was issued.")
             .Produces<DonationResponse>()
             .ProducesValidationProblem()
             .ProducesProblem(StatusCodes.Status404NotFound)
@@ -204,10 +232,16 @@ public static class StaffEndpoints
     public sealed record TeacherRequest(
         string FullName, string? Phone, string? Email, string? Qualification, string? UserId);
 
+    /// <summary><c>Paid</c> defaults to true: a donation recorded with no word otherwise has been received.</summary>
     public sealed record DonationRequest(
-        string DonorName, string? DonorMemberId, long Amount, DateOnly DonatedOn, string Mode, string? Purpose);
+        string DonorName, string? DonorMemberId, long Amount, DateOnly DonatedOn, string? Mode, string? Purpose, bool? Paid);
 
-    public sealed record VoidRequest(string Reason);
+    public sealed record DonationCorrection(
+        string DonorName, long Amount, DateOnly DonatedOn, string? Mode, DateOnly? PaidOn, string? Purpose);
+
+    public sealed record PaidRequest(string Mode, DateOnly PaidOn);
+
+    public sealed record VoidRequest(string? Reason);
 
     public sealed record AnnouncementRequest(string Title, string Body);
 }
