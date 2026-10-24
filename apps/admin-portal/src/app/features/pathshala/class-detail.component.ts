@@ -157,9 +157,18 @@ type Mark = AttendanceStatus | '';
             class="input inline"
             type="date"
             name="registerDate"
+            [max]="todayValue"
             [ngModel]="registerDate()"
             (ngModelChange)="chooseDate($event)"
+            [attr.aria-invalid]="dateProblem(subject) ? 'true' : null"
           />
+          @if (meetingDays(subject); as days) {
+            <p class="small">This class meets on {{ days }}.</p>
+          }
+
+          @if (dateProblem(subject); as problem) {
+            <p class="notice" role="alert">{{ problem }}</p>
+          }
 
           @if (registerLoading()) {
             <p class="empty" role="status">Reading the register…</p>
@@ -209,7 +218,7 @@ type Mark = AttendanceStatus | '';
               Excused days are not counted against a child's attendance percentage.
             </p>
 
-            <button class="btn" type="button" [disabled]="busy() || toSubmit().length === 0"
+            <button class="btn" type="button" [disabled]="busy() || toSubmit().length === 0 || dateProblem(subject) !== null"
               (click)="submitRegister()">
               Submit {{ toSubmit().length }} mark{{ toSubmit().length === 1 ? '' : 's' }}
             </button>
@@ -656,6 +665,45 @@ export class ClassDetailComponent implements OnInit {
       );
   }
 
+  /** Today on this browser's calendar - the teacher's day, not the server's UTC one. */
+  readonly todayValue = today();
+
+  /** "Sunday and Wednesday", or null for a class with no timetable yet (which meets any day). */
+  meetingDays(subject: PathshalaClass): string | null {
+    const days = WEEK.filter((day) => subject.schedule.some((slot) => slot.dayOfWeek === day));
+
+    if (days.length === 0) {
+      return null;
+    }
+
+    return days.length === 1 ? days[0]! : `${days.slice(0, -1).join(', ')} and ${days[days.length - 1]}`;
+  }
+
+  /**
+   * Why the chosen date cannot be marked, before asking - the service's own
+   * two refusals: a day still to come, and a day the class does not meet.
+   */
+  dateProblem(subject: PathshalaClass): string | null {
+    const date = this.registerDate();
+
+    if (!date) {
+      return null;
+    }
+
+    if (date > this.todayValue) {
+      return 'That day is still to come. A register is marked once the class has met.';
+    }
+
+    const weekday = WEEK[(new Date(`${date}T00:00:00`).getDay() + 6) % 7]!;
+    const days = this.meetingDays(subject);
+
+    if (days !== null && !subject.schedule.some((slot) => slot.dayOfWeek === weekday)) {
+      return `This class does not meet on a ${weekday}. It meets on ${days}.`;
+    }
+
+    return null;
+  }
+
   chooseDate(date: string): void {
     this.registerDate.set(date);
     this.loadRegister();
@@ -680,6 +728,9 @@ export class ClassDetailComponent implements OnInit {
         this.loading.set(false);
 
         if (found) {
+          // Today, if the class meets today; otherwise the last day it did -
+          // which is the register a teacher is opening this to mark.
+          this.registerDate.set(lastClassDay(found.schedule.map((slot) => slot.dayOfWeek)));
           this.loadRoll();
           this.loadExams();
           this.loadTeachers();
@@ -903,8 +954,40 @@ export class ClassDetailComponent implements OnInit {
 }
 
 /** Today, as the date input wants it. */
+/** Monday first, matching the timetable's own day names. */
+const WEEK = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
+
+/** A local Date as "yyyy-MM-dd". */
+function localDay(date: Date): string {
+  const pad = (n: number) => n.toString().padStart(2, '0');
+
+  return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}`;
+}
+
+/**
+ * The most recent day, today included, that the class meets on - or today
+ * for a class with no timetable, which the service lets meet any day.
+ */
+function lastClassDay(meetingDays: readonly string[]): string {
+  const day = new Date();
+
+  for (let back = 0; back < 7 && meetingDays.length > 0; back++) {
+    if (meetingDays.includes(WEEK[(day.getDay() + 6) % 7]!)) {
+      return localDay(day);
+    }
+
+    day.setDate(day.getDate() - 1);
+  }
+
+  return localDay(new Date());
+}
+
+/**
+ * Today on this browser's calendar. `toISOString()` is UTC, which in India
+ * is still yesterday until 5:30 in the morning.
+ */
 function today(): string {
-  return new Date().toISOString().slice(0, 10);
+  return localDay(new Date());
 }
 
 type ClassTab = 'register' | 'roll' | 'exams' | 'timetable' | 'teachers';

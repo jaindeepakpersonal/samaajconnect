@@ -102,12 +102,42 @@ describe('ClassDetailComponent', () => {
     http = TestBed.inject(HttpTestingController);
   });
 
-  afterEach(() => http.verify());
+  afterEach(() => {
+    http.verify();
+    vi.useRealTimers();
+  });
 
   const text = () => fixture.nativeElement.textContent as string;
 
-  /** Today, which is what the register date defaults to. */
-  const date = () => new Date().toISOString().slice(0, 10);
+  /**
+   * Today on this machine's calendar, which is what the register date defaults
+   * to for a class with no timetable - local, not UTC, as the component does.
+   */
+  const date = () => {
+    const now = new Date();
+    const pad = (n: number) => n.toString().padStart(2, '0');
+
+    return `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())}`;
+  };
+
+  /** Wednesday 4 March 2026, 10am local - and a component built on that day. */
+  function onWednesday4March() {
+    vi.useFakeTimers({ toFake: ['Date'] });
+    vi.setSystemTime(new Date(2026, 2, 4, 10, 0, 0));
+    fixture = TestBed.createComponent(ClassDetailComponent);
+    component = fixture.componentInstance;
+  }
+
+  /** The class, meeting on Sundays. */
+  const onSundays = () =>
+    detail({
+      classes: [
+        {
+          ...detail().classes[0]!,
+          schedule: [{ dayOfWeek: 'Sunday', startTime: '09:00', endTime: '10:00' }],
+        },
+      ],
+    });
 
   function load(
     school: PathshalaDetail = detail(),
@@ -116,6 +146,7 @@ describe('ClassDetailComponent', () => {
     exams: ClassExam[] = [],
     names: { id: string; fullName: string }[] = [],
     teachers: PathshalaTeacher[] = [],
+    registerOn: string = date(),
   ) {
     fixture.detectChanges();
     http.expectOne((r) => r.url === `/v1/pathshala/pathshalas/${PATHSHALA_ID}`).flush(school);
@@ -131,7 +162,7 @@ describe('ClassDetailComponent', () => {
       }
 
       http
-        .expectOne(`/v1/pathshala/classes/${CLASS_ID}/register?date=${date()}`)
+        .expectOne(`/v1/pathshala/classes/${CLASS_ID}/register?date=${registerOn}`)
         .flush(register);
     }
 
@@ -404,6 +435,53 @@ describe('ClassDetailComponent', () => {
 
     expect(text()).toContain('A child');
     expect(text()).not.toContain('kid1');
+  });
+
+  it('opens the register on the last day the class met, not on a day it does not meet', () => {
+    onWednesday4March();
+    load(onSundays(), [student('e1', 'kid1')], [], [], [], [], '2026-03-01');
+
+    expect(component.registerDate()).toBe('2026-03-01');
+    expect(text()).toContain('This class meets on Sunday.');
+    expect(component.dateProblem(component.klass()!)).toBeNull();
+  });
+
+  it('says a day still to come cannot be marked yet, and will not submit it', () => {
+    onWednesday4March();
+    load(onSundays(), [student('e1', 'kid1')], [], [], [], [], '2026-03-01');
+
+    component.chooseDate('2026-03-08');
+    http.expectOne(`/v1/pathshala/classes/${CLASS_ID}/register?date=2026-03-08`).flush([]);
+    component.marks['e1'] = 'Present';
+    fixture.detectChanges();
+
+    expect(text()).toContain('That day is still to come');
+    const submit = [...fixture.nativeElement.querySelectorAll('button')].find((b: HTMLButtonElement) =>
+      (b.textContent ?? '').trim().startsWith('Submit'),
+    ) as HTMLButtonElement | undefined;
+    expect(submit?.disabled).toBe(true);
+    expect(fixture.nativeElement.querySelector('input[type="date"]').getAttribute('max')).toBe('2026-03-04');
+  });
+
+  it('says which days the class meets when another day is picked', () => {
+    onWednesday4March();
+    load(onSundays(), [student('e1', 'kid1')], [], [], [], [], '2026-03-01');
+
+    component.chooseDate('2026-03-03');
+    http.expectOne(`/v1/pathshala/classes/${CLASS_ID}/register?date=2026-03-03`).flush([]);
+    fixture.detectChanges();
+
+    expect(text()).toContain('This class does not meet on a Tuesday. It meets on Sunday.');
+  });
+
+  it('lets a class with no timetable be marked on any day up to today', () => {
+    onWednesday4March();
+    load(detail(), [student('e1', 'kid1')], [], [], [], [], '2026-03-04');
+
+    component.chooseDate('2026-03-03');
+    http.expectOne(`/v1/pathshala/classes/${CLASS_ID}/register?date=2026-03-03`).flush([]);
+
+    expect(component.dateProblem(component.klass()!)).toBeNull();
   });
 
   /** Answers the re-read every action fires. */

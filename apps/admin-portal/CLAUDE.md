@@ -253,6 +253,16 @@ them to Present would invent attendance for a child nobody saw — and every
 attendance number this platform reports, on every screen, is a count over
 exactly those rows. Two tests hold it.
 
+**The register's date is checked before it is sent (2026-10-24).** The service
+refuses a day still to come and a day the class does not meet, and the screen
+used to find out only by asking: it opened on today's UTC date whatever the
+timetable said, so a Saturday-only class opened on a day it could not be marked,
+and the next obvious pick - the coming Saturday - was refused as "before the
+class has met". It now opens on the last day the class meets, caps the picker at
+today on the browser's own calendar, says which days the class meets, and names
+the problem with Submit disabled. A class with no timetable meets any day, as
+the service has it.
+
 **Withdrawing is on the roll, not the placement queue.** It is the same
 `DELETE /enrollments/{id}` a placement decision does not use, and the screen says
 what it does: the child comes off the roll and their attendance and results

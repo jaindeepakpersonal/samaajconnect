@@ -331,6 +331,29 @@ public sealed class PathshalaFlowTests(PathshalaApiFactory factory)
     }
 
     [Fact]
+    public async Task A_register_is_marked_on_the_teachers_own_calendar_day()
+    {
+        // 20:00 UTC on 1 March is 01:30 on 2 March in India. The 2nd's class
+        // has met there, though UTC has not reached the 2nd; the 3rd has not
+        // happened anywhere.
+        var fixture = await AClassAsync();
+        var enrolmentId = await APlacedStudentAsync(fixture);
+        factory.Clock.Set(new DateTimeOffset(2026, 3, 1, 20, 0, 0, TimeSpan.Zero));
+
+        var tomorrowInUtc = await Teacher().PostAsJsonAsync(
+            $"/v1/pathshala/classes/{fixture.ClassId}/attendance",
+            new { classDate = "2026-03-02", marks = new[] { new { enrolmentId, status = "Present" } } });
+
+        tomorrowInUtc.StatusCode.Should().Be(HttpStatusCode.OK);
+
+        var dayAfter = await Teacher().PostAsJsonAsync(
+            $"/v1/pathshala/classes/{fixture.ClassId}/attendance",
+            new { classDate = "2026-03-03", marks = new[] { new { enrolmentId, status = "Present" } } });
+
+        dayAfter.StatusCode.Should().Be(HttpStatusCode.Conflict);
+    }
+
+    [Fact]
     public async Task A_teacher_of_another_class_cannot_mark_this_one()
     {
         // Holding Pathshala.Attendance.Write says teacher, not teacher of this

@@ -261,6 +261,15 @@ teacher's read simply did not exist, and nothing failed to point it out because
 no screen had ever tried. `GetClassRegisterQuery` closes it, and the admin class
 screen loads it before showing the form rather than after.
 
+**"Before the class has met" is judged with a day's slack (2026-10-24).** A
+register's `ClassDate` is the teacher's own calendar day, and this service's
+clock is UTC - which in India is still yesterday until 5:30 in the morning, so
+"after UTC today" refused a register for a class that had just met. A date up to
+UTC tomorrow is accepted; anything later has not happened anywhere. The admin
+class screen does the exact check on the browser's own date (no future dates in
+the picker, and it opens on the last day the class meets rather than today), so
+the slack is only ever reached by a teacher east of Greenwich.
+
 A date nobody has marked answers with an empty list, not 404. "Not marked yet"
 is a normal state of a register, and a teacher opening next Sunday's should get
 a blank form rather than an error.

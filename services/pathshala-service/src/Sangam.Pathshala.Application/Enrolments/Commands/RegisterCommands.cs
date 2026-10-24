@@ -105,9 +105,14 @@ public sealed class MarkAttendanceCommandHandler(
             return Result.Failure<MarkAttendanceResponse>(PathshalaAccess.NoSuchClass);
         }
 
-        var today = DateOnly.FromDateTime(clock.UtcNow.UtcDateTime);
+        // The class date is the teacher's calendar day; this clock is UTC. In
+        // India the local date runs ahead of UTC until 5:30 in the morning, so
+        // "after UTC today" refused a register for a class that had just met.
+        // A day's slack covers every zone east of Greenwich; anything later is
+        // still a day that has not happened anywhere.
+        var latestClassDay = DateOnly.FromDateTime(clock.UtcNow.UtcDateTime).AddDays(1);
 
-        if (command.ClassDate > today)
+        if (command.ClassDate > latestClassDay)
         {
             return Result.Failure<MarkAttendanceResponse>(Error.Conflict(
                 "Attendance.Future", "A register cannot be marked before the class has met."));
