@@ -117,7 +117,7 @@ import { ALL_LOCALITIES, LocalityFilterComponent, matchesLocality } from '../../
                     <td>{{ localityName(group.localityId) }}</td>
                     <td>
                       @if (group.presidentMemberId) {
-                        {{ memberName(group.presidentMemberId) }}
+                        <a [routerLink]="['/members', group.presidentMemberId]">{{ memberName(group.presidentMemberId) }}</a>
                       } @else {
                         <span class="muted">Not set</span>
                       }

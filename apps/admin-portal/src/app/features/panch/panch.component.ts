@@ -77,7 +77,7 @@ import { isNotFound } from '../../core/http-status';
                 <tbody>
                   @for (member of seated.members; track member.memberId) {
                     <tr>
-                      <td><b>{{ memberName(member.memberId) }}</b></td>
+                      <td><b><a [routerLink]="['/members', member.memberId]">{{ memberName(member.memberId) }}</a></b></td>
                       <td>{{ member.seatedAt | date: 'd MMM y' }}</td>
                       <td>
                         @if (confirmingRemoval() === member.memberId) {

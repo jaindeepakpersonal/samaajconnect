@@ -8,6 +8,8 @@ import {
   AttendanceStatus,
   AttendanceSummary,
   AdminMember,
+  AdminMemberGroup,
+  AdminMemberHousehold,
   AdminUser,
   AssignRoleResult,
   AuditLogEntry,
@@ -415,6 +417,16 @@ export class AdminApi {
     }
 
     return this.http.get<Paged<AdminMember>>('/v1/members', { params });
+  }
+
+  /** The household a member belongs to, for their page. `household` is null when they are in none. */
+  memberHousehold(id: string): Observable<AdminMemberHousehold> {
+    return this.http.get<AdminMemberHousehold>(`/v1/members/${id}/household`);
+  }
+
+  /** The volunteer groups a member belongs to, and their role in each. */
+  memberGroups(id: string): Observable<AdminMemberGroup[]> {
+    return this.http.get<AdminMemberGroup[]>(`/v1/volunteer-groups/members/${id}/groups`);
   }
 
   member(id: string): Observable<AdminMember> {

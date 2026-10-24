@@ -61,7 +61,7 @@ import { Election, Panel, stageLabel } from './panch.models';
             <div class="grid">
               @for (member of seated.members; track member.memberId) {
                 <div class="card" [class.mine]="member.memberId === me()">
-                  <h2>{{ nameFor(member.memberId) }}</h2>
+                  <h2><a [routerLink]="['/members', member.memberId]">{{ nameFor(member.memberId) }}</a></h2>
                   <p class="small">Seated {{ date(member.seatedAt) }}</p>
                 </div>
               }

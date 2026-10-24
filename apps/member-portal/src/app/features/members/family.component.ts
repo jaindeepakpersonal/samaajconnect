@@ -1,4 +1,5 @@
 import { Component, OnInit, computed, inject, signal } from '@angular/core';
+import { RouterLink } from '@angular/router';
 import { FormsModule } from '@angular/forms';
 import { AuthedImageDirective, AuthService, describeError } from '@samaajconnect/shared';
 import { MembersApi } from './members.api';
@@ -34,7 +35,7 @@ import {
  */
 @Component({
   selector: 'app-family',
-  imports: [AuthedImageDirective, FormsModule],
+  imports: [AuthedImageDirective, FormsModule, RouterLink],
   styleUrl: './members.css',
   template: `
     <div class="members-page">
@@ -122,7 +123,7 @@ import {
               <ul class="people">
                 @for (person of activeMembers(household); track person.id) {
                   <li>
-                    {{ nameFor(person, household) }}
+                    <a [routerLink]="['/members', person.memberProfileId]">{{ nameFor(person, household) }}</a>
                     <span class="small">· {{ person.relationship }}</span>
                   </li>
                 }
@@ -159,7 +160,7 @@ import {
                 @for (request of pendingRequests(household); track request.id) {
                   <div class="request">
                     <p>
-                      <b>{{ request.fullName }}</b>
+                      <b><a [routerLink]="['/members', request.memberProfileId]">{{ request.fullName }}</a></b>
                       <span class="small"> · {{ request.relationship }}</span>
                     </p>
 

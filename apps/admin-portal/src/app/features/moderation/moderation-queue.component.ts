@@ -1,4 +1,5 @@
 import { DatePipe } from '@angular/common';
+import { RouterLink } from '@angular/router';
 import { Component, OnInit, computed, inject, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { AuthService, describeError } from '@samaajconnect/shared';
@@ -32,7 +33,7 @@ import { ModerationDecision, ModerationQueueEntry } from '../../core/admin.model
  */
 @Component({
   selector: 'app-moderation-queue',
-  imports: [FormsModule, DatePipe],
+  imports: [FormsModule, DatePipe, RouterLink],
   template: `
     <h1 class="title">Timeline / Content Moderation</h1>
     <p class="sub">Posts awaiting review in {{ scope.label() }}, and ones members have reported.</p>
@@ -65,7 +66,7 @@ import { ModerationDecision, ModerationQueueEntry } from '../../core/admin.model
             <div>
               <h2>{{ entry.post.title }}</h2>
               <p class="muted">
-                {{ authorName(entry.post.authorMemberId) }}
+                <a [routerLink]="['/members', entry.post.authorMemberId]">{{ authorName(entry.post.authorMemberId) }}</a>
                 · {{ entry.post.createdAt | date: 'd MMM y, HH:mm' }}
                 · {{ entry.post.commentCount }}
                 {{ entry.post.commentCount === 1 ? 'comment' : 'comments' }}

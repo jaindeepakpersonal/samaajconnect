@@ -1264,6 +1264,32 @@ export interface AdminMember {
   readonly motherName?: string | null;
 }
 
+/** Mirrors `MemberHouseholdResponse`: null when the member is in no household. */
+export interface AdminMemberHousehold {
+  readonly household: {
+    readonly familyId: string;
+    readonly namedAfter: string | null;
+    readonly members: readonly {
+      readonly memberId: string;
+      readonly fullName: string;
+      readonly photoUrl: string | null;
+      readonly relationshipToAdmin: string | null;
+      readonly isHead: boolean;
+      readonly isAdmin: boolean;
+    }[];
+  } | null;
+}
+
+/** Mirrors `MemberGroupResponse`: one group a member belongs to. */
+export interface AdminMemberGroup {
+  readonly groupId: string;
+  readonly name: string;
+  readonly photoUrl: string | null;
+  readonly roleTitle: string | null;
+  readonly isPresident: boolean;
+  readonly joinedAt: string;
+}
+
 /** The body of `PATCH /v1/members/{id}/details`. No privacy fields, by design. */
 export interface MemberCorrection {
   readonly fullName: string;

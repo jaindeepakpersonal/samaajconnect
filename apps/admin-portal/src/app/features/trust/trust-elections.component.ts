@@ -1,4 +1,5 @@
 import { DatePipe } from '@angular/common';
+import { RouterLink } from '@angular/router';
 import { Component, OnInit, computed, inject, input, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { describeError } from '@samaajconnect/shared';
@@ -29,7 +30,7 @@ import {
  */
 @Component({
   selector: 'app-trust-elections',
-  imports: [FormsModule, DatePipe],
+  imports: [FormsModule, DatePipe, RouterLink],
   template: `
     @if (error(); as message) {
       <p class="notice error" role="alert">{{ message }}</p>
@@ -136,7 +137,7 @@ import {
               <p class="notice ok">
                 Elected:
                 @for (winner of election.winnerMemberIds; track winner; let last = $last) {
-                  <b>{{ name(winner) }}</b>{{ last ? '' : ', ' }}
+                  <b><a [routerLink]="['/members', winner]">{{ name(winner) }}</a></b>{{ last ? '' : ', ' }}
                 }
               </p>
             }
@@ -193,8 +194,8 @@ import {
                       <tbody>
                         @for (candidate of shown.candidates; track candidate.id) {
                           <tr>
-                            <td><b>{{ name(candidate.memberId) }}</b></td>
-                            <td>{{ name(candidate.nominatedBy) }}</td>
+                            <td><b><a [routerLink]="['/members', candidate.memberId]">{{ name(candidate.memberId) }}</a></b></td>
+                            <td><a [routerLink]="['/members', candidate.nominatedBy]">{{ name(candidate.nominatedBy) }}</a></td>
                             <td>
                               <span class="pill" [class.warn]="candidate.status === 'Nominated'">
                                 {{ candidate.status === 'Approved' ? 'On the ballot' : 'Waiting' }}

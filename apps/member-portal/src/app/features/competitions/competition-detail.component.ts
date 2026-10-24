@@ -139,7 +139,7 @@ import {
               <div class="grid">
                 @for (entry of rd.entries; track entry.id) {
                   <div class="card">
-                    <h2>{{ nameFor(entry.participantMemberId) }}</h2>
+                    <h2><a [routerLink]="['/members', entry.participantMemberId]">{{ nameFor(entry.participantMemberId) }}</a></h2>
 
                     @if (rd.canSeeScores) {
                       @if (entry.averageScore !== null) {
@@ -201,7 +201,7 @@ import {
                 @for (entry of published.ranking; track entry.entryId) {
                   <tr>
                     <td>{{ entry.rank }}</td>
-                    <td>{{ nameFor(entry.participantMemberId) }}</td>
+                    <td><a [routerLink]="['/members', entry.participantMemberId]">{{ nameFor(entry.participantMemberId) }}</a></td>
                     <td>{{ entry.averageScore }}</td>
                   </tr>
                 }

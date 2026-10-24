@@ -77,7 +77,7 @@ import {
               </tr>
               @for (person of activeMembers(); track person.id) {
                 <tr>
-                  <td>{{ nameFor(person.memberId) }}</td>
+                  <td><a [routerLink]="['/members', person.memberId]">{{ nameFor(person.memberId) }}</a></td>
                   <td>{{ person.positionTitle ?? '—' }}</td>
                 </tr>
               }
@@ -106,7 +106,7 @@ import {
                   <p>
                     Elected:
                     @for (winnerId of election.winnerMemberIds; track winnerId; let last = $last) {
-                      <b>{{ nameFor(winnerId) }}</b>{{ last ? '' : ', ' }}
+                      <b><a [routerLink]="['/members', winnerId]">{{ nameFor(winnerId) }}</a></b>{{ last ? '' : ', ' }}
                     }
                   </p>
                 }

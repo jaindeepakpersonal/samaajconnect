@@ -91,7 +91,7 @@ import { isNotFound } from '../../core/http-status';
               <tbody>
                 @for (judge of judges(); track judge.id) {
                   <tr>
-                    <td><b>{{ memberName(judge.memberId) }}</b></td>
+                    <td><b><a [routerLink]="['/members', judge.memberId]">{{ memberName(judge.memberId) }}</a></b></td>
                     <td>{{ judge.assignedAt | date: 'd MMM y' }}</td>
                     <td>
                       <button class="btn small alt" type="button" [disabled]="busy()"
@@ -206,7 +206,7 @@ import { isNotFound } from '../../core/http-status';
                   <tbody>
                     @for (entry of rd.entries; track entry.id) {
                       <tr>
-                        <td><b>{{ memberName(entry.participantMemberId) }}</b></td>
+                        <td><b><a [routerLink]="['/members', entry.participantMemberId]">{{ memberName(entry.participantMemberId) }}</a></b></td>
                         <td>{{ entry.averageScore ?? '—' }}</td>
                       </tr>
                     }
@@ -248,7 +248,7 @@ import { isNotFound } from '../../core/http-status';
                     @for (entry of ranking.ranking; track entry.entryId) {
                       <tr>
                         <td>{{ entry.rank }}</td>
-                        <td><b>{{ memberName(entry.participantMemberId) }}</b></td>
+                        <td><b><a [routerLink]="['/members', entry.participantMemberId]">{{ memberName(entry.participantMemberId) }}</a></b></td>
                         <td>{{ entry.averageScore }}</td>
                       </tr>
                     }

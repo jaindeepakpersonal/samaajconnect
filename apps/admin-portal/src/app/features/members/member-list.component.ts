@@ -125,7 +125,7 @@ import { AdminMember, Gautra, Locality, LookupItem } from '../../core/admin.mode
 
               <div class="member-body">
                 <h2 class="member-name">
-                  {{ member.fullName }}
+                  <a [routerLink]="['/members', member.id]">{{ member.fullName }}</a>
                   @if (gautraName(member.gautraId); as gautra) {
                     <span class="member-gautra">({{ gautra }})</span>
                   }

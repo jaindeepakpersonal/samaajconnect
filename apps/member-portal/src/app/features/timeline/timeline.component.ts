@@ -177,7 +177,7 @@ import { Comment, Post, ReactionType, Reactions } from './timeline.models';
                   } @else {
                     <span class="avatar initials" aria-hidden="true">{{ initials(authorLabel(post.authorMemberId)) }}</span>
                   }
-                  <span class="author">{{ authorLabel(post.authorMemberId) }}</span>
+                  <a class="author" [routerLink]="['/members', post.authorMemberId]">{{ authorLabel(post.authorMemberId) }}</a>
                   <span class="pill" [class.warn]="isAwaitingReview(post)">{{ label(post) }}</span>
                   <span>{{ when(post.createdAt) }}</span>
                 </div>
@@ -250,7 +250,7 @@ import { Comment, Post, ReactionType, Reactions } from './timeline.models';
                             } @else {
                               <span class="avatar small initials" aria-hidden="true">{{ initials(authorLabel(comment.authorMemberId)) }}</span>
                             }
-                            <span>{{ authorLabel(comment.authorMemberId) }}</span>
+                            <a [routerLink]="['/members', comment.authorMemberId]">{{ authorLabel(comment.authorMemberId) }}</a>
                             <span>{{ when(comment.createdAt) }}</span>
                           </div>
                           <p>{{ comment.body }}</p>

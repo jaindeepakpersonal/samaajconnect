@@ -96,7 +96,7 @@ import { Campaign, CampaignDetail, CampaignResult, Candidate, stageLabel } from 
               @for (entry of published.ranking; track entry.candidateId) {
                 <tr>
                   <td>{{ entry.rank }}</td>
-                  <td>{{ nameFor(entry.memberId) }}</td>
+                  <td><a [routerLink]="['/members', entry.memberId]">{{ nameFor(entry.memberId) }}</a></td>
                   <td>{{ categoryFor(entry.candidateId, found) }}</td>
                   <td>{{ entry.votes }}</td>
                 </tr>
@@ -201,7 +201,7 @@ import { Campaign, CampaignDetail, CampaignResult, Candidate, stageLabel } from 
           <div class="grid">
             @for (candidate of ballot(found); track candidate.id) {
               <div class="card" [class.mine]="isMyVote(candidate, found.campaign)">
-                <h2>{{ nameFor(candidate.memberId) }}</h2>
+                <h2><a [routerLink]="['/members', candidate.memberId]">{{ nameFor(candidate.memberId) }}</a></h2>
                 <p>{{ candidate.category ?? 'No category given' }}</p>
 
                 @if (found.tallyVisible && candidate.votes !== null) {

@@ -1,9 +1,19 @@
-import { Component, OnInit, inject, signal } from '@angular/core';
+import { Component, DestroyRef, OnInit, inject, signal } from '@angular/core';
+import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { FormsModule } from '@angular/forms';
 import { ActivatedRoute, RouterLink } from '@angular/router';
-import { describeError } from '@samaajconnect/shared';
+import { AuthedImageDirective, describeError } from '@samaajconnect/shared';
 import { AdminApi } from '../../core/admin-api';
-import { AdminAddress, AdminMember, City, Gautra, LookupItem, Locality } from '../../core/admin.models';
+import {
+  AdminAddress,
+  AdminMember,
+  AdminMemberGroup,
+  AdminMemberHousehold,
+  City,
+  Gautra,
+  LookupItem,
+  Locality,
+} from '../../core/admin.models';
 
 /**
  * One member, and the correction form.
@@ -37,10 +47,18 @@ import { AdminAddress, AdminMember, City, Gautra, LookupItem, Locality } from '.
  * previously selected and loads that City's own list, since a Locality from
  * the old City is nonsense once the City changes. "Same as permanent" is a
  * one-time copy into Temporary, not a link the two stay bound by afterwards.
+ *
+ * **It opens as the member's page since 2026-10-24, and corrects only on
+ * request.** Every member list in this panel links here, and most visits are
+ * to look somebody up, not to change them - so the page shows the member as a
+ * profile (photo, name with Gautra, details, address, household and volunteer
+ * groups) and "Correct details" opens the form. Cancel puts back what is on
+ * file. It follows the route, so a household link from one member to another
+ * reloads rather than showing the first member under the second's address.
  */
 @Component({
   selector: 'app-member-detail',
-  imports: [FormsModule, RouterLink],
+  imports: [AuthedImageDirective, FormsModule, RouterLink],
   template: `
     <a class="back" routerLink="/members">‹ Back to Members</a>
 
@@ -51,11 +69,27 @@ import { AdminAddress, AdminMember, City, Gautra, LookupItem, Locality } from '.
     @if (loading()) {
       <p class="empty" role="status">Loading…</p>
     } @else if (member(); as person) {
-      <h1 class="title">{{ person.fullName }}</h1>
-      <p class="sub">
-        Correcting somebody's details on their behalf. What they share with the Samaaj stays
-        their decision.
-      </p>
+      <div class="member-head">
+        @if (person.photoUrl; as path) {
+          <img class="member-avatar" [scAuthedSrc]="path" [alt]="'Photo of ' + person.fullName" />
+        } @else {
+          <span class="member-avatar initials" aria-hidden="true">{{ initials(person.fullName) }}</span>
+        }
+        <div class="member-head-text">
+          <h1 class="title">
+            {{ person.fullName }}
+            @if (nameOf(gautras(), person.gautraId); as gautra) {
+              <span class="member-gautra">({{ gautra }})</span>
+            }
+          </h1>
+          <p class="sub">{{ headline(person) }}</p>
+        </div>
+        @if (!editing()) {
+          <div class="member-head-actions">
+            <button class="btn" type="button" (click)="startEditing()">Correct details</button>
+          </div>
+        }
+      </div>
 
       @if (saved()) {
         <p class="notice ok" role="status">
@@ -63,6 +97,94 @@ import { AdminAddress, AdminMember, City, Gautra, LookupItem, Locality } from '.
           of the fields you changed.
         </p>
       }
+
+      @if (!editing()) {
+        <div class="grid2">
+          <div class="card">
+            <h2>About</h2>
+            <dl class="facts">
+              <dt>Mobile</dt>
+              <dd>{{ person.mobile ?? notSet }}</dd>
+              <dt>Email</dt>
+              <dd>{{ person.email ?? notSet }}</dd>
+              <dt>Date of birth</dt>
+              <dd>{{ person.dateOfBirth ?? notSet }}</dd>
+              <dt>Gender</dt>
+              <dd>{{ person.gender }}</dd>
+              <dt>Gautra</dt>
+              <dd>{{ nameOf(gautras(), person.gautraId) ?? notSet }}</dd>
+              <dt>Profession</dt>
+              <dd>{{ labelOf(professions(), person.professionId) ?? notSet }}</dd>
+              <dt>Qualification</dt>
+              <dd>{{ labelOf(qualifications(), person.qualificationId) ?? notSet }}</dd>
+              <dt>Father</dt>
+              <dd>{{ person.fatherName ?? notSet }}</dd>
+              <dt>Mother</dt>
+              <dd>{{ person.motherName ?? notSet }}</dd>
+            </dl>
+          </div>
+
+          <div class="card">
+            <h2>Address</h2>
+            <dl class="facts">
+              <dt>Permanent</dt>
+              <dd>{{ addressText(person.permanentAddress, permanentLocalities()) }}</dd>
+              <dt>Temporary</dt>
+              <dd>{{ person.temporaryAddress ? addressText(person.temporaryAddress, temporaryLocalities()) : notSet }}</dd>
+            </dl>
+          </div>
+
+          <div class="card">
+            <h2>Household</h2>
+            @if (household(); as found) {
+              @if (found.household; as home) {
+                @if (home.namedAfter; as namedAfter) {
+                  <p class="small">{{ namedAfter }}'s household</p>
+                }
+                <ul class="people">
+                  @for (relative of home.members; track relative.memberId) {
+                    <li>
+                      <a [routerLink]="['/members', relative.memberId]">{{ relative.fullName }}</a>
+                      <span class="small">
+                        · {{ relative.isAdmin ? 'Family admin' : (relative.relationshipToAdmin ?? 'Member') }}
+                        @if (relative.isHead) { · Head }
+                      </span>
+                    </li>
+                  }
+                </ul>
+              } @else {
+                <p class="empty">Not in a household on the platform.</p>
+              }
+            } @else {
+              <p class="empty" role="status">Loading…</p>
+            }
+          </div>
+
+          <div class="card">
+            <h2>Volunteer groups</h2>
+            @if (groups(); as found) {
+              @if (found.length === 0) {
+                <p class="empty">Not in any volunteer group.</p>
+              } @else {
+                <ul class="people">
+                  @for (group of found; track group.groupId) {
+                    <li>
+                      <a [routerLink]="['/groups', group.groupId]">{{ group.name }}</a>
+                      <span class="small"> · {{ group.isPresident ? 'President' : (group.roleTitle ?? 'Member') }}</span>
+                    </li>
+                  }
+                </ul>
+              }
+            } @else {
+              <p class="empty" role="status">Loading…</p>
+            }
+          </div>
+        </div>
+      } @else {
+      <p class="sub">
+        Correcting somebody's details on their behalf. What they share with the Samaaj stays
+        their decision.
+      </p>
 
       <div class="card">
         <h2>Details</h2>
@@ -282,10 +404,11 @@ import { AdminAddress, AdminMember, City, Gautra, LookupItem, Locality } from '.
             <button class="btn" type="submit" [disabled]="saving()">
               {{ saving() ? 'Saving…' : 'Save corrections' }}
             </button>
-            <a class="btn alt" routerLink="/members">Cancel</a>
+            <button class="btn alt" type="button" (click)="cancelEditing()">Cancel</button>
           </div>
         </form>
       </div>
+      }
     }
   `,
   styles: `
@@ -299,13 +422,107 @@ import { AdminAddress, AdminMember, City, Gautra, LookupItem, Locality } from '.
     .error-text {
       color: var(--danger-text, #b00020);
     }
+
+    .member-head {
+      display: flex;
+      gap: 16px;
+      align-items: center;
+      flex-wrap: wrap;
+      margin: 12px 0 16px;
+    }
+
+    .member-avatar {
+      width: 96px;
+      height: 96px;
+      border-radius: 50%;
+      object-fit: cover;
+      flex-shrink: 0;
+      background: var(--soft);
+    }
+
+    .member-avatar.initials {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 2rem;
+      font-weight: 700;
+      color: var(--accent-ink);
+    }
+
+    .member-head-text {
+      flex: 1 1 240px;
+      min-width: 0;
+    }
+
+    .member-head-text .title {
+      margin: 0;
+      overflow-wrap: anywhere;
+    }
+
+    .member-gautra {
+      font-weight: 400;
+      color: var(--muted);
+    }
+
+    .member-head-actions {
+      display: flex;
+      gap: 8px;
+    }
+
+    .grid2 {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+      gap: 16px;
+    }
+
+    .grid2 .card {
+      margin: 0;
+    }
+
+    .facts {
+      display: grid;
+      grid-template-columns: max-content 1fr;
+      gap: 6px 16px;
+      margin: 0;
+    }
+
+    .facts dt {
+      font-weight: 600;
+    }
+
+    .facts dd {
+      margin: 0;
+      color: var(--muted);
+      overflow-wrap: anywhere;
+    }
+
+    .people {
+      list-style: none;
+      margin: 0;
+      padding: 0;
+    }
+
+    .people li {
+      padding: 6px 0;
+    }
+
+    .people li + li {
+      border-top: 1px solid var(--line);
+    }
   `,
 })
 export class MemberDetailComponent implements OnInit {
   private readonly api = inject(AdminApi);
   private readonly route = inject(ActivatedRoute);
+  private readonly destroyRef = inject(DestroyRef);
 
   readonly member = signal<AdminMember | null>(null);
+
+  /** View mode until "Correct details" - most visits look somebody up. */
+  readonly editing = signal(false);
+  readonly household = signal<AdminMemberHousehold | null>(null);
+  readonly groups = signal<readonly AdminMemberGroup[] | null>(null);
+  readonly notSet = 'Not set';
   readonly loading = signal(true);
   readonly saving = signal(false);
   readonly saved = signal(false);
@@ -353,12 +570,25 @@ export class MemberDetailComponent implements OnInit {
     });
     this.api.listCities().subscribe({ next: (found) => this.cities.set(found), error: () => {} });
 
-    const id = this.route.snapshot.paramMap.get('id');
+    // A household link from one member to another reuses this component, so
+    // follow the id rather than reading it once.
+    this.route.paramMap
+      .pipe(takeUntilDestroyed(this.destroyRef))
+      .subscribe((params) => this.load(params.get('id')));
+  }
 
+  private load(id: string | null): void {
     if (id === null) {
       this.loading.set(false);
       return;
     }
+
+    this.loading.set(true);
+    this.editing.set(false);
+    this.saved.set(false);
+    this.error.set(null);
+    this.household.set(null);
+    this.groups.set(null);
 
     this.api.member(id).subscribe({
       next: (person) => {
@@ -371,6 +601,71 @@ export class MemberDetailComponent implements OnInit {
         this.loading.set(false);
       },
     });
+
+    // Either failing leaves its card saying so rather than breaking the page.
+    this.api.memberHousehold(id).subscribe({
+      next: (found) => this.household.set(found),
+      error: () => this.household.set({ household: null }),
+    });
+
+    this.api.memberGroups(id).subscribe({
+      next: (found) => this.groups.set(found),
+      error: () => this.groups.set([]),
+    });
+  }
+
+  startEditing(): void {
+    this.saved.set(false);
+    this.editing.set(true);
+  }
+
+  /** Back to the page, putting back what is on file. */
+  cancelEditing(): void {
+    const person = this.member();
+
+    if (person !== null) {
+      this.fill(person);
+    }
+
+    this.error.set(null);
+    this.editing.set(false);
+  }
+
+  initials(name: string): string {
+    return name
+      .split(/\s+/)
+      .filter((part) => part.length > 0)
+      .slice(0, 2)
+      .map((part) => part[0]!.toUpperCase())
+      .join('');
+  }
+
+  nameOf(list: readonly { id: string; name: string }[], id: string | null): string | null {
+    return id === null ? null : (list.find((item) => item.id === id)?.name ?? null);
+  }
+
+  labelOf(list: readonly LookupItem[], id: string | null): string | null {
+    return id === null ? null : (list.find((item) => item.id === id)?.label ?? null);
+  }
+
+  /** Profession and locality, under the name, when set. */
+  headline(person: AdminMember): string {
+    return [
+      this.labelOf(this.professions(), person.professionId),
+      this.nameOf(this.permanentLocalities(), person.permanentAddress.localityId),
+    ]
+      .filter((part): part is string => part !== null)
+      .join(' · ');
+  }
+
+  addressText(address: AdminAddress, localities: readonly Locality[]): string {
+    const parts = [
+      address.line,
+      this.nameOf(localities, address.localityId),
+      this.nameOf(this.cities(), address.cityId),
+    ].filter((part): part is string => typeof part === 'string' && part.trim().length > 0);
+
+    return parts.length === 0 ? this.notSet : parts.join(', ');
   }
 
   private fill(person: AdminMember): void {
@@ -486,6 +781,7 @@ export class MemberDetailComponent implements OnInit {
           this.fill(updated);
           this.saving.set(false);
           this.saved.set(true);
+          this.editing.set(false);
         },
         error: (failure: unknown) => {
           this.error.set(describeError(failure));

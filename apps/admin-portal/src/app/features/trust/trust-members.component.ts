@@ -1,4 +1,5 @@
 import { Component, OnInit, computed, inject, input, signal } from '@angular/core';
+import { RouterLink } from '@angular/router';
 import { FormsModule } from '@angular/forms';
 import { describeError } from '@samaajconnect/shared';
 import { Observable } from 'rxjs';
@@ -19,7 +20,7 @@ import { TrustMemberDialogComponent } from './trust-member-dialog.component';
  */
 @Component({
   selector: 'app-trust-members',
-  imports: [FormsModule, TrustMemberDialogComponent],
+  imports: [FormsModule, TrustMemberDialogComponent, RouterLink],
   template: `
     @if (error(); as message) {
       <p class="notice error" role="alert">{{ message }}</p>
@@ -54,7 +55,7 @@ import { TrustMemberDialogComponent } from './trust-member-dialog.component';
             <tbody>
               @for (member of members(); track member.id) {
                 <tr>
-                  <td><b>{{ name(member.memberId) }}</b></td>
+                  <td><b><a [routerLink]="['/members', member.memberId]">{{ name(member.memberId) }}</a></b></td>
                   <td>
                     @if (member.status === 'Active') {
                       <label class="sr-only" [for]="'role-' + member.id">Role of {{ name(member.memberId) }}</label>

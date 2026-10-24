@@ -110,7 +110,7 @@ import {
                 • {{ area }}
               }
               @if (found.group.presidentMemberId; as president) {
-                • President: {{ nameFor(president, found) }}
+                • President: <a [routerLink]="['/members', president]">{{ nameFor(president, found) }}</a>
               }
             </p>
           </div>

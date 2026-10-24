@@ -74,7 +74,7 @@ import { isNotFound } from '../../core/http-status';
       <h1 class="title">{{ found.group.name }}</h1>
       <p class="sub">
         @if (found.group.presidentMemberId) {
-          President: {{ memberName(found.group.presidentMemberId) }}
+          President: <a [routerLink]="['/members', found.group.presidentMemberId]">{{ memberName(found.group.presidentMemberId) }}</a>
         } @else {
           No president yet
         }
@@ -188,7 +188,7 @@ import { isNotFound } from '../../core/http-status';
                     <tbody>
                       @for (request of pending(); track request.id) {
                         <tr>
-                          <td><b>{{ memberName(request.memberId) }}</b></td>
+                          <td><b><a [routerLink]="['/members', request.memberId]">{{ memberName(request.memberId) }}</a></b></td>
                           <td>{{ request.note ?? '—' }}</td>
                           <td>{{ request.createdAt | date: 'd MMM y' }}</td>
                           <td>
@@ -373,8 +373,8 @@ import { isNotFound } from '../../core/http-status';
                               <tbody>
                                 @for (candidate of shown.candidates; track candidate.id) {
                                   <tr>
-                                    <td><b>{{ memberName(candidate.memberId) }}</b></td>
-                                    <td>{{ memberName(candidate.nominatedBy) }}</td>
+                                    <td><b><a [routerLink]="['/members', candidate.memberId]">{{ memberName(candidate.memberId) }}</a></b></td>
+                                    <td><a [routerLink]="['/members', candidate.nominatedBy]">{{ memberName(candidate.nominatedBy) }}</a></td>
                                     <td>
                                       <span class="pill" [class.warn]="candidate.status === 'Nominated'">
                                         {{ candidate.status === 'Approved' ? 'On the ballot' : 'Waiting' }}
@@ -430,7 +430,7 @@ import { isNotFound } from '../../core/http-status';
                     <tbody>
                       @for (member of found.members; track member.memberId) {
                         <tr>
-                          <td><b>{{ memberName(member.memberId) }}</b></td>
+                          <td><b><a [routerLink]="['/members', member.memberId]">{{ memberName(member.memberId) }}</a></b></td>
                           <td>
                             @if (found.group.iCanRunElections && member.memberId !== found.group.presidentMemberId) {
                               <label class="sr-only" [for]="'member-role-' + member.memberId">

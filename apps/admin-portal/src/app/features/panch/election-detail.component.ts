@@ -141,7 +141,7 @@ import { isNotFound } from '../../core/http-status';
                 @for (entry of ranking.ranking; track entry.candidateId) {
                   <tr>
                     <td>{{ entry.rank }}</td>
-                    <td><b>{{ memberName(entry.memberId) }}</b></td>
+                    <td><b><a [routerLink]="['/members', entry.memberId]">{{ memberName(entry.memberId) }}</a></b></td>
                     <td>{{ entry.votes }}</td>
                     <td>{{ seated(ranking, entry.memberId) ? 'Seated' : '—' }}</td>
                   </tr>
@@ -176,7 +176,7 @@ import { isNotFound } from '../../core/http-status';
               <tbody>
                 @for (candidate of approved(); track candidate.id) {
                   <tr>
-                    <td><b>{{ memberName(candidate.memberId) }}</b></td>
+                    <td><b><a [routerLink]="['/members', candidate.memberId]">{{ memberName(candidate.memberId) }}</a></b></td>
                     <td>
                       @if (candidate.votes !== null) {
                         {{ candidate.votes }}
@@ -224,8 +224,8 @@ import { isNotFound } from '../../core/http-status';
               <tbody>
                 @for (candidate of nominated(); track candidate.id) {
                   <tr>
-                    <td><b>{{ memberName(candidate.memberId) }}</b></td>
-                    <td>{{ memberName(candidate.nominatedBy) }}</td>
+                    <td><b><a [routerLink]="['/members', candidate.memberId]">{{ memberName(candidate.memberId) }}</a></b></td>
+                    <td><a [routerLink]="['/members', candidate.nominatedBy]">{{ memberName(candidate.nominatedBy) }}</a></td>
                     <td>
                       <div class="row-actions">
                         <button class="btn small" type="button" [disabled]="busy()"

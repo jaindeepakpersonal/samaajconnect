@@ -40,7 +40,7 @@ screen. The spec is `docs/product/wireframes/admin-panel-wireframes.html`.
 | Trust detail | `/trust/:id` | — | built; no wireframe covers running one. Six tabs: members (add in a popup, a role picker per row, remove), roles (define with seats, rename/resize, remove), elections (set up for a role, approve nominations, move stages, publish), donations (pledge, then collect against a receipt number), collections (what a Boli winner or a pledge owes; record the payment), expenses (record, approve) |
 | Social Issues | `/issues` | `#issues` | built. The reviewer's approval queue |
 | Members | `/members` | `#members` | built. Search the Samaaj directory and open somebody |
-| Member detail | `/members/:id` | — | built; the wireframe's "View" had no screen behind it. The correction form |
+| Member detail | `/members/:id` | — | built; the wireframe's "View" had no screen behind it. The member's page - photo, details, address, household, volunteer groups - with the correction form behind "Correct details". Every member list in this panel links here |
 | Change password | `/change-password` | — | built; no wireframe covers it — the wireframe's sign-in screen has no forgot-password link at all |
 | Reports & Analytics | `/reports` | `#reports` | built — the three per-Samaaj cards only. The wireframe's Super-Admin-only cross-tenant comparison table is a deferred follow-up, see below |
 | Settings | `/settings` | `#settings` | built — Security only, see below. Tenant Branding and Module Controls point at the Samaaj screen, which already covers them; Notification Providers stays honestly unbuilt |

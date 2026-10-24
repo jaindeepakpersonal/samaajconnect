@@ -1,7 +1,8 @@
 import { provideHttpClient } from '@angular/common/http';
 import { HttpTestingController, provideHttpClientTesting } from '@angular/common/http/testing';
 import { ComponentFixture, TestBed } from '@angular/core/testing';
-import { ActivatedRoute, provideRouter } from '@angular/router';
+import { ActivatedRoute, convertToParamMap, provideRouter } from '@angular/router';
+import { of } from 'rxjs';
 import { API_CONFIG, AuthService } from '@samaajconnect/shared';
 import { AdminMember } from '../../core/admin.models';
 import { MemberDetailComponent } from './member-detail.component';
@@ -233,7 +234,10 @@ describe('MemberDetailComponent', () => {
         { provide: API_CONFIG, useValue: { gatewayUrl: '' } },
         {
           provide: ActivatedRoute,
-          useValue: { snapshot: { paramMap: new Map([['id', 'm1']]) } },
+          useValue: {
+            snapshot: { paramMap: new Map([['id', 'm1']]) },
+            paramMap: of(convertToParamMap({ id: 'm1' })),
+          },
         },
       ],
     });
@@ -259,12 +263,51 @@ describe('MemberDetailComponent', () => {
     http.expectOne((r) => r.url === '/v1/master-data/cities').flush([]);
   }
 
-  function load(person: AdminMember = member()) {
+  /** Opens the member's page: the profile, their household and their groups. */
+  function loadView(person: AdminMember = member()) {
     fixture.detectChanges();
     settleMasterData();
     http.expectOne('/v1/members/m1').flush(person);
+    http.expectOne('/v1/members/m1/household').flush({ household: null });
+    http.expectOne('/v1/volunteer-groups/members/m1/groups').flush([]);
     fixture.detectChanges();
   }
+
+  /** Opens the page and presses Correct details - the tests below are about the form. */
+  function load(person: AdminMember = member()) {
+    loadView(person);
+    component.startEditing();
+    fixture.detectChanges();
+  }
+
+  it("opens as the member's page, with the form only behind Correct details", () => {
+    loadView(member({ fatherName: 'Mahesh Shah' }));
+
+    expect(fixture.nativeElement.querySelector('form')).toBeNull();
+    expect(text()).toContain('Meera Shah');
+    expect(text()).toContain('Mahesh Shah');
+    expect(text()).toContain('Not in a household on the platform');
+    expect(text()).toContain('Not in any volunteer group');
+
+    const correct = [...fixture.nativeElement.querySelectorAll('button')].find(
+      (b) => (b as HTMLElement).textContent?.trim() === 'Correct details',
+    ) as HTMLButtonElement;
+    correct.click();
+    fixture.detectChanges();
+
+    expect(fixture.nativeElement.querySelector('form')).not.toBeNull();
+  });
+
+  it('cancelling the correction puts back what is on file', () => {
+    load();
+
+    component.form.fullName = 'Somebody Else';
+    component.cancelEditing();
+    fixture.detectChanges();
+
+    expect(component.form.fullName).toBe('Meera Shah');
+    expect(fixture.nativeElement.querySelector('form')).toBeNull();
+  });
 
   it('fills the form from what the service returned', () => {
     load();
