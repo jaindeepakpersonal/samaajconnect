@@ -35,50 +35,10 @@ import { blankToNull } from '../../core/modal-keys';
     }
 
     <div class="card">
-      <h2>Record a donation</h2>
-
-      <form (ngSubmit)="record()">
-        <div class="form-grid">
-          <div class="field">
-            <label for="donor-name">Donor</label>
-            <input id="donor-name" class="input" name="donorName" [(ngModel)]="donorName"
-              maxlength="200" placeholder="Shri Mahendra Jain" />
-          </div>
-
-          <div class="field">
-            <label for="donation-amount">Amount (₹)</label>
-            <input id="donation-amount" class="input" name="amount" inputmode="decimal"
-              [(ngModel)]="amount" placeholder="5,100"
-              [attr.aria-invalid]="amount.trim() && !paise() ? 'true' : null" />
-          </div>
-
-          <div class="field">
-            <label for="donation-date">Given on</label>
-            <input id="donation-date" class="input" type="date" name="donatedOn" [(ngModel)]="donatedOn" />
-          </div>
-
-          <div class="field">
-            <label for="donation-mode">Mode</label>
-            <select id="donation-mode" class="input" name="mode" [(ngModel)]="mode">
-              @for (option of modes; track option.value) {
-                <option [value]="option.value">{{ option.label }}</option>
-              }
-            </select>
-          </div>
-        </div>
-
-        <label for="donation-purpose">Purpose</label>
-        <input id="donation-purpose" class="input" name="purpose" [(ngModel)]="purpose"
-          maxlength="200" placeholder="Books for the new session" />
-
-        <div class="actions">
-          <button class="btn" type="submit" [disabled]="busy() || !canRecord()">Record</button>
-        </div>
-      </form>
-    </div>
-
-    <div class="card spaced">
-      <h2>Ledger</h2>
+      <div class="section-head">
+        <h2>Ledger</h2>
+        <button class="btn small" type="button" (click)="openForm()">Record a donation</button>
+      </div>
 
       @if (voiding(); as donation) {
         <form class="notice" role="status" (ngSubmit)="voidDonation(donation)">
@@ -127,6 +87,7 @@ import { blankToNull } from '../../core/modal-keys';
                           (click)="startVoid(donation)">
                           Void…
                         </button>
+            <button class="btn alt" type="button" (click)="closeForm()">Cancel</button>
                       }
                     </td>
                   </tr>
@@ -139,8 +100,71 @@ import { blankToNull } from '../../core/modal-keys';
         <p class="empty" role="status">Loading…</p>
       }
     </div>
+
+    @if (formOpen()) {
+      <div class="modal-backdrop" (click)="closeForm()">
+        <div class="card modal-card modal-dialog" role="dialog" aria-modal="true"
+          aria-labelledby="donation-popup-title" (click)="$event.stopPropagation()" (keydown.escape)="closeForm()">
+          <h2 id="donation-popup-title">Record a donation</h2>
+
+          @if (error(); as message) {
+            <p class="notice error" role="alert">{{ message }}</p>
+          }
+
+            <form (ngSubmit)="record()">
+              <div class="form-grid">
+                <div class="field">
+                  <label for="donor-name">Donor</label>
+                  <input id="donor-name" class="input" name="donorName" [(ngModel)]="donorName"
+                    maxlength="200" placeholder="Shri Mahendra Jain" />
+                </div>
+
+                <div class="field">
+                  <label for="donation-amount">Amount (₹)</label>
+                  <input id="donation-amount" class="input" name="amount" inputmode="decimal"
+                    [(ngModel)]="amount" placeholder="5,100"
+                    [attr.aria-invalid]="amount.trim() && !paise() ? 'true' : null" />
+                </div>
+
+                <div class="field">
+                  <label for="donation-date">Given on</label>
+                  <input id="donation-date" class="input" type="date" name="donatedOn" [(ngModel)]="donatedOn" />
+                </div>
+
+                <div class="field">
+                  <label for="donation-mode">Mode</label>
+                  <select id="donation-mode" class="input" name="mode" [(ngModel)]="mode">
+                    @for (option of modes; track option.value) {
+                      <option [value]="option.value">{{ option.label }}</option>
+                    }
+                  </select>
+                </div>
+              </div>
+
+              <label for="donation-purpose">Purpose</label>
+              <input id="donation-purpose" class="input" name="purpose" [(ngModel)]="purpose"
+                maxlength="200" placeholder="Books for the new session" />
+
+              <div class="actions">
+                <button class="btn" type="submit" [disabled]="busy() || !canRecord()">Record</button>
+              </div>
+            </form>
+        </div>
+      </div>
+    }
   `,
   styles: `
+    .section-head {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: var(--space-3);
+      flex-wrap: wrap;
+    }
+
+    .section-head h2 {
+      margin: 0;
+    }
     .spaced {
       margin-top: var(--space-4);
     }
@@ -168,6 +192,18 @@ export class PathshalaDonationsComponent implements OnInit {
 
   readonly ledger = signal<DonationLedger | null>(null);
   readonly busy = signal(false);
+
+  /** Whether the form is open over the tab. */
+  readonly formOpen = signal(false);
+
+  openForm(): void {
+    this.error.set(null);
+    this.formOpen.set(true);
+  }
+
+  closeForm(): void {
+    this.formOpen.set(false);
+  }
   readonly error = signal<string | null>(null);
   readonly done = signal<string | null>(null);
   readonly voiding = signal<PathshalaDonation | null>(null);
@@ -232,6 +268,7 @@ export class PathshalaDonationsComponent implements OnInit {
         this.donorName = '';
         this.amount = '';
         this.purpose = '';
+        this.formOpen.set(false);
         return `Receipt ${saved.receiptNumber}: ${formatRupees(saved.amount)} from ${donor}.`;
       },
     );

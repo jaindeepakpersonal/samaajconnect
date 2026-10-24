@@ -32,26 +32,10 @@ import { PathshalaAnnouncement } from '../../core/admin.models';
     }
 
     <div class="card">
-      <h2>Message every parent</h2>
-
-      <form (ngSubmit)="send()">
-        <label for="announcement-title">Title</label>
-        <input id="announcement-title" class="input" name="title" [(ngModel)]="title"
-          maxlength="150" placeholder="No class this Sunday" />
-
-        <label for="announcement-body">Message</label>
-        <textarea id="announcement-body" class="input" name="body" rows="5" [(ngModel)]="body"
-          maxlength="2000"></textarea>
-        <p class="small">{{ body.length }} / 2000. Every parent with a child here is notified.</p>
-
-        <div class="actions">
-          <button class="btn" type="submit" [disabled]="busy() || !canSend()">Send to parents</button>
-        </div>
-      </form>
-    </div>
-
-    <div class="card spaced">
-      <h2>Sent</h2>
+      <div class="section-head">
+        <h2>Sent</h2>
+        <button class="btn small" type="button" (click)="openForm()">Message every parent</button>
+      </div>
 
       @if (loading()) {
         <p class="empty" role="status">Loading…</p>
@@ -72,8 +56,48 @@ import { PathshalaAnnouncement } from '../../core/admin.models';
         </ul>
       }
     </div>
+
+    @if (formOpen()) {
+      <div class="modal-backdrop" (click)="closeForm()">
+        <div class="card modal-card modal-dialog" role="dialog" aria-modal="true"
+          aria-labelledby="announcement-popup-title" (click)="$event.stopPropagation()" (keydown.escape)="closeForm()">
+          <h2 id="announcement-popup-title">Message every parent</h2>
+
+          @if (error(); as message) {
+            <p class="notice error" role="alert">{{ message }}</p>
+          }
+
+            <form (ngSubmit)="send()">
+              <label for="announcement-title">Title</label>
+              <input id="announcement-title" class="input" name="title" [(ngModel)]="title"
+                maxlength="150" placeholder="No class this Sunday" />
+
+              <label for="announcement-body">Message</label>
+              <textarea id="announcement-body" class="input" name="body" rows="5" [(ngModel)]="body"
+                maxlength="2000"></textarea>
+              <p class="small">{{ body.length }} / 2000. Every parent with a child here is notified.</p>
+
+              <div class="actions">
+                <button class="btn" type="submit" [disabled]="busy() || !canSend()">Send to parents</button>
+                <button class="btn alt" type="button" (click)="closeForm()">Cancel</button>
+              </div>
+            </form>
+        </div>
+      </div>
+    }
   `,
   styles: `
+    .section-head {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: var(--space-3);
+      flex-wrap: wrap;
+    }
+
+    .section-head h2 {
+      margin: 0;
+    }
     ul.plain {
       list-style: none;
       padding: 0;
@@ -103,6 +127,18 @@ export class PathshalaAnnouncementsComponent implements OnInit {
   readonly sent = signal<readonly PathshalaAnnouncement[]>([]);
   readonly loading = signal(true);
   readonly busy = signal(false);
+
+  /** Whether the form is open over the tab. */
+  readonly formOpen = signal(false);
+
+  openForm(): void {
+    this.error.set(null);
+    this.formOpen.set(true);
+  }
+
+  closeForm(): void {
+    this.formOpen.set(false);
+  }
   readonly error = signal<string | null>(null);
   readonly done = signal<string | null>(null);
 
@@ -133,6 +169,7 @@ export class PathshalaAnnouncementsComponent implements OnInit {
         );
         this.title = '';
         this.body = '';
+        this.formOpen.set(false);
         this.busy.set(false);
         this.load();
       },

@@ -214,6 +214,9 @@ describe('PathshalaDetailComponent', () => {
     load();
 
     expect(text()).toContain('Class 8 — Jain Studies');
+
+    component.openPopup('class');
+    fixture.detectChanges();
     expect(text()).toContain('Add a class to 2026-27');
   });
 
@@ -243,6 +246,8 @@ describe('PathshalaDetailComponent', () => {
     query['tab'] = 'classes';
     asAdmin();
     load(detail({ sessions: [], classes: [] }));
+    component.openPopup('class');
+    fixture.detectChanges();
 
     expect(text()).toContain('Open a session first');
     expect(text()).not.toContain('Add a class to');

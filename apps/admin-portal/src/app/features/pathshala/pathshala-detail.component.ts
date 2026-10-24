@@ -131,7 +131,12 @@ const TABS: readonly { value: PathshalaTab; label: string; managersOnly?: true }
           @switch (tab()) {
             @case ('sessions') {
               <div class="card">
-                <h2>Academic sessions</h2>
+                <div class="section-head">
+                  <h2>Academic sessions</h2>
+                  @if (canManage()) {
+                    <button class="btn small" type="button" (click)="openPopup('session')">Open a session</button>
+                  }
+                </div>
 
                 @if (school.sessions.length === 0) {
                   <p class="empty">None yet. Open one to start creating classes.</p>
@@ -162,45 +167,17 @@ const TABS: readonly { value: PathshalaTab; label: string; managersOnly?: true }
                   </div>
                 }
 
-                @if (canManage()) {
-                  <form (ngSubmit)="openSession()">
-                    <h3 class="section-heading">Open a session</h3>
-                    <p class="small">
-                      Opening a session makes it the current one. The previous session's classes
-                      and records are kept.
-                    </p>
-
-                    <div class="form-grid">
-                      <div class="field">
-                        <label for="session-label">Label</label>
-                        <input id="session-label" class="input" name="label"
-                          [(ngModel)]="sessionLabel" maxlength="40" placeholder="2026-27" />
-                      </div>
-
-                      <div class="field">
-                        <label for="session-start">Starts</label>
-                        <input id="session-start" class="input" type="date" name="start"
-                          [(ngModel)]="sessionStart" />
-                      </div>
-
-                      <div class="field">
-                        <label for="session-end">Ends</label>
-                        <input id="session-end" class="input" type="date" name="end"
-                          [(ngModel)]="sessionEnd" />
-                      </div>
-                    </div>
-
-                    <button class="btn" type="submit" [disabled]="busy() || !canOpenSession()">
-                      Open session
-                    </button>
-                  </form>
-                }
               </div>
             }
 
             @case ('classes') {
               <div class="card">
-                <h2>Classes</h2>
+                <div class="section-head">
+                  <h2>Classes</h2>
+                  @if (canManage()) {
+                    <button class="btn small" type="button" (click)="openPopup('class')">Add a class</button>
+                  }
+                </div>
 
                 @if (school.classes.length === 0) {
                   <p class="empty">No classes yet.</p>
@@ -235,42 +212,11 @@ const TABS: readonly { value: PathshalaTab; label: string; managersOnly?: true }
                     record exams.
                   </p>
                 }
-
-                @if (canManage()) {
-                  @if (currentSession(); as current) {
-                    <form (ngSubmit)="createClass(current.id)">
-                      <h3 class="section-heading">Add a class to {{ current.label }}</h3>
-
-                      <div class="form-grid">
-                        <div class="field">
-                          <label for="class-name">Name</label>
-                          <input id="class-name" class="input" name="className"
-                            [(ngModel)]="className" maxlength="120"
-                            placeholder="Class 8 — Jain Studies" />
-                        </div>
-
-                        <div class="field">
-                          <label for="class-room">Room</label>
-                          <input id="class-room" class="input" name="roomLabel"
-                            [(ngModel)]="roomLabel" maxlength="60" placeholder="Room 2" />
-                        </div>
-                      </div>
-
-                      <button class="btn" type="submit" [disabled]="busy() || !className.trim()">
-                        Add class
-                      </button>
-                    </form>
-                  } @else {
-                    <p class="notice">
-                      Open a session first. A class belongs to one, so there is nowhere to put it
-                      yet.
-                    </p>
-                  }
-                }
               </div>
             }
 
             @case ('teachers') {
+
               <app-pathshala-teachers
                 [pathshalaId]="school.id"
                 [classes]="school.classes"
@@ -309,12 +255,112 @@ const TABS: readonly { value: PathshalaTab; label: string; managersOnly?: true }
             }
           }
         </div>
+
+        <!-- Open a session ------------------------------------------------ -->
+        @if (popup() === 'session') {
+          <div class="modal-backdrop" (click)="closePopup()">
+            <div class="card modal-card modal-dialog" role="dialog" aria-modal="true"
+              aria-labelledby="session-popup-title" (click)="$event.stopPropagation()"
+              (keydown.escape)="closePopup()">
+              <h2 id="session-popup-title">Open a session</h2>
+              <p class="small">
+                Opening a session makes it the current one. The previous session's classes and
+                records are kept.
+              </p>
+
+              @if (error(); as message) {
+                <p class="notice error" role="alert">{{ message }}</p>
+              }
+
+              <form (ngSubmit)="openSession()">
+                <div class="form-grid">
+                  <div class="field">
+                    <label for="session-label">Label</label>
+                    <input id="session-label" class="input" name="label"
+                      [(ngModel)]="sessionLabel" maxlength="40" placeholder="2026-27" />
+                  </div>
+
+                  <div class="field">
+                    <label for="session-start">Starts</label>
+                    <input id="session-start" class="input" type="date" name="start"
+                      [(ngModel)]="sessionStart" />
+                  </div>
+
+                  <div class="field">
+                    <label for="session-end">Ends</label>
+                    <input id="session-end" class="input" type="date" name="end"
+                      [(ngModel)]="sessionEnd" />
+                  </div>
+                </div>
+
+                <div class="actions">
+                  <button class="btn" type="submit" [disabled]="busy() || !canOpenSession()">Open session</button>
+                  <button class="btn alt" type="button" (click)="closePopup()">Cancel</button>
+                </div>
+              </form>
+            </div>
+          </div>
+        }
+
+        <!-- Add a class ---------------------------------------------------- -->
+        @if (popup() === 'class') {
+          <div class="modal-backdrop" (click)="closePopup()">
+            <div class="card modal-card modal-dialog" role="dialog" aria-modal="true"
+              aria-labelledby="class-popup-title" (click)="$event.stopPropagation()"
+              (keydown.escape)="closePopup()">
+              @if (currentSession(); as current) {
+                <h2 id="class-popup-title">Add a class to {{ current.label }}</h2>
+
+                @if (error(); as message) {
+                  <p class="notice error" role="alert">{{ message }}</p>
+                }
+
+                <form (ngSubmit)="createClass(current.id)">
+                  <div class="form-grid">
+                    <div class="field">
+                      <label for="class-name">Name</label>
+                      <input id="class-name" class="input" name="className"
+                        [(ngModel)]="className" maxlength="120" placeholder="Class 8 — Jain Studies" />
+                    </div>
+
+                    <div class="field">
+                      <label for="class-room">Room</label>
+                      <input id="class-room" class="input" name="roomLabel"
+                        [(ngModel)]="roomLabel" maxlength="60" placeholder="Room 2" />
+                    </div>
+                  </div>
+
+                  <div class="actions">
+                    <button class="btn" type="submit" [disabled]="busy() || !className.trim()">Add class</button>
+                    <button class="btn alt" type="button" (click)="closePopup()">Cancel</button>
+                  </div>
+                </form>
+              } @else {
+                <h2 id="class-popup-title">Add a class</h2>
+                <p class="notice">
+                  Open a session first. A class belongs to one, so there is nowhere to put it yet.
+                </p>
+                <div class="actions">
+                  <button class="btn alt" type="button" (click)="closePopup()">Close</button>
+                </div>
+              }
+            </div>
+          </div>
+        }
       }
     }
   `,
   styles: `
-    .section-heading {
-      margin-top: var(--space-5);
+    .section-head {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: var(--space-3);
+      flex-wrap: wrap;
+    }
+
+    .section-head h2 {
+      margin: 0;
     }
   `,
 })
@@ -329,6 +375,9 @@ export class PathshalaDetailComponent implements OnInit {
   readonly pathshala = signal<PathshalaDetail | null>(null);
   readonly loading = signal(true);
   readonly busy = signal(false);
+
+  /** Which form is open over the page, if any. */
+  readonly popup = signal<'session' | 'class' | null>(null);
   readonly notFound = signal(false);
   readonly error = signal<string | null>(null);
   readonly done = signal<string | null>(null);
@@ -420,6 +469,15 @@ export class PathshalaDetailComponent implements OnInit {
     });
   }
 
+  openPopup(which: 'session' | 'class'): void {
+    this.error.set(null);
+    this.popup.set(which);
+  }
+
+  closePopup(): void {
+    this.popup.set(null);
+  }
+
   openSession(): void {
     if (!this.canOpenSession()) {
       return;
@@ -432,6 +490,7 @@ export class PathshalaDetailComponent implements OnInit {
       `${label} is now the current session.`,
       () => {
         this.sessionLabel = '';
+        this.popup.set(null);
         this.sessionStart = '';
         this.sessionEnd = '';
       },
@@ -450,6 +509,7 @@ export class PathshalaDetailComponent implements OnInit {
       `${name} added.`,
       () => {
         this.className = '';
+        this.popup.set(null);
         this.roomLabel = '';
       },
     );
