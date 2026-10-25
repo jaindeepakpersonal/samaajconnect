@@ -7,20 +7,20 @@ namespace Sangam.IdentityTenant.Infrastructure.Repositories;
 
 /// <summary>
 /// Keeps Samaaj logos in this service's own database. See
-/// <see cref="ILogoStore"/> for why here, and why behind an interface.
+/// <see cref="ITenantImageStore"/> for why here, and why behind an interface.
 /// </summary>
-public sealed class LogoStore(IdentityTenantDbContext dbContext) : ILogoStore
+public sealed class TenantImageStore(IdentityTenantDbContext dbContext) : ITenantImageStore
 {
-    public Task<TenantLogo?> GetAsync(Guid id, CancellationToken cancellationToken = default) =>
-        dbContext.TenantLogos
+    public Task<TenantImage?> GetAsync(Guid id, CancellationToken cancellationToken = default) =>
+        dbContext.TenantImages
             .AsNoTracking()
             .FirstOrDefaultAsync(l => l.Id == id, cancellationToken);
 
-    public void Add(TenantLogo logo) => dbContext.TenantLogos.Add(logo);
+    public void Add(TenantImage logo) => dbContext.TenantImages.Add(logo);
 
     public async Task RemoveAsync(Guid id, CancellationToken cancellationToken = default)
     {
-        var logo = await dbContext.TenantLogos
+        var logo = await dbContext.TenantImages
             .FirstOrDefaultAsync(l => l.Id == id, cancellationToken);
 
         // Silent on a miss. A logo replaced twice, or two administrators
@@ -28,20 +28,20 @@ public sealed class LogoStore(IdentityTenantDbContext dbContext) : ILogoStore
         // for a caller to do differently either way.
         if (logo is not null)
         {
-            dbContext.TenantLogos.Remove(logo);
+            dbContext.TenantImages.Remove(logo);
         }
     }
 
     public async Task RemoveAllForTenantAsync(
         Guid tenantId, CancellationToken cancellationToken = default)
     {
-        var logos = await dbContext.TenantLogos
+        var logos = await dbContext.TenantImages
             .Where(l => l.TenantId == tenantId)
             .ToListAsync(cancellationToken);
 
         if (logos.Count > 0)
         {
-            dbContext.TenantLogos.RemoveRange(logos);
+            dbContext.TenantImages.RemoveRange(logos);
         }
     }
 }

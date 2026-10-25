@@ -368,6 +368,13 @@ jobs:
     runs-on: ubuntu-latest
     needs: [backend]
 
+    # One value for the whole job: docker compose bootstraps the Super Admin
+    # with it and every script below signs in with it. Left to their own
+    # defaults the two drifted apart (compose's changed, the scripts' did not),
+    # and the first sign-in of the smoke run would have failed.
+    env:
+      SUPERADMIN_PASSWORD: ci-superadmin-password
+
     # The coverage CLAUDE.md section 9 asks for: a route that works when curled
     # directly at a service but was never wired into YARP passes every unit and
     # integration test above, and fails here.

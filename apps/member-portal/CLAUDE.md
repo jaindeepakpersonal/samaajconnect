@@ -19,7 +19,7 @@ before translating another screen.
 | Issue detail | `/issues/:id` | — | built; no wireframe covers it, and the workflow is unusable without one |
 | Members | `/members` | `#members` | built |
 | Member detail | `/members/:id` | `#memberdetail` | built - a profile page: cover, photo, name with Gautra, details, and Family (father, mother, household) and Volunteer groups cards |
-| My Family | `/family` | `#family` + `#children` | built as one screen |
+| My Family | `/family` | `#family` + `#children` | built as one screen, with a family tree of the household since 2026-10-25 - see below |
 | Celebrities of Samaaj | `/voting` | `#celebrity` | built |
 | Campaign detail | `/voting/:id` | `#celebrity` + `#celebrityresults` | built as one screen |
 | Your data and privacy | `/privacy` | `#profile`'s privacy card, plus none for the DPDP rights | built - carries `#profile`'s per-field directory privacy card, moved here 2026-09-11, ahead of the three DPDP rights (no wireframe covers those, and endpoints reachable only with curl are not rights a member has). Reachable from the top bar's user menu, not the sidebar |
@@ -160,6 +160,13 @@ whose only job was returning to the one screen with a way out is not
 saving a click, it is clutter the wireframe's own list screens never drew
 either.
 
+The member page's "‹ Back to Members" link went the same way on 2026-10-25,
+in both portals, at the user's request: the browser's back button does that
+job. It was also wrong more often than right - a member's page is reached
+from a household, a group roster, a post's author and a Boli's winner, and
+the link sent every one of those readers to the directory instead of back to
+where they came from.
+
 **The wireframe's numbers are not in the shipped Home.** It showed 1,248
 members, 4 family, 6 events. Those services do not exist, and the skill is
 explicit that prototype values must not be hardcoded, so a tile carries a count
@@ -262,6 +269,15 @@ of a reaction on the wire. Author names use the same batched, memoized
 pattern: one `MembersApi.get()` per distinct `authorMemberId` on screen,
 called from `load()` for the feed and from `toggleComments()` for whichever
 thread is open, never for the whole Samaaj.
+
+**Home is headed by the Samaaj's own banner and logo (2026-10-25)** - the
+banner photo across the top, the logo in a white-ringed circle on it, and the
+Samaaj's name beside that. They come from the same anonymous Samaaj lookup the
+shell makes for its name (`logoUrl`, `bannerUrl`). The logo is public and drawn
+from its path; the banner is a members-only photograph, so it goes through
+`scAuthedSrc` - a plain `src` would be refused. A Samaaj with no banner gets a
+band in the brand colour, one with no logo its initials, and a lookup that
+fails draws no header and costs the feed nothing.
 
 **Home opens on the reader's own face, and every post shows its author's
 (2026-09-27).** A card at the top of Timeline carries the member's photo, name
@@ -666,6 +682,21 @@ failing the export — a partial copy delivered beats a complete one refused —
 and gathering the data is reported separately from the browser refusing to save
 it, because those are different problems and only one of them is the member's to
 fix.
+
+**My Family draws the household as a family tree (2026-10-25), centred on the
+family admin, because that is what the data can say.** A member joins by naming
+their relationship *to the admin*, so `FamilyTreeComponent` puts the admin's
+parents above them, their spouse beside them (joined), their siblings either
+side, and their children below - adult members and minors' records together -
+with no request to any service beyond the household and children this screen
+already loads, plus the memoized `MemberLookup` for faces. It cannot place
+anyone's relatives but the admin's: a sibling's spouse joined as "Other", so
+"Other" is listed under the tree as "Also in the household" rather than guessed
+onto it. A converted child is drawn once, as the member they now are; a pending
+request is not drawn at all. Parents read "Parent", not Father or Mother -
+the household's own data carries no gender, and inventing one from a name
+would be guessing. The lines are CSS, not a library: nothing loads from
+another origin under this app's content security policy.
 
 **"Waiting to join a household" is a state this screen did not have.**
 `/families/mine` answers with the household for somebody whose request is only

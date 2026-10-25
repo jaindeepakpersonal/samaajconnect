@@ -1,6 +1,6 @@
 import { Component, DestroyRef, OnInit, inject, signal } from '@angular/core';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
-import { ActivatedRoute, RouterLink } from '@angular/router';
+import { ActivatedRoute } from '@angular/router';
 import { describeError } from '@samaajconnect/shared';
 import { MasterDataApi } from './master-data.api';
 import { MemberCommunityComponent } from './member-community.component';
@@ -47,12 +47,10 @@ import { Gautra, LookupItem, Locality, Member } from './members.models';
  */
 @Component({
   selector: 'app-member-detail',
-  imports: [RouterLink, ProfileHeaderComponent, MemberCommunityComponent],
+  imports: [ProfileHeaderComponent, MemberCommunityComponent],
   styleUrl: './members.css',
   template: `
     <div class="members-page">
-      <a class="back" routerLink="/members">‹ Back to Members</a>
-
       @if (loading()) {
         <p role="status">Loading the profile…</p>
       } @else if (error(); as message) {

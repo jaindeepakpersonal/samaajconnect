@@ -60,8 +60,6 @@ import {
   selector: 'app-member-detail',
   imports: [AuthedImageDirective, FormsModule, RouterLink],
   template: `
-    <a class="back" routerLink="/members">‹ Back to Members</a>
-
     @if (error(); as message) {
       <p class="notice error" role="alert">{{ message }}</p>
     }

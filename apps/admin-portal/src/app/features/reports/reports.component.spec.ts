@@ -13,6 +13,7 @@ const TENANT: Tenant = {
   slug: 'mahavir-samaj',
   domain: null,
   logoUrl: null,
+  bannerUrl: null,
   contactPerson: null,
   contactEmail: null,
   status: 'Active',

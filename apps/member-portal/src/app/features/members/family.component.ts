@@ -2,6 +2,7 @@ import { Component, OnInit, computed, inject, signal } from '@angular/core';
 import { RouterLink } from '@angular/router';
 import { FormsModule } from '@angular/forms';
 import { AuthedImageDirective, AuthService, describeError } from '@samaajconnect/shared';
+import { FamilyTreeComponent } from './family-tree.component';
 import { MembersApi } from './members.api';
 import {
   Child,
@@ -35,7 +36,7 @@ import {
  */
 @Component({
   selector: 'app-family',
-  imports: [AuthedImageDirective, FormsModule, RouterLink],
+  imports: [AuthedImageDirective, FamilyTreeComponent, FormsModule, RouterLink],
   styleUrl: './members.css',
   template: `
     <div class="members-page">
@@ -286,6 +287,17 @@ import {
               </button>
             </div>
           </div>
+        </div>
+
+        <!-- Family tree ------------------------------------------------ -->
+        <h2 class="section-heading">Family tree</h2>
+        <p class="small">
+          Drawn around the family admin, because that is who everyone's relationship is
+          recorded against. Relatives the household has recorded as "Other" are listed beneath it.
+        </p>
+
+        <div class="card">
+          <app-family-tree [family]="household" [children]="children()" />
         </div>
 
         <!-- Children --------------------------------------------------- -->

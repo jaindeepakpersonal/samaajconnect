@@ -165,7 +165,7 @@ describe('PanchComponent', () => {
     expect(component.windowsOverlap()).toBe(true);
     expect(component.canSubmit()).toBe(false);
 
-    component.create();
+    component.save();
     http.expectNone('/v1/panch/elections');
   });
 
@@ -192,7 +192,7 @@ describe('PanchComponent', () => {
 
     expect(component.canSubmit()).toBe(true);
 
-    component.create();
+    component.save();
     const request = http.expectOne('/v1/panch/elections');
 
     expect(request.request.method).toBe('POST');
@@ -208,6 +208,116 @@ describe('PanchComponent', () => {
 
     expect(text()).toContain('created as a draft');
     expect(text()).toContain('Samaaj Panch 2026');
+  });
+
+  function reload(elections: Election[]) {
+    http.expectOne('/v1/panch/panel').flush(panel());
+    http.expectOne('/v1/panch/elections').flush(elections);
+    http.expectOne('/v1/members?take=100').flush({ items: MEMBERS, hasMore: false });
+    fixture.detectChanges();
+  }
+
+  const buttons = () =>
+    Array.from(fixture.nativeElement.querySelectorAll('button') as NodeListOf<HTMLButtonElement>).map(
+      (b) => b.textContent?.replace(/\s+/g, ' ').trim() ?? '',
+    );
+
+  it('offers Edit and Delete until voting opens, Extend voting while it is open, and nothing after', () => {
+    load(panel(), [
+      election({ id: 'd', title: 'Draft one', status: 'Draft' }),
+      election({ id: 'n', title: 'Nominating', status: 'NominationsOpen' }),
+      election({ id: 'v', title: 'Voting', status: 'VotingOpen' }),
+      election({ id: 'c', title: 'Closed one', status: 'Closed' }),
+    ]);
+
+    const labels = buttons();
+
+    expect(labels).toContain('Edit Draft one');
+    expect(labels).toContain('Delete Nominating');
+    expect(labels).toContain('Extend voting for Voting');
+    expect(labels).not.toContain('Edit Voting');
+    expect(labels).not.toContain('Delete Voting');
+    expect(labels.some((l) => l.includes('Closed one'))).toBe(false);
+  });
+
+  it('edits an election with its own values filled in, and saves the whole of it', () => {
+    load(panel(), [election({ status: 'NominationsOpen', description: 'First call' })]);
+
+    component.openEdit(new MouseEvent('click'), election({ status: 'NominationsOpen', description: 'First call' }));
+    fixture.detectChanges();
+
+    expect(text()).toContain('Edit Samaaj Panch 2026');
+    expect(component.title).toBe('Samaaj Panch 2026');
+    expect(component.description).toBe('First call');
+    expect(component.nominationEndAt).not.toBe('');
+
+    // Nominations closed too early: push their close out, and voting with it.
+    component.nominationEndAt = '2026-08-30T00:00';
+    component.votingStartAt = '2026-09-01T00:00';
+    component.save();
+
+    const request = http.expectOne(`/v1/panch/elections/${ELECTION_ID}`);
+    expect(request.request.method).toBe('PATCH');
+    expect(request.request.body.title).toBe('Samaaj Panch 2026');
+    expect(request.request.body.nominationEndAt).toBe(new Date('2026-08-30T00:00').toISOString());
+    request.flush(election({ status: 'NominationsOpen' }));
+    reload([election({ status: 'NominationsOpen' })]);
+
+    expect(text()).toContain('Samaaj Panch 2026 saved.');
+    http.expectNone('/v1/panch/elections');
+  });
+
+  it('deletes only after saying what goes with it', () => {
+    load(panel(), [election({ status: 'NominationsOpen', candidateCount: 3 })]);
+
+    component.confirmingDeletion.set(ELECTION_ID);
+    fixture.detectChanges();
+
+    expect(text()).toContain('and its 3 nominations');
+    expect(text()).toContain('cannot be undone');
+    http.expectNone(`/v1/panch/elections/${ELECTION_ID}`);
+
+    component.deleteElection(election({ status: 'NominationsOpen', candidateCount: 3 }));
+    const request = http.expectOne(`/v1/panch/elections/${ELECTION_ID}`);
+
+    expect(request.request.method).toBe('DELETE');
+    request.flush(null, { status: 204, statusText: 'No Content' });
+    reload([]);
+
+    expect(text()).toContain('Samaaj Panch 2026 deleted.');
+    expect(component.confirmingDeletion()).toBeNull();
+  });
+
+  it('extends voting only to a later close', () => {
+    const voting = election({ status: 'VotingOpen', votingEndAt: '2026-09-20T00:00:00Z' });
+    load(panel(), [voting]);
+
+    component.openExtend(new MouseEvent('click'), voting);
+    fixture.detectChanges();
+
+    expect(text()).toContain('can only move later');
+
+    component.votingEndAt = '2026-09-10T00:00';
+    fixture.detectChanges();
+
+    expect(component.extendsLater()).toBe(false);
+    expect(text()).toContain('Choose a time after the current close');
+
+    component.extend();
+    http.expectNone(`/v1/panch/elections/${ELECTION_ID}/extend-voting`);
+
+    component.votingEndAt = '2026-09-27T00:00';
+    expect(component.extendsLater()).toBe(true);
+
+    component.extend();
+    const request = http.expectOne(`/v1/panch/elections/${ELECTION_ID}/extend-voting`);
+
+    expect(request.request.method).toBe('POST');
+    expect(request.request.body.votingEndAt).toBe(new Date('2026-09-27T00:00').toISOString());
+    request.flush({ ...voting, votingEndAt: '2026-09-27T00:00:00Z' });
+    reload([{ ...voting, votingEndAt: '2026-09-27T00:00:00Z' }]);
+
+    expect(text()).toContain('Voting for Samaaj Panch 2026 now closes');
   });
 
   it('says which elections are actually open, not just what their status says', () => {
@@ -318,6 +428,18 @@ describe('ElectionDetailComponent', () => {
     expect(text()).not.toContain('Take off the ballot');
   });
 
+  it('says voting has closed, not opened, once it has', () => {
+    load(
+      detail({
+        election: election({ status: 'Closed' }),
+        candidates: [candidate({ status: 'Approved', votes: 3 })],
+      }),
+    );
+
+    expect(text()).toContain('Voting has closed');
+    expect(text()).not.toContain('Voting has opened');
+  });
+
   it('shows an administrator the tally even when members cannot see it', () => {
     load(
       detail({
@@ -326,7 +448,9 @@ describe('ElectionDetailComponent', () => {
       }),
     );
 
-    expect(text()).toContain('4 votes cast');
+    // Votes, not voters: one ballot backs up to ten candidates.
+    expect(text()).toContain('4 votes for these candidates');
+    expect(text()).toContain('counts choices, not voters');
     expect(text()).toContain('Members cannot see these counts until voting closes');
   });
 

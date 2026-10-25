@@ -4,9 +4,12 @@ using Sangam.Panch.Application.Elections;
 using Sangam.Panch.Application.Elections.Commands.CastBallot;
 using Sangam.Panch.Application.Elections.Commands.CreateElection;
 using Sangam.Panch.Application.Elections.Commands.DecideCandidate;
+using Sangam.Panch.Application.Elections.Commands.DeleteElection;
+using Sangam.Panch.Application.Elections.Commands.ExtendVoting;
 using Sangam.Panch.Application.Elections.Commands.MoveElection;
 using Sangam.Panch.Application.Elections.Commands.NominateCandidate;
 using Sangam.Panch.Application.Elections.Commands.PublishElectionResults;
+using Sangam.Panch.Application.Elections.Commands.UpdateElection;
 using Sangam.Panch.Application.Elections.Queries;
 using Sangam.Panch.Application.Panel;
 
@@ -105,6 +108,75 @@ public static class ElectionEndpoints
             .Produces<ElectionDetailResponse>()
             .ProducesProblem(StatusCodes.Status401Unauthorized)
             .ProducesProblem(StatusCodes.Status404NotFound);
+
+        group.MapPatch("/elections/{id:guid}", async (
+                Guid id,
+                CreateElectionRequest request,
+                ISender sender,
+                CancellationToken cancellationToken) =>
+            {
+                var command = new UpdateElectionCommand(
+                    id,
+                    request.Title,
+                    request.Description,
+                    request.NominationStartAt,
+                    request.NominationEndAt,
+                    request.VotingStartAt,
+                    request.VotingEndAt,
+                    request.ResultsVisibility);
+
+                var result = await sender.Send(command, cancellationToken);
+
+                return result.ToApiResult();
+            })
+            .RequireAuthorization()
+            .WithName("UpdateElection")
+            .WithSummary("Correct an election's title, windows or results visibility - before voting opens.")
+            .Produces<ElectionResponse>()
+            .ProducesValidationProblem()
+            .ProducesProblem(StatusCodes.Status401Unauthorized)
+            .ProducesProblem(StatusCodes.Status403Forbidden)
+            .ProducesProblem(StatusCodes.Status404NotFound)
+            .ProducesProblem(StatusCodes.Status409Conflict);
+
+        group.MapDelete("/elections/{id:guid}", async (
+                Guid id,
+                ISender sender,
+                CancellationToken cancellationToken) =>
+            {
+                var result = await sender.Send(new DeleteElectionCommand(id), cancellationToken);
+
+                return result.ToApiResult(_ => Results.NoContent());
+            })
+            .RequireAuthorization()
+            .WithName("DeleteElection")
+            .WithSummary("Delete an election, with its nominations - only before voting opens.")
+            .Produces(StatusCodes.Status204NoContent)
+            .ProducesProblem(StatusCodes.Status401Unauthorized)
+            .ProducesProblem(StatusCodes.Status403Forbidden)
+            .ProducesProblem(StatusCodes.Status404NotFound)
+            .ProducesProblem(StatusCodes.Status409Conflict);
+
+        group.MapPost("/elections/{id:guid}/extend-voting", async (
+                Guid id,
+                ExtendVotingRequest request,
+                ISender sender,
+                CancellationToken cancellationToken) =>
+            {
+                var result = await sender.Send(
+                    new ExtendVotingCommand(id, request.VotingEndAt), cancellationToken);
+
+                return result.ToApiResult();
+            })
+            .RequireAuthorization()
+            .WithName("ExtendVoting")
+            .WithSummary("Keep voting open longer, while it is open. Later only, never earlier.")
+            .Produces<ElectionResponse>()
+            .ProducesValidationProblem()
+            .ProducesProblem(StatusCodes.Status401Unauthorized)
+            .ProducesProblem(StatusCodes.Status403Forbidden)
+            .ProducesProblem(StatusCodes.Status404NotFound)
+            .ProducesProblem(StatusCodes.Status409Conflict);
 
         group.MapPost("/elections/{id:guid}/status", async (
                 Guid id,
@@ -233,6 +305,9 @@ public static class ElectionEndpoints
         DateTimeOffset VotingStartAt,
         DateTimeOffset VotingEndAt,
         string ResultsVisibility);
+
+    /// <summary>The new close of voting - later than the current one.</summary>
+    public sealed record ExtendVotingRequest(DateTimeOffset VotingEndAt);
 
     /// <summary>NominationsOpen, VotingOpen or Closed. Publishing is its own call.</summary>
     public sealed record MoveRequest(string Status);

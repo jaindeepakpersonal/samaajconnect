@@ -32,7 +32,7 @@ public sealed class TenantConfiguration : IEntityTypeConfiguration<Tenant>
         builder.Property(t => t.Name).HasMaxLength(200).IsRequired();
         builder.Property(t => t.Slug).HasMaxLength(63).IsRequired();
         builder.Property(t => t.Domain).HasMaxLength(253);
-        // No max length: LogoImageId is a Guid pointing at tenant_logos.
+        // No max length: LogoImageId and BannerImageId are Guids pointing at tenant_images.
         builder.Property(t => t.ContactPerson).HasMaxLength(200);
         builder.Property(t => t.ContactEmail).HasMaxLength(320);
         builder.Property(t => t.GrievanceContactName).HasMaxLength(200);

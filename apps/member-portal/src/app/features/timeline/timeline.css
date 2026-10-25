@@ -7,6 +7,94 @@
   padding: var(--space-6) var(--space-4);
 }
 
+/* ---- The Samaaj's banner and logo --------------------------------------- */
+
+/* Wide and short, the photo cropped to fill. With no banner the band is the
+   brand colour, so a Samaaj that has not uploaded one still has a header
+   rather than a hole. */
+.samaaj-hero {
+  position: relative;
+  aspect-ratio: 4 / 1;
+  min-height: 140px;
+  margin-bottom: var(--space-5);
+  border-radius: var(--radius-lg);
+  overflow: hidden;
+  background: linear-gradient(120deg, var(--accent-ink), var(--accent));
+}
+
+.hero-banner {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+/* A dark fade under the name, so white text reads over any photograph. */
+.samaaj-hero.has-banner::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(to top, rgba(0, 0, 0, 0.55), rgba(0, 0, 0, 0) 60%);
+}
+
+.hero-identity {
+  position: absolute;
+  left: var(--space-5);
+  bottom: var(--space-4);
+  z-index: 1;
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+}
+
+.hero-logo {
+  width: 72px;
+  height: 72px;
+  flex: none;
+  border-radius: 50%;
+  border: 3px solid #ffffff;
+  background: #ffffff;
+  object-fit: cover;
+}
+
+.hero-logo.initials {
+  display: grid;
+  place-items: center;
+  color: var(--accent-ink);
+  font-weight: 700;
+  font-size: 1.4rem;
+}
+
+.hero-name {
+  margin: 0;
+  color: #ffffff;
+  font-size: 1.35rem;
+  font-weight: 700;
+  line-height: 1.25;
+  text-shadow: 0 1px 3px rgba(0, 0, 0, 0.5);
+}
+
+@media (max-width: 700px) {
+  .samaaj-hero {
+    aspect-ratio: 5 / 2;
+  }
+
+  .hero-identity {
+    left: var(--space-4);
+    bottom: var(--space-3);
+  }
+
+  .hero-logo {
+    width: 56px;
+    height: 56px;
+  }
+
+  .hero-name {
+    font-size: 1.1rem;
+  }
+}
+
 .page-head {
   display: flex;
   justify-content: space-between;

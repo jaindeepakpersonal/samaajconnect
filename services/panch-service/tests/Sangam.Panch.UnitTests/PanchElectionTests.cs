@@ -12,6 +12,7 @@ public sealed class PanchElectionTests
 {
     private static readonly Guid TenantId = Guid.NewGuid();
     private static readonly DateTimeOffset Now = new(2026, 3, 1, 9, 0, 0, TimeSpan.Zero);
+    private static readonly Guid Admin = Guid.NewGuid();
 
     private static PanchElection Election() =>
         PanchElection.Create(
@@ -23,7 +24,7 @@ public sealed class PanchElectionTests
     private static (PanchElection Election, List<Candidate> Candidates) WithBallot(int count)
     {
         var election = Election();
-        election.MoveTo(ElectionStatus.NominationsOpen, Now);
+        election.MoveTo(ElectionStatus.NominationsOpen, Admin, Now);
 
         var candidates = new List<Candidate>();
 
@@ -49,16 +50,124 @@ public sealed class PanchElectionTests
     {
         var election = Election();
 
-        election.MoveTo(ElectionStatus.VotingOpen, Now).Should().BeFalse("nominations come first");
-        election.MoveTo(ElectionStatus.NominationsOpen, Now).Should().BeTrue();
-        election.MoveTo(ElectionStatus.Draft, Now).Should().BeFalse("an election cannot go backwards");
+        election.MoveTo(ElectionStatus.VotingOpen, Admin, Now).Should().BeFalse("nominations come first");
+        election.MoveTo(ElectionStatus.NominationsOpen, Admin, Now).Should().BeTrue();
+        election.MoveTo(ElectionStatus.Draft, Admin, Now).Should().BeFalse("an election cannot go backwards");
+    }
+
+    [Fact]
+    public void It_can_be_edited_and_deleted_only_until_voting_opens()
+    {
+        var (election, _) = WithBallot(1);
+
+        election.CanBeEdited.Should().BeTrue();
+        election.CanBeDeleted.Should().BeTrue();
+
+        election.MoveTo(ElectionStatus.VotingOpen, Admin, Now.AddDays(7)).Should().BeTrue();
+
+        election.CanBeEdited.Should().BeFalse("members have been told the windows and may have voted");
+        election.CanBeDeleted.Should().BeFalse("deleting would destroy ballots");
+    }
+
+    [Fact]
+    public void Voting_is_only_ever_extended_later_and_only_while_it_is_open()
+    {
+        var (election, _) = WithBallot(1);
+        var actor = Guid.NewGuid();
+
+        election.ExtendVoting(Now.AddDays(30), actor, Now).Should().BeFalse("voting has not opened yet");
+
+        election.MoveTo(ElectionStatus.VotingOpen, Admin, Now.AddDays(7));
+        election.ClearDomainEvents();
+
+        election.ExtendVoting(Now.AddDays(10), actor, Now.AddDays(8)).Should().BeFalse("earlier than announced");
+        election.ExtendVoting(Now.AddDays(14), actor, Now.AddDays(8)).Should().BeFalse("the same close is no extension");
+        election.VotingEndAt.Should().Be(Now.AddDays(14));
+        election.DomainEvents.Should().BeEmpty();
+
+        election.ExtendVoting(Now.AddDays(21), actor, Now.AddDays(8)).Should().BeTrue();
+
+        election.VotingEndAt.Should().Be(Now.AddDays(21));
+        election.DomainEvents.Should().ContainSingle().Which.Should().BeEquivalentTo(
+            new ElectionVotingExtendedDomainEvent(
+                election.Id, TenantId, Now.AddDays(14), Now.AddDays(21), actor, Now.AddDays(8)));
+    }
+
+    [Fact]
+    public void An_edit_replaces_the_windows_without_moving_the_status()
+    {
+        var election = Election();
+        election.MoveTo(ElectionStatus.NominationsOpen, Admin, Now);
+        election.ClearDomainEvents();
+
+        election.Update(
+            " Panch 2026 ", "  ", Now, Now.AddDays(10), Now.AddDays(10), Now.AddDays(20),
+            ResultsVisibility.HiddenUntilClose, Guid.NewGuid(), Now);
+
+        election.Title.Should().Be("Panch 2026");
+        election.Description.Should().BeNull();
+        election.NominationEndAt.Should().Be(Now.AddDays(10));
+        election.ResultsVisibility.Should().Be(ResultsVisibility.HiddenUntilClose);
+        election.Status.Should().Be(ElectionStatus.NominationsOpen);
+        election.DomainEvents.Should().ContainSingle().Which.Should().BeOfType<ElectionUpdatedDomainEvent>();
+    }
+
+    [Fact]
+    public void A_status_change_names_the_administrator_who_made_it()
+    {
+        var (election, _) = WithBallot(1);
+        var closer = Guid.NewGuid();
+        election.MoveTo(ElectionStatus.VotingOpen, Admin, Now.AddDays(7));
+        election.ClearDomainEvents();
+
+        election.MoveTo(ElectionStatus.Closed, closer, Now.AddDays(8)).Should().BeTrue();
+
+        election.DomainEvents.Should().ContainSingle().Which.Should().BeEquivalentTo(
+            new ElectionStatusChangedDomainEvent(
+                election.Id, TenantId, "VotingOpen", "Closed", closer, Now.AddDays(8)));
+    }
+
+    [Fact]
+    public void Approving_and_turning_down_a_nomination_each_name_who_decided()
+    {
+        var election = Election();
+        election.MoveTo(ElectionStatus.NominationsOpen, Admin, Now);
+        var approved = election.Nominate(Guid.NewGuid(), Guid.NewGuid(), Now)!;
+        var turnedDown = election.Nominate(Guid.NewGuid(), Guid.NewGuid(), Now)!;
+        election.ClearDomainEvents();
+
+        election.ApproveCandidate(approved.Id, Admin, Now).Should().BeTrue();
+        election.RejectCandidate(turnedDown.Id, Admin, Now).Should().BeTrue();
+
+        election.DomainEvents.Should().BeEquivalentTo(
+            [
+                new CandidateDecidedDomainEvent(
+                    election.Id, TenantId, approved.Id, approved.MemberId, "Approved", Admin, Now),
+                new CandidateDecidedDomainEvent(
+                    election.Id, TenantId, turnedDown.Id, turnedDown.MemberId, "TurnedDown", Admin, Now),
+            ],
+            options => options.WithStrictOrdering());
+    }
+
+    [Fact]
+    public void A_decision_that_changes_nothing_records_nothing()
+    {
+        var (election, candidates) = WithBallot(1);
+        election.ClearDomainEvents();
+
+        election.ApproveCandidate(candidates[0].Id, Admin, Now).Should().BeFalse("already on the ballot");
+        election.MoveTo(ElectionStatus.VotingOpen, Admin, Now.AddDays(7));
+        election.ClearDomainEvents();
+        election.RejectCandidate(candidates[0].Id, Admin, Now.AddDays(8)).Should().BeFalse("the ballot is set");
+
+        election.DomainEvents.Should().BeEmpty();
     }
 
     [Fact]
     public void One_candidacy_per_member_however_many_nominate_them()
     {
         var election = Election();
-        election.MoveTo(ElectionStatus.NominationsOpen, Now);
+        election.MoveTo(ElectionStatus.NominationsOpen, Admin, Now);
         var member = Guid.NewGuid();
 
         election.Nominate(member, Guid.NewGuid(), Now).Should().NotBeNull();
@@ -71,7 +180,7 @@ public sealed class PanchElectionTests
     public void An_unapproved_nomination_is_not_on_the_ballot()
     {
         var election = Election();
-        election.MoveTo(ElectionStatus.NominationsOpen, Now);
+        election.MoveTo(ElectionStatus.NominationsOpen, Admin, Now);
         election.Nominate(Guid.NewGuid(), Guid.NewGuid(), Now);
 
         election.Ballot.Should().BeEmpty();

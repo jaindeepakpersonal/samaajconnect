@@ -26,6 +26,8 @@ public sealed class ElectionRepository(PanchDbContext dbContext) : IElectionRepo
             .ToListAsync(cancellationToken);
 
     public void Add(PanchElection election) => dbContext.Elections.Add(election);
+
+    public void Remove(PanchElection election) => dbContext.Elections.Remove(election);
 }
 
 public sealed class BallotRepository(

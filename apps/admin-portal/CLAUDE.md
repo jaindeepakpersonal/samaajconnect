@@ -11,7 +11,7 @@ screen. The spec is `docs/product/wireframes/admin-panel-wireframes.html`.
 |---|---|---|---|
 | Sign in | `/login` | — (the wireframe has none) | built. A CAPTCHA and the password, then a 6-digit code on an untrusted browser (trust it for 30 days) - `SignInFlow` in libs/shared, shared with the member portal |
 | Dashboard | `/dashboard` | `#dashboard` | built — see below |
-| Samaaj / Tenants | `/tenants` | `#tenants` | built. Status, modules, logo, and the DPDP s.13 grievance contact |
+| Samaaj / Tenants | `/tenants` | `#tenants` | built. Status, modules, logo and banner (flagged "Missing" until a Samaaj has both), and the DPDP s.13 grievance contact |
 | Create Samaaj | `/tenants/new` | `#createtenant` | built |
 | Admin Users & Roles | `/admins` | `#admins` | built. Roles, re-issuing a one-time activation code, and suspending or reinstating an account |
 | Invite Admin | `/admins/invite` | `#inviteadmin` | built |
@@ -32,7 +32,7 @@ screen. The spec is `docs/product/wireframes/admin-panel-wireframes.html`.
 | Campaign detail | `/voting/:id` | — | built; no wireframe covers running one. Stage, ballot, nominations, tally, result |
 | Competitions | `/competitions` | — | built; no wireframe covers this new module. Competitions; setting one up and correcting one (until registration closes) in a popup, with its type, venue, city or village, optional locality, and how it is judged - rounds, max marks, and an audition with its date and how many go through |
 | Competition detail | `/competitions/:id` | — | built; no wireframe covers running one. Six tabs - Details (the format, the cover photo), Participants (who applied), Judges (each on a panel, assigned in a popup), Rounds (made when judging starts; each opens in a popup), Scores (every judge's mark and the standings) and Results (publish the winners) - with Edit, starting judging and closing the audition confirmed in popups |
-| Samaaj Panch | `/panch` | — | built; no wireframe covers it. The seated Panch with Remove, and the elections list with a create modal |
+| Samaaj Panch | `/panch` | — | built; no wireframe covers it. The seated Panch with Remove, and the elections list with a create modal; each election row offers Edit and Delete until voting opens, then Extend voting - see below |
 | Panch election | `/panch/:id` | — | built. Stage, approving nominations, the tally, publishing (which replaces the Panch) |
 | Volunteer Groups | `/groups` | `#groups` (member-facing) | built. Create (president optional), set a president later, and stand one down |
 | Group roles & elections | `/groups/:id` | — | built; no wireframe covers running one. Define volunteer roles and their seats, assign them, open an election for any role, approve nominations, move its stages, publish - the president or an administrator of the group |
@@ -670,6 +670,13 @@ pending row, and the panel says the earlier code has been cancelled, because an
 administrator who hands out a second code without knowing that leaves somebody
 holding a dead one.
 
+**The banner sits beside the logo in one "Logo & banner" panel (2026-10-25)**,
+and the panel says what differs: the logo is public, the banner is shown only
+to the Samaaj's own members. So the logo is drawn with a plain `<img src>` and
+the banner preview through `scAuthedSrc`, which sends the token - a plain `src`
+would be refused. The row's button carries a "Missing" pill until a Samaaj has
+both, the same nudge "Grievance contact" gives with "Not named".
+
 **The grievance form duplicates the service's rule and must stay in step.** A
 name with no email and no phone is refused, because that is not a means of
 redressal; clearing all three is allowed, because removing a contact is not the
@@ -938,6 +945,17 @@ out loud: **publishing replaces the whole Panch**, so the confirmation
 names that. Removing a member asks first and leaves the seat empty; nobody
 is promoted. Names come from the member directory (`/v1/members`, first
 hundred) and fall back to 'A member' rather than a GUID.
+
+**A Panch election is edited, deleted and extended from its row on the list
+(2026-10-25)**; until then one could not be changed at all once created. The
+row offers exactly what panch-service accepts at that stage. A draft or one
+taking nominations has Edit (the create modal, filled in - pushing the
+nominations close out is how they are extended) and Delete (confirmed inline,
+naming how many nominations go with it). Voting open has Extend voting, a
+small modal on the same dialog whose one field must be later than the close
+members were told - the service refuses an earlier one, so the screen does
+not offer it, and says closing early is the Close button. Closed or published
+has nothing.
 
 **Volunteer group elections had no screen in this panel, only in the member
 portal, and the one election an administrator is meant to run was the case that

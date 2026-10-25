@@ -4,14 +4,24 @@ using Sangam.IdentityTenant.Domain.Common;
 namespace Sangam.IdentityTenant.Domain.Media;
 
 /// <summary>
-/// A Samaaj's logo, hosted by the platform.
+/// One of a Samaaj's own images, hosted by the platform: its logo, or the
+/// banner photo across the top of its members' Home. Which one it is, is which
+/// of <c>Tenant.LogoImageId</c> and <c>Tenant.BannerImageId</c> points at it.
 /// </summary>
 /// <remarks>
+/// <para>
+/// Named <c>TenantLogo</c> until the banner arrived on 2026-10-25: the bytes,
+/// the sniffing and the size cap are identical, and a banner kept in a class
+/// called "logo" would have misled the next reader. Who may <i>read</i> each is
+/// not identical, and is decided by the query rather than by this row - the
+/// paragraphs below are about the logo; the banner is members-only, see
+/// <c>GetTenantBannerQuery</c>.
+/// </para>
 /// <para>
 /// The same shape as member-family-service's <c>StoredImage</c> and for the same
 /// reason — <c>LogoUrl</c> was a link a client supplied, so anyone who saw it
 /// fetched the image from whatever host it named. The bytes live in this
-/// service's own database, behind <c>ILogoStore</c>, so an object store is one
+/// service's own database, behind <c>ITenantImageStore</c>, so an object store is one
 /// implementation and a migration rather than a rewrite.
 /// </para>
 /// <para>
@@ -43,7 +53,7 @@ namespace Sangam.IdentityTenant.Domain.Media;
 /// about something that cannot happen dilutes the ones that matter.
 /// </para>
 /// </remarks>
-public sealed class TenantLogo : AggregateRoot
+public sealed class TenantImage : AggregateRoot
 {
     public Guid Id { get; private set; }
 
@@ -73,7 +83,7 @@ public sealed class TenantLogo : AggregateRoot
     public Guid UploadedBy { get; private set; }
     public DateTimeOffset UploadedAt { get; private set; }
 
-    private TenantLogo() { }   // EF Core
+    private TenantImage() { }   // EF Core
 
     /// <summary>
     /// Creates a logo from bytes that have already been accepted.
@@ -86,7 +96,7 @@ public sealed class TenantLogo : AggregateRoot
     /// check — a programming error, which is what exceptions are for
     /// (CLAUDE.md §4.1).
     /// </remarks>
-    public static TenantLogo Capture(
+    public static TenantImage Capture(
         Guid tenantId,
         byte[] bytes,
         Guid uploadedBy,
@@ -97,10 +107,10 @@ public sealed class TenantLogo : AggregateRoot
         var contentType = ImageContent.Sniff(bytes)
             ?? throw new ArgumentException(
                 "These bytes are not an image this platform accepts. "
-                + "Check ImageContent.Sniff before constructing a TenantLogo.",
+                + "Check ImageContent.Sniff before constructing a TenantImage.",
                 nameof(bytes));
 
-        return new TenantLogo
+        return new TenantImage
         {
             Id = Guid.NewGuid(),
             TenantId = tenantId,

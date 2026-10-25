@@ -21,7 +21,7 @@ public sealed class Tenant : AggregateRoot
     public string? Domain { get; private set; }
 
     /// <summary>
-    /// The <see cref="Media.TenantLogo"/> holding this Samaaj mark, or null.
+    /// The <see cref="Media.TenantImage"/> holding this Samaaj mark, or null.
     /// </summary>
     /// <remarks>
     /// This replaced a client-supplied <c>LogoUrl</c> that nothing could ever
@@ -30,6 +30,14 @@ public sealed class Tenant : AggregateRoot
     /// control with nothing behind it.
     /// </remarks>
     public Guid? LogoImageId { get; private set; }
+
+    /// <summary>
+    /// The <see cref="Media.TenantImage"/> holding the photo across the top of
+    /// this Samaaj's members' Home, or null. Members only, unlike the logo:
+    /// a banner is usually a photograph, and a photograph usually has people in
+    /// it.
+    /// </summary>
+    public Guid? BannerImageId { get; private set; }
 
     public string? ContactPerson { get; private set; }
     public string? ContactEmail { get; private set; }
@@ -133,6 +141,25 @@ public sealed class Tenant : AggregateRoot
     {
         var previous = LogoImageId;
         LogoImageId = null;
+        return previous;
+    }
+
+    /// <summary>
+    /// Points this Samaaj at a newly stored banner, answering the one it
+    /// replaced - the same contract as <see cref="SetLogo"/>, for its reason.
+    /// </summary>
+    public Guid? SetBanner(Guid imageId)
+    {
+        var previous = BannerImageId;
+        BannerImageId = imageId;
+        return previous;
+    }
+
+    /// <summary>Removes the banner, answering the id to delete, or null when there was none.</summary>
+    public Guid? RemoveBanner()
+    {
+        var previous = BannerImageId;
+        BannerImageId = null;
         return previous;
     }
 

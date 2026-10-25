@@ -1006,18 +1006,54 @@ public static class KnownEvents
             EntityName: "Competition",
             EntityIdProperty: "competitionId",
             ActorIdProperty: "decidedBy"),
-        // panch-service. An election moving on is the administrator's own act
-        // and names no separate actor, the shape competition.* and
-        // celebrity-voting.campaign.* take. A change to the panel does name one:
-        // the administrator who removed a member, or who published the election
-        // that seated it - "who decided who sits on the Panch" is the question
-        // this trail exists to answer. The panel has no id of its own; it is
-        // the Samaaj's, so the tenant is what it is recorded against.
+        // panch-service. Every act on a Panch election names the administrator
+        // who did it - "who decided who sits on the Panch" is the question this
+        // trail exists to answer, and opening voting, closing it early and
+        // publishing are where that is decided. Until 2026-10-25 a status
+        // change named nobody, the shape competition.* still takes. A change to
+        // the panel names the administrator who removed a member, or who
+        // published the election that seated it. The panel has no id of its
+        // own; it is the Samaaj's, so the tenant is what it is recorded against.
         ["panch.election.status-changed.v1"] = new(
             Action: "ElectionStatusChanged",
             EntityName: "PanchElection",
             EntityIdProperty: "electionId",
+            ActorIdProperty: "changedBy",
             BeforeProperties: ["previousStatus"]),
+
+        // A turned-down nomination is deleted, so this row is the only record
+        // that somebody was put forward and kept off the ballot. Recorded
+        // against the candidacy, with the administrator as the actor - the
+        // member it is about is in the payload, and is not who acted.
+        ["panch.candidate.decided.v1"] = new(
+            Action: "CandidateDecided",
+            EntityName: "PanchCandidate",
+            EntityIdProperty: "candidateId",
+            ActorIdProperty: "decidedBy"),
+
+        // An administrator's own corrections to an election, so each names
+        // who made it. Extending voting keeps the close members were first
+        // told beside the new one; deleting is the only record that the
+        // election existed, its row being gone.
+        ["panch.election.updated.v1"] = new(
+            Action: "ElectionUpdated",
+            EntityName: "PanchElection",
+            EntityIdProperty: "electionId",
+            ActorIdProperty: "updatedBy"),
+
+        ["panch.election.voting-extended.v1"] = new(
+            Action: "ElectionVotingExtended",
+            EntityName: "PanchElection",
+            EntityIdProperty: "electionId",
+            ActorIdProperty: "extendedBy",
+            BeforeProperties: ["previousVotingEndAt"]),
+
+        ["panch.election.deleted.v1"] = new(
+            Action: "ElectionDeleted",
+            EntityName: "PanchElection",
+            EntityIdProperty: "electionId",
+            ActorIdProperty: "deletedBy",
+            BeforeProperties: ["status"]),
 
         ["panch.panel.changed.v1"] = new(
             Action: "PanelChanged",
@@ -1028,8 +1064,7 @@ public static class KnownEvents
         // trust-service, phase 1 (roster only - elections, donations, expenses
         // and payment collection are later phases). Creating a Trust and
         // changing its status are the administrator's own act and name no
-        // separate actor, the same shape panch.election.status-changed.v1
-        // takes. A roster change does name one - who put a member on a Trust,
+        // separate actor, the same shape competition.* takes. A roster change does name one - who put a member on a Trust,
         // who changed their position, who took them off - the same "who did
         // this" the volunteer-groups.member.* pair already answers for an
         // identical shape of question.
@@ -1070,8 +1105,8 @@ public static class KnownEvents
 
         // trust-service, phase 2 (elections for trustee positions). Moving an
         // election is the administrator's own act and names no separate
-        // actor, the identical shape panch.election.status-changed.v1 and
-        // volunteer-groups.election.status-changed.v1 already take.
+        // actor, the identical shape volunteer-groups.election.status-changed.v1
+        // already takes.
         ["trust.election.status-changed.v1"] = new(
             Action: "ElectionStatusChanged",
             EntityName: "TrustElection",

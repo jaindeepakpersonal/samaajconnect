@@ -25,7 +25,7 @@ set -euo pipefail
 GATEWAY="${GATEWAY:-http://localhost:8080}"
 
 SUPERADMIN="${SUPERADMIN:-superadmin@samaajconnect.local}"
-SUPERADMIN_PASSWORD="${SUPERADMIN_PASSWORD:-change-me-immediately}"
+SUPERADMIN_PASSWORD="${SUPERADMIN_PASSWORD:-superadminpassword}"   # docker-compose.yml's own default
 
 # Samaaj A holds the data. Samaaj B does the probing.
 #
@@ -294,6 +294,16 @@ B_TOKEN=$(register_member "$B_SLUG" "$B_MEMBER" "Probe B" "$NOTICE")
 AA=(-H "Authorization: Bearer $A_TOKEN" -H 'Content-Type: application/json')
 SA=(-H "Authorization: Bearer $SUPER" -H "X-Tenant-Override-Id: $A_ID" -H 'Content-Type: application/json')
 
+# A's profile is created by member-family-service from the registration event,
+# over Kafka, not by the registration call itself. On a stack that has only just
+# started, uploading A's photo straight away reached a profile that did not
+# exist yet - the upload was refused, and the photo control then read 404 for
+# A's own Samaaj. Wait for it, as the smoke script does.
+for _ in $(seq 1 30); do
+  [ "$(curl -s -o /dev/null -w '%{http_code}' -H "Authorization: Bearer $A_TOKEN" "$GATEWAY/v1/members/me")" = "200" ] && break
+  sleep 2
+done
+
 echo "== building one of everything in Samaaj A =="
 
 POST_ID=$(curl -s "${AA[@]}" -X POST "$GATEWAY/v1/timeline/posts" \
@@ -342,8 +352,11 @@ SESSION_ID=$(curl -s "${SA[@]}" -X POST "$GATEWAY/v1/pathshala/pathshalas/$PATHS
 CLASS_ID=$(curl -s "${SA[@]}" -X POST "$GATEWAY/v1/pathshala/pathshalas/$PATHSHALA_ID/classes" \
   -d "{\"sessionId\":\"$SESSION_ID\",\"name\":\"Probe class\",\"roomLabel\":null}" | json_field id)
 
+# A contact name and phone are required since asking for a place began
+# collecting who the Pathshala should call; without them the request was
+# refused and this fixture silently came back empty.
 ENROLMENT_ID=$(curl -s "${SA[@]}" -X POST "$GATEWAY/v1/pathshala/pathshalas/$PATHSHALA_ID/enrollments" \
-  -d '{"childProfileId":"00000000-0000-0000-0000-0000000000aa"}' | json_field id)
+  -d '{"childProfileId":"00000000-0000-0000-0000-0000000000aa","contactName":"Probe Parent","contactPhone":"+919800000001"}' | json_field id)
 
 curl -s -o /dev/null "${SA[@]}" -X POST "$GATEWAY/v1/pathshala/enrollments/$ENROLMENT_ID/placement" \
   -d "{\"classId\":\"$CLASS_ID\",\"place\":true}"
@@ -475,8 +488,10 @@ curl -s -o /dev/null "${SA[@]}" -X POST "$GATEWAY/v1/celebrity-voting/campaigns/
 # `candidateId`, not `id`: nominating answers with the campaign, the candidate
 # and whether anything was added, since a repeat nomination is a no-op reported
 # as success. Reaching for `id` here got nothing.
+# A category is required since a nomination with no stated reason gave a
+# reviewer nothing to judge it by; null was refused.
 NOMINATION_ID=$(curl -s "${AA[@]}" -X POST "$GATEWAY/v1/celebrity-voting/campaigns/$OPEN_CAMPAIGN_ID/candidates" \
-  -d "{\"memberId\":\"$A_MEMBER2_ID\",\"category\":null}" | json_field candidateId)
+  -d "{\"memberId\":\"$A_MEMBER2_ID\",\"category\":\"Community service\"}" | json_field candidateId)
 
 OCCASION_ID=$(curl -s "${SA[@]}" -X POST "$GATEWAY/v1/boli/occasions" \
   -d '{"title":"Probe occasion","description":"A","occasionDate":"2099-01-01"}' | json_field id)
@@ -561,13 +576,13 @@ probe "groups    apply to A's group"     POST "/v1/volunteer-groups/groups/$GROU
 probe "groups    read A's group"         GET  "/v1/volunteer-groups/groups/$GROUP_ID"       "$B_TOKEN"
 probe "events    register for A's event" POST "/v1/events/$EVENT_ID/registration"    "$B_TOKEN" "" '{}'
 probe "events    read A's event"         GET  "/v1/events/$EVENT_ID"                 "$B_TOKEN"
-probe "voting    nominate in A's campaign" POST "/v1/celebrity-voting/campaigns/$CAMPAIGN_ID/candidates" "$B_TOKEN" "" "{\"memberId\":\"$A_MEMBER_ID\",\"category\":null}"
+probe "voting    nominate in A's campaign" POST "/v1/celebrity-voting/campaigns/$CAMPAIGN_ID/candidates" "$B_TOKEN" "" "{\"memberId\":\"$A_MEMBER_ID\",\"category\":\"Community service\"}"
 probe "voting    vote in A's campaign"   POST "/v1/celebrity-voting/campaigns/$CAMPAIGN_ID/votes" "$B_TOKEN" "" '{"candidateId":"00000000-0000-0000-0000-000000000001"}'
 probe "voting    read A's campaign"      GET  "/v1/celebrity-voting/campaigns/$CAMPAIGN_ID" "$B_TOKEN"
 probe "boli      bid on A's Boli"        POST "/v1/boli/boli/$BOLI_ID/bids"          "$B_TOKEN" "" '{"amount":9999900}'
 probe "boli      read A's Boli"          GET  "/v1/boli/boli/$BOLI_ID"               "$B_TOKEN"
 probe "boli      read A's occasion"      GET  "/v1/boli/occasions/$OCCASION_ID"      "$B_TOKEN"
-probe "pathshala enrol in A's Pathshala" POST "/v1/pathshala/pathshalas/$PATHSHALA_ID/enrollments" "$B_TOKEN" "" '{"childProfileId":"00000000-0000-0000-0000-000000000001"}'
+probe "pathshala enrol in A's Pathshala" POST "/v1/pathshala/pathshalas/$PATHSHALA_ID/enrollments" "$B_TOKEN" "" '{"childProfileId":"00000000-0000-0000-0000-000000000001","contactName":"Probe Parent","contactPhone":"+919800000002"}'
 probe "pathshala read A's Pathshala"     GET  "/v1/pathshala/pathshalas/$PATHSHALA_ID" "$B_TOKEN"
 probe "members   read A's member"        GET  "/v1/members/$A_MEMBER_ID"             "$B_TOKEN"
 # A full, valid body - otherwise ValidationBehavior answers 400 before the
@@ -579,7 +594,7 @@ probe "members   read A's member"        GET  "/v1/members/$A_MEMBER_ID"        
 # command gained that one, this body stopped reaching the handler at all and the
 # endpoint quietly stopped being probed. `refuses` now says STALE rather than
 # FAIL for a 400, so the next time it is obvious what happened.
-probe "members   correct A's member"     PATCH "/v1/members/$A_MEMBER_ID"            "$B_TOKEN" "" '{"fullName":"probe","privacy":{"mobile":"Private","email":"Private","address":"Private","profession":"Private","dateOfBirth":"Private"},"isListedInDirectory":true}'
+probe "members   correct A's member"     PATCH "/v1/members/$A_MEMBER_ID"            "$B_TOKEN" "" '{"fullName":"probe","gender":"Male","permanentAddress":{"line":null,"cityId":null,"localityId":null},"temporaryAddress":null,"privacy":{"mobile":"Private","email":"Private","address":"Private","profession":"Private","dateOfBirth":"Private","qualification":"Private"},"isListedInDirectory":true}'
 probe "children  withdraw A's child's consent" DELETE "/v1/children/$CHILD_ID/parental-consent" "$B_TOKEN"
 probe        "members   read A's member's photo"    GET    "/v1/members/$A_MEMBER_ID/photo"  "$B_TOKEN"
 probe        "members   remove A's member's photo"  DELETE "/v1/members/$A_MEMBER_ID/photo"  "$B_TOKEN"
@@ -597,7 +612,7 @@ probe "issues    approve A's issue"       POST "/v1/social-issues/$ISSUE_ID/stat
 probe "groups    change A's group status" PATCH "/v1/volunteer-groups/groups/$GROUP_ID/status" "$SUPER" "$B_ID" '{"status":"Inactive"}'
 probe "groups    hand A's group over"     PATCH "/v1/volunteer-groups/groups/$GROUP_ID/president" "$SUPER" "$B_ID" "{\"newPresidentMemberId\":\"$A_MEMBER_ID\"}"
 probe "identity  suspend A's admin"       PUT  "/v1/identity/admins/$A_MEMBER_ID/status" "$SUPER" "$B_ID" "{\"suspended\":true,\"password\":\"$SUPERADMIN_PASSWORD\"}"
-probe "members   correct A's member's details" PATCH "/v1/members/$A_MEMBER_ID/details" "$SUPER" "$B_ID" '{"fullName":"probe"}'
+probe "members   correct A's member's details" PATCH "/v1/members/$A_MEMBER_ID/details" "$SUPER" "$B_ID" '{"fullName":"probe","gender":"Male","permanentAddress":{"line":null,"cityId":null,"localityId":null}}'
 probe "events    publish A's event"       POST "/v1/events/$EVENT_ID/publish"         "$SUPER" "$B_ID" '{}'
 probe "events    cancel A's event"        POST "/v1/events/$EVENT_ID/cancel"          "$SUPER" "$B_ID" '{"reason":"probe"}'
 probe "voting    move A's campaign"       POST "/v1/celebrity-voting/campaigns/$CAMPAIGN_ID/status" "$SUPER" "$B_ID" '{"status":"NominationsOpen"}'
@@ -613,7 +628,7 @@ probe "pathshala deactivate A's"          DELETE "/v1/pathshala/pathshalas/$PATH
 probe "pathshala read A's roll"           GET  "/v1/pathshala/classes/$CLASS_ID/roll"     "$SUPER" "$B_ID"
 probe "pathshala read A's register"       GET  "/v1/pathshala/classes/$CLASS_ID/register?date=2026-01-01" "$SUPER" "$B_ID"
 probe "pathshala read A's class exams"    GET  "/v1/pathshala/classes/$CLASS_ID/exams"    "$SUPER" "$B_ID"
-probe "pathshala teach A's class"         POST "/v1/pathshala/classes/$CLASS_ID/teachers" "$SUPER" "$B_ID" "{\"teacherMemberId\":\"$A_MEMBER_ID\",\"assign\":true}"
+probe "pathshala teach A's class"         POST "/v1/pathshala/classes/$CLASS_ID/teachers" "$SUPER" "$B_ID" '{"teacherId":"00000000-0000-0000-0000-0000000000bb","assign":true}'
 probe "pathshala timetable A's class"     POST "/v1/pathshala/classes/$CLASS_ID/schedule" "$SUPER" "$B_ID" '{"dayOfWeek":"Sunday","startTime":"09:00:00","endTime":"10:00:00"}'
 probe "pathshala mark A's register"       POST "/v1/pathshala/classes/$CLASS_ID/attendance" "$SUPER" "$B_ID" "{\"classDate\":\"2026-01-01\",\"marks\":[{\"enrolmentId\":\"$ENROLMENT_ID\",\"status\":\"Present\"}]}"
 probe "pathshala set an exam in A's class" POST "/v1/pathshala/classes/$CLASS_ID/exams"   "$SUPER" "$B_ID" '{"title":"probe","examDate":"2026-01-01","maxScore":10}'

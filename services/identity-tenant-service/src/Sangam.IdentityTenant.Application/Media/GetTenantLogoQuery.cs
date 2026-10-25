@@ -35,7 +35,7 @@ namespace Sangam.IdentityTenant.Application.Media;
 /// </para>
 /// </remarks>
 [AllowAnonymousRequest]
-public sealed record GetTenantLogoQuery(Guid TenantId) : IQuery<LogoContent>;
+public sealed record GetTenantLogoQuery(Guid TenantId) : IQuery<TenantImageContent>;
 
 public sealed class GetTenantLogoQueryValidator : AbstractValidator<GetTenantLogoQuery>
 {
@@ -44,10 +44,10 @@ public sealed class GetTenantLogoQueryValidator : AbstractValidator<GetTenantLog
 
 public sealed class GetTenantLogoQueryHandler(
     ITenantRepository tenants,
-    ILogoStore logos)
-    : IRequestHandler<GetTenantLogoQuery, Result<LogoContent>>
+    ITenantImageStore logos)
+    : IRequestHandler<GetTenantLogoQuery, Result<TenantImageContent>>
 {
-    public async Task<Result<LogoContent>> Handle(
+    public async Task<Result<TenantImageContent>> Handle(
         GetTenantLogoQuery query,
         CancellationToken cancellationToken)
     {
@@ -58,7 +58,7 @@ public sealed class GetTenantLogoQueryHandler(
         // not this endpoint.
         if (tenant?.LogoImageId is not { } logoId)
         {
-            return Result.Failure<LogoContent>(
+            return Result.Failure<TenantImageContent>(
                 Error.NotFound("Tenant.NoLogo", "No logo for that Samaaj."));
         }
 
@@ -66,17 +66,17 @@ public sealed class GetTenantLogoQueryHandler(
 
         if (logo is null)
         {
-            return Result.Failure<LogoContent>(
+            return Result.Failure<TenantImageContent>(
                 Error.NotFound("Tenant.NoLogo", "No logo for that Samaaj."));
         }
 
-        return Result.Success(new LogoContent(
+        return Result.Success(new TenantImageContent(
             logo.Bytes, logo.ContentType, logo.ContentHash, logo.UploadedAt));
     }
 }
 
 /// <summary>Bytes ready to be written to a response, with what a cache needs.</summary>
-public sealed record LogoContent(
+public sealed record TenantImageContent(
     byte[] Bytes,
     string ContentType,
     string ETag,

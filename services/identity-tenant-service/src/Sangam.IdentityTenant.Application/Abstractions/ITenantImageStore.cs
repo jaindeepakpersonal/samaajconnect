@@ -13,17 +13,17 @@ namespace Sangam.IdentityTenant.Application.Abstractions;
 /// migration rather than a rewrite of the handlers.
 ///
 /// Nothing here is tenant-filtered, and that is not an omission.
-/// <c>TenantLogo</c> is not <c>ITenantScopedEntity</c> because <c>Tenant</c> is
+/// <c>TenantImage</c> is not <c>ITenantScopedEntity</c> because <c>Tenant</c> is
 /// not either — it is the row every other entity's TenantId points at. A logo is
 /// also read on the anonymous registration path, where no tenant is resolved at
 /// all, so a query filter would hide every logo from the one screen that most
 /// needs them.
 /// </remarks>
-public interface ILogoStore
+public interface ITenantImageStore
 {
-    Task<TenantLogo?> GetAsync(Guid id, CancellationToken cancellationToken = default);
+    Task<TenantImage?> GetAsync(Guid id, CancellationToken cancellationToken = default);
 
-    void Add(TenantLogo logo);
+    void Add(TenantImage logo);
 
     /// <summary>
     /// Removes a logo. Silent when the id is unknown: a logo replaced twice, or

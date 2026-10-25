@@ -214,6 +214,8 @@ existing platform (`Pathshala.Attendance.Write`, `Issue.Approve`):
 | `Gautra.Manage` | Manage one Samaaj's own Gautra list. Granted to `SamaajAdmin`, scoped to their own tenant the same way every other tenant-scoped write is |
 | `Panch.Manage` | Convene a Samaaj Panch election: set it up, move its stages, approve candidates, publish the result, remove a seated member. Granted to `SamaajAdmin`. It never chooses who wins: the members vote |
 | `Trust.Manage` | Set up a locality's Trust, change its status, and add, update or remove members of its roster. Granted to `SamaajAdmin`. Phase 1 only — elections, donations, expenses and payment collection are later phases and gate on nothing yet |
+| `Competition.Manage` | Organise a competition: set one up and correct it, move its stages, name its judges and their panels, close an audition, publish the winners, and read every judge's marks. Granted to `SamaajAdmin`. A judge records marks without it - judging is a member act on the member portal, not a role |
+| `Tenant.ManageSecurityPolicy` | Set a Samaaj's own overrides to the password floor, OTP lifetimes, lockout and session length. Granted to `SamaajAdmin`, for their own Samaaj; a Super Admin sets any. Its own key rather than `Tenant.Manage`, which is the platform-level power over which Samaaj exist and what modules they run |
 
 `AuthorizationCatalog` in identity-tenant-service is the executable copy of
 this table, with stable hand-assigned ids so a grant means the same thing in
@@ -519,6 +521,13 @@ is the outer gate and grants nothing on its own.
       cheaper to serve than photos rather than more expensive. Ticking this box
       does **not** cover that endpoint, and `GetTenantLogoQuery` is on the
       anonymous list above with the same reasoning.
+
+      **A Samaaj's banner is not that exception, and the difference is
+      deliberate (2026-10-25).** It is stored beside the logo, but it is a
+      photograph - usually of the Samaaj's own members - so it is served per
+      request to that Samaaj's members and administrators and to Super Admins
+      only, `Cache-Control: private`, and this box does cover it. Another
+      Samaaj's member is told there is none.
 
 ## Data privacy
 

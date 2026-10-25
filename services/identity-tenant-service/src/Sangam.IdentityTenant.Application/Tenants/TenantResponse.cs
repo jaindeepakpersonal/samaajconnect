@@ -7,6 +7,7 @@ public sealed record TenantResponse(
     string Slug,
     string? Domain,
     string? LogoUrl,
+    string? BannerUrl,
     string? ContactPerson,
     string? ContactEmail,
     string Status,
@@ -25,6 +26,13 @@ public sealed record TenantSummaryResponse(
     string Name,
     string Slug,
     string? LogoUrl,
+
+    /// <summary>
+    /// A path, never the image: this endpoint is anonymous, and the banner is
+    /// served only to the Samaaj's own members. Knowing one exists says nothing
+    /// a picture would.
+    /// </summary>
+    string? BannerUrl,
     string Status,
     IReadOnlyCollection<string> EnabledModules,
     GrievanceContactResponse? GrievanceContact);

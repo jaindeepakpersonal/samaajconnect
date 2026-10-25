@@ -41,6 +41,7 @@ public sealed class MoveElectionCommandHandler(
     IElectionRepository elections,
     IUnitOfWork unitOfWork,
     ITenantContext tenantContext,
+    ICurrentUser currentUser,
     IDateTimeProvider clock,
     ILogger<MoveElectionCommandHandler> logger)
     : IRequestHandler<MoveElectionCommand, Result<ElectionResponse>>
@@ -49,6 +50,12 @@ public sealed class MoveElectionCommandHandler(
         MoveElectionCommand command,
         CancellationToken cancellationToken)
     {
+        if (currentUser.UserId is not { } actorId)
+        {
+            return Result.Failure<ElectionResponse>(
+                Error.Unauthorized("Auth.Required", "Authentication is required for this request."));
+        }
+
         var election = await elections.GetByIdAsync(command.ElectionId, cancellationToken);
 
         if (election is null
@@ -69,7 +76,7 @@ public sealed class MoveElectionCommandHandler(
                 "No nominations have been approved, so there is nothing to vote on."));
         }
 
-        if (!election.MoveTo(target, clock.UtcNow))
+        if (!election.MoveTo(target, actorId, clock.UtcNow))
         {
             return Result.Failure<ElectionResponse>(Error.Conflict(
                 "Election.InvalidTransition",

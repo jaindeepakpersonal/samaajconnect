@@ -432,12 +432,39 @@ public sealed class KnownEventsTests
     }
 
     [Fact]
-    public void A_panch_election_moving_on_keeps_the_stage_it_left()
+    public void A_panch_election_moving_on_keeps_the_stage_it_left_and_who_moved_it()
     {
         var descriptor = KnownEvents.Describe("panch.election.status-changed.v1");
 
         descriptor.EntityIdProperty.Should().Be("electionId");
+        descriptor.ActorIdProperty.Should().Be("changedBy");
         descriptor.BeforeProperties.Should().Equal("previousStatus");
+    }
+
+    [Fact]
+    public void A_panch_nomination_decision_names_the_administrator_not_the_nominee()
+    {
+        var descriptor = KnownEvents.Describe("panch.candidate.decided.v1");
+
+        descriptor.Action.Should().Be("CandidateDecided");
+        descriptor.EntityName.Should().Be("PanchCandidate");
+        descriptor.EntityIdProperty.Should().Be("candidateId");
+        descriptor.ActorIdProperty.Should().Be("decidedBy");
+    }
+
+    [Fact]
+    public void Correcting_extending_or_deleting_a_panch_election_names_the_administrator()
+    {
+        KnownEvents.Describe("panch.election.updated.v1").ActorIdProperty.Should().Be("updatedBy");
+
+        var extended = KnownEvents.Describe("panch.election.voting-extended.v1");
+        extended.ActorIdProperty.Should().Be("extendedBy");
+        extended.BeforeProperties.Should().Equal("previousVotingEndAt");
+
+        var deleted = KnownEvents.Describe("panch.election.deleted.v1");
+        deleted.Action.Should().Be("ElectionDeleted");
+        deleted.EntityIdProperty.Should().Be("electionId");
+        deleted.ActorIdProperty.Should().Be("deletedBy");
     }
 
     [Fact]

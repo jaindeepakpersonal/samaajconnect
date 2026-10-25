@@ -14,8 +14,8 @@ public sealed class TenantLogoTests
 
     private static byte[] Png() => [0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A, 1, 2, 3];
 
-    private static TenantLogo Capture(byte[]? bytes = null) =>
-        TenantLogo.Capture(TenantId, bytes ?? Png(), ActorId, Now);
+    private static TenantImage Capture(byte[]? bytes = null) =>
+        TenantImage.Capture(TenantId, bytes ?? Png(), ActorId, Now);
 
     /// <summary>
     /// The reason sniffing lives in the domain rather than at the endpoint: the
@@ -27,8 +27,8 @@ public sealed class TenantLogoTests
     {
         Capture().ContentType.Should().Be(ImageContent.Png);
 
-        typeof(TenantLogo)
-            .GetMethod(nameof(TenantLogo.Capture))!
+        typeof(TenantImage)
+            .GetMethod(nameof(TenantImage.Capture))!
             .GetParameters()
             .Select(p => p.Name)
             .Should().NotContain("contentType");
@@ -49,7 +49,7 @@ public sealed class TenantLogoTests
     [Fact]
     public void Bytes_that_are_not_an_image_cannot_become_a_logo()
     {
-        var act = () => TenantLogo.Capture(
+        var act = () => TenantImage.Capture(
             TenantId, Encoding.UTF8.GetBytes("not a picture"), ActorId, Now);
 
         act.Should().Throw<ArgumentException>();

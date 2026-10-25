@@ -1,7 +1,7 @@
 import { Component, OnInit, inject, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { RouterLink } from '@angular/router';
-import { describeError } from '@samaajconnect/shared';
+import { AuthedImageDirective, describeError } from '@samaajconnect/shared';
 import { AdminApi } from '../../core/admin-api';
 import { AdminScope } from '../../core/admin-scope';
 import { ModuleDescriptor, Tenant, TenantStatus } from '../../core/admin.models';
@@ -24,7 +24,7 @@ import { ModuleDescriptor, Tenant, TenantStatus } from '../../core/admin.models'
  */
 @Component({
   selector: 'app-tenant-list',
-  imports: [FormsModule, RouterLink],
+  imports: [AuthedImageDirective, FormsModule, RouterLink],
   template: `
     <h1 class="title">Samaaj / Tenants</h1>
     <p class="sub">Super Admin only • manage all tenant organisations.</p>
@@ -160,7 +160,10 @@ import { ModuleDescriptor, Tenant, TenantStatus } from '../../core/admin.models'
                         [attr.aria-expanded]="logoFor() === tenant.id"
                         (click)="openLogo(tenant)"
                       >
-                        Logo
+                        Logo &amp; banner
+                        @if (tenant.logoUrl === null || tenant.bannerUrl === null) {
+                          <span class="pill warn">Missing</span>
+                        }
                       </button>
                       <!--
                         DPDP section 13. DPDP-COMPLIANCE.md has marked this
@@ -217,6 +220,7 @@ import { ModuleDescriptor, Tenant, TenantStatus } from '../../core/admin.models'
 
                   @if (logoFor() === tenant.id) {
                     <div class="logo-panel" role="status">
+                      <h3>Logo</h3>
                       <p class="small">
                         The Samaaj's own mark. It appears beside the name on the registration
                         form, so somebody choosing their Samaaj can recognise it — which is
@@ -245,8 +249,8 @@ import { ModuleDescriptor, Tenant, TenantStatus } from '../../core/admin.models'
                         <p class="small error" role="alert">{{ logoError() }}</p>
                       }
 
-                      <div class="actions">
-                        @if (tenant.logoUrl) {
+                      @if (tenant.logoUrl) {
+                        <div class="actions">
                           <button
                             class="btn alt small"
                             type="button"
@@ -254,6 +258,49 @@ import { ModuleDescriptor, Tenant, TenantStatus } from '../../core/admin.models'
                             (click)="removeLogo(tenant)"
                           >
                             Remove logo
+                          </button>
+                        </div>
+                      }
+
+                      <h3>Banner</h3>
+                      <p class="small">
+                        The photo across the top of every member's Home, with the logo on it.
+                        Unlike the logo it is shown only to this Samaaj's own members, because a
+                        photograph of a community usually has its members in it. A wide picture
+                        works best - it is cropped to about four times as wide as it is tall.
+                      </p>
+
+                      @if (tenant.bannerUrl; as banner) {
+                        <img class="tenant-banner" [scAuthedSrc]="banner"
+                          [alt]="'Banner of ' + tenant.name" />
+                      } @else {
+                        <p class="small">No banner yet.</p>
+                      }
+
+                      <label [for]="tenant.id + 'banner'">Choose a banner</label>
+                      <input
+                        class="input"
+                        [id]="tenant.id + 'banner'"
+                        type="file"
+                        accept="image/jpeg,image/png,image/webp"
+                        [disabled]="busyId() === tenant.id"
+                        (change)="chooseBanner(tenant, $event)"
+                      />
+                      <p class="small">JPEG, PNG or WebP, up to 2 MB.</p>
+
+                      @if (bannerError()) {
+                        <p class="small error" role="alert">{{ bannerError() }}</p>
+                      }
+
+                      <div class="actions">
+                        @if (tenant.bannerUrl) {
+                          <button
+                            class="btn alt small"
+                            type="button"
+                            [disabled]="busyId() === tenant.id"
+                            (click)="removeBanner(tenant)"
+                          >
+                            Remove banner
                           </button>
                         }
                         <button class="btn alt small" type="button" (click)="logoFor.set(null)">
@@ -451,9 +498,10 @@ export class TenantListComponent implements OnInit {
   /** Kept apart from `error` so a wrong password lands next to the field. */
   readonly confirmError = signal<string | null>(null);
 
-  /** Which Samaaj's logo panel is open, if any. */
+  /** Which Samaaj's logo-and-banner panel is open, if any. */
   readonly logoFor = signal<string | null>(null);
   readonly logoError = signal<string | null>(null);
+  readonly bannerError = signal<string | null>(null);
 
   password = '';
 
@@ -522,7 +570,55 @@ export class TenantListComponent implements OnInit {
    */
   openLogo(tenant: Tenant): void {
     this.logoError.set(null);
+    this.bannerError.set(null);
     this.logoFor.set(this.logoFor() === tenant.id ? null : tenant.id);
+  }
+
+  /** Uploads the chosen banner straight away - the logo's flow, for its reasons. */
+  chooseBanner(tenant: Tenant, event: Event): void {
+    const input = event.target as HTMLInputElement;
+    const file = input.files?.[0] ?? null;
+
+    input.value = '';
+    this.bannerError.set(null);
+
+    if (file === null) {
+      return;
+    }
+
+    if (file.size > MaxLogoBytes) {
+      this.bannerError.set('That banner is larger than 2 MB. Choose a smaller one.');
+      return;
+    }
+
+    this.busyId.set(tenant.id);
+
+    this.api.uploadTenantBanner(tenant.id, file).subscribe({
+      next: () => {
+        this.busyId.set(null);
+        this.load();
+      },
+      error: (failure: unknown) => {
+        this.busyId.set(null);
+        this.bannerError.set(describeError(failure));
+      },
+    });
+  }
+
+  removeBanner(tenant: Tenant): void {
+    this.bannerError.set(null);
+    this.busyId.set(tenant.id);
+
+    this.api.removeTenantBanner(tenant.id).subscribe({
+      next: () => {
+        this.busyId.set(null);
+        this.load();
+      },
+      error: (failure: unknown) => {
+        this.busyId.set(null);
+        this.bannerError.set(describeError(failure));
+      },
+    });
   }
 
   // ---- The grievance contact (DPDP s.13) ---------------------------------

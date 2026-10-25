@@ -22,6 +22,17 @@ const member: CurrentUser = {
   permissions: ['Members.Read', 'Timeline.Post'],
 };
 
+/** The reader's Samaaj as the anonymous lookup answers it: no logo, no banner. */
+const SAMAAJ = {
+  id: 't1',
+  name: 'Mahavir Samaaj',
+  slug: 'mahavir-samaj',
+  logoUrl: null as string | null,
+  bannerUrl: null as string | null,
+  status: 'Active',
+  enabledModules: ['community'],
+};
+
 function post(overrides: Partial<Post> = {}): Post {
   return {
     id: 'p1',
@@ -123,9 +134,17 @@ describe('TimelineComponent', () => {
     }
   }
 
-  /** Answers the reader's own profile, which the card at the top asks for. */
-  function flushMe(overrides: Partial<MyProfile> = {}): void {
+  /**
+   * Answers the reader's own profile, which the card at the top asks for -
+   * and the Samaaj lookup for the header above it, when /me has answered and
+   * so asked for one.
+   */
+  function flushMe(overrides: Partial<MyProfile> = {}, samaaj: object = SAMAAJ): void {
     http.expectOne('/v1/members/me').flush(myProfile(overrides));
+
+    for (const req of http.match('/v1/identity/tenants/mahavir-samaj')) {
+      req.flush(samaaj);
+    }
   }
 
   /** Answers the calls the screen makes on load: /me, the feed, then any author names it needs. */
@@ -490,6 +509,58 @@ describe('TimelineComponent', () => {
     flushMemberLookups();
     fixture.detectChanges();
 
+    expect(text()).toContain('Community blood donation drive');
+  });
+
+  // ---- The Samaaj's banner and logo -----------------------------------------
+
+  function hero(): HTMLElement | null {
+    return (fixture.nativeElement as HTMLElement).querySelector('.samaaj-hero');
+  }
+
+  it('heads Home with the Samaaj name, its logo, and its banner fetched with the token', () => {
+    URL.createObjectURL = () => 'blob:banner';
+    URL.revokeObjectURL = () => undefined;
+    const banner = '/v1/identity/tenants/t1/banner?v=abcd1234';
+
+    fixture.detectChanges();
+    http.expectOne('/v1/identity/me').flush(member);
+    http.expectOne('/v1/timeline/posts').flush([]);
+    flushMe({}, { ...SAMAAJ, logoUrl: '/v1/identity/tenants/t1/logo', bannerUrl: banner });
+    fixture.detectChanges();
+
+    // The banner is members-only: not drawn from its bare path, but fetched.
+    http.expectOne(banner).flush(new Blob(['x']));
+    fixture.detectChanges();
+
+    expect(hero()?.textContent).toContain('Mahavir Samaaj');
+    expect(hero()?.classList).toContain('has-banner');
+    expect(hero()?.querySelector<HTMLImageElement>('.hero-banner')?.getAttribute('src')).toBe('blob:banner');
+
+    // The logo is public, so a plain src is right for it.
+    expect(hero()?.querySelector<HTMLImageElement>('img.hero-logo')?.getAttribute('src'))
+      .toBe('/v1/identity/tenants/t1/logo');
+  });
+
+  it('still heads Home with the name and initials when the Samaaj has neither image', () => {
+    load([]);
+
+    expect(hero()?.textContent).toContain('Mahavir Samaaj');
+    expect(hero()?.classList).not.toContain('has-banner');
+    expect(hero()?.querySelector('img')).toBeNull();
+    expect(hero()?.querySelector('.hero-logo.initials')?.textContent?.trim()).toBe('MS');
+  });
+
+  it('draws no header at all when the Samaaj lookup fails, and the feed is unaffected', () => {
+    fixture.detectChanges();
+    http.expectOne('/v1/identity/me').flush(member);
+    http.expectOne('/v1/timeline/posts').flush([post()]);
+    http.expectOne('/v1/members/me').flush(myProfile());
+    http.expectOne('/v1/identity/tenants/mahavir-samaj').flush({}, { status: 500, statusText: 'Server Error' });
+    flushMemberLookups();
+    fixture.detectChanges();
+
+    expect(hero()).toBeNull();
     expect(text()).toContain('Community blood donation drive');
   });
 

@@ -64,7 +64,7 @@ public sealed class DecideCandidateCommandHandler(
 
         var changed = command.Approve
             ? election.ApproveCandidate(command.CandidateId, actorId, now)
-            : election.RejectCandidate(command.CandidateId, now);
+            : election.RejectCandidate(command.CandidateId, actorId, now);
 
         if (!changed && election.FindCandidate(command.CandidateId) is null)
         {

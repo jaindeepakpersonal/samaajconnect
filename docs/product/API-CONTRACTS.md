@@ -21,6 +21,12 @@ enforced by `TenantAuthorizationBehavior`, not just UI hiding.
 | GET | `/tenants/by-id/{id}` | Anonymous | Resolve id → tenant (used by the gateway on every request) |
 | GET | `/tenants/directory` | Anonymous | Active Samaaj a visitor can register into |
 | PUT | `/tenants/{id}/grievance-contact` | SuperAdmin, SamaajAdmin | Name who members complain to (DPDP s.13) |
+| POST | `/tenants/{id}/logo` | SuperAdmin, SamaajAdmin (own Samaaj) | Upload the logo, multipart. JPEG/PNG/WebP read from the bytes, 2 MB |
+| GET | `/tenants/{id}/logo` | Anonymous | The logo - public, so the registration form can show it. `Cache-Control: public` |
+| DELETE | `/tenants/{id}/logo` | SuperAdmin, SamaajAdmin (own Samaaj) | Take the logo down; twice is success |
+| POST | `/tenants/{id}/banner` | SuperAdmin, SamaajAdmin (own Samaaj) | Upload the banner across members' Home, multipart, same rules as the logo |
+| GET | `/tenants/{id}/banner` | That Samaaj's Member/SamaajAdmin/AreaAdmin, SuperAdmin | The banner - members only, `Cache-Control: private`. Another Samaaj's member gets 404 |
+| DELETE | `/tenants/{id}/banner` | SuperAdmin, SamaajAdmin (own Samaaj) | Take the banner down; twice is success |
 | GET | `/tenants/{id}/security-policy` | SuperAdmin, SamaajAdmin (own Samaaj) | A Samaaj's own overrides to the platform's password/OTP/lockout/session constants, raw and nullable |
 | PUT | `/tenants/{id}/security-policy` | SuperAdmin, SamaajAdmin (own Samaaj) | Replace those overrides, whole. A null field clears that override back to the platform default |
 | POST | `/register` | Anonymous | Member registration into one Samaaj |
@@ -564,6 +570,9 @@ nominating, voting and every read.
 | GET | `/elections` | `Members.Read` | This Samaaj's elections, newest first, each with the caller's own ballot choices |
 | POST | `/elections` | `Panch.Manage` | Set an election up. Starts `Draft`; nominations must close before voting opens |
 | GET | `/elections/{id}` | `Members.Read` | Ballot always; tally only when this caller may see it |
+| PATCH | `/elections/{id}` | `Panch.Manage` | Correct the title, description, both windows and results visibility - `Draft` or `NominationsOpen` only. Same body and window rules as creating one; extending nominations is pushing their close out here |
+| DELETE | `/elections/{id}` | `Panch.Manage` | `204`. Deletes the election and its nominations - `Draft` or `NominationsOpen` only; once voting opens it holds ballots and is closed instead (`409`) |
+| POST | `/elections/{id}/extend-voting` | `Panch.Manage` | `{votingEndAt}`. Keeps voting open longer while it is open - later than the current close only (`409` otherwise) |
 | POST | `/elections/{id}/status` | `Panch.Manage` | Strictly forward: `NominationsOpen`, `VotingOpen`, `Closed`. Publishing is its own call |
 | POST | `/elections/{id}/candidates` | `Members.Read` | Put a member forward while nominations are open. A repeat is success |
 | POST | `/elections/{id}/candidates/{candidateId}/decide` | `Panch.Manage` | Approve onto the ballot, or remove before voting opens |

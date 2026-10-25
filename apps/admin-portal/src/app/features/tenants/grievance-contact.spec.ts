@@ -12,6 +12,7 @@ const TENANT = {
   status: 'Active',
   enabledModules: ['community'],
   logoUrl: null as string | null,
+  bannerUrl: null as string | null,
   grievanceContact: null as object | null,
 };
 

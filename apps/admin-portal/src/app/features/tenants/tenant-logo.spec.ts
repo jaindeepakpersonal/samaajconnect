@@ -12,6 +12,7 @@ const TENANT = {
   status: 'Active',
   enabledModules: ['community'],
   logoUrl: null as string | null,
+  bannerUrl: null as string | null,
 };
 
 /**
@@ -103,7 +104,7 @@ describe('TenantListComponent logo', () => {
 
     const button = Array.from<HTMLButtonElement>(
       fixture.nativeElement.querySelectorAll('button'),
-    ).find((b) => b.textContent?.trim() === 'Logo')!;
+    ).find((b) => b.textContent?.trim().startsWith('Logo & banner'))!;
 
     expect(button.getAttribute('aria-expanded')).toBe('false');
 
@@ -201,5 +202,87 @@ describe('TenantListComponent logo', () => {
     fixture.detectChanges();
 
     expect(text()).toContain('served to anyone');
+  });
+
+  // ---- The banner ---------------------------------------------------------
+
+  const BANNER = '/v1/identity/tenants/t1/banner?v=abcd1234';
+
+  function chooseBanner(file: File): void {
+    const input: HTMLInputElement = fixture.nativeElement.querySelector('#t1banner');
+
+    Object.defineProperty(input, 'files', { value: [file], configurable: true });
+    input.dispatchEvent(new Event('change'));
+    fixture.detectChanges();
+  }
+
+  it('flags a Samaaj that is missing its logo or its banner, and not one that has both', () => {
+    start();
+    expect(text()).toContain('Missing');
+
+    TestBed.resetTestingModule();
+    TestBed.configureTestingModule({
+      imports: [TenantListComponent],
+      providers: [
+        provideRouter([]),
+        provideHttpClient(),
+        provideHttpClientTesting(),
+        { provide: API_CONFIG, useValue: { gatewayUrl: '' } },
+      ],
+    });
+
+    start({ ...TENANT, logoUrl: '/v1/identity/tenants/t1/logo', bannerUrl: BANNER });
+    expect(text()).not.toContain('Missing');
+  });
+
+  it('uploads a banner through its own input, as multipart, and re-reads', () => {
+    start();
+    component.openLogo(component.tenants()[0]!);
+    fixture.detectChanges();
+
+    chooseBanner(png());
+
+    const upload = http.expectOne('/v1/identity/tenants/t1/banner');
+    expect(upload.request.method).toBe('POST');
+    expect(upload.request.body).toBeInstanceOf(FormData);
+    upload.flush(null);
+
+    http.expectOne((r) => r.url === '/v1/identity/tenants').flush([TENANT]);
+  });
+
+  /**
+   * Not a plain `src`, unlike the logo above: the banner is served only to the
+   * Samaaj's members, and an `<img>` sends no token.
+   */
+  it('fetches the banner with the token rather than drawing it from a bare path', () => {
+    let created = 0;
+    URL.createObjectURL = () => {
+      created++;
+      return 'blob:banner';
+    };
+    URL.revokeObjectURL = () => undefined;
+
+    start({ ...TENANT, bannerUrl: BANNER });
+    component.openLogo(component.tenants()[0]!);
+    fixture.detectChanges();
+
+    const banner: HTMLImageElement = fixture.nativeElement.querySelector('.tenant-banner');
+    expect(banner).not.toBeNull();
+    expect(banner.getAttribute('src')).not.toBe(BANNER);
+
+    http.expectOne(BANNER).flush(new Blob([new Uint8Array(4)]));
+    fixture.detectChanges();
+
+    expect(created).toBe(1);
+  });
+
+  it('says the banner is for this Samaaj alone, and offers removal only when there is one', () => {
+    start();
+    component.openLogo(component.tenants()[0]!);
+    fixture.detectChanges();
+
+    expect(text()).toContain("only to this Samaaj's own members");
+    expect(text()).toContain('No banner yet');
+    expect(text()).not.toContain('Remove banner');
   });
 });

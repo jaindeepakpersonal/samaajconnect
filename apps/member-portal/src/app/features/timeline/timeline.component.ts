@@ -2,7 +2,7 @@ import { HttpErrorResponse } from '@angular/common/http';
 import { Component, OnInit, computed, inject, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { RouterLink } from '@angular/router';
-import { AuthService, AuthedImageDirective, describeError } from '@samaajconnect/shared';
+import { AuthService, AuthedImageDirective, TenantSummary, describeError } from '@samaajconnect/shared';
 import { MasterDataApi } from '../members/master-data.api';
 import { MembersApi } from '../members/members.api';
 import { MyProfile } from '../members/members.models';
@@ -63,6 +63,25 @@ import { Comment, Post, ReactionType, Reactions } from './timeline.models';
   styleUrl: './timeline.css',
   template: `
     <div class="timeline-page">
+      @if (samaaj(); as home) {
+        <!-- The Samaaj's own banner and logo, the first thing a member sees.
+             The logo is public and drawn from its path; the banner is a
+             members-only photograph, so it is fetched with the token. -->
+        <section class="samaaj-hero" [class.has-banner]="home.bannerUrl !== null" aria-label="Your Samaaj">
+          @if (home.bannerUrl; as banner) {
+            <img class="hero-banner" [scAuthedSrc]="banner" alt="" />
+          }
+          <div class="hero-identity">
+            @if (home.logoUrl; as logo) {
+              <img class="hero-logo" [src]="logo" [alt]="home.name + ' logo'" />
+            } @else {
+              <span class="hero-logo initials" aria-hidden="true">{{ initials(home.name) }}</span>
+            }
+            <p class="hero-name">{{ home.name }}</p>
+          </div>
+        </section>
+      }
+
       <header class="page-head">
         <div>
           <h1 class="page-title">Timeline</h1>
@@ -303,6 +322,9 @@ export class TimelineComponent implements OnInit {
 
   readonly gautraName = signal<string | null>(null);
 
+  /** The reader's Samaaj, for its banner and logo. Null until it loads; nothing is drawn if it cannot. */
+  readonly samaaj = signal<TenantSummary | null>(null);
+
   readonly myName = computed(() => this.myProfile()?.fullName ?? this.auth.user()?.fullName ?? 'You');
 
   readonly myPhoto = computed(() => this.myProfile()?.photoUrl ?? null);
@@ -379,14 +401,31 @@ export class TimelineComponent implements OnInit {
     // and they arrive from /me rather than from the token. Loading the feed
     // first would render the compose box before that is known.
     this.auth.ensureCurrentUser().subscribe({
-      next: () => {
+      next: (user) => {
         this.load();
         this.loadMe();
+        this.loadSamaaj(user.tenantSlug);
       },
       error: () => {
         this.load();
         this.loadMe();
       },
+    });
+  }
+
+  /**
+   * The Samaaj summary, for the banner and logo at the top. The same anonymous
+   * lookup the shell makes for the Samaaj's name; a failure draws no header and
+   * costs nothing else.
+   */
+  private loadSamaaj(slug: string): void {
+    if (!slug) {
+      return;
+    }
+
+    this.auth.findTenant(slug).subscribe({
+      next: (found) => this.samaaj.set(found),
+      error: () => this.samaaj.set(null),
     });
   }
 

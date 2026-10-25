@@ -4,11 +4,11 @@ using Sangam.IdentityTenant.Domain.Media;
 
 namespace Sangam.IdentityTenant.Infrastructure.Persistence.Configurations;
 
-public sealed class TenantLogoConfiguration : IEntityTypeConfiguration<TenantLogo>
+public sealed class TenantImageConfiguration : IEntityTypeConfiguration<TenantImage>
 {
-    public void Configure(EntityTypeBuilder<TenantLogo> builder)
+    public void Configure(EntityTypeBuilder<TenantImage> builder)
     {
-        builder.ToTable("tenant_logos");
+        builder.ToTable("tenant_images");
 
         builder.HasKey(l => l.Id);
 
@@ -32,6 +32,6 @@ public sealed class TenantLogoConfiguration : IEntityTypeConfiguration<TenantLog
         // How archiving a Samaaj finds every logo it has, including any a
         // replace path orphaned. Not unique: a Samaaj may briefly have two rows
         // while a logo is replaced inside one transaction.
-        builder.HasIndex(l => l.TenantId).HasDatabaseName("ix_tenant_logos_tenant");
+        builder.HasIndex(l => l.TenantId).HasDatabaseName("ix_tenant_images_tenant");
     }
 }

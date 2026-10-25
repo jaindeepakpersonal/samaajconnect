@@ -1,3 +1,4 @@
+import { HttpErrorResponse } from '@angular/common/http';
 import { Component, OnInit, computed, inject, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { ActivatedRoute, RouterLink } from '@angular/router';
@@ -41,6 +42,11 @@ import { Candidate, Election, ElectionDetail, ElectionResult, stageLabel } from 
 
       @if (loading()) {
         <p role="status">Loading the election…</p>
+      } @else if (notFound()) {
+        <p class="notice info" role="status">
+          There is no such election in our Samaaj. It may have been deleted before voting
+          opened.
+        </p>
       } @else if (error(); as message) {
         <div class="notice error" role="alert">
           {{ message }}
@@ -239,6 +245,12 @@ export class ElectionComponent implements OnInit {
   readonly result = signal<ElectionResult | null>(null);
   readonly loading = signal(true);
   readonly error = signal<string | null>(null);
+  /**
+   * A 404 is an answer, not a failure: an election deleted before voting opened
+   * is gone for good, so offering "Try again" would promise something no retry
+   * can give.
+   */
+  readonly notFound = signal(false);
   readonly busy = signal(false);
   readonly names = signal<Readonly<Record<string, string>>>({});
 
@@ -289,6 +301,7 @@ export class ElectionComponent implements OnInit {
 
     this.loading.set(true);
     this.error.set(null);
+    this.notFound.set(false);
 
     this.api.get(id).subscribe({
       next: (found) => {
@@ -305,6 +318,13 @@ export class ElectionComponent implements OnInit {
       },
       error: (failure: unknown) => {
         this.loading.set(false);
+
+        if (failure instanceof HttpErrorResponse && failure.status === 404) {
+          this.detail.set(null);
+          this.notFound.set(true);
+          return;
+        }
+
         this.error.set(describeError(failure));
       },
     });
@@ -346,6 +366,9 @@ export class ElectionComponent implements OnInit {
     this.memberId = '';
     this.selectedNomineeName.set(null);
     this.nominateError.set(null);
+    // The last outcome was about somebody else; left up, it reads as being
+    // about whoever is being typed now.
+    this.nominateMessage.set(null);
 
     if (value.trim().length < 2) {
       this.nomineeResults.set([]);
@@ -380,16 +403,19 @@ export class ElectionComponent implements OnInit {
     this.nominateError.set(null);
     this.nominateMessage.set(null);
 
+    const name = this.selectedNomineeName() ?? 'They';
+
     this.api.nominate(election.id, this.memberId).subscribe({
       next: (outcome) => {
         this.clearNominee();
         this.busy.set(false);
 
-        // A repeat nomination is success, not an error - say which happened.
+        // A repeat nomination is success, not an error - say which happened,
+        // and about whom, since the box is already empty for the next name.
         this.nominateMessage.set(
           outcome.nominated
-            ? 'Put forward. An administrator decides whether they reach the ballot.'
-            : 'They had already been put forward. One candidacy each keeps a vote from splitting.',
+            ? `${name} put forward. An administrator decides whether they reach the ballot.`
+            : `${name} had already been put forward. One candidacy each keeps a vote from splitting.`,
         );
 
         this.load();

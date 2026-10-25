@@ -12,6 +12,9 @@ export interface Tenant {
   readonly slug: string;
   readonly domain: string | null;
   readonly logoUrl: string | null;
+
+  /** Members only, unlike the logo - fetch it with `scAuthedSrc`, never a plain `src`. */
+  readonly bannerUrl: string | null;
   readonly contactPerson: string | null;
   readonly contactEmail: string | null;
   readonly status: TenantStatus;
@@ -842,7 +845,7 @@ export interface CampaignResult {
 /** Forward only, like a campaign; publishing is its own call, then `Published`. */
 export type ElectionStatus = 'Draft' | 'NominationsOpen' | 'VotingOpen' | 'Closed' | 'Published';
 
-/** What creating an election sends. */
+/** What creating or editing an election sends. */
 export interface ElectionInput {
   readonly title: string;
   readonly description: string | null;
