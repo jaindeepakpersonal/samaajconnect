@@ -43,6 +43,18 @@ status() {
   curl -s -o /dev/null -w '%{http_code}' "$@"
 }
 
+# How many 2-second tries a check waits for a row to reach the audit trail.
+#
+# A row arrives over Kafka, and often on a topic this run has just created:
+# audit-notification-service finds new topics by a regex subscription that
+# refreshes every 30 seconds, then rebalances before it reads. Forty seconds
+# covered that on a developer's machine and not on a cold CI runner, where
+# "the removal reaches the audit trail" failed with every service working.
+# Ninety seconds is the refresh, the rebalance and the slow runner together.
+# A check stops the moment its row appears, so this costs nothing when it
+# passes.
+AUDIT_WAIT_TRIES=45
+
 # One scratch directory for the whole run, and exactly one trap.
 #
 # The upload sections write fixture bytes rather than shipping files, because
@@ -1122,7 +1134,7 @@ SAMAAJ_ADMIN_ID=$(curl -s -H "Authorization: Bearer $SAMAAJ_ADMIN_TOKEN" "$GATEW
 require_id samaaj_admin_id "$SAMAAJ_ADMIN_ID"
 
 role_matrix_change_audited=0
-for attempt in $(seq 1 20); do
+for attempt in $(seq 1 "$AUDIT_WAIT_TRIES"); do
   if curl -s -H "Authorization: Bearer $ADMIN_TOKEN" -H "$ADMIN_TENANT_HEADER" \
      "$GATEWAY/v1/audit/logs?action=RoleMatrixChanged&limit=200" \
      | grep -q "\"entityId\":\"$STUDENT_ROLE\",\"actorUserId\":\"$SAMAAJ_ADMIN_ID\""; then
@@ -1331,7 +1343,7 @@ check "and withdrawing again is success rather than an error" 200 \
 # the other audit checks: the row arrives over Kafka through the outbox
 # rather than inside this request.
 consent_withdrawal_audited=0
-for attempt in $(seq 1 20); do
+for attempt in $(seq 1 "$AUDIT_WAIT_TRIES"); do
   if curl -s -H "Authorization: Bearer $ADMIN_TOKEN" -H "$ADMIN_TENANT_HEADER" \
      "$GATEWAY/v1/audit/logs?action=ParentalConsentWithdrawn&limit=200" \
      | grep -q "\"entityId\":\"$SECOND_CHILD\",\"actorUserId\":\"$MEMBER_ID\""; then
@@ -1506,7 +1518,7 @@ fi
 # A broadcast is one person messaging everybody, so it has to be traceable to
 # them. The row arrives over Kafka through this service's own outbox.
 broadcast_audited=0
-for attempt in $(seq 1 20); do
+for attempt in $(seq 1 "$AUDIT_WAIT_TRIES"); do
   if curl -s -H "Authorization: Bearer $ADMIN_TOKEN" -H "$ADMIN_TENANT_HEADER" \
      "$GATEWAY/v1/audit/logs?action=BroadcastSent" | grep -q "$BROADCAST_ID"; then
     broadcast_audited=1
@@ -1812,7 +1824,7 @@ MODERATOR_ID=$(curl -s -H "Authorization: Bearer $ADMIN_TOKEN" -H "$ADMIN_TENANT
 require_id moderator_id "$MODERATOR_ID"
 
 post_moderation_audited=0
-for attempt in $(seq 1 20); do
+for attempt in $(seq 1 "$AUDIT_WAIT_TRIES"); do
   if curl -s -H "Authorization: Bearer $ADMIN_TOKEN" -H "$ADMIN_TENANT_HEADER" \
      "$GATEWAY/v1/audit/logs?action=PostModerated&limit=200" \
      | grep -q "\"entityId\":\"$POST_ID\",\"actorUserId\":\"$MODERATOR_ID\""; then
@@ -2122,7 +2134,7 @@ fi
 # shape those two checks use, because the row arrives over Kafka through the
 # outbox rather than inside the request that triggered it.
 member_removal_audited=0
-for attempt in $(seq 1 20); do
+for attempt in $(seq 1 "$AUDIT_WAIT_TRIES"); do
   if curl -s -H "Authorization: Bearer $ADMIN_TOKEN" -H "$ADMIN_TENANT_HEADER" \
      "$GATEWAY/v1/audit/logs?action=MemberRemoved&limit=200" \
      | grep -q "\"entityId\":\"$CHILD_USER_ID\",\"actorUserId\":\"$MEMBER_ID\""; then
@@ -2489,7 +2501,7 @@ REVIEWER_ID=$(curl -s -H "Authorization: Bearer $ADMIN_TOKEN" -H "$ADMIN_TENANT_
 require_id reviewer_id "$REVIEWER_ID"
 
 issue_decision_audited=0
-for attempt in $(seq 1 20); do
+for attempt in $(seq 1 "$AUDIT_WAIT_TRIES"); do
   if curl -s -H "Authorization: Bearer $ADMIN_TOKEN" -H "$ADMIN_TENANT_HEADER" \
      "$GATEWAY/v1/audit/logs?action=IssueStatusChanged&limit=200" \
      | grep -q "\"entityId\":\"$ISSUE_ID\",\"actorUserId\":\"$REVIEWER_ID\""; then
@@ -2518,7 +2530,7 @@ check "the administrator, standing in for the Panch, records the decision" 200 \
      -d '{"decision":"Repaint the crossing and post a marshal at closing time.","monitoringGroupId":null}')"
 
 decision_audited=0
-for attempt in $(seq 1 20); do
+for attempt in $(seq 1 "$AUDIT_WAIT_TRIES"); do
   if curl -s -H "Authorization: Bearer $ADMIN_TOKEN" -H "$ADMIN_TENANT_HEADER" \
      "$GATEWAY/v1/audit/logs?action=IssueDecided&limit=200" \
      | grep -q "\"entityId\":\"$ISSUE_ID\",\"actorUserId\":\"$REVIEWER_ID\""; then
@@ -2916,7 +2928,7 @@ check "and kills the live token in the same session" 401 \
 # descriptor that can produce this action, so entityName needs no separate
 # check here.
 session_revocation_audited=0
-for attempt in $(seq 1 20); do
+for attempt in $(seq 1 "$AUDIT_WAIT_TRIES"); do
   if curl -s -H "Authorization: Bearer $ADMIN_TOKEN" -H "$ADMIN_TENANT_HEADER" \
      "$GATEWAY/v1/audit/logs?action=SessionRevoked&limit=200" \
      | grep -q "\"actorUserId\":\"$MEMBER_ID\""; then
@@ -3186,7 +3198,7 @@ fi
 # parent - names a different person from the child the request is about, the
 # same "distinct actor" shape as the other flagship finds in this pass.
 enrolment_request_audited=0
-for attempt in $(seq 1 20); do
+for attempt in $(seq 1 "$AUDIT_WAIT_TRIES"); do
   if curl -s -H "Authorization: Bearer $ADMIN_TOKEN" -H "$ADMIN_TENANT_HEADER" \
      "$GATEWAY/v1/audit/logs?action=EnrolmentRequested&limit=200" \
      | grep -q "\"entityId\":\"$ENROLMENT_ID\",\"actorUserId\":\"$MEMBER_ID\""; then
