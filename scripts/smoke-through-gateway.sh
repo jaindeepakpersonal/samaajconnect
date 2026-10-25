@@ -21,7 +21,7 @@ set -euo pipefail
 GATEWAY="${GATEWAY:-http://localhost:8080}"
 SLUG="${SLUG:-smoke-samaj}"
 SUPERADMIN="${SUPERADMIN:-superadmin@samaajconnect.local}"
-SUPERADMIN_PASSWORD="${SUPERADMIN_PASSWORD:-change-me-immediately}"
+SUPERADMIN_PASSWORD="${SUPERADMIN_PASSWORD:-superadminpassword}"   # docker-compose.yml's own default
 MEMBER="${MEMBER:-smoke-member@example.com}"
 MEMBER_PASSWORD="${MEMBER_PASSWORD:-a-long-enough-password}"
 

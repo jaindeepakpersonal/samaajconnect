@@ -25,7 +25,7 @@ set -euo pipefail
 GATEWAY="${GATEWAY:-http://localhost:8080}"
 
 SUPERADMIN="${SUPERADMIN:-superadmin@samaajconnect.local}"
-SUPERADMIN_PASSWORD="${SUPERADMIN_PASSWORD:-change-me-immediately}"
+SUPERADMIN_PASSWORD="${SUPERADMIN_PASSWORD:-superadminpassword}"   # docker-compose.yml's own default
 
 # Samaaj A holds the data. Samaaj B does the probing.
 #
