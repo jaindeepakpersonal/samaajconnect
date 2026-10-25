@@ -1,6 +1,7 @@
-import { HttpInterceptorFn } from '@angular/common/http';
+import { HttpErrorResponse, HttpInterceptorFn } from '@angular/common/http';
 import { Injectable, computed, inject, signal } from '@angular/core';
 import { TokenStore } from '@samaajconnect/shared';
+import { catchError, throwError } from 'rxjs';
 import { Tenant } from './admin.models';
 
 const STORAGE_KEY = 'samaajconnect.admin.scope';
@@ -86,5 +87,34 @@ export const adminScopeInterceptor: HttpInterceptorFn = (request, next) => {
 
   return next(
     request.clone({ setHeaders: { 'X-Tenant-Override-Id': tenantId } }),
+  ).pipe(
+    catchError((error: unknown) => {
+      if (!isUnavailableSamaaj(error)) {
+        return throwError(() => error);
+      }
+
+      // The remembered Samaaj no longer exists, or has been deactivated - a
+      // database reset leaves exactly this behind in an open tab. The gateway
+      // refuses every request carrying it, /me included, so a stale scope used
+      // to lock the Super Admin out: the panel could not say who they were
+      // and sent them back to sign in, where signing in again changed nothing.
+      // Forgetting it puts them on the platform view, which is always valid.
+      scope.clear();
+
+      // A read is retried without it, which is what lets the panel start. A
+      // write is not: the gateway refused it before any service saw it, and
+      // resending it without the override would quietly change which Samaaj
+      // it acts on.
+      return request.method === 'GET' ? next(request) : throwError(() => error);
+    }),
   );
 };
+
+/** The gateway's answer to an override naming a Samaaj it cannot serve. */
+function isUnavailableSamaaj(error: unknown): boolean {
+  return (
+    error instanceof HttpErrorResponse &&
+    error.status === 403 &&
+    (error.error as { title?: unknown } | null)?.title === 'Tenant.Unavailable'
+  );
+}

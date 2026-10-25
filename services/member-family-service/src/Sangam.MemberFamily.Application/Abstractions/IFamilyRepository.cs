@@ -18,6 +18,14 @@ public interface IFamilyRepository
         Guid memberProfileId, CancellationToken cancellationToken = default);
 
     /// <summary>
+    /// One household by its own id, bypassing the tenant filter - for the
+    /// conversion-completion consumer, which knows the child's family and not
+    /// yet any member of it. The caller compares the tenant with the event's.
+    /// </summary>
+    Task<Family?> GetByIdForConsumerAsync(
+        Guid familyId, CancellationToken cancellationToken = default);
+
+    /// <summary>
     /// The households these members actively belong to, with their members -
     /// one query for a whole directory page rather than one per row.
     /// </summary>

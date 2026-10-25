@@ -80,7 +80,7 @@ worked example of a cross-service flow with no synchronous call.
 | Topic | Why |
 |---|---|
 | `identity.user.registered.v1` | Create the initial profile |
-| `identity.child-conversion.completed.v1` | Mark the child Converted and link the account |
+| `identity.child-conversion.completed.v1` | Mark the child Converted and link the account, create the new member's profile, and make them an Active member of their household |
 | `identity.user.erased.v1` | Erase everything this service holds about that member |
 
 An explicit topic list, unlike audit-notification-service's catch-all regex.
@@ -658,6 +658,52 @@ The loop closes in identity-tenant-service, which consumes the approval,
 creates a `PendingActivation` account, and announces
 `identity.child-conversion.completed.v1` once the new member has redeemed an
 activation code. Only then does the child record here become `Converted`.
+
+**Completing a conversion creates the new member's profile, and until
+2026-10-25 nothing did.** identity-tenant-service raises
+`UserActivatedFromChildDomainEvent` *instead of* `UserRegisteredDomainEvent`
+for a converted child - rightly, because the child record has to be linked -
+but `CompleteChildConversionCommand` only marked the record Converted. So a
+converted child signed in with the Member role and no `MemberProfile`:
+`/v1/members/me` answered 404, nothing on My Profile could be saved, and
+marital status, which matrimony-service decides eligibility from, could never
+be set. The smoke script's Matrimony section is what found it. It is the same
+gap identity-tenant-service's `User.Activate()` remarks describe for invited
+admins, one consumer further along, and nothing failed loudly in either case.
+
+Decided 2026-10-25: a converted child is a **full
+member**, with everything an ordinary registration gets and a few things only
+the child record can supply.
+
+- **Seeded from the child record:** name, date of birth and gender. Contact is
+  the identifier they activated with (`MobileOrEmail` on the event), exactly as
+  `FromRegistration` seeds it.
+- **A registration's defaults:** `FieldPrivacy.Default` and listed in the
+  directory. They are an adult member now, and both are theirs to change.
+- **The household's address:** the family admin's permanent address, copied as
+  a value (later changes to either do not follow the other). It starts
+  Private, and its locality is what puts them in their Area Admin's scope
+  rather than outside everyone's.
+- **Their household:** an Active `FamilyMember`, relationship `Child`, with no
+  join request - `Family.AdmitConvertedChild`. They were already in it as a
+  record, and the family admin started the conversion. They can leave like
+  anyone else.
+- **Not their photograph.** The child's was held on a parent's consent (s.9);
+  whether the adult wants it on a directory card is for them to decide by
+  uploading one.
+
+**Idempotent by the profile's primary key, and repairs what came before.** The
+profile is created whenever none exists for the user id, not only on the
+delivery that marks the child Converted - so replaying the event for a child
+converted before this existed gives them their profile. **Joining the household
+happens only alongside creating the profile**: once a profile exists the member
+has had the chance to leave, and a late redelivery must not quietly put them
+back. An erased converted member keeps their (erased) profile row, so a replay
+recreates nothing. A completion naming a different Samaaj than the child's is
+ignored, and one for an already-converted child naming a different account
+never re-links it. No event is raised - like a registration's profile, this is
+the *result* of identity-tenant-service's event, which is already on the audit
+trail. `ConversionCompletionTests` holds all of it.
 
 ## DPDP and children's data
 

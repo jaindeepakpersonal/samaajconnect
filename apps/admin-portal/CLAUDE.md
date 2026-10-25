@@ -125,6 +125,18 @@ gate and the audit log is the only record of who acted on whose Samaaj (root
 `CLAUDE.md` §6). The banner naming the Samaaj is the least the panel can do
 about that.
 
+**A remembered Samaaj that no longer exists is forgotten, not obeyed
+(2026-10-25).** The scope lives in `sessionStorage`, so it outlives the Samaaj
+it names - a database reset leaves exactly that in any open tab, and so does a
+Samaaj being deactivated. The gateway answers every request carrying such an
+override with 403 `Tenant.Unavailable`, `/v1/identity/me` included, and the
+panel used to read that as "cannot say who you are" and send the Super Admin
+back to sign in - where signing in again changed nothing, with no message at
+all. `adminScopeInterceptor` now clears the scope on that answer and retries a
+GET without it, so the panel starts on the platform view. A write is not
+retried: the gateway refused it before any service saw it, and resending it
+without the override would silently change which Samaaj it acts on.
+
 **Changing the scope reloads the page.** Screens read their data once on init
 and the router reuses a component when the URL has not changed, so an in-app
 navigation would leave the previous Samaaj's rows on screen under the new
