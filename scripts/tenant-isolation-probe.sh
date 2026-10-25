@@ -342,8 +342,11 @@ SESSION_ID=$(curl -s "${SA[@]}" -X POST "$GATEWAY/v1/pathshala/pathshalas/$PATHS
 CLASS_ID=$(curl -s "${SA[@]}" -X POST "$GATEWAY/v1/pathshala/pathshalas/$PATHSHALA_ID/classes" \
   -d "{\"sessionId\":\"$SESSION_ID\",\"name\":\"Probe class\",\"roomLabel\":null}" | json_field id)
 
+# A contact name and phone are required since asking for a place began
+# collecting who the Pathshala should call; without them the request was
+# refused and this fixture silently came back empty.
 ENROLMENT_ID=$(curl -s "${SA[@]}" -X POST "$GATEWAY/v1/pathshala/pathshalas/$PATHSHALA_ID/enrollments" \
-  -d '{"childProfileId":"00000000-0000-0000-0000-0000000000aa"}' | json_field id)
+  -d '{"childProfileId":"00000000-0000-0000-0000-0000000000aa","contactName":"Probe Parent","contactPhone":"+919800000001"}' | json_field id)
 
 curl -s -o /dev/null "${SA[@]}" -X POST "$GATEWAY/v1/pathshala/enrollments/$ENROLMENT_ID/placement" \
   -d "{\"classId\":\"$CLASS_ID\",\"place\":true}"
@@ -475,8 +478,10 @@ curl -s -o /dev/null "${SA[@]}" -X POST "$GATEWAY/v1/celebrity-voting/campaigns/
 # `candidateId`, not `id`: nominating answers with the campaign, the candidate
 # and whether anything was added, since a repeat nomination is a no-op reported
 # as success. Reaching for `id` here got nothing.
+# A category is required since a nomination with no stated reason gave a
+# reviewer nothing to judge it by; null was refused.
 NOMINATION_ID=$(curl -s "${AA[@]}" -X POST "$GATEWAY/v1/celebrity-voting/campaigns/$OPEN_CAMPAIGN_ID/candidates" \
-  -d "{\"memberId\":\"$A_MEMBER2_ID\",\"category\":null}" | json_field candidateId)
+  -d "{\"memberId\":\"$A_MEMBER2_ID\",\"category\":\"Community service\"}" | json_field candidateId)
 
 OCCASION_ID=$(curl -s "${SA[@]}" -X POST "$GATEWAY/v1/boli/occasions" \
   -d '{"title":"Probe occasion","description":"A","occasionDate":"2099-01-01"}' | json_field id)
