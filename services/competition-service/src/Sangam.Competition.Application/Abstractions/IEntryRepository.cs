@@ -19,5 +19,9 @@ public interface IEntryRepository
 
     Task<int> CountByRoundAsync(Guid roundId, CancellationToken cancellationToken = default);
 
+    /// <summary>Every entry in these rounds - a competition's rounds are few, so this is one query for the lot.</summary>
+    Task<IReadOnlyList<Entry>> ListByRoundsAsync(
+        IReadOnlyCollection<Guid> roundIds, CancellationToken cancellationToken = default);
+
     void Add(Entry entry);
 }

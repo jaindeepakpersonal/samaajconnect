@@ -28,6 +28,14 @@ namespace Sangam.Competition.Infrastructure.Migrations
                         .HasColumnType("uuid")
                         .HasColumnName("id");
 
+                    b.Property<DateOnly?>("AuditionDate")
+                        .HasColumnType("date")
+                        .HasColumnName("audition_date");
+
+                    b.Property<bool>("AuditionRequired")
+                        .HasColumnType("boolean")
+                        .HasColumnName("audition_required");
+
                     b.Property<Guid?>("CityId")
                         .HasColumnType("uuid")
                         .HasColumnName("city_id");
@@ -49,9 +57,17 @@ namespace Sangam.Competition.Infrastructure.Migrations
                         .HasColumnType("character varying(2000)")
                         .HasColumnName("description");
 
+                    b.Property<int?>("FinalistCount")
+                        .HasColumnType("integer")
+                        .HasColumnName("finalist_count");
+
                     b.Property<Guid?>("LocalityId")
                         .HasColumnType("uuid")
                         .HasColumnName("locality_id");
+
+                    b.Property<int>("MaxMarks")
+                        .HasColumnType("integer")
+                        .HasColumnName("max_marks");
 
                     b.Property<Guid?>("PhotoId")
                         .HasColumnType("uuid")
@@ -64,6 +80,10 @@ namespace Sangam.Competition.Infrastructure.Migrations
                     b.Property<DateTimeOffset>("RegistrationStartAt")
                         .HasColumnType("timestamp with time zone")
                         .HasColumnName("registration_start_at");
+
+                    b.Property<int>("RoundCount")
+                        .HasColumnType("integer")
+                        .HasColumnName("round_count");
 
                     b.Property<string>("Status")
                         .IsRequired()
@@ -115,6 +135,12 @@ namespace Sangam.Competition.Infrastructure.Migrations
                     b.Property<Guid>("MemberId")
                         .HasColumnType("uuid")
                         .HasColumnName("member_id");
+
+                    b.Property<string>("Panel")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)")
+                        .HasColumnName("panel");
 
                     b.HasKey("Id")
                         .HasName("pk_competition_judges");
@@ -182,6 +208,12 @@ namespace Sangam.Competition.Infrastructure.Migrations
                         .HasColumnType("timestamp with time zone")
                         .HasColumnName("created_at");
 
+                    b.Property<string>("Kind")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)")
+                        .HasColumnName("kind");
+
                     b.Property<string>("Name")
                         .IsRequired()
                         .HasMaxLength(100)
@@ -206,6 +238,43 @@ namespace Sangam.Competition.Infrastructure.Migrations
                         .HasDatabaseName("ix_rounds_competition_id_sequence_number");
 
                     b.ToTable("rounds", (string)null);
+                });
+
+            modelBuilder.Entity("Sangam.Competition.Domain.Entries.CompetitionResult", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<Guid>("CompetitionId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("competition_id");
+
+                    b.Property<DateTimeOffset>("PublishedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("published_at");
+
+                    b.Property<Guid>("PublishedBy")
+                        .HasColumnType("uuid")
+                        .HasColumnName("published_by");
+
+                    b.Property<string>("RankedMemberIds")
+                        .IsRequired()
+                        .HasColumnType("jsonb")
+                        .HasColumnName("ranked_member_ids");
+
+                    b.Property<Guid>("TenantId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("tenant_id");
+
+                    b.HasKey("Id")
+                        .HasName("pk_competition_results");
+
+                    b.HasIndex("CompetitionId")
+                        .IsUnique()
+                        .HasDatabaseName("ix_competition_results_competition_id");
+
+                    b.ToTable("competition_results", (string)null);
                 });
 
             modelBuilder.Entity("Sangam.Competition.Domain.Entries.Entry", b =>

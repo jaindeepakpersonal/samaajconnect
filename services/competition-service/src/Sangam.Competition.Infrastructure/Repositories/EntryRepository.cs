@@ -29,5 +29,15 @@ public sealed class EntryRepository(CompetitionDbContext dbContext) : IEntryRepo
     public Task<int> CountByRoundAsync(Guid roundId, CancellationToken cancellationToken = default) =>
         dbContext.Entries.AsNoTracking().CountAsync(e => e.RoundId == roundId, cancellationToken);
 
+    public async Task<IReadOnlyList<Entry>> ListByRoundsAsync(
+        IReadOnlyCollection<Guid> roundIds, CancellationToken cancellationToken = default) =>
+        roundIds.Count == 0
+            ? []
+            : await dbContext.Entries
+                .AsNoTracking()
+                .Where(e => roundIds.Contains(e.RoundId))
+                .OrderBy(e => e.CreatedAt)
+                .ToListAsync(cancellationToken);
+
     public void Add(Entry entry) => dbContext.Entries.Add(entry);
 }

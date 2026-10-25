@@ -23,6 +23,8 @@ public sealed class CompetitionDbContext(
 
     public DbSet<RoundResult> RoundResults => Set<RoundResult>();
 
+    public DbSet<CompetitionResult> CompetitionResults => Set<CompetitionResult>();
+
     public DbSet<OutboxMessage> OutboxMessages => Set<OutboxMessage>();
 
     public DbSet<Domain.Media.CompetitionPhoto> CompetitionPhotos => Set<Domain.Media.CompetitionPhoto>();

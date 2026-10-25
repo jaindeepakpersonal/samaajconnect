@@ -4229,6 +4229,20 @@ competition_checks() {
     fail=$((fail + 1))
   fi
 
+  # The judge's own sheet and the organiser's scoresheet (2026-10-25), and
+  # neither for an ordinary member.
+  check "the judge reads their own judging sheet" 200 \
+    "$(status -H "Authorization: Bearer $SAMAAJ_ADMIN_TOKEN" "$GATEWAY/v1/competitions/$COMPETITION_ID/judging/mine")"
+
+  check "a member who is not a judge has no judging sheet" 403 \
+    "$(status -H "Authorization: Bearer $MEMBER_TOKEN" "$GATEWAY/v1/competitions/$COMPETITION_ID/judging/mine")"
+
+  check "the organiser reads every judge's marks" 200 \
+    "$(status -H "Authorization: Bearer $ADMIN_TOKEN" -H "$ADMIN_TENANT_HEADER" "$GATEWAY/v1/competitions/$COMPETITION_ID/scoresheet")"
+
+  check "an ordinary member may not" 403 \
+    "$(status -H "Authorization: Bearer $MEMBER_TOKEN" "$GATEWAY/v1/competitions/$COMPETITION_ID/scoresheet")"
+
   check "switching the competitions module off" 200 \
     "$(status -X PUT "$GATEWAY/v1/identity/tenants/$TENANT_ID/modules" \
        -H 'Content-Type: application/json' -H "Authorization: Bearer $ADMIN_TOKEN" -H "$ADMIN_TENANT_HEADER" \

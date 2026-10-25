@@ -21,7 +21,13 @@ public sealed record UpdateCompetitionCommand(
     DateTimeOffset RegistrationStartAt,
     DateTimeOffset RegistrationEndAt,
     string? Venue = null,
-    string? CityId = null) : ICommand<CompetitionResponse>;
+    string? CityId = null,
+    /// <summary>The format (2026-10-25) - see `CompetitionFormat`. Each optional; left out, it is the default.</summary>
+    int? RoundCount = null,
+    int? MaxMarks = null,
+    bool? AuditionRequired = null,
+    DateOnly? AuditionDate = null,
+    int? FinalistCount = null) : ICommand<CompetitionResponse>, IHasCompetitionFormat;
 
 public sealed class UpdateCompetitionCommandValidator : AbstractValidator<UpdateCompetitionCommand>
 {
@@ -38,6 +44,8 @@ public sealed class UpdateCompetitionCommandValidator : AbstractValidator<Update
         RuleFor(x => x.RegistrationEndAt)
             .GreaterThan(x => x.RegistrationStartAt)
             .WithMessage("Registration cannot close before it opens.");
+
+        Include(new CompetitionFormatValidator());
     }
 
     private static bool BeNullOrAGuid(string? value) => value is null || Guid.TryParse(value, out _);
@@ -77,7 +85,8 @@ public sealed class UpdateCompetitionCommandHandler(
             actorId,
             clock.UtcNow,
             command.Venue,
-            command.CityId is { } cityId ? Guid.Parse(cityId) : null);
+            command.CityId is { } cityId ? Guid.Parse(cityId) : null,
+            command.SaysAnythingAboutFormat() ? command.ToFormat(competition.Format) : null);
 
         if (!updated)
         {

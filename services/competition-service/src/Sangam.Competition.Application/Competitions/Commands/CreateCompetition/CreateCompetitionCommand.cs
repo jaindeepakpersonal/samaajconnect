@@ -3,6 +3,7 @@ using MediatR;
 using Sangam.Competition.Application.Abstractions;
 using Sangam.Competition.Application.Common;
 using Sangam.Competition.Application.Security;
+using Sangam.Competition.Domain.Competitions;
 using CompetitionAggregate = Sangam.Competition.Domain.Competitions.Competition;
 
 namespace Sangam.Competition.Application.Competitions.Commands.CreateCompetition;
@@ -19,7 +20,13 @@ public sealed record CreateCompetitionCommand(
     /// <summary>A string, validated as a Guid; null for the whole Samaaj.</summary>
     string? LocalityId = null,
     string? Venue = null,
-    string? CityId = null) : ICommand<CompetitionResponse>;
+    string? CityId = null,
+    /// <summary>The format (2026-10-25) - see `CompetitionFormat`. Each optional; left out, it is the default.</summary>
+    int? RoundCount = null,
+    int? MaxMarks = null,
+    bool? AuditionRequired = null,
+    DateOnly? AuditionDate = null,
+    int? FinalistCount = null) : ICommand<CompetitionResponse>, IHasCompetitionFormat;
 
 public sealed class CreateCompetitionCommandValidator : AbstractValidator<CreateCompetitionCommand>
 {
@@ -45,6 +52,8 @@ public sealed class CreateCompetitionCommandValidator : AbstractValidator<Create
         RuleFor(x => x.RegistrationEndAt)
             .GreaterThan(x => x.RegistrationStartAt)
             .WithMessage("Registration cannot close before it opens.");
+
+        Include(new CompetitionFormatValidator());
     }
 
     private static bool BeNullOrAGuid(string? value) =>
@@ -85,7 +94,8 @@ public sealed class CreateCompetitionCommandHandler(
             clock.UtcNow,
             command.LocalityId is { } localityId ? Guid.Parse(localityId) : null,
             command.Venue,
-            command.CityId is { } cityId ? Guid.Parse(cityId) : null);
+            command.CityId is { } cityId ? Guid.Parse(cityId) : null,
+            command.ToFormat(CompetitionFormat.Default));
 
         competitions.Add(competition);
 

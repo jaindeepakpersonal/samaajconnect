@@ -31,6 +31,10 @@ public interface IScoreRepository
         IReadOnlyList<Guid> entryIds, CancellationToken cancellationToken = default);
 
     /// <summary>This one judge's own marks across the given entries.</summary>
+    /// <summary>Every judge's marks on these entries - the organiser's scoresheet, and the judge's own sheet filtered to them.</summary>
+    Task<IReadOnlyList<Score>> ListByEntriesAsync(
+        IReadOnlyList<Guid> entryIds, CancellationToken cancellationToken = default);
+
     Task<IReadOnlyDictionary<Guid, int>> ListMineAsync(
         IReadOnlyList<Guid> entryIds, Guid judgeMemberId, CancellationToken cancellationToken = default);
 }

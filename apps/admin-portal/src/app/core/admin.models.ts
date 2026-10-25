@@ -1415,7 +1415,8 @@ export type LookupCategory =
   | 'MaritalStatus'
   | 'Qualification'
   | 'BusinessCategory'
-  | 'EventType';
+  | 'EventType'
+  | 'CompetitionType';
 
 /** Mirrors master-data-service's `LookupItemResponse`. Every write is a soft delete. */
 export interface LookupItem {
@@ -1473,9 +1474,31 @@ export type CompetitionStatus =
 
 export type RoundStatus = 'Open' | 'Closed';
 
+/** The audition decides who takes part; a main round is the competition itself. */
+export type RoundKind = 'Audition' | 'Main';
+
+/** What a judge marks when there is an audition. Main for every judge when there is none. */
+export type JudgePanel = 'Main' | 'Audition' | 'Both';
+
+/**
+ * How a competition is run (2026-10-25), chosen when it is set up and editable
+ * until registration closes. The rounds come from it when judging starts.
+ */
+export interface CompetitionFormat {
+  /** Main rounds. 0 is one judging, shown to members as its top three only. */
+  readonly roundCount: number;
+  /** The most one judge may give one participant in one round. */
+  readonly maxMarks: number;
+  readonly auditionRequired: boolean;
+  /** `yyyy-MM-dd`. Null without an audition. */
+  readonly auditionDate: string | null;
+  /** How many go through from the audition - the top N, ties at the cut-off included. */
+  readonly finalistCount: number | null;
+}
+
 /** Mirrors `CompetitionResponse`. */
 /** What creating or correcting a competition sends. */
-export interface CompetitionInput {
+export interface CompetitionInput extends CompetitionFormat {
   readonly title: string;
   readonly description: string | null;
   readonly competitionTypeId: string | null;
@@ -1488,7 +1511,7 @@ export interface CompetitionInput {
   readonly registrationEndAt: string;
 }
 
-export interface Competition {
+export interface Competition extends CompetitionFormat {
   readonly id: string;
   readonly title: string;
   readonly description: string | null;
@@ -1526,6 +1549,7 @@ export interface Round {
   readonly closedAt: string | null;
   readonly entryCount: number;
   readonly hasPublishedResult: boolean;
+  readonly kind: RoundKind;
 }
 
 /** Mirrors `JudgeResponse`. */
@@ -1533,6 +1557,7 @@ export interface CompetitionJudge {
   readonly id: string;
   readonly memberId: string;
   readonly assignedAt: string;
+  readonly panel: JudgePanel;
 }
 
 /** Mirrors `CompetitionDetailResponse`. */
@@ -1546,6 +1571,63 @@ export interface CompetitionDetail {
 
   /** Whether this caller holds `Competition.Manage` - the organiser screen should show its controls. */
   readonly canManage: boolean;
+
+  /** Whether the final standings have been published. */
+  readonly hasPublishedResult: boolean;
+}
+
+/** A place in the standings. Equal totals share a rank - 1, 2, 2, 4. */
+export interface Standing {
+  readonly rank: number;
+  readonly memberId: string;
+  /** The participant's round averages added up. */
+  readonly total: number;
+}
+
+/** One judge's mark on one entry. */
+export interface JudgeMark {
+  readonly judgeMemberId: string;
+  readonly value: number;
+  readonly comments: string | null;
+  readonly updatedAt: string;
+}
+
+export interface ScoresheetEntry {
+  readonly entryId: string;
+  readonly participantMemberId: string;
+  readonly marks: readonly JudgeMark[];
+  /** Null when no judge has marked it. */
+  readonly average: number | null;
+  /** On an audition: whether they went through. Null until it is closed, and on a main round. */
+  readonly wentThrough: boolean | null;
+}
+
+export interface ScoresheetRound {
+  readonly round: Round;
+  readonly entries: readonly ScoresheetEntry[];
+}
+
+/** Mirrors `ScoresheetResponse` - every judge's marks and the standings now. Live until published. */
+export interface Scoresheet {
+  readonly competitionId: string;
+  readonly maxMarks: number;
+  readonly judges: readonly CompetitionJudge[];
+  readonly rounds: readonly ScoresheetRound[];
+  readonly standings: readonly Standing[];
+  readonly hasPublishedResult: boolean;
+}
+
+/** Mirrors `CompetitionResultResponse` - the published final standings. */
+export interface CompetitionFinalResult {
+  readonly competitionId: string;
+  /** First to third, ties included. */
+  readonly winners: readonly Standing[];
+  /** Every place - the organiser's. */
+  readonly standings: readonly Standing[];
+  readonly roundCount: number;
+  readonly maxMarks: number;
+  readonly publishedBy: string;
+  readonly publishedAt: string;
 }
 
 /**

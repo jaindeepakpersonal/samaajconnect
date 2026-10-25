@@ -57,6 +57,20 @@ public sealed class Competition : AggregateRoot, ITenantScopedEntity
     public DateTimeOffset RegistrationStartAt { get; private set; }
     public DateTimeOffset RegistrationEndAt { get; private set; }
 
+    /// <summary>Main rounds; zero is one judging shown only as its top three. See <see cref="CompetitionFormat"/>.</summary>
+    public int RoundCount { get; private set; }
+
+    /// <summary>The most one judge may give one participant in one round.</summary>
+    public int MaxMarks { get; private set; } = 100;
+
+    public bool AuditionRequired { get; private set; }
+    public DateOnly? AuditionDate { get; private set; }
+
+    /// <summary>How many go through from the audition - the top N, ties at the cut-off included.</summary>
+    public int? FinalistCount { get; private set; }
+
+    public CompetitionFormat Format => new(RoundCount, MaxMarks, AuditionRequired, AuditionDate, FinalistCount);
+
     public CompetitionStatus Status { get; private set; }
     public Guid CreatedByMemberId { get; private set; }
     public DateTimeOffset CreatedAt { get; private set; }
@@ -78,11 +92,12 @@ public sealed class Competition : AggregateRoot, ITenantScopedEntity
         DateTimeOffset now,
         Guid? localityId = null,
         string? venue = null,
-        Guid? cityId = null)
+        Guid? cityId = null,
+        CompetitionFormat? format = null)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(title);
 
-        return new Competition
+        var competition = new Competition
         {
             Id = Guid.NewGuid(),
             TenantId = tenantId,
@@ -98,6 +113,19 @@ public sealed class Competition : AggregateRoot, ITenantScopedEntity
             CreatedByMemberId = createdByMemberId,
             CreatedAt = now,
         };
+
+        competition.Apply(format ?? CompetitionFormat.Default);
+
+        return competition;
+    }
+
+    private void Apply(CompetitionFormat format)
+    {
+        RoundCount = format.RoundCount;
+        MaxMarks = format.MaxMarks;
+        AuditionRequired = format.AuditionRequired;
+        AuditionDate = format.AuditionRequired ? format.AuditionDate : null;
+        FinalistCount = format.AuditionRequired ? format.FinalistCount : null;
     }
 
     /// <summary>Whether registration is open right now: the status says so, and the clock agrees.</summary>
@@ -117,7 +145,8 @@ public sealed class Competition : AggregateRoot, ITenantScopedEntity
         Guid updatedBy,
         DateTimeOffset now,
         string? venue = null,
-        Guid? cityId = null)
+        Guid? cityId = null,
+        CompetitionFormat? format = null)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(title);
 
@@ -134,6 +163,13 @@ public sealed class Competition : AggregateRoot, ITenantScopedEntity
         CityId = cityId;
         RegistrationStartAt = registrationStartAt;
         RegistrationEndAt = registrationEndAt;
+
+        // The format can change with the rest: nothing is judged until
+        // judging starts, which is where the rounds come from.
+        if (format is not null)
+        {
+            Apply(format);
+        }
 
         Raise(new CompetitionUpdatedDomainEvent(Id, TenantId, updatedBy, now));
 
@@ -194,6 +230,11 @@ public sealed class Competition : AggregateRoot, ITenantScopedEntity
 
         var previous = Status;
         Status = target;
+
+        if (target == CompetitionStatus.InProgress)
+        {
+            SetUpRounds(now);
+        }
 
         Raise(new CompetitionStatusChangedDomainEvent(
             Id, TenantId, previous.ToString(), target.ToString(), now));
@@ -263,6 +304,53 @@ public sealed class Competition : AggregateRoot, ITenantScopedEntity
 
     public bool IsJudge(Guid memberId) => FindJudge(memberId) is not null;
 
+    /// <summary>Whether this member may mark a round of this kind.</summary>
+    public bool CanJudge(Guid memberId, RoundKind kind) => FindJudge(memberId)?.Judges(kind) == true;
+
+    public Round? AuditionRound => _rounds.FirstOrDefault(r => r.Kind == RoundKind.Audition);
+
+    public IReadOnlyList<Round> MainRounds =>
+        [.. _rounds.Where(r => r.Kind == RoundKind.Main).OrderBy(r => r.SequenceNumber)];
+
+    /// <summary>Who is registered now, in the order they registered.</summary>
+    public IReadOnlyList<Guid> RegisteredMemberIds =>
+        [.. _registrations
+            .Where(r => r.Status == RegistrationStatus.Registered)
+            .OrderBy(r => r.RegisteredAt)
+            .Select(r => r.MemberId)];
+
+    /// <summary>
+    /// The rounds the format asks for, made when judging starts: the audition
+    /// first when there is one, then Round 1 to N - or a single "Final" for a
+    /// competition with no rounds. Rounds an organiser added by hand before
+    /// then are kept, and stand in for the main rounds.
+    /// </summary>
+    private void SetUpRounds(DateTimeOffset now)
+    {
+        var next = _rounds.Count == 0 ? 1 : _rounds.Max(r => r.SequenceNumber) + 1;
+
+        if (AuditionRequired && AuditionRound is null)
+        {
+            _rounds.Add(new Round(Id, "Audition", next++, now, RoundKind.Audition));
+        }
+
+        if (MainRounds.Count > 0)
+        {
+            return;
+        }
+
+        if (RoundCount == 0)
+        {
+            _rounds.Add(new Round(Id, "Final", next, now));
+            return;
+        }
+
+        for (var number = 1; number <= RoundCount; number++)
+        {
+            _rounds.Add(new Round(Id, $"Round {number}", next++, now));
+        }
+    }
+
     /// <summary>
     /// Assigns or removes a judge. Returns false when assigning somebody
     /// already a judge, or removing somebody who is not one.
@@ -272,18 +360,26 @@ public sealed class Competition : AggregateRoot, ITenantScopedEntity
     /// role, the same "the president is just a member" reasoning
     /// volunteer-groups-service already established for its own group lead.
     /// </remarks>
-    public bool AssignJudge(Guid memberId, bool assign, DateTimeOffset now)
+    public bool AssignJudge(Guid memberId, bool assign, DateTimeOffset now, JudgePanel panel = JudgePanel.Main)
     {
         var existing = FindJudge(memberId);
 
         if (assign)
         {
+            // Assigning a judge again on another panel moves them to it.
             if (existing is not null)
             {
-                return false;
+                if (existing.Panel == panel)
+                {
+                    return false;
+                }
+
+                existing.MoveTo(panel);
+
+                return true;
             }
 
-            _judges.Add(new CompetitionJudge(Id, memberId, now));
+            _judges.Add(new CompetitionJudge(Id, memberId, panel, now));
 
             return true;
         }
@@ -341,6 +437,14 @@ public sealed class Competition : AggregateRoot, ITenantScopedEntity
     /// <summary>Announces a round's ranking. Raised by the handler, which has computed it.</summary>
     public void AnnounceRoundResults(Guid roundId, IReadOnlyList<Guid> rankedEntryIds, DateTimeOffset now) =>
         Raise(new RoundResultsPublishedDomainEvent(Id, TenantId, roundId, rankedEntryIds, now));
+
+    /// <summary>Announces the final standings. Raised by the handler, which has computed them.</summary>
+    public void AnnounceResults(IReadOnlyList<Guid> rankedMemberIds, Guid publishedBy, DateTimeOffset now) =>
+        Raise(new CompetitionResultsPublishedDomainEvent(Id, TenantId, rankedMemberIds, publishedBy, now));
+
+    /// <summary>The audition has been closed and its finalists entered in every main round.</summary>
+    public void AnnounceFinalists(IReadOnlyList<Guid> finalistMemberIds, Guid decidedBy, DateTimeOffset now) =>
+        Raise(new FinalistsSelectedDomainEvent(Id, TenantId, finalistMemberIds, decidedBy, now));
 }
 
 public enum CompetitionStatus

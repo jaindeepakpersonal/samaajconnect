@@ -15,6 +15,11 @@ namespace Sangam.Competition.Application.Competitions.Commands.MoveCompetition;
 /// Strictly forward: Draft to RegistrationOpen to RegistrationClosed to
 /// InProgress to Closed. There is no route back and no command to reopen
 /// one, the same stance `VotingCampaign`'s own move command takes.
+///
+/// Starting judging (InProgress) sets the rounds up from the format and enters
+/// every registered member: into the audition when there is one - the
+/// finalists reach the main rounds when it closes - and otherwise into every
+/// main round. Members apply; nobody enters them by hand.
 /// </remarks>
 [RequiresPermission(PermissionKeys.CompetitionManage)]
 public sealed record MoveCompetitionCommand(Guid CompetitionId, string Status)
@@ -35,6 +40,7 @@ public sealed class MoveCompetitionCommandValidator : AbstractValidator<MoveComp
 
 public sealed class MoveCompetitionCommandHandler(
     ICompetitionRepository competitions,
+    IEntryRepository entries,
     IUnitOfWork unitOfWork,
     ITenantContext tenantContext,
     IDateTimeProvider clock,
@@ -55,11 +61,23 @@ public sealed class MoveCompetitionCommandHandler(
 
         var target = Enum.Parse<CompetitionStatus>(command.Status, ignoreCase: true);
 
-        if (!competition.MoveTo(target, clock.UtcNow))
+        var now = clock.UtcNow;
+
+        if (!competition.MoveTo(target, now))
         {
             return Result.Failure<CompetitionResponse>(Error.Conflict(
                 "Competition.InvalidTransition",
                 $"A competition that is {competition.Status} cannot become {target}."));
+        }
+
+        if (target == CompetitionStatus.InProgress)
+        {
+            IReadOnlyList<Round> firstRounds = competition.AuditionRound is { } audition
+                ? [audition]
+                : competition.MainRounds;
+
+            await CompetitionJudging.EnterAsync(
+                entries, competition.TenantId, firstRounds, competition.RegisteredMemberIds, now, cancellationToken);
         }
 
         await unitOfWork.SaveChangesAsync(cancellationToken);

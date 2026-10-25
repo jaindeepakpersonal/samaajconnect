@@ -102,6 +102,15 @@ public sealed class ScoreRepository(
             .ToDictionaryAsync(x => x.EntryId, x => x.Average, cancellationToken);
     }
 
+    public async Task<IReadOnlyList<Score>> ListByEntriesAsync(
+        IReadOnlyList<Guid> entryIds, CancellationToken cancellationToken = default) =>
+        entryIds.Count == 0
+            ? []
+            : await dbContext.Scores
+                .AsNoTracking()
+                .Where(s => entryIds.Contains(s.EntryId))
+                .ToListAsync(cancellationToken);
+
     public async Task<IReadOnlyDictionary<Guid, int>> ListMineAsync(
         IReadOnlyList<Guid> entryIds, Guid judgeMemberId, CancellationToken cancellationToken = default)
     {

@@ -34,8 +34,8 @@ before translating another screen.
 | My businesses | `/businesses/mine` | — | built. The caller's own businesses as tiles, plus a register form with the address, city/village and locality, and a photo |
 | Manage business | `/businesses/mine/:id` | — | built. Two tabs, Details and Products, with Edit details and Add/Edit product in popups; the photo, product images, activate/deactivate |
 | Orders | `/businesses/orders` | — | built. Placed/Received tabs |
-| Competitions | `/competitions` | — | built; no wireframe covers this new module. Browse, register, withdraw |
-| Competition detail | `/competitions/:id` | — | built. A page since 2026-10-24: cover photo, title, where it is held, stage, Register/Withdraw, then three tabs - Details (about, the window, the judges), Participants (who is registered, by name, a page at a time), Rounds (entries, a judging section visible only to an assigned judge, the published result) |
+| Competitions | `/competitions` | — | built; no wireframe covers this new module. Browse, apply, withdraw |
+| Competition detail | `/competitions/:id` | — | built. A page: cover photo, title, type, where it is held, stage, Apply as participant / Withdraw (each confirmed in a popup), then tabs - Details (the window, how it is judged, the judges), Participants, Rounds (only when it has rounds; each opens in a popup), Results (the winners), and Judging for a judge (their own sheet - a mark and comment per participant) |
 | Samaaj Panch | `/panch` | — | built; no wireframe covers it. Who sits on the Panch, and the elections |
 | Panch election | `/panch/:id` | — | built. Nominate somebody by name, cast one final ballot of up to ten, read the result |
 | Trusts | `/trust` | — | built; no wireframe covers this new module. Our Samaaj's locality Trusts, read-only, with a "What you owe" card above them when a Boli the member won has fallen due to a Trust |
@@ -905,6 +905,20 @@ filters.** The nominee picker calls the same `MembersApi.search(term)` the
 Members directory uses, capped at the service's own default of 50 - a
 nomination is one member found by name, not a browse, so nothing here needs
 Locality filtering or pagination on top of it.
+
+**A competition's page follows its format (2026-10-25).** Members *apply*
+rather than "register" - the button opens a popup saying what they sign up to
+(an audition date, how many rounds) - and nobody is entered by hand: starting
+judging enters everybody who applied. A competition with no rounds has no
+Rounds tab at all, the user's rule that one judged once shows its top three
+"without mentioning round details". **Results** names the winners once
+published - first, second and third, ties sharing a place, each with their
+face and their total out of the max marks times the rounds - and asks for
+`/result` only once the detail says it is published. **Judging** is drawn for
+a judge only: `/judging/mine` is their own sheet, every participant in each
+round their panel judges, with a mark out of the competition's max and a
+comment, saved per participant, and checked against the max before it is sent.
+A refused mark is reported beside its participant, not at the top of the page.
 
 **Competitions is a new module this cycle, standalone from Events by
 design (the user's own scope decision, not an oversight) - shaped after

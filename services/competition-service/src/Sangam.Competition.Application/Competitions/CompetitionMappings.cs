@@ -24,7 +24,13 @@ internal static class CompetitionMappings
             competition.LocalityId,
             competition.Venue,
             competition.CityId,
-            competition.PhotoId is { } photoId ? $"/v1/competitions/{competition.Id}/photo?v={photoId:N}" : null);
+            competition.PhotoId is { } photoId ? $"/v1/competitions/{competition.Id}/photo?v={photoId:N}" : null,
+            competition.RoundCount,
+            competition.MaxMarks,
+            competition.AuditionRequired,
+            competition.AuditionDate,
+            competition.FinalistCount,
+            memberId is { } panelOf ? competition.FindJudge(panelOf)?.Panel.ToString() : null);
 
     public static RoundResponse ToResponse(this Round round, int entryCount, bool hasPublishedResult) =>
         new(
@@ -35,10 +41,14 @@ internal static class CompetitionMappings
             round.CreatedAt,
             round.ClosedAt,
             entryCount,
-            hasPublishedResult);
+            hasPublishedResult,
+            round.Kind.ToString());
 
     public static JudgeResponse ToResponse(this CompetitionJudge judge) =>
-        new(judge.Id, judge.MemberId, judge.AssignedAt);
+        new(judge.Id, judge.MemberId, judge.AssignedAt, judge.Panel.ToString());
+
+    public static StandingResponse ToResponse(this Standing standing) =>
+        new(standing.Rank, standing.MemberId, standing.Total);
 
     /// <summary>
     /// Ranks a round's entries by average mark, best first.

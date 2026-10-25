@@ -992,6 +992,20 @@ public static class KnownEvents
             Action: "RoundResultsPublished",
             EntityName: "Round",
             EntityIdProperty: "roundId"),
+
+        // Who announced the winners, and who closed the audition that decided
+        // who took part - the two decisions about people in a competition.
+        ["competition.results.published.v1"] = new(
+            Action: "CompetitionResultsPublished",
+            EntityName: "Competition",
+            EntityIdProperty: "competitionId",
+            ActorIdProperty: "publishedBy"),
+
+        ["competition.finalists.selected.v1"] = new(
+            Action: "FinalistsSelected",
+            EntityName: "Competition",
+            EntityIdProperty: "competitionId",
+            ActorIdProperty: "decidedBy"),
         // panch-service. An election moving on is the administrator's own act
         // and names no separate actor, the shape competition.* and
         // celebrity-voting.campaign.* take. A change to the panel does name one:

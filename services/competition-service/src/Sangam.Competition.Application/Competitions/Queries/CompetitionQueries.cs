@@ -38,6 +38,7 @@ public sealed class GetCompetitionQueryHandler(
     ICompetitionRepository competitions,
     IEntryRepository entries,
     IRoundResultRepository roundResults,
+    ICompetitionResultRepository results,
     ICurrentUser currentUser)
     : IRequestHandler<GetCompetitionQuery, Result<CompetitionDetailResponse>>
 {
@@ -75,7 +76,8 @@ public sealed class GetCompetitionQueryHandler(
             rounds,
             [.. competition.Judges.OrderBy(j => j.AssignedAt).Select(j => j.ToResponse())],
             registeredMemberIds,
-            canManage));
+            canManage,
+            await results.FindByCompetitionAsync(competition.Id, cancellationToken) is not null));
     }
 }
 

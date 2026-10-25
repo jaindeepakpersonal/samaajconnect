@@ -3,6 +3,7 @@ using MediatR;
 using Sangam.Competition.Application.Abstractions;
 using Sangam.Competition.Application.Common;
 using Sangam.Competition.Application.Security;
+using Sangam.Competition.Domain.Competitions;
 
 namespace Sangam.Competition.Application.Competitions.Commands.AssignJudge;
 
@@ -18,9 +19,13 @@ namespace Sangam.Competition.Application.Competitions.Commands.AssignJudge;
 /// the same defense-in-depth this platform already applies to every other
 /// body-bound id (celebrity-voting-service's `NominateCandidateCommand`,
 /// volunteer-groups-service's own election nomination).
+///
+/// <paramref name="Panel"/> is Main, Audition or Both (2026-10-25), Main when
+/// left out. Assigning a judge already assigned, on a different panel, moves
+/// them to it. A competition with no audition has only the main panel.
 /// </remarks>
 [RequiresPermission(PermissionKeys.CompetitionManage)]
-public sealed record AssignJudgeCommand(Guid CompetitionId, string MemberId, bool Assign)
+public sealed record AssignJudgeCommand(Guid CompetitionId, string MemberId, bool Assign, string? Panel = null)
     : ICommand<JudgeAssignmentResponse>;
 
 public sealed class AssignJudgeCommandValidator : AbstractValidator<AssignJudgeCommand>
@@ -29,6 +34,11 @@ public sealed class AssignJudgeCommandValidator : AbstractValidator<AssignJudgeC
     {
         RuleFor(x => x.CompetitionId).NotEmpty();
         RuleFor(x => x.MemberId).Must(BeAGuid).WithMessage("Choose a member to assign.");
+
+        RuleFor(x => x.Panel)
+            .Must(p => Enum.TryParse<JudgePanel>(p, ignoreCase: true, out _))
+            .When(x => x.Panel is not null)
+            .WithMessage("Panel must be Main, Audition or Both.");
     }
 
     private static bool BeAGuid(string value) => Guid.TryParse(value, out _);
@@ -56,17 +66,29 @@ public sealed class AssignJudgeCommandHandler(
         // Guaranteed parseable by AssignJudgeCommandValidator.BeAGuid.
         var memberId = Guid.Parse(command.MemberId);
 
-        if (!competition.AssignJudge(memberId, command.Assign, clock.UtcNow))
+        var panel = command.Panel is { } named
+            ? Enum.Parse<JudgePanel>(named, ignoreCase: true)
+            : JudgePanel.Main;
+
+        if (command.Assign && panel != JudgePanel.Main && !competition.AuditionRequired)
+        {
+            return Result.Failure<JudgeAssignmentResponse>(Error.Conflict(
+                "Judge.NoAudition",
+                "This competition has no audition, so every judge marks the main rounds."));
+        }
+
+        if (!competition.AssignJudge(memberId, command.Assign, clock.UtcNow, panel))
         {
             return Result.Failure<JudgeAssignmentResponse>(Error.Conflict(
                 "Judge.NoChange",
                 command.Assign
-                    ? "This member is already a judge for this competition."
+                    ? "This member is already a judge on that panel."
                     : "This member is not a judge for this competition."));
         }
 
         await unitOfWork.SaveChangesAsync(cancellationToken);
 
-        return Result.Success(new JudgeAssignmentResponse(competition.Id, memberId, command.Assign));
+        return Result.Success(new JudgeAssignmentResponse(
+            competition.Id, memberId, command.Assign, command.Assign ? panel.ToString() : null));
     }
 }

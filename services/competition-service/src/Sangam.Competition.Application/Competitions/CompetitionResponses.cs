@@ -28,9 +28,23 @@ public sealed record CompetitionResponse(
     Guid? CityId = null,
 
     /// <summary>Where to fetch its photo - versioned by the photo's id, so a replaced one is a new URL. Null when none.</summary>
-    string? PhotoUrl = null);
+    string? PhotoUrl = null,
 
-public sealed record JudgeResponse(Guid Id, Guid MemberId, DateTimeOffset AssignedAt);
+    /// <summary>Main rounds. Zero is one judging, shown to members as its top three and nothing else.</summary>
+    int RoundCount = 0,
+
+    int MaxMarks = 100,
+    bool AuditionRequired = false,
+    DateOnly? AuditionDate = null,
+
+    /// <summary>How many go through from the audition - the top N, ties at the cut-off included.</summary>
+    int? FinalistCount = null,
+
+    /// <summary>Main, Audition or Both when this caller is a judge of it; null otherwise.</summary>
+    string? MyJudgePanel = null);
+
+/// <summary>A judge, and the panel they sit on - Main, Audition or Both.</summary>
+public sealed record JudgeResponse(Guid Id, Guid MemberId, DateTimeOffset AssignedAt, string Panel = "Main");
 
 public sealed record RoundResponse(
     Guid Id,
@@ -40,7 +54,10 @@ public sealed record RoundResponse(
     DateTimeOffset CreatedAt,
     DateTimeOffset? ClosedAt,
     int EntryCount,
-    bool HasPublishedResult);
+    bool HasPublishedResult,
+
+    /// <summary>Audition or Main.</summary>
+    string Kind = "Main");
 
 public sealed record CompetitionDetailResponse(
     CompetitionResponse Competition,
@@ -57,7 +74,10 @@ public sealed record CompetitionDetailResponse(
     IReadOnlyList<Guid> RegisteredMemberIds,
 
     /// <summary>Whether this caller holds `Competition.Manage` - the organiser controls the screen should offer.</summary>
-    bool CanManage);
+    bool CanManage,
+
+    /// <summary>Whether the final standings have been published.</summary>
+    bool HasPublishedResult = false);
 
 /// <summary>
 /// One entry in a round.
@@ -86,7 +106,77 @@ public sealed record RoundDetailResponse(
 public sealed record ScoreResponse(
     Guid EntryId, Guid JudgeMemberId, int Value, string? Comments, DateTimeOffset UpdatedAt);
 
-public sealed record JudgeAssignmentResponse(Guid CompetitionId, Guid MemberId, bool Assigned);
+public sealed record JudgeAssignmentResponse(Guid CompetitionId, Guid MemberId, bool Assigned, string? Panel = null);
+
+/// <summary>A place in the standings: rank (shared on an equal total), who, and their total of round averages.</summary>
+public sealed record StandingResponse(int Rank, Guid MemberId, double Total);
+
+/// <summary>
+/// The published final standings. Everyone sees the winners - first, second
+/// and third, ties included; the full standings are the organiser's.
+/// </summary>
+public sealed record CompetitionResultResponse(
+    Guid CompetitionId,
+    IReadOnlyList<StandingResponse> Winners,
+
+    /// <summary>Every participant, best first - for the organiser only; empty for anybody else.</summary>
+    IReadOnlyList<StandingResponse> Standings,
+
+    int RoundCount,
+    int MaxMarks,
+    Guid PublishedBy,
+    DateTimeOffset PublishedAt);
+
+/// <summary>One judge's mark on one entry, as the organiser's scoresheet shows it.</summary>
+public sealed record JudgeMarkResponse(Guid JudgeMemberId, int Value, string? Comments, DateTimeOffset UpdatedAt);
+
+public sealed record ScoresheetEntryResponse(
+    Guid EntryId,
+    Guid ParticipantMemberId,
+    IReadOnlyList<JudgeMarkResponse> Marks,
+
+    /// <summary>The judges' average; null when nobody has marked it.</summary>
+    double? Average,
+
+    /// <summary>On an audition round: whether this participant went through. Null until the audition is closed, and on a main round.</summary>
+    bool? WentThrough);
+
+public sealed record ScoresheetRoundResponse(RoundResponse Round, IReadOnlyList<ScoresheetEntryResponse> Entries);
+
+/// <summary>
+/// Every mark every judge has given, round by round, and the standings they
+/// add up to now - the organiser's panel. Live: the standings move while
+/// rounds are open, and only the published result is frozen.
+/// </summary>
+public sealed record ScoresheetResponse(
+    Guid CompetitionId,
+    int MaxMarks,
+    IReadOnlyList<JudgeResponse> Judges,
+    IReadOnlyList<ScoresheetRoundResponse> Rounds,
+    IReadOnlyList<StandingResponse> Standings,
+    bool HasPublishedResult);
+
+/// <summary>One participant on a judge's sheet, with this judge's own mark if given.</summary>
+public sealed record JudgingEntryResponse(Guid EntryId, Guid ParticipantMemberId, int? MyScore, string? MyComments);
+
+public sealed record JudgingRoundResponse(
+    RoundResponse Round,
+
+    /// <summary>Whether this judge may mark it now: their panel judges it and it is open.</summary>
+    bool CanScore,
+
+    IReadOnlyList<JudgingEntryResponse> Entries);
+
+/// <summary>
+/// A judge's own sheet: the rounds their panel judges, each participant, and
+/// the marks they have given. Never another judge's marks, and never the
+/// judge's own entry, if they are also taking part.
+/// </summary>
+public sealed record JudgingSheetResponse(
+    Guid CompetitionId,
+    int MaxMarks,
+    string Panel,
+    IReadOnlyList<JudgingRoundResponse> Rounds);
 
 public sealed record RegistrationResponse(Guid CompetitionId, Guid MemberId, bool Registered);
 

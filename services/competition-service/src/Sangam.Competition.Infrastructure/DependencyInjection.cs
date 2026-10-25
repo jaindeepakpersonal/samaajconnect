@@ -36,6 +36,7 @@ public static class DependencyInjection
         services.AddScoped<IEntryRepository, EntryRepository>();
         services.AddScoped<IScoreRepository, ScoreRepository>();
         services.AddScoped<IRoundResultRepository, RoundResultRepository>();
+        services.AddScoped<ICompetitionResultRepository, CompetitionResultRepository>();
         services.AddSingleton<IDateTimeProvider, SystemDateTimeProvider>();
 
         services.AddOptions<JwtOptions>()

@@ -9,9 +9,9 @@ namespace Sangam.Competition.Domain.Entries;
 /// A separate, tenant-scoped aggregate - not owned by <c>Competition</c> or
 /// <c>Round</c> - for the same "don't let the busy child balloon the
 /// parent" reasoning that keeps businesses-service's <c>Order</c> its own
-/// aggregate rather than nested under <c>Business</c>. Created by the
-/// organiser one at a time; there is no automatic advancement between
-/// rounds (see <c>Round</c>'s own remarks).
+/// aggregate rather than nested under <c>Business</c>. Made for everybody
+/// who applied when judging starts, for the finalists when the audition
+/// closes, and by the organiser for somebody added late (see <c>Round</c>).
 /// </remarks>
 public sealed class Entry : ITenantScopedEntity
 {

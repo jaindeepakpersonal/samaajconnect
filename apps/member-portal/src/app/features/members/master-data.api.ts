@@ -63,6 +63,13 @@ export class MasterDataApi {
     });
   }
 
+  /** The CompetitionType category - named on a competition's page (2026-10-25). */
+  listCompetitionTypes(): Observable<LookupItem[]> {
+    return this.http.get<LookupItem[]>('/v1/master-data/lookup-items', {
+      params: new HttpParams().set('category', 'CompetitionType').set('includeInactive', false),
+    });
+  }
+
   /** The Country category, first called from the Pathshala directory to name a location. */
   listCountries(): Observable<LookupItem[]> {
     return this.http.get<LookupItem[]>('/v1/master-data/lookup-items', {

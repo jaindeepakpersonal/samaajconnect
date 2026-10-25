@@ -27,7 +27,8 @@ public sealed class RecordScoreCommandValidator : AbstractValidator<RecordScoreC
     {
         RuleFor(x => x.CompetitionId).NotEmpty();
         RuleFor(x => x.EntryId).NotEmpty();
-        RuleFor(x => x.Value).InclusiveBetween(0, 100);
+        // The competition's own max marks is checked by the handler, which has it.
+        RuleFor(x => x.Value).InclusiveBetween(0, CompetitionFormat.HighestMaxMarks);
         RuleFor(x => x.Comments).MaximumLength(500);
     }
 }
@@ -79,6 +80,29 @@ public sealed class RecordScoreCommandHandler(
         {
             return Result.Failure<ScoreResponse>(
                 Error.NotFound("Entry.NotFound", "No such entry in this competition."));
+        }
+
+        if (!competition.CanJudge(judgeId, round.Kind))
+        {
+            return Result.Failure<ScoreResponse>(Error.Forbidden(
+                "Judge.WrongPanel",
+                round.Kind == RoundKind.Audition
+                    ? "You judge the main rounds, not the audition."
+                    : "You judge the audition, not the main rounds."));
+        }
+
+        if (entry.ParticipantMemberId == judgeId)
+        {
+            return Result.Failure<ScoreResponse>(Error.Conflict(
+                "Judge.OwnEntry", "You cannot mark your own entry."));
+        }
+
+        if (command.Value > competition.MaxMarks)
+        {
+            return Result.Failure<ScoreResponse>(Error.Validation(new Dictionary<string, string[]>
+            {
+                ["value"] = [$"A mark is out of {competition.MaxMarks}."],
+            }));
         }
 
         if (round.Status != RoundStatus.Open)

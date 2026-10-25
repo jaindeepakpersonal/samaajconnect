@@ -55,6 +55,34 @@ public sealed record RoundResultsPublishedDomainEvent(
     public string Topic => "competition.round.results-published.v1";
 }
 
+/// <summary>
+/// The final standings were published: member ids best first. Who published
+/// them is the actor the audit trail records.
+/// </summary>
+public sealed record CompetitionResultsPublishedDomainEvent(
+    Guid CompetitionId,
+    Guid TenantId,
+    IReadOnlyList<Guid> RankedMemberIds,
+    Guid PublishedBy,
+    DateTimeOffset OccurredAt) : IDomainEvent
+{
+    public string Topic => "competition.results.published.v1";
+}
+
+/// <summary>
+/// The audition was closed and these members went through - the top N by
+/// average mark, ties at the cut-off included.
+/// </summary>
+public sealed record FinalistsSelectedDomainEvent(
+    Guid CompetitionId,
+    Guid TenantId,
+    IReadOnlyList<Guid> FinalistMemberIds,
+    Guid DecidedBy,
+    DateTimeOffset OccurredAt) : IDomainEvent
+{
+    public string Topic => "competition.finalists.selected.v1";
+}
+
 /// <summary>A competition's details were corrected. Ids and who; the details are on the competition.</summary>
 public sealed record CompetitionUpdatedDomainEvent(
     Guid CompetitionId,

@@ -45,6 +45,10 @@ public sealed class CompetitionConfiguration : IEntityTypeConfiguration<Competit
             .SetPropertyAccessMode(PropertyAccessMode.Field);
 
         builder.Ignore(c => c.DomainEvents);
+        builder.Ignore(c => c.Format);
+        builder.Ignore(c => c.AuditionRound);
+        builder.Ignore(c => c.MainRounds);
+        builder.Ignore(c => c.RegisteredMemberIds);
     }
 }
 
@@ -72,6 +76,7 @@ public sealed class CompetitionJudgeConfiguration : IEntityTypeConfiguration<Com
         builder.Property(j => j.Id).ValueGeneratedNever();
 
         builder.HasIndex(j => new { j.CompetitionId, j.MemberId }).IsUnique();
+        builder.Property(j => j.Panel).HasConversion<string>().HasMaxLength(20);
     }
 }
 
@@ -84,6 +89,7 @@ public sealed class RoundConfiguration : IEntityTypeConfiguration<Round>
         builder.Property(r => r.Id).ValueGeneratedNever();
         builder.Property(r => r.Name).IsRequired().HasMaxLength(100);
         builder.Property(r => r.Status).HasConversion<string>().HasMaxLength(20);
+        builder.Property(r => r.Kind).HasConversion<string>().HasMaxLength(20);
 
         builder.HasIndex(r => new { r.CompetitionId, r.SequenceNumber }).IsUnique();
     }

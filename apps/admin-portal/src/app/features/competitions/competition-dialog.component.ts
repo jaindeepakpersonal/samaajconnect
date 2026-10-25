@@ -2,7 +2,7 @@ import { AfterViewInit, Component, ElementRef, OnInit, ViewChild, inject, input,
 import { FormsModule } from '@angular/forms';
 import { describeError } from '@samaajconnect/shared';
 import { AdminApi } from '../../core/admin-api';
-import { Competition, CompetitionInput, City } from '../../core/admin.models';
+import { Competition, CompetitionInput, City, LookupItem } from '../../core/admin.models';
 import { LocalityOptions } from '../../core/locality-options';
 import { blankToNull, modalKeydown } from '../../core/modal-keys';
 
@@ -16,6 +16,12 @@ import { blankToNull, modalKeydown } from '../../core/modal-keys';
  *
  * **The locality is optional** - "Whole Samaaj" is most competitions - and it
  * bounds nobody: any member may take part. It is what the locality filter reads.
+ *
+ * **The format is asked for here, up front (2026-10-25)**: the competition type
+ * (master data's Competition type list), how many rounds, the max marks, and
+ * whether an audition comes first - with its date and how many go through.
+ * Nothing is judged until judging starts, which is when the rounds are made,
+ * so all of it stays editable until registration closes.
  */
 @Component({
   selector: 'app-competition-dialog',
@@ -42,6 +48,14 @@ import { blankToNull, modalKeydown } from '../../core/modal-keys';
           <label for="competition-title">Title</label>
           <input id="competition-title" class="input" name="title" [(ngModel)]="title"
             maxlength="200" placeholder="Rangoli Contest 2026" #firstField />
+
+          <label for="competition-type">Competition type</label>
+          <select id="competition-type" class="input" name="type" [(ngModel)]="competitionTypeId">
+            <option value="">Not specified</option>
+            @for (type of types(); track type.id) {
+              <option [value]="type.id">{{ type.label }}</option>
+            }
+          </select>
 
           <label for="competition-description">Description</label>
           <textarea id="competition-description" class="input" name="description" rows="3"
@@ -84,6 +98,57 @@ import { blankToNull, modalKeydown } from '../../core/modal-keys';
             <p class="notice warn" role="alert">Registration cannot close before it opens.</p>
           }
 
+          <h3>How it is judged</h3>
+          <div class="form-grid">
+            <div class="field">
+              <label for="competition-rounds">Number of rounds</label>
+              <input id="competition-rounds" class="input" type="number" name="roundCount" min="0" max="20"
+                [(ngModel)]="roundCount" [attr.aria-invalid]="roundsInvalid() ? 'true' : null" />
+            </div>
+            <div class="field">
+              <label for="competition-max">Max marks</label>
+              <input id="competition-max" class="input" type="number" name="maxMarks" min="1" max="1000"
+                [(ngModel)]="maxMarks" [attr.aria-invalid]="marksInvalid() ? 'true' : null" />
+            </div>
+          </div>
+          <p class="small">
+            @if (roundCount === 0) {
+              No rounds: the judges mark everybody once, and members see the top three.
+            } @else {
+              Every participant takes part in all {{ roundCount }} round(s); the winners have the
+              highest total of their round averages.
+            }
+            Each judge marks out of {{ maxMarks || '…' }}.
+          </p>
+
+          <label class="inline-check">
+            <input type="checkbox" name="auditionRequired" [(ngModel)]="auditionRequired" />
+            An audition comes first
+          </label>
+
+          @if (auditionRequired) {
+            <div class="form-grid">
+              <div class="field">
+                <label for="competition-audition-date">Audition date</label>
+                <input id="competition-audition-date" class="input" type="date" name="auditionDate"
+                  [(ngModel)]="auditionDate" [attr.aria-invalid]="auditionInvalid() ? 'true' : null" />
+              </div>
+              <div class="field">
+                <label for="competition-finalists">How many go through</label>
+                <input id="competition-finalists" class="input" type="number" name="finalistCount" min="1" max="500"
+                  [(ngModel)]="finalistCount" [attr.aria-invalid]="auditionInvalid() ? 'true' : null" />
+              </div>
+            </div>
+            <p class="small">
+              The audition judges mark everybody who applied; the top {{ finalistCount || 'N' }} by
+              average go through to every round - and anybody tied with the last of them.
+            </p>
+          }
+
+          @if (formatProblem(); as problem) {
+            <p class="notice warn" role="alert">{{ problem }}</p>
+          }
+
           @if (!competition()) {
             <p class="small">It starts as a draft: registration does not open until you move it on.</p>
           }
@@ -97,6 +162,14 @@ import { blankToNull, modalKeydown } from '../../core/modal-keys';
         </form>
       </div>
     </div>
+  `,
+  styles: `
+    .inline-check {
+      display: flex;
+      align-items: center;
+      gap: var(--space-2);
+      margin: var(--space-3) 0;
+    }
   `,
 })
 export class CompetitionDialogComponent implements OnInit, AfterViewInit {
@@ -124,11 +197,22 @@ export class CompetitionDialogComponent implements OnInit, AfterViewInit {
   readonly cities = signal<readonly City[]>([]);
   registrationEndAt = '';
 
+  /** Master data's Competition type list. */
+  readonly types = signal<readonly LookupItem[]>([]);
+
+  competitionTypeId = '';
+  roundCount = 0;
+  maxMarks = 100;
+  auditionRequired = false;
+  auditionDate = '';
+  finalistCount: number | null = null;
+
   @ViewChild('firstField') private readonly firstFieldRef?: ElementRef<HTMLInputElement>;
 
   ngOnInit(): void {
     this.localities.load();
     this.api.listCities().subscribe({ next: (found) => this.cities.set(found), error: () => {} });
+    this.api.listLookupItems('CompetitionType').subscribe({ next: (found) => this.types.set(found), error: () => {} });
 
     const existing = this.competition();
 
@@ -140,7 +224,52 @@ export class CompetitionDialogComponent implements OnInit, AfterViewInit {
       this.cityId = existing.cityId ?? '';
       this.registrationStartAt = toLocalInput(existing.registrationStartAt);
       this.registrationEndAt = toLocalInput(existing.registrationEndAt);
+      this.competitionTypeId = existing.competitionTypeId ?? '';
+      this.roundCount = existing.roundCount;
+      this.maxMarks = existing.maxMarks;
+      this.auditionRequired = existing.auditionRequired;
+      this.auditionDate = existing.auditionDate ?? '';
+      this.finalistCount = existing.finalistCount;
     }
+  }
+
+  roundsInvalid(): boolean {
+    return !Number.isInteger(this.roundCount) || this.roundCount < 0 || this.roundCount > 20;
+  }
+
+  marksInvalid(): boolean {
+    return !Number.isInteger(this.maxMarks) || this.maxMarks < 1 || this.maxMarks > 1000;
+  }
+
+  auditionInvalid(): boolean {
+    if (!this.auditionRequired) {
+      return false;
+    }
+
+    const count = this.finalistCount;
+
+    return !this.auditionDate || count === null || !Number.isInteger(count) || count < 1 || count > 500;
+  }
+
+  /** The same rules competition-service applies, said before a round trip rather than after. */
+  formatProblem(): string | null {
+    if (this.roundsInvalid()) {
+      return 'Rounds must be a whole number from 0 to 20.';
+    }
+
+    if (this.marksInvalid()) {
+      return 'Max marks must be a whole number from 1 to 1000.';
+    }
+
+    if (this.auditionInvalid()) {
+      return 'Give the audition date, and how many go through - from 1 to 500.';
+    }
+
+    if (this.auditionRequired && this.registrationStartAt && this.auditionDate < this.registrationStartAt.slice(0, 10)) {
+      return 'The audition cannot be before registration opens.';
+    }
+
+    return null;
   }
 
   ngAfterViewInit(): void {
@@ -160,7 +289,8 @@ export class CompetitionDialogComponent implements OnInit, AfterViewInit {
       this.title.trim().length > 0 &&
       this.registrationStartAt.length > 0 &&
       this.registrationEndAt.length > 0 &&
-      !this.windowInvalid()
+      !this.windowInvalid() &&
+      this.formatProblem() === null
     );
   }
 
@@ -177,12 +307,17 @@ export class CompetitionDialogComponent implements OnInit, AfterViewInit {
     const input: CompetitionInput = {
       title: this.title.trim(),
       description: blankToNull(this.description),
-      competitionTypeId: existing?.competitionTypeId ?? null,
+      competitionTypeId: this.competitionTypeId || null,
       localityId: this.localityId || null,
       venue: blankToNull(this.venue),
       cityId: this.cityId || null,
       registrationStartAt: new Date(this.registrationStartAt).toISOString(),
       registrationEndAt: new Date(this.registrationEndAt).toISOString(),
+      roundCount: this.roundCount,
+      maxMarks: this.maxMarks,
+      auditionRequired: this.auditionRequired,
+      auditionDate: this.auditionRequired ? this.auditionDate : null,
+      finalistCount: this.auditionRequired ? this.finalistCount : null,
     };
 
     const work = existing ? this.api.updateCompetition(existing.id, input) : this.api.createCompetition(input);

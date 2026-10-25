@@ -26,7 +26,7 @@ import { Competition, stageLabel } from './competitions.models';
       <header class="page-head">
         <div>
           <h1 class="page-title">Competitions</h1>
-          <p class="subtitle">Register, see the rounds, and follow the result.</p>
+          <p class="subtitle">Apply as a participant, follow the rounds, and see who won.</p>
         </div>
       </header>
 
@@ -56,7 +56,7 @@ import { Competition, stageLabel } from './competitions.models';
                   </span>
 
                   @if (competition.myRegistrationStatus === 'Registered') {
-                    <span class="pill ok">You are registered</span>
+                    <span class="pill ok">You have applied</span>
                   }
 
                   @if (competition.isJudge) {
@@ -168,7 +168,7 @@ export class CompetitionsListComponent implements OnInit {
 
   action(competition: Competition): string {
     if (competition.acceptsRegistrations) {
-      return competition.myRegistrationStatus === 'Registered' ? 'View' : 'Register';
+      return competition.myRegistrationStatus === 'Registered' ? 'View' : 'Apply';
     }
 
     return 'View';

@@ -15,6 +15,7 @@ const LOOKUP_TABS: readonly { value: LookupCategory; label: string }[] = [
   { value: 'Qualification', label: 'Qualification' },
   { value: 'BusinessCategory', label: 'Business category' },
   { value: 'EventType', label: 'Event type' },
+  { value: 'CompetitionType', label: 'Competition type' },
 ];
 
 const ALL_TABS: readonly { value: TabKey; label: string }[] = [

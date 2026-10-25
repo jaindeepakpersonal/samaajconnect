@@ -8,6 +8,7 @@ using Sangam.Competition.Application.Competitions.Commands.UpdateCompetition;
 using Sangam.Competition.Application.Competitions.Commands.CreateEntry;
 using Sangam.Competition.Application.Competitions.Commands.CreateRound;
 using Sangam.Competition.Application.Competitions.Commands.MoveCompetition;
+using Sangam.Competition.Application.Competitions.Commands.PublishCompetitionResults;
 using Sangam.Competition.Application.Competitions.Commands.PublishRoundResults;
 using Sangam.Competition.Application.Competitions.Commands.RecordScore;
 using Sangam.Competition.Application.Competitions.Commands.RegisterForCompetition;
@@ -49,7 +50,12 @@ public static class CompetitionEndpoints
                     request.RegistrationEndAt,
                     request.LocalityId,
                     request.Venue,
-                    request.CityId);
+                    request.CityId,
+                    request.RoundCount,
+                    request.MaxMarks,
+                    request.AuditionRequired,
+                    request.AuditionDate,
+                    request.FinalistCount);
 
                 var result = await sender.Send(command, cancellationToken);
 
@@ -76,7 +82,12 @@ public static class CompetitionEndpoints
                     request.RegistrationStartAt,
                     request.RegistrationEndAt,
                     request.Venue,
-                    request.CityId);
+                    request.CityId,
+                    request.RoundCount,
+                    request.MaxMarks,
+                    request.AuditionRequired,
+                    request.AuditionDate,
+                    request.FinalistCount);
 
                 var result = await sender.Send(command, cancellationToken);
 
@@ -157,13 +168,13 @@ public static class CompetitionEndpoints
                 Guid id, JudgeRequest request, ISender sender, CancellationToken cancellationToken) =>
             {
                 var result = await sender.Send(
-                    new AssignJudgeCommand(id, request.MemberId, request.Assign), cancellationToken);
+                    new AssignJudgeCommand(id, request.MemberId, request.Assign, request.Panel), cancellationToken);
 
                 return result.ToApiResult();
             })
             .RequireAuthorization()
             .WithName("AssignJudge")
-            .WithSummary("Assign or remove a judge.")
+            .WithSummary("Assign or remove a judge, on the Main, Audition or Both panel. Assigning again on another panel moves them.")
             .Produces<JudgeAssignmentResponse>()
             .ProducesValidationProblem()
             .ProducesProblem(StatusCodes.Status401Unauthorized)
@@ -297,6 +308,62 @@ public static class CompetitionEndpoints
             .ProducesProblem(StatusCodes.Status401Unauthorized)
             .ProducesProblem(StatusCodes.Status404NotFound);
 
+        group.MapGet("/{id:guid}/result", async (Guid id, ISender sender, CancellationToken cancellationToken) =>
+            {
+                var result = await sender.Send(new GetCompetitionResultQuery(id), cancellationToken);
+
+                return result.ToApiResult();
+            })
+            .RequireAuthorization()
+            .WithName("GetCompetitionResult")
+            .WithSummary("The published final standings: the winners for everyone, every place for the organiser. 404 until published.")
+            .Produces<CompetitionResultResponse>()
+            .ProducesProblem(StatusCodes.Status401Unauthorized)
+            .ProducesProblem(StatusCodes.Status404NotFound);
+
+        group.MapPost("/{id:guid}/result", async (Guid id, ISender sender, CancellationToken cancellationToken) =>
+            {
+                var result = await sender.Send(new PublishCompetitionResultsCommand(id), cancellationToken);
+
+                return result.ToApiResult();
+            })
+            .RequireAuthorization()
+            .WithName("PublishCompetitionResults")
+            .WithSummary("Publish the final standings and freeze them. Only once every round is closed.")
+            .Produces<CompetitionResultResponse>()
+            .ProducesProblem(StatusCodes.Status401Unauthorized)
+            .ProducesProblem(StatusCodes.Status403Forbidden)
+            .ProducesProblem(StatusCodes.Status404NotFound)
+            .ProducesProblem(StatusCodes.Status409Conflict);
+
+        group.MapGet("/{id:guid}/scoresheet", async (Guid id, ISender sender, CancellationToken cancellationToken) =>
+            {
+                var result = await sender.Send(new GetScoresheetQuery(id), cancellationToken);
+
+                return result.ToApiResult();
+            })
+            .RequireAuthorization()
+            .WithName("GetScoresheet")
+            .WithSummary("Every judge's marks, round by round, and the standings they add up to. The organiser's.")
+            .Produces<ScoresheetResponse>()
+            .ProducesProblem(StatusCodes.Status401Unauthorized)
+            .ProducesProblem(StatusCodes.Status403Forbidden)
+            .ProducesProblem(StatusCodes.Status404NotFound);
+
+        group.MapGet("/{id:guid}/judging/mine", async (Guid id, ISender sender, CancellationToken cancellationToken) =>
+            {
+                var result = await sender.Send(new GetMyJudgingQuery(id), cancellationToken);
+
+                return result.ToApiResult();
+            })
+            .RequireAuthorization()
+            .WithName("GetMyJudging")
+            .WithSummary("The calling judge's own sheet: their panel's rounds, each participant, and the marks they gave.")
+            .Produces<JudgingSheetResponse>()
+            .ProducesProblem(StatusCodes.Status401Unauthorized)
+            .ProducesProblem(StatusCodes.Status403Forbidden)
+            .ProducesProblem(StatusCodes.Status404NotFound);
+
         return app;
     }
 
@@ -308,7 +375,12 @@ public static class CompetitionEndpoints
         DateTimeOffset RegistrationEndAt,
         string? LocalityId = null,
         string? Venue = null,
-        string? CityId = null);
+        string? CityId = null,
+        int? RoundCount = null,
+        int? MaxMarks = null,
+        bool? AuditionRequired = null,
+        DateOnly? AuditionDate = null,
+        int? FinalistCount = null);
 
     /// <summary>RegistrationOpen, RegistrationClosed, InProgress or Closed.</summary>
     public sealed record MoveRequest(string Status);
@@ -317,7 +389,7 @@ public static class CompetitionEndpoints
     // field crashes ASP.NET Core's own JSON model binding with an unhandled
     // 400 the moment the value cannot be parsed. Validated and parsed in the
     // matching command's own validator/handler instead.
-    public sealed record JudgeRequest(string MemberId, bool Assign);
+    public sealed record JudgeRequest(string MemberId, bool Assign, string? Panel = null);
 
     public sealed record RoundRequest(string Name);
 

@@ -4,16 +4,12 @@ namespace Sangam.Competition.Domain.Competitions;
 /// One judged round of a competition. Owned by <see cref="Competition"/>.
 /// </summary>
 /// <remarks>
-/// There is no automatic advancement between rounds. The organiser creates
-/// one <see cref="Entries.Entry"/> per participant they want in a given
-/// round, by hand, for every round including the first - a simple
-/// one-round competition just has one round with an entry for everyone who
-/// registered, and an elimination format has the organiser create fewer
-/// entries in the next round after reviewing the previous one's published
-/// result. "Does an entry exist for this round" already answers "is this
-/// participant still in it," so there is nothing an automatic top-N cutoff
-/// would buy that is worth its own edge cases (a tie at the cutoff, a
-/// participant who withdraws mid-competition).
+/// Made from the competition's format when judging starts (2026-10-25): an
+/// Audition round first when there is one, then the main rounds - see
+/// <see cref="Competition"/>'s SetUpRounds. "Does an entry exist for this
+/// round" is what says a participant is in it: everybody who applied is
+/// entered when judging starts, and the audition's finalists reach every
+/// main round when it closes.
 /// </remarks>
 public sealed class Round
 {
@@ -22,12 +18,17 @@ public sealed class Round
     public string Name { get; private set; } = null!;
     public int SequenceNumber { get; private set; }
     public RoundStatus Status { get; private set; }
+
+    /// <summary>The audition, or a round of the competition itself. Every round before 2026-10-25 is Main.</summary>
+    public RoundKind Kind { get; private set; } = RoundKind.Main;
+
     public DateTimeOffset CreatedAt { get; private set; }
     public DateTimeOffset? ClosedAt { get; private set; }
 
     private Round() { }   // EF Core
 
-    internal Round(Guid competitionId, string name, int sequenceNumber, DateTimeOffset now)
+    internal Round(
+        Guid competitionId, string name, int sequenceNumber, DateTimeOffset now, RoundKind kind = RoundKind.Main)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(name);
 
@@ -35,6 +36,7 @@ public sealed class Round
         CompetitionId = competitionId;
         Name = name.Trim();
         SequenceNumber = sequenceNumber;
+        Kind = kind;
         Status = RoundStatus.Open;
         CreatedAt = now;
     }

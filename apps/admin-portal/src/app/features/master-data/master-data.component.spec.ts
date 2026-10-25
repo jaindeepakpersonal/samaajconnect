@@ -139,7 +139,7 @@ describe('MasterDataComponent', () => {
     expect(text()).toContain('Gautra — Mahavir Samaaj');
   });
 
-  it('shows all eleven tabs to a Super Admin, one type of data at a time', () => {
+  it('shows all twelve tabs to a Super Admin, one type of data at a time', () => {
     configure(['SuperAdmin'], 't1');
     build();
     loadAsSuperAdmin(true);
@@ -154,6 +154,7 @@ describe('MasterDataComponent', () => {
       'Qualification',
       'Business category',
       'Event type',
+      'Competition type',
       'States',
       'Cities/Villages',
       'Localities',

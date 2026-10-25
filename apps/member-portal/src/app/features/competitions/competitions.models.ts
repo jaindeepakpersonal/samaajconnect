@@ -16,6 +16,12 @@ export type CompetitionStatus =
 /** `RoundStatus` in the domain. */
 export type RoundStatus = 'Open' | 'Closed';
 
+/** The audition decides who takes part; a main round is the competition itself. */
+export type RoundKind = 'Audition' | 'Main';
+
+/** What a judge marks: the main rounds, the audition, or both. */
+export type JudgePanel = 'Main' | 'Audition' | 'Both';
+
 export interface Competition {
   readonly id: string;
   readonly title: string;
@@ -53,6 +59,22 @@ export interface Competition {
 
   /** The cover photo, fetched with the token (`scAuthedSrc`). Null when there is none. */
   readonly photoUrl?: string | null;
+
+  /** Main rounds (2026-10-25). 0 is one judging, shown as its top three and nothing else. */
+  readonly roundCount: number;
+
+  /** The most one judge gives one participant in one round. */
+  readonly maxMarks: number;
+  readonly auditionRequired: boolean;
+
+  /** `yyyy-MM-dd`; null without an audition. */
+  readonly auditionDate: string | null;
+
+  /** How many go through from the audition - the top N, ties at the cut-off included. */
+  readonly finalistCount: number | null;
+
+  /** This member's panel when they are a judge of it; null otherwise. */
+  readonly myJudgePanel: JudgePanel | null;
 }
 
 export interface Round {
@@ -64,12 +86,14 @@ export interface Round {
   readonly closedAt: string | null;
   readonly entryCount: number;
   readonly hasPublishedResult: boolean;
+  readonly kind: RoundKind;
 }
 
 export interface CompetitionJudge {
   readonly id: string;
   readonly memberId: string;
   readonly assignedAt: string;
+  readonly panel: JudgePanel;
 }
 
 export interface CompetitionDetail {
@@ -79,6 +103,53 @@ export interface CompetitionDetail {
 
   /** Who is registered, in the order they registered. Every member of the Samaaj may see it. */
   readonly registeredMemberIds?: readonly string[];
+
+  /** Whether the winners have been published. */
+  readonly hasPublishedResult: boolean;
+}
+
+/** A place in the final standings. Equal totals share a rank. */
+export interface Standing {
+  readonly rank: number;
+  readonly memberId: string;
+  /** Round averages added up. */
+  readonly total: number;
+}
+
+/** Mirrors `CompetitionResultResponse` - the published winners. */
+export interface CompetitionFinalResult {
+  readonly competitionId: string;
+  /** First, second and third, ties included. */
+  readonly winners: readonly Standing[];
+  /** Every place - empty for anybody but the organiser. */
+  readonly standings: readonly Standing[];
+  readonly roundCount: number;
+  readonly maxMarks: number;
+  readonly publishedBy: string;
+  readonly publishedAt: string;
+}
+
+/** One participant on a judge's own sheet. */
+export interface JudgingEntry {
+  readonly entryId: string;
+  readonly participantMemberId: string;
+  readonly myScore: number | null;
+  readonly myComments: string | null;
+}
+
+export interface JudgingRound {
+  readonly round: Round;
+  /** The judge's panel marks it and it is still open. */
+  readonly canScore: boolean;
+  readonly entries: readonly JudgingEntry[];
+}
+
+/** Mirrors `JudgingSheetResponse` - a judge's own sheet. Never another judge's marks. */
+export interface JudgingSheet {
+  readonly competitionId: string;
+  readonly maxMarks: number;
+  readonly panel: JudgePanel;
+  readonly rounds: readonly JudgingRound[];
 }
 
 /**

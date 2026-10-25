@@ -523,29 +523,33 @@ does need a genuine organiser-vs-participant split.
 | Method | Path | Roles | Purpose |
 |---|---|---|---|
 | GET | `/` | `Members.Read` | This Samaaj's competitions, each with the caller's own registration status. `?localityId=` narrows to one locality |
-| POST | `/` | `Competition.Manage` | Set a competition up. Starts `Draft`. Optional `localityId`, `venue` (300) and `cityId` |
-| PATCH | `/{id}` | `Competition.Manage` | Correct the details, locality included. Draft or taking registrations only; 409 after |
+| POST | `/` | `Competition.Manage` | Set a competition up. Starts `Draft`. Optional `localityId`, `venue` (300), `cityId`, `competitionTypeId`, and the format: `roundCount` (0-20; 0 is one judging), `maxMarks` (1-1000), `auditionRequired`, with `auditionDate` and `finalistCount` (1-500) required when it is true. Left out: one judging out of 100, no audition |
+| PATCH | `/{id}` | `Competition.Manage` | Correct the details and the format. Draft or taking registrations only; 409 after. Format fields left out stay as they were |
 | GET | `/{id}` | `Members.Read` | Rounds, registration count, judges, and the currently-registered member ids an organiser picks entries from - and the member portal's Participants tab |
 | POST | `/{id}/photo` | `Competition.Manage` | Upload the cover photo (multipart, one file; JPEG/PNG/WebP read from the bytes, 2 MB). Replaces any; any stage. Answers the competition |
 | DELETE | `/{id}/photo` | `Competition.Manage` | Take the photo down. Twice is success |
 | GET | `/{id}/photo` | `Members.Read` | The photo bytes. `Cache-Control: private` and an ETag. A competition carries `photoUrl`, with `?v={photoId}` |
-| POST | `/{id}/status` | `Competition.Manage` | Strictly forward: Draft → RegistrationOpen → RegistrationClosed → InProgress → Closed |
+| POST | `/{id}/status` | `Competition.Manage` | Strictly forward: Draft → RegistrationOpen → RegistrationClosed → InProgress → Closed. InProgress makes the rounds from the format and enters everybody registered - into the audition if there is one, otherwise every round |
 | POST | `/{id}/registrations` | `Members.Read` | Register the caller. Only while registration is open. A repeat registration is success with `registered: false` |
 | DELETE | `/{id}/registrations/mine` | `Members.Read` | The caller's own withdrawal. Registering again later reactivates the same row |
-| POST | `/{id}/judges` | `Competition.Manage` | Assign a member as judge, or remove one — one call for both directions |
-| POST | `/{id}/rounds` | `Competition.Manage` | Open a new round. No automatic advancement from a previous one |
+| POST | `/{id}/judges` | `Competition.Manage` | Assign a member as judge, or remove one — one call for both directions. `panel`: `Main` (the default), `Audition` or `Both` - 409 for anything but Main without an audition; assigning again on another panel moves the judge |
+| POST | `/{id}/rounds` | `Competition.Manage` | Open a round by hand. Before judging starts, rounds opened this way stand in for the format's main rounds |
 | GET | `/{id}/rounds/{roundId}` | `Members.Read` | A round's entries. Marks are visible only to the organiser or an assigned judge |
-| POST | `/{id}/rounds/{roundId}/close` | `Competition.Manage` | Close a round. No new entries or scores after this |
-| POST | `/{id}/rounds/{roundId}/entries` | `Competition.Manage` | Put one registered participant into the round. 409 for a duplicate or an unregistered participant |
-| POST | `/{id}/entries/{entryId}/scores` | `Members.Read`, assigned judge only | Record or correct this judge's mark. An upsert while the round is open, unlike a vote |
+| POST | `/{id}/rounds/{roundId}/close` | `Competition.Manage` | Close a round. No new entries or scores after this. Closing the audition enters its finalists - the top `finalistCount` by average, ties at the cut-off included, nobody unmarked - in every main round; 409 when nobody has been marked |
+| POST | `/{id}/rounds/{roundId}/entries` | `Competition.Manage` | Put one registered participant into the round - somebody added late. 409 for a duplicate or an unregistered participant |
+| POST | `/{id}/entries/{entryId}/scores` | `Members.Read`, a judge on the panel that judges the round | Record or correct this judge's mark. An upsert while the round is open, unlike a vote. 400 above the competition's `maxMarks`; 403 for the other panel's round; 409 on the judge's own entry |
+| GET | `/{id}/judging/mine` | `Members.Read`, a judge of it (403 otherwise) | The judge's own sheet: each round their panel judges, every participant but themselves, and the mark and comment they gave |
+| GET | `/{id}/scoresheet` | `Competition.Manage` | Every judge's mark on every entry, round by round, each average, who went through the audition, and the standings now |
+| POST | `/{id}/result` | `Competition.Manage` | Publish the final standings and freeze them. Only once every main round is closed; publishing again returns the same |
+| GET | `/{id}/result` | `Members.Read` | The published standings. 404 until published. `winners` (rank 1-3, ties included) for everybody; `standings` (every place) for the organiser only |
 | POST | `/{id}/rounds/{roundId}/results` | `Competition.Manage` | Compute the ranking and freeze it. Only from a closed round; publishing again returns the same frozen result |
 | GET | `/{id}/rounds/{roundId}/results` | `Members.Read` | The published ranking. 404 until it has one |
 
 Standalone from events-service by design — a competition is not an Event.
-No photo endpoint, the same reason businesses-service has none. Individual
-judge marks are never returned to a caller who is neither the organiser
-nor an assigned judge, before or after publication; only the published
-ranking's rank and average are.
+Individual judge marks are never returned to a caller who is neither the
+organiser nor an assigned judge, before or after publication; a judge sees
+only their own, and members see the winners and their totals. A total is a
+participant's main-round averages added up; equal totals share a place.
 
 ## panch-service — `/v1/panch`
 

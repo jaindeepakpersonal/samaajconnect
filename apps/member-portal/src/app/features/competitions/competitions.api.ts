@@ -4,7 +4,9 @@ import { Observable } from 'rxjs';
 import {
   Competition,
   CompetitionDetail,
+  CompetitionFinalResult,
   CompetitionResult,
+  JudgingSheet,
   RegistrationResult,
   RoundDetail,
   ScoreResult,
@@ -75,6 +77,16 @@ export class CompetitionsApi {
   }
 
   /** The published ranking, as frozen. 404 until it has been published. */
+  /** This judge's own sheet: their panel's rounds, each participant, and the marks they gave. 403 for a non-judge. */
+  judging(competitionId: string): Observable<JudgingSheet> {
+    return this.http.get<JudgingSheet>(`/v1/competitions/${competitionId}/judging/mine`);
+  }
+
+  /** The published winners. 404 until they are published. */
+  result(competitionId: string): Observable<CompetitionFinalResult> {
+    return this.http.get<CompetitionFinalResult>(`/v1/competitions/${competitionId}/result`);
+  }
+
   roundResult(competitionId: string, roundId: string): Observable<CompetitionResult> {
     return this.http.get<CompetitionResult>(
       `/v1/competitions/${competitionId}/rounds/${roundId}/results`,

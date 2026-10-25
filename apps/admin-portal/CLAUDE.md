@@ -30,8 +30,8 @@ screen. The spec is `docs/product/wireframes/admin-panel-wireframes.html`.
 | Event detail | `/events/:id` | — | built; no wireframe covers one. A page: a photo cover (or a calendar leaf), tabs - About, Schedule, Going (who is going, who is waiting, and in what order) - and Edit, one popup for the details and the photo |
 | Celebrities / Voting | `/voting` | `#celebrity` | built. Campaigns, setting one up, and editing one (a modal, until voting opens) |
 | Campaign detail | `/voting/:id` | — | built; no wireframe covers running one. Stage, ballot, nominations, tally, result |
-| Competitions | `/competitions` | — | built; no wireframe covers this new module. Competitions; setting one up and correcting one (until registration closes) in a popup, with a venue, city or village, and an optional locality |
-| Competition detail | `/competitions/:id` | — | built; no wireframe covers running one. The cover photo (add, change, remove - at any stage), where it is held, stage, judges, rounds, entries, publish results |
+| Competitions | `/competitions` | — | built; no wireframe covers this new module. Competitions; setting one up and correcting one (until registration closes) in a popup, with its type, venue, city or village, optional locality, and how it is judged - rounds, max marks, and an audition with its date and how many go through |
+| Competition detail | `/competitions/:id` | — | built; no wireframe covers running one. Six tabs - Details (the format, the cover photo), Participants (who applied), Judges (each on a panel, assigned in a popup), Rounds (made when judging starts; each opens in a popup), Scores (every judge's mark and the standings) and Results (publish the winners) - with Edit, starting judging and closing the audition confirmed in popups |
 | Samaaj Panch | `/panch` | — | built; no wireframe covers it. The seated Panch with Remove, and the elections list with a create modal |
 | Panch election | `/panch/:id` | — | built. Stage, approving nominations, the tally, publishing (which replaces the Panch) |
 | Volunteer Groups | `/groups` | `#groups` (member-facing) | built. Create (president optional), set a president later, and stand one down |
@@ -772,23 +772,28 @@ identical: Draft → RegistrationOpen → RegistrationClosed → InProgress →
 Closed, strictly forward, so the screen offers exactly the one move the
 competition can make rather than four buttons and three refusals.
 
-**Entries are created by the organiser, one at a time, in every round
-including the first - there is no "advance the top N" button anywhere on
-this screen, and that is deliberate.** `Round`'s own doc comment explains
-why: a top-N cutoff has its own edge cases (a tie at the cutoff, a
-withdrawal mid-competition) the backlog never asked for, and "does an
-entry exist for this round" already answers "is this participant still in
-it." The entry picker on a selected round only offers registered members
-who do not already have one, computed client-side from
-`registeredMemberIds` and the round's own entries - the same "let the
-server's shape decide, don't re-derive it" instinct the role matrix screen
-already gets right.
+**The rounds and their entries come from the format (2026-10-25), and this
+file used to say the opposite.** It said an organiser created every entry by
+hand and that a top-N cutoff was deliberately absent; the user asked for
+members to apply, everybody to be judged in every round, and an audition's
+top N to go through. Setting a competition up now asks for its type, rounds,
+max marks and audition; starting judging - confirmed in a popup that says what
+it makes and how many it enters - makes the rounds and enters everybody, and
+closing the audition - confirmed too, because it decides who takes part -
+enters its finalists in every round. A round's popup still offers to add
+somebody who applied and is not in it, for a late addition; hand-made rounds
+are gone from this screen. See competition-service's "Format, audition and
+winners" for the rules, ties included.
 
-**This screen never shows an individual judge's mark, only a computed
-average.** `RoundDetailResponse.canSeeScores` is true for the organiser
-throughout - the same "an administrator sees the tally regardless" stance
-Celebrities / Voting already takes - and recording an actual score is a
-judge's own act, on member-portal, not something this panel offers at all.
+**The Scores tab shows every judge's mark, and this file used to say it never
+would.** The user asked for "a panel to see score entered by all judges, and
+final winners based on all judges entries", which is
+`GET /v1/competitions/{id}/scoresheet`: a table per round with a column per
+judge on that round's panel, each average, who went through the audition, and
+the standings now. It is still the organiser's alone - a member never sees a
+mark, and a judge sees only their own. Recording a mark is still a judge's
+act, on the member portal. **Results** publishes the winners once every round
+is closed, after a popup saying every member will see them.
 
 **Publishing a round's result is not confirmed the way a campaign's is.**
 Unlike celebrity-voting-service, publishing a closed round twice returns

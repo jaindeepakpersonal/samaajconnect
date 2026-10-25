@@ -31,7 +31,10 @@ import {
   Competition,
   CompetitionInput,
   CompetitionDetail,
+  CompetitionFinalResult,
   CompetitionResult,
+  JudgePanel,
+  Scoresheet,
   CompetitionStatus,
   ModerationDecision,
   ModerationQueueEntry,
@@ -1743,19 +1746,27 @@ export class AdminApi {
     return this.http.post<Competition>(`/v1/competitions/${id}/status`, { status });
   }
 
-  /** Assigns a member as a judge, or removes one. One call for both directions. */
-  assignJudge(competitionId: string, memberId: string, assign: boolean): Observable<unknown> {
-    return this.http.post(`/v1/competitions/${competitionId}/judges`, { memberId, assign });
+  /**
+   * Assigns a member as a judge on a panel, or removes one. Assigning a judge
+   * again on another panel moves them to it.
+   */
+  assignJudge(competitionId: string, memberId: string, assign: boolean, panel: JudgePanel = 'Main'): Observable<unknown> {
+    return this.http.post(`/v1/competitions/${competitionId}/judges`, { memberId, assign, panel });
   }
 
-  /**
-   * Opens a new round.
-   *
-   * There is no automatic advancement between rounds - entries are created one
-   * at a time, in every round including the first.
-   */
-  createRound(competitionId: string, name: string): Observable<Round> {
-    return this.http.post<Round>(`/v1/competitions/${competitionId}/rounds`, { name });
+  /** Every judge's marks, round by round, and the standings they add up to now. */
+  scoresheet(competitionId: string): Observable<Scoresheet> {
+    return this.http.get<Scoresheet>(`/v1/competitions/${competitionId}/scoresheet`);
+  }
+
+  /** The published final standings. 404 until published. */
+  competitionResult(competitionId: string): Observable<CompetitionFinalResult> {
+    return this.http.get<CompetitionFinalResult>(`/v1/competitions/${competitionId}/result`);
+  }
+
+  /** Publishes the final standings and freezes them. Only once every round is closed. */
+  publishCompetitionResult(competitionId: string): Observable<CompetitionFinalResult> {
+    return this.http.post<CompetitionFinalResult>(`/v1/competitions/${competitionId}/result`, {});
   }
 
   /** A round's entries. Marks are visible only to the organiser or an assigned judge. */
@@ -1768,7 +1779,7 @@ export class AdminApi {
     return this.http.post<Round>(`/v1/competitions/${competitionId}/rounds/${roundId}/close`, {});
   }
 
-  /** Puts one registered participant into a round. */
+  /** Puts one registered participant into a round - somebody who registered late, say. Judging enters everybody else. */
   createEntry(
     competitionId: string,
     roundId: string,
