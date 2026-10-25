@@ -55,6 +55,63 @@ public sealed class PanchElectionTests
     }
 
     [Fact]
+    public void It_can_be_edited_and_deleted_only_until_voting_opens()
+    {
+        var (election, _) = WithBallot(1);
+
+        election.CanBeEdited.Should().BeTrue();
+        election.CanBeDeleted.Should().BeTrue();
+
+        election.MoveTo(ElectionStatus.VotingOpen, Now.AddDays(7)).Should().BeTrue();
+
+        election.CanBeEdited.Should().BeFalse("members have been told the windows and may have voted");
+        election.CanBeDeleted.Should().BeFalse("deleting would destroy ballots");
+    }
+
+    [Fact]
+    public void Voting_is_only_ever_extended_later_and_only_while_it_is_open()
+    {
+        var (election, _) = WithBallot(1);
+        var actor = Guid.NewGuid();
+
+        election.ExtendVoting(Now.AddDays(30), actor, Now).Should().BeFalse("voting has not opened yet");
+
+        election.MoveTo(ElectionStatus.VotingOpen, Now.AddDays(7));
+        election.ClearDomainEvents();
+
+        election.ExtendVoting(Now.AddDays(10), actor, Now.AddDays(8)).Should().BeFalse("earlier than announced");
+        election.ExtendVoting(Now.AddDays(14), actor, Now.AddDays(8)).Should().BeFalse("the same close is no extension");
+        election.VotingEndAt.Should().Be(Now.AddDays(14));
+        election.DomainEvents.Should().BeEmpty();
+
+        election.ExtendVoting(Now.AddDays(21), actor, Now.AddDays(8)).Should().BeTrue();
+
+        election.VotingEndAt.Should().Be(Now.AddDays(21));
+        election.DomainEvents.Should().ContainSingle().Which.Should().BeEquivalentTo(
+            new ElectionVotingExtendedDomainEvent(
+                election.Id, TenantId, Now.AddDays(14), Now.AddDays(21), actor, Now.AddDays(8)));
+    }
+
+    [Fact]
+    public void An_edit_replaces_the_windows_without_moving_the_status()
+    {
+        var election = Election();
+        election.MoveTo(ElectionStatus.NominationsOpen, Now);
+        election.ClearDomainEvents();
+
+        election.Update(
+            " Panch 2026 ", "  ", Now, Now.AddDays(10), Now.AddDays(10), Now.AddDays(20),
+            ResultsVisibility.HiddenUntilClose, Guid.NewGuid(), Now);
+
+        election.Title.Should().Be("Panch 2026");
+        election.Description.Should().BeNull();
+        election.NominationEndAt.Should().Be(Now.AddDays(10));
+        election.ResultsVisibility.Should().Be(ResultsVisibility.HiddenUntilClose);
+        election.Status.Should().Be(ElectionStatus.NominationsOpen);
+        election.DomainEvents.Should().ContainSingle().Which.Should().BeOfType<ElectionUpdatedDomainEvent>();
+    }
+
+    [Fact]
     public void One_candidacy_per_member_however_many_nominate_them()
     {
         var election = Election();

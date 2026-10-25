@@ -441,6 +441,21 @@ public sealed class KnownEventsTests
     }
 
     [Fact]
+    public void Correcting_extending_or_deleting_a_panch_election_names_the_administrator()
+    {
+        KnownEvents.Describe("panch.election.updated.v1").ActorIdProperty.Should().Be("updatedBy");
+
+        var extended = KnownEvents.Describe("panch.election.voting-extended.v1");
+        extended.ActorIdProperty.Should().Be("extendedBy");
+        extended.BeforeProperties.Should().Equal("previousVotingEndAt");
+
+        var deleted = KnownEvents.Describe("panch.election.deleted.v1");
+        deleted.Action.Should().Be("ElectionDeleted");
+        deleted.EntityIdProperty.Should().Be("electionId");
+        deleted.ActorIdProperty.Should().Be("deletedBy");
+    }
+
+    [Fact]
     public void A_changed_family_head_is_recorded_against_the_family_admin_who_chose_it()
     {
         var descriptor = KnownEvents.Describe("members.family.head-changed.v1");

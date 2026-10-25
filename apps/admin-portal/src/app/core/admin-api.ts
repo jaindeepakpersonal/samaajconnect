@@ -1078,6 +1078,21 @@ export class AdminApi {
     return this.http.post<Election>('/v1/panch/elections', election);
   }
 
+  /** Corrects a draft, or one taking nominations - title, windows, visibility. */
+  updateElection(id: string, election: ElectionInput): Observable<Election> {
+    return this.http.patch<Election>(`/v1/panch/elections/${id}`, election);
+  }
+
+  /** Deletes an election that voting has not reached, with its nominations. */
+  deleteElection(id: string): Observable<void> {
+    return this.http.delete<void>(`/v1/panch/elections/${id}`);
+  }
+
+  /** Keeps voting open longer. Later than the current close only. */
+  extendVoting(id: string, votingEndAt: string): Observable<Election> {
+    return this.http.post<Election>(`/v1/panch/elections/${id}/extend-voting`, { votingEndAt });
+  }
+
   /** Moves an election on one stage. Never backwards. */
   moveElection(id: string, status: ElectionStatus): Observable<Election> {
     return this.http.post<Election>(`/v1/panch/elections/${id}/status`, { status });

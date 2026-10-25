@@ -352,14 +352,16 @@ and expose its endpoints behind the gateway at the route prefix shown.
   non-owned aggregates
 - **Owns:** PanchElection (with `Candidate`), Ballot, Vote,
   ElectionResult, PanelMember
-- **Key commands:** `CreateElectionCommand`, `MoveElectionCommand`,
+- **Key commands:** `CreateElectionCommand`, `UpdateElectionCommand`,
+  `ExtendVotingCommand`, `DeleteElectionCommand`, `MoveElectionCommand`,
   `NominateCandidateCommand`, `DecideCandidateCommand`,
   `CastBallotCommand`, `PublishElectionResultsCommand`,
   `RemovePanelMemberCommand`
 - **Key queries:** `ListElectionsQuery`, `GetElectionQuery`,
   `GetResultsQuery`, `GetPanelQuery`
 - **Events published:** `panch.election.status-changed.v1`,
-  `panch.panel.changed.v1`
+  `panch.election.updated.v1`, `panch.election.voting-extended.v1`,
+  `panch.election.deleted.v1`, `panch.panel.changed.v1`
 - **Events consumed:** none
 - **Gateway route prefix:** `/v1/panch/**`, module-gated on `panch` (off by
   default)

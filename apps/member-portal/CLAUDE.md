@@ -160,6 +160,13 @@ whose only job was returning to the one screen with a way out is not
 saving a click, it is clutter the wireframe's own list screens never drew
 either.
 
+The member page's "‹ Back to Members" link went the same way on 2026-10-25,
+in both portals, at the user's request: the browser's back button does that
+job. It was also wrong more often than right - a member's page is reached
+from a household, a group roster, a post's author and a Boli's winner, and
+the link sent every one of those readers to the directory instead of back to
+where they came from.
+
 **The wireframe's numbers are not in the shipped Home.** It showed 1,248
 members, 4 family, 6 events. Those services do not exist, and the skill is
 explicit that prototype values must not be hardcoded, so a tile carries a count

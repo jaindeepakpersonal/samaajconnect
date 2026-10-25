@@ -26,6 +26,9 @@ when it is ready to elect a Panch.
 | Command | Permission | Notes |
 |---|---|---|
 | `CreateElectionCommand` | `Panch.Manage` | Starts as `Draft`. Nominations close before voting opens |
+| `UpdateElectionCommand` | `Panch.Manage` | Title, description, both windows, results visibility. `Draft`/`NominationsOpen` only - see below |
+| `ExtendVotingCommand` | `Panch.Manage` | While voting is open, moves its close **later**. Never earlier |
+| `DeleteElectionCommand` | `Panch.Manage` | `Draft`/`NominationsOpen` only, with its nominations. Never once it holds ballots |
 | `MoveElectionCommand` | `Panch.Manage` | Strictly forward: `NominationsOpen`, `VotingOpen`, `Closed`. Refuses `VotingOpen` on an empty ballot |
 | `NominateCandidateCommand` | `Members.Read` | A repeat nomination is a no-op reported as success |
 | `DecideCandidateCommand` | `Panch.Manage` | Approve onto the ballot, or remove before voting opens |
@@ -45,6 +48,9 @@ when it is ready to elect a Panch.
 ## Events published
 
 - `ElectionStatusChangedDomainEvent` — `panch.election.status-changed.v1`
+- `ElectionUpdatedDomainEvent` — `panch.election.updated.v1`
+- `ElectionVotingExtendedDomainEvent` — `panch.election.voting-extended.v1`
+- `ElectionDeletedDomainEvent` — `panch.election.deleted.v1`
 - `PanelChangedDomainEvent` — `panch.panel.changed.v1`
 
 ## Events consumed
@@ -92,6 +98,32 @@ rule for anything that reaches the audit trail.
 
 **Ballots are never loaded with the election.** The tally is a `GROUP BY`
 in the database.
+
+**An election is corrected, extended and deleted by three different rules
+(2026-10-25).** Until then a created election could not be changed at all:
+nominations that closed with too few names, or a typo in the title, meant
+leaving a dead election on the list and starting another.
+
+- **Edit** (`PATCH`) replaces the title, description, both windows and
+  results visibility, with the create form's window rules - while it is a
+  draft or taking nominations. Nominations that closed too early are
+  reopened by pushing their close out: the status never advanced, so there
+  is nothing to undo. The same rule celebrity-voting and volunteer-groups use.
+- **Extend voting** is the one change allowed once voting has opened, and it
+  only moves the close **later**. Members were told the windows and whether
+  the count is live, and some have voted against both. Moving the close
+  earlier while ballots arrive would let whoever runs the election end it
+  while the count suits them, and lock out anybody planning to vote on the
+  last day; closing early stays possible, as the visible Close.
+- **Delete** removes the election and its nominations while it is a draft or
+  taking nominations - before any ballot can exist. From voting onward the
+  election holds a record of how the Samaaj voted and is closed instead. The
+  row is gone, so `panch.election.deleted.v1` (with who deleted it, and the
+  stage it was at) is the only trace it existed; it is raised before the
+  delete and drained in the same save.
+
+Each names the administrator who acted, and the extension also carries the
+close members were first told, so the audit row shows both.
 
 ## Testing
 

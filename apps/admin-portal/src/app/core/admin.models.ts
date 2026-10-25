@@ -842,7 +842,7 @@ export interface CampaignResult {
 /** Forward only, like a campaign; publishing is its own call, then `Published`. */
 export type ElectionStatus = 'Draft' | 'NominationsOpen' | 'VotingOpen' | 'Closed' | 'Published';
 
-/** What creating an election sends. */
+/** What creating or editing an election sends. */
 export interface ElectionInput {
   readonly title: string;
   readonly description: string | null;

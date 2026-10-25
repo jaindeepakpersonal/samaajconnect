@@ -14,6 +14,9 @@ public interface IElectionRepository
     Task<IReadOnlyList<PanchElection>> ListAsync(CancellationToken cancellationToken = default);
 
     void Add(PanchElection election);
+
+    /// <summary>Deletes the election and, by cascade, its candidates.</summary>
+    void Remove(PanchElection election);
 }
 
 /// <summary>

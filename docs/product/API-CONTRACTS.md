@@ -564,6 +564,9 @@ nominating, voting and every read.
 | GET | `/elections` | `Members.Read` | This Samaaj's elections, newest first, each with the caller's own ballot choices |
 | POST | `/elections` | `Panch.Manage` | Set an election up. Starts `Draft`; nominations must close before voting opens |
 | GET | `/elections/{id}` | `Members.Read` | Ballot always; tally only when this caller may see it |
+| PATCH | `/elections/{id}` | `Panch.Manage` | Correct the title, description, both windows and results visibility - `Draft` or `NominationsOpen` only. Same body and window rules as creating one; extending nominations is pushing their close out here |
+| DELETE | `/elections/{id}` | `Panch.Manage` | `204`. Deletes the election and its nominations - `Draft` or `NominationsOpen` only; once voting opens it holds ballots and is closed instead (`409`) |
+| POST | `/elections/{id}/extend-voting` | `Panch.Manage` | `{votingEndAt}`. Keeps voting open longer while it is open - later than the current close only (`409` otherwise) |
 | POST | `/elections/{id}/status` | `Panch.Manage` | Strictly forward: `NominationsOpen`, `VotingOpen`, `Closed`. Publishing is its own call |
 | POST | `/elections/{id}/candidates` | `Members.Read` | Put a member forward while nominations are open. A repeat is success |
 | POST | `/elections/{id}/candidates/{candidateId}/decide` | `Panch.Manage` | Approve onto the ballot, or remove before voting opens |

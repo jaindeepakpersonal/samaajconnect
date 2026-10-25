@@ -78,6 +78,96 @@ public sealed class PanchElection : AggregateRoot, ITenantScopedEntity
         };
     }
 
+    /// <summary>
+    /// Whether the whole election - its title, every window, results
+    /// visibility - can still be corrected: a draft, or while nominations are
+    /// being taken.
+    /// </summary>
+    /// <remarks>
+    /// The rule celebrity-voting and volunteer-groups use for their own
+    /// elections. Once voting opens, members have been told the windows and
+    /// whether the count is live, and may have voted against both, so from then
+    /// on only <see cref="ExtendVoting"/> is offered.
+    /// </remarks>
+    public bool CanBeEdited => Status is ElectionStatus.Draft or ElectionStatus.NominationsOpen;
+
+    /// <summary>
+    /// Whether the election can be deleted outright: only before voting opens,
+    /// so that no ballot is ever destroyed. An election past that point has
+    /// votes in it - a record of how the Samaaj voted - and can only be closed.
+    /// </summary>
+    public bool CanBeDeleted => Status is ElectionStatus.Draft or ElectionStatus.NominationsOpen;
+
+    /// <summary>
+    /// Replaces the title, description, windows and results visibility. The
+    /// caller has checked <see cref="CanBeEdited"/> and the window ordering.
+    /// </summary>
+    /// <remarks>
+    /// Never moves <see cref="Status"/>. Nominations left open past their own
+    /// close date have nothing to undo - <see cref="AcceptsNominations"/> is
+    /// already false - so pushing <see cref="NominationEndAt"/> out here is how
+    /// they are extended.
+    /// </remarks>
+    public void Update(
+        string title,
+        string? description,
+        DateTimeOffset nominationStartAt,
+        DateTimeOffset nominationEndAt,
+        DateTimeOffset votingStartAt,
+        DateTimeOffset votingEndAt,
+        ResultsVisibility resultsVisibility,
+        Guid updatedBy,
+        DateTimeOffset now)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(title);
+
+        Title = title.Trim();
+        Description = string.IsNullOrWhiteSpace(description) ? null : description.Trim();
+        NominationStartAt = nominationStartAt;
+        NominationEndAt = nominationEndAt;
+        VotingStartAt = votingStartAt;
+        VotingEndAt = votingEndAt;
+        ResultsVisibility = resultsVisibility;
+
+        Raise(new ElectionUpdatedDomainEvent(Id, TenantId, updatedBy, now));
+    }
+
+    /// <summary>
+    /// Keeps voting open longer. Returns false, changing nothing, unless voting
+    /// is open and <paramref name="votingEndAt"/> is later than the close
+    /// already announced.
+    /// </summary>
+    /// <remarks>
+    /// <b>Later only.</b> Moving the close earlier while ballots are coming in
+    /// would let whoever runs the election end it while the count suits them -
+    /// and anybody who planned to vote on the last day would find it gone.
+    /// Closing early is still possible, as an act everybody can see: the Close
+    /// button.
+    /// </remarks>
+    public bool ExtendVoting(DateTimeOffset votingEndAt, Guid extendedBy, DateTimeOffset now)
+    {
+        if (Status != ElectionStatus.VotingOpen || votingEndAt <= VotingEndAt)
+        {
+            return false;
+        }
+
+        var previous = VotingEndAt;
+        VotingEndAt = votingEndAt;
+
+        Raise(new ElectionVotingExtendedDomainEvent(
+            Id, TenantId, previous, votingEndAt, extendedBy, now));
+
+        return true;
+    }
+
+    /// <summary>
+    /// Announces that this election is being deleted. The handler has checked
+    /// <see cref="CanBeDeleted"/> and removes the row in the same save, so the
+    /// announcement and the deletion commit together.
+    /// </summary>
+    public void MarkDeleted(Guid deletedBy, DateTimeOffset now) =>
+        Raise(new ElectionDeletedDomainEvent(Id, TenantId, Status.ToString(), deletedBy, now));
+
     public Candidate? FindCandidate(Guid candidateId) =>
         _candidates.FirstOrDefault(c => c.Id == candidateId);
 

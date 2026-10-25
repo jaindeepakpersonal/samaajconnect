@@ -129,7 +129,7 @@ import { isNotFound } from '../../core/http-status';
               <thead>
                 <tr>
                   <th>Election</th><th>Nominations</th><th>Voting</th>
-                  <th>Ballot</th><th>Status</th>
+                  <th>Ballot</th><th>Status</th><th><span class="sr-only">Actions</span></th>
                 </tr>
               </thead>
               <tbody>
@@ -158,6 +158,42 @@ import { isNotFound } from '../../core/http-status';
                         {{ election.status }}
                       </span>
                     </td>
+                    <td>
+                      @if (confirmingDeletion() === election.id) {
+                        <div class="row-actions" role="status">
+                          <span class="small">
+                            Delete {{ election.title }}@if (election.candidateCount > 0) {
+                              and its {{ election.candidateCount }}
+                              {{ election.candidateCount === 1 ? 'nomination' : 'nominations' }}
+                            }? This cannot be undone.
+                          </span>
+                          <button class="btn small" type="button" [disabled]="busy()"
+                            (click)="deleteElection(election)">
+                            Delete for good
+                          </button>
+                          <button class="btn small alt" type="button"
+                            (click)="confirmingDeletion.set(null)">
+                            Keep
+                          </button>
+                        </div>
+                      } @else if (isEditable(election)) {
+                        <div class="row-actions">
+                          <button class="btn small alt" type="button" [disabled]="busy()"
+                            (click)="openEdit($event, election)">
+                            Edit<span class="sr-only"> {{ election.title }}</span>
+                          </button>
+                          <button class="btn small alt" type="button" [disabled]="busy()"
+                            (click)="confirmingDeletion.set(election.id)">
+                            Delete<span class="sr-only"> {{ election.title }}</span>
+                          </button>
+                        </div>
+                      } @else if (election.status === 'VotingOpen') {
+                        <button class="btn small alt" type="button" [disabled]="busy()"
+                          (click)="openExtend($event, election)">
+                          Extend voting<span class="sr-only"> for {{ election.title }}</span>
+                        </button>
+                      }
+                    </td>
                   </tr>
                 }
               </tbody>
@@ -176,9 +212,45 @@ import { isNotFound } from '../../core/http-status';
             (click)="$event.stopPropagation()"
             (keydown)="onModalKeydown($event)"
           >
-            <h2 id="election-modal-title">Set up an election</h2>
+            <h2 id="election-modal-title">
+              @switch (modalMode()) {
+                @case ('edit') { Edit {{ editing()?.title }} }
+                @case ('extend') { Extend voting }
+                @default { Set up an election }
+              }
+            </h2>
 
-            <form (ngSubmit)="create()">
+            @if (modalMode() === 'extend') {
+              <form (ngSubmit)="extend()">
+                <p class="small">
+                  Voting is open, so its close can only move later. Members have been told it
+                  closes {{ editing()?.votingEndAt | date: 'd MMM y, h:mm a' }}; anybody planning to
+                  vote before then still can.
+                </p>
+
+                <div class="field">
+                  <label for="extend-end">Voting now closes</label>
+                  <input id="extend-end" class="input" type="datetime-local" name="extendedEndAt"
+                    [(ngModel)]="votingEndAt" #firstField
+                    [attr.aria-invalid]="votingEndAt && !extendsLater() ? 'true' : null" />
+                </div>
+
+                @if (votingEndAt && !extendsLater()) {
+                  <p class="notice warn" role="alert">
+                    Choose a time after the current close. Voting cannot be cut short this way -
+                    close it instead.
+                  </p>
+                }
+
+                <div class="actions">
+                  <button class="btn" type="submit" [disabled]="busy() || !extendsLater()">
+                    Extend voting
+                  </button>
+                  <button class="btn alt" type="button" (click)="closeModal()">Cancel</button>
+                </div>
+              </form>
+            } @else {
+            <form (ngSubmit)="save()">
               <div class="form-grid">
                 <div class="field">
                   <label for="election-title">Title</label>
@@ -254,11 +326,12 @@ import { isNotFound } from '../../core/http-status';
 
               <div class="actions">
                 <button class="btn" type="submit" [disabled]="busy() || !canSubmit()">
-                  Create as a draft
+                  {{ modalMode() === 'edit' ? 'Save changes' : 'Create as a draft' }}
                 </button>
                 <button class="btn alt" type="button" (click)="closeModal()">Cancel</button>
               </div>
             </form>
+            }
           </div>
         </div>
       }
@@ -305,6 +378,13 @@ export class PanchComponent implements OnInit {
   readonly error = signal<string | null>(null);
   readonly done = signal<string | null>(null);
   readonly confirmingRemoval = signal<string | null>(null);
+  readonly confirmingDeletion = signal<string | null>(null);
+
+  /** What the one modal is doing: setting an election up, correcting one, or extending its voting. */
+  readonly modalMode = signal<'create' | 'edit' | 'extend'>('create');
+
+  /** The election being edited or extended. */
+  readonly editing = signal<Election | null>(null);
 
   private readonly names = signal<ReadonlyMap<string, string>>(new Map());
 
@@ -362,6 +442,26 @@ export class PanchComponent implements OnInit {
     );
   }
 
+  /**
+   * Whether the service will take an edit or a deletion: a draft, or one
+   * taking nominations. Mirrors panch-service's own rule, so the screen never
+   * offers a button that always answers 409.
+   */
+  isEditable(election: Election): boolean {
+    return election.status === 'Draft' || election.status === 'NominationsOpen';
+  }
+
+  /** Whether the new close is later than the one members were told. */
+  extendsLater(): boolean {
+    const current = this.editing();
+
+    return (
+      current !== null &&
+      this.votingEndAt.length > 0 &&
+      new Date(this.votingEndAt) > new Date(current.votingEndAt)
+    );
+  }
+
   openModal(event: MouseEvent): void {
     this.title = '';
     this.description = '';
@@ -370,6 +470,29 @@ export class PanchComponent implements OnInit {
     this.votingStartAt = '';
     this.votingEndAt = '';
     this.resultsVisibility = 'HiddenUntilClose';
+    this.show('create', null, event);
+  }
+
+  openEdit(event: MouseEvent, election: Election): void {
+    this.title = election.title;
+    this.description = election.description ?? '';
+    this.nominationStartAt = toLocalInputValue(election.nominationStartAt);
+    this.nominationEndAt = toLocalInputValue(election.nominationEndAt);
+    this.votingStartAt = toLocalInputValue(election.votingStartAt);
+    this.votingEndAt = toLocalInputValue(election.votingEndAt);
+    this.resultsVisibility = election.resultsVisibility;
+    this.show('edit', election, event);
+  }
+
+  openExtend(event: MouseEvent, election: Election): void {
+    this.votingEndAt = toLocalInputValue(election.votingEndAt);
+    this.show('extend', election, event);
+  }
+
+  private show(mode: 'create' | 'edit' | 'extend', election: Election | null, event: MouseEvent): void {
+    this.modalMode.set(mode);
+    this.editing.set(election);
+    this.confirmingDeletion.set(null);
     this.modalTrigger = event.currentTarget as HTMLElement;
     this.error.set(null);
     this.done.set(null);
@@ -468,7 +591,7 @@ export class PanchComponent implements OnInit {
     });
   }
 
-  create(): void {
+  save(): void {
     if (!this.canSubmit()) {
       return;
     }
@@ -483,15 +606,77 @@ export class PanchComponent implements OnInit {
       resultsVisibility: this.resultsVisibility,
     };
 
+    const editing = this.modalMode() === 'edit' ? this.editing() : null;
+
     this.busy.set(true);
     this.error.set(null);
     this.done.set(null);
 
-    this.api.createElection(input).subscribe({
+    const request = editing
+      ? this.api.updateElection(editing.id, input)
+      : this.api.createElection(input);
+
+    request.subscribe({
       next: () => {
-        this.done.set(`${input.title} created as a draft. Nominations are not open yet.`);
+        this.done.set(
+          editing
+            ? `${input.title} saved.`
+            : `${input.title} created as a draft. Nominations are not open yet.`,
+        );
         this.busy.set(false);
         this.closeModal();
+        this.load();
+      },
+      error: (failure: unknown) => {
+        this.error.set(describeError(failure));
+        this.busy.set(false);
+      },
+    });
+  }
+
+  extend(): void {
+    const election = this.editing();
+
+    if (election === null || !this.extendsLater()) {
+      return;
+    }
+
+    this.busy.set(true);
+    this.error.set(null);
+    this.done.set(null);
+
+    this.api.extendVoting(election.id, new Date(this.votingEndAt).toISOString()).subscribe({
+      next: (updated) => {
+        this.done.set(
+          `Voting for ${updated.title} now closes ${new Date(updated.votingEndAt).toLocaleString('en-IN', {
+            day: 'numeric',
+            month: 'short',
+            year: 'numeric',
+            hour: 'numeric',
+            minute: '2-digit',
+          })}.`,
+        );
+        this.busy.set(false);
+        this.closeModal();
+        this.load();
+      },
+      error: (failure: unknown) => {
+        this.error.set(describeError(failure));
+        this.busy.set(false);
+      },
+    });
+  }
+
+  deleteElection(election: Election): void {
+    this.busy.set(true);
+    this.error.set(null);
+    this.done.set(null);
+
+    this.api.deleteElection(election.id).subscribe({
+      next: () => {
+        this.confirmingDeletion.set(null);
+        this.done.set(`${election.title} deleted.`);
+        this.busy.set(false);
         this.load();
       },
       error: (failure: unknown) => {
@@ -521,4 +706,20 @@ export class PanchComponent implements OnInit {
       },
     });
   }
+}
+
+/** An ISO instant to the local `datetime-local` input value it renders as. */
+function toLocalInputValue(iso: string): string {
+  const date = new Date(iso);
+
+  if (Number.isNaN(date.getTime())) {
+    return '';
+  }
+
+  const pad = (n: number) => n.toString().padStart(2, '0');
+
+  return (
+    `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}` +
+    `T${pad(date.getHours())}:${pad(date.getMinutes())}`
+  );
 }

@@ -1019,6 +1019,30 @@ public static class KnownEvents
             EntityIdProperty: "electionId",
             BeforeProperties: ["previousStatus"]),
 
+        // An administrator's own corrections to an election, so each names
+        // who made it. Extending voting keeps the close members were first
+        // told beside the new one; deleting is the only record that the
+        // election existed, its row being gone.
+        ["panch.election.updated.v1"] = new(
+            Action: "ElectionUpdated",
+            EntityName: "PanchElection",
+            EntityIdProperty: "electionId",
+            ActorIdProperty: "updatedBy"),
+
+        ["panch.election.voting-extended.v1"] = new(
+            Action: "ElectionVotingExtended",
+            EntityName: "PanchElection",
+            EntityIdProperty: "electionId",
+            ActorIdProperty: "extendedBy",
+            BeforeProperties: ["previousVotingEndAt"]),
+
+        ["panch.election.deleted.v1"] = new(
+            Action: "ElectionDeleted",
+            EntityName: "PanchElection",
+            EntityIdProperty: "electionId",
+            ActorIdProperty: "deletedBy",
+            BeforeProperties: ["status"]),
+
         ["panch.panel.changed.v1"] = new(
             Action: "PanelChanged",
             EntityName: "PanchPanel",
