@@ -388,7 +388,10 @@ describe('FamilyComponent', () => {
     http = TestBed.inject(HttpTestingController);
   });
 
-  afterEach(() => http.verify());
+  afterEach(() => {
+    settleLookups();
+    http.verify();
+  });
 
   /** Answers /me, the household and its children. */
   function load(household: Family | null, children: Child[] = []): void {
@@ -406,7 +409,24 @@ describe('FamilyComponent', () => {
     }
 
     fixture.detectChanges();
+    settleLookups();
     settlePhotos();
+  }
+
+  /**
+   * Answers the family tree's lookups - one `GET /v1/members/{id}` per adult
+   * on it, for their photo - with members who have none, so no photo request
+   * follows unless a test asks for one.
+   */
+  function settleLookups(photos: Record<string, string> = {}): void {
+    for (const request of http.match(
+      (r) => r.method === 'GET' && /^\/v1\/members\/[^/]+$/.test(r.url) && r.url !== '/v1/members/me',
+    )) {
+      const id = request.request.url.split('/').pop()!;
+      request.flush(member({ id, photoUrl: photos[id] ?? null }));
+    }
+
+    fixture.detectChanges();
   }
 
   /**
@@ -435,6 +455,94 @@ describe('FamilyComponent', () => {
       (fixture.nativeElement as HTMLElement).querySelectorAll('button'),
     ).find((b) => b.textContent?.trim().startsWith(label)) as HTMLButtonElement | undefined;
   }
+
+  // ---- The family tree ------------------------------------------------------
+
+  /** The names in one part of the tree, in the order drawn. */
+  function namesIn(selector: string): string[] {
+    return Array.from(
+      (fixture.nativeElement as HTMLElement).querySelectorAll(`${selector} .person .name`),
+    ).map((n) => n.textContent?.trim() ?? '');
+  }
+
+  const household = () =>
+    family({
+      familyAdminMemberId: 'a1',
+      familyHeadMemberId: 'p1',
+      viewerIsAdmin: false,
+      members: [
+        familyMember({ id: 'm-a1', memberProfileId: 'a1', fullName: 'Mahesh Jain', relationship: 'Other' }),
+        familyMember({ id: 'm-p1', memberProfileId: 'p1', fullName: 'Kanta Jain', relationship: 'Parent' }),
+        familyMember({ id: 'm-s1', memberProfileId: 's1', fullName: 'Sunita Jain', relationship: 'Spouse' }),
+        familyMember({ id: 'm-b1', memberProfileId: 'b1', fullName: 'Ramesh Jain', relationship: 'Sibling' }),
+        familyMember({ id: 'm-me', memberProfileId: ME, fullName: 'Ravi Shah', relationship: 'Child' }),
+        familyMember({ id: 'm-o1', memberProfileId: 'o1', fullName: 'Lalit Jain', relationship: 'Other' }),
+        familyMember({
+          id: 'm-q1', memberProfileId: 'q1', fullName: 'Still Asking', relationship: 'Child', status: 'PendingJoinRequest',
+        }),
+      ],
+    });
+
+  it('draws three generations around the family admin', () => {
+    load(household(), [
+      child({ id: 'c1', fullName: 'Anaya Jain', status: 'Minor', age: 11 }),
+      child({ id: 'c2', fullName: 'Grown Up', status: 'Converted' }),
+    ]);
+
+    expect(namesIn('.generation[aria-label="Parents"]')).toEqual(['Kanta Jain']);
+    expect(namesIn('.couple')).toEqual(['Mahesh Jain', 'Sunita Jain']);
+    expect(namesIn('.generation[aria-label="The family admin\'s generation"]')).toContain('Ramesh Jain');
+
+    // Adult children and minors together; a converted child is already a
+    // member, so their old record is not drawn twice.
+    expect(namesIn('.generation.children')).toEqual(['Ravi Shah', 'Anaya Jain']);
+    expect(text()).toContain('Age 11');
+    expect(namesIn('.tree')).not.toContain('Grown Up');
+
+    // "Other" cannot be placed, so it is listed rather than guessed.
+    expect(namesIn('.generation.others')).toEqual(['Lalit Jain']);
+
+    // Only active members: a pending request is not yet family.
+    expect(text()).not.toContain('Still Asking');
+  });
+
+  it('marks the reader, the head and the family admin, and links adults to their profiles', () => {
+    load(household());
+
+    const page = fixture.nativeElement as HTMLElement;
+    const card = (name: string) =>
+      Array.from(page.querySelectorAll('.tree .person')).find((p) => p.textContent?.includes(name))!;
+
+    expect(card('Ravi Shah').classList).toContain('you');
+    expect(card('Ravi Shah').textContent).toContain('You');
+    expect(card('Kanta Jain').textContent).toContain('Head');
+    expect(card('Mahesh Jain').textContent).toContain('Family admin');
+    expect(page.querySelector('.tree a[href="/members/s1"]')?.textContent).toContain('Sunita Jain');
+  });
+
+  it('shows a face where the lookup has one, fetched with the token', () => {
+    fixture.detectChanges();
+    http.expectOne('/v1/identity/me').flush(currentUser);
+    http.expectOne('/v1/families/mine').flush(household());
+    http.expectOne('/v1/children').flush([]);
+    fixture.detectChanges();
+
+    settleLookups({ s1: '/v1/members/s1/photo' });
+    http.expectOne('/v1/members/s1/photo').flush(new Blob(['x']));
+    fixture.detectChanges();
+
+    const spouse = (fixture.nativeElement as HTMLElement).querySelector('.couple .person:last-child');
+    expect(spouse?.querySelector('img.face')?.getAttribute('src')).toBe('blob:test');
+    expect(spouse?.querySelector('.initials')).toBeNull();
+  });
+
+  it('draws a household of one as just its admin', () => {
+    load(family());
+
+    expect(namesIn('.couple')).toEqual(['Ravi Shah']);
+    expect((fixture.nativeElement as HTMLElement).querySelector('.generation.children')).toBeNull();
+    expect((fixture.nativeElement as HTMLElement).querySelector('.generation.others')).toBeNull();
+  });
 
   // ---- No household yet ---------------------------------------------------
 

@@ -1,0 +1,157 @@
+/* The household as generations, joined by lines drawn in CSS - no library, and
+   nothing loaded from another origin, which the content security policy would
+   refuse anyway. */
+
+.tree {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  overflow-x: auto;
+  padding-bottom: var(--space-2);
+}
+
+.generation {
+  display: flex;
+  justify-content: center;
+  align-items: flex-start;
+  gap: var(--space-4);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+/* One vertical line between two generations. */
+.link.down {
+  width: 2px;
+  height: var(--space-5);
+  background: var(--line);
+}
+
+/* The children hang from a bar across them, each from its own short line. */
+.generation.children {
+  position: relative;
+  padding-top: var(--space-4);
+}
+
+.generation.children > li {
+  position: relative;
+}
+
+.generation.children > li::before {
+  content: '';
+  position: absolute;
+  top: calc(-1 * var(--space-4));
+  left: 50%;
+  width: 2px;
+  height: var(--space-4);
+  background: var(--line);
+}
+
+.generation.children > li::after {
+  content: '';
+  position: absolute;
+  top: calc(-1 * var(--space-4));
+  left: calc(-1 * var(--space-2));
+  right: calc(-1 * var(--space-2));
+  height: 2px;
+  background: var(--line);
+}
+
+/* The bar stops at the outermost children rather than running past them. */
+.generation.children > li:first-child::after {
+  left: 50%;
+}
+
+.generation.children > li:last-child::after {
+  right: 50%;
+}
+
+.generation.children > li:only-child::after {
+  display: none;
+}
+
+/* The admin and their spouse, side by side and joined. */
+.couple {
+  display: flex;
+  align-items: center;
+}
+
+.bond {
+  width: var(--space-5);
+  height: 2px;
+  background: var(--accent);
+}
+
+.person {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  width: 120px;
+  padding: var(--space-2);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-md);
+  background: var(--panel);
+  text-align: center;
+}
+
+.person.you {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 2px var(--soft);
+}
+
+.face {
+  width: 56px;
+  height: 56px;
+  border-radius: 50%;
+  object-fit: cover;
+  background: var(--soft);
+}
+
+.face.initials {
+  display: grid;
+  place-items: center;
+  color: var(--accent-ink);
+  font-weight: 700;
+}
+
+.name {
+  font-weight: 600;
+  line-height: 1.25;
+  overflow-wrap: anywhere;
+}
+
+.tags {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 2px;
+}
+
+.tags .pill {
+  font-size: 0.7rem;
+}
+
+.others-heading {
+  margin-top: var(--space-5);
+}
+
+.generation.others {
+  flex-wrap: wrap;
+  justify-content: flex-start;
+}
+
+@media (max-width: 700px) {
+  .tree {
+    align-items: flex-start;
+  }
+
+  .person {
+    width: 96px;
+  }
+
+  .face {
+    width: 44px;
+    height: 44px;
+  }
+}

@@ -19,7 +19,7 @@ before translating another screen.
 | Issue detail | `/issues/:id` | — | built; no wireframe covers it, and the workflow is unusable without one |
 | Members | `/members` | `#members` | built |
 | Member detail | `/members/:id` | `#memberdetail` | built - a profile page: cover, photo, name with Gautra, details, and Family (father, mother, household) and Volunteer groups cards |
-| My Family | `/family` | `#family` + `#children` | built as one screen |
+| My Family | `/family` | `#family` + `#children` | built as one screen, with a family tree of the household since 2026-10-25 - see below |
 | Celebrities of Samaaj | `/voting` | `#celebrity` | built |
 | Campaign detail | `/voting/:id` | `#celebrity` + `#celebrityresults` | built as one screen |
 | Your data and privacy | `/privacy` | `#profile`'s privacy card, plus none for the DPDP rights | built - carries `#profile`'s per-field directory privacy card, moved here 2026-09-11, ahead of the three DPDP rights (no wireframe covers those, and endpoints reachable only with curl are not rights a member has). Reachable from the top bar's user menu, not the sidebar |
@@ -682,6 +682,21 @@ failing the export — a partial copy delivered beats a complete one refused —
 and gathering the data is reported separately from the browser refusing to save
 it, because those are different problems and only one of them is the member's to
 fix.
+
+**My Family draws the household as a family tree (2026-10-25), centred on the
+family admin, because that is what the data can say.** A member joins by naming
+their relationship *to the admin*, so `FamilyTreeComponent` puts the admin's
+parents above them, their spouse beside them (joined), their siblings either
+side, and their children below - adult members and minors' records together -
+with no request to any service beyond the household and children this screen
+already loads, plus the memoized `MemberLookup` for faces. It cannot place
+anyone's relatives but the admin's: a sibling's spouse joined as "Other", so
+"Other" is listed under the tree as "Also in the household" rather than guessed
+onto it. A converted child is drawn once, as the member they now are; a pending
+request is not drawn at all. Parents read "Parent", not Father or Mother -
+the household's own data carries no gender, and inventing one from a name
+would be guessing. The lines are CSS, not a library: nothing loads from
+another origin under this app's content security policy.
 
 **"Waiting to join a household" is a state this screen did not have.**
 `/families/mine` answers with the household for somebody whose request is only
