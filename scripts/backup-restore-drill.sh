@@ -116,31 +116,37 @@ guarantee_indexes() {
 # a real deployment the consumer is never settled, so that false failure would
 # have been the normal result.
 #
-# So a mismatch is re-checked. If the original's own counts moved between two
-# reads, the original is live and the difference says nothing about the dump.
+# So the original is counted immediately before and immediately after its own
+# dump, and the restored copy is compared against that - not against a count
+# read minutes later, after every other database has dumped and restored.
+#
+# The first version of this guard counted the original twice at comparison time
+# and called it "moved" only if those two reads differed. That misses the common
+# case: rows that arrive after the dump and then stop. CI hit exactly that -
+# four audit rows landed between `pg_dump` and the comparison, the consumer went
+# quiet, both late reads agreed on 369, and the drill blamed a 365-row dump that
+# was a perfectly good snapshot of its moment.
+#
+# If the before and after counts agree, nothing changed while pg_dump ran, so
+# its snapshot must hold exactly those counts and any difference is the dump's.
+# If they differ, the database was being written to during the dump and the
+# copy has nothing exact to be compared against.
+declare -A counts_at_dump=()
+declare -A moved_during_dump=()
+
 compare_rows() {
   local db="$1" drill="$2"
-  local original restored again
+  local restored
 
-  original=$(row_counts "$db")
-  restored=$(row_counts "$drill")
-
-  if [ "$original" = "$restored" ]; then
-    check "$db rows" "$original" "$restored"
-    return
-  fi
-
-  again=$(row_counts "$db")
-
-  if [ "$original" != "$again" ]; then
-    printf '  ..    %s rows: the original moved while the drill ran, so the dump\n' "$db"
-    printf '        cannot be compared against it. Not a restore failure.\n'
+  if [ -n "${moved_during_dump[$db]:-}" ]; then
+    printf '  ..    %s rows: the original was written to while it was dumped, so the\n' "$db"
+    printf '        dump cannot be compared against it. Not a restore failure.\n'
     moved=$((moved + 1))
     return
   fi
 
-  # The original held still and the copy still differs. That is the dump.
-  check "$db rows" "$original" "$restored"
+  restored=$(row_counts "$drill")
+  check "$db rows" "${counts_at_dump[$db]}" "$restored"
 }
 
 mkdir -p "$OUT_DIR"
@@ -166,8 +172,14 @@ echo "== backing up =="
 for db in "${db_list[@]}"; do
   [ -z "$db" ] && continue
 
+  before=$(row_counts "$db")
+
   docker compose exec -T "$COMPOSE_SERVICE" \
     pg_dump -U "$PGUSER" --format=custom --no-owner --no-acl "$db" > "$OUT_DIR/$db.dump"
+
+  after=$(row_counts "$db")
+  counts_at_dump[$db]="$before"
+  [ "$before" = "$after" ] || moved_during_dump[$db]=1
 
   size=$(wc -c < "$OUT_DIR/$db.dump" | tr -d ' ')
 
