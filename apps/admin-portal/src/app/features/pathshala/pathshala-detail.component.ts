@@ -99,7 +99,7 @@ const TABS: readonly { value: PathshalaTab; label: string; managersOnly?: true }
       </p>
 
       @if (school.status !== 'Active') {
-        <p class="notice">
+        <p class="notice warn">
           This Pathshala has been stood down. Its records are kept and it takes no new
           enrolments.
         </p>

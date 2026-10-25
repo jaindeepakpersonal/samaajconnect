@@ -21,6 +21,11 @@ export interface Occasion {
   readonly status: OccasionStatus;
   readonly typeCount: number;
   readonly boliCount: number;
+
+  /** Where it is held (2026-10-24): a locality, a city or village, and the venue in the manager's words. */
+  readonly localityId?: string | null;
+  readonly cityId?: string | null;
+  readonly venue?: string | null;
 }
 
 export interface BoliType {
@@ -35,6 +40,9 @@ export interface OccasionDetail {
   readonly description: string | null;
   readonly occasionDate: string;
   readonly status: OccasionStatus;
+  readonly localityId?: string | null;
+  readonly cityId?: string | null;
+  readonly venue?: string | null;
   readonly types: readonly BoliType[];
   readonly boli: readonly Boli[];
 }
@@ -93,6 +101,12 @@ export interface Boli {
   readonly minimumNextBid: number;
   readonly highestBidderIsMe: boolean;
   readonly bidCount: number;
+
+  /** The occasion it is offered at, and where that is - a Boli's place is its occasion's. */
+  readonly occasionTitle?: string | null;
+  readonly localityId?: string | null;
+  readonly cityId?: string | null;
+  readonly venue?: string | null;
 }
 
 /**
@@ -141,6 +155,11 @@ export interface BoliResult {
   readonly isPublished: boolean;
   readonly recordedAt: string;
   readonly publishedAt: string | null;
+
+  /** The occasion and where it is, so announced results can be filtered by place. */
+  readonly occasionId?: string | null;
+  readonly localityId?: string | null;
+  readonly cityId?: string | null;
 }
 
 /** What each Boli state is called on screen, when nothing else describes it. */
@@ -156,3 +175,9 @@ export const OccasionStatusLabels: Readonly<Record<OccasionStatus, string>> = {
   Active: 'Under way',
   Closed: 'Finished',
 };
+
+/** Narrows the Boli list to one place. Empty strings are "anywhere". */
+export interface BoliPlaceFilter {
+  cityId: string;
+  localityId: string;
+}

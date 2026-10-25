@@ -70,7 +70,7 @@ import { AuthService, describeError } from '@samaajconnect/shared';
         }
 
         @if (passwordChanged()) {
-          <p class="notice info" role="status">
+          <p class="notice ok" role="status">
             Your password has been changed. Every other signed-in device has been signed out.
           </p>
         }

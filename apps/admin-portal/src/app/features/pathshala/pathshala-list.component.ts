@@ -140,7 +140,7 @@ import { ALL_LOCALITIES, LocalityFilterComponent, matchesLocality } from '../../
             </div>
 
             @if (standingDown() === item.id) {
-              <div class="notice spaced" role="status">
+              <div class="notice warn spaced" role="status">
                 <p>
                   <b>{{ item.name }}</b> will stop taking enrolments. Every session, class,
                   register and exam result is kept - a Pathshala that closed still taught the

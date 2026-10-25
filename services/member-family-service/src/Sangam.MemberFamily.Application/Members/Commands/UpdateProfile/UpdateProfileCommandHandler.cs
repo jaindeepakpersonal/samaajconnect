@@ -81,6 +81,13 @@ public sealed class UpdateProfileCommandHandler(
             // their own details apart from an admin correcting them.
             currentUser.UserId ?? profile.Id);
 
+        profile.SetMaritalStatus(
+            string.IsNullOrWhiteSpace(command.MaritalStatus)
+                ? null
+                : Enum.Parse<MaritalStatus>(command.MaritalStatus, ignoreCase: true),
+            currentUser.UserId ?? profile.Id,
+            clock.UtcNow);
+
         await unitOfWork.SaveChangesAsync(cancellationToken);
 
         return Result.Success(profile.ToOwnerResponse());

@@ -109,6 +109,8 @@ export class MembersApi {
       // themselves out of the directory back into it the next time they
       // edited anything else.
       isListedInDirectory: profile.isListedInDirectory,
+      // Replaces with the rest, so it is always sent - null for "not saying".
+      maritalStatus: profile.maritalStatus ?? null,
     });
   }
 

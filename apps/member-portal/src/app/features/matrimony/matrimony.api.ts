@@ -1,7 +1,9 @@
 import { HttpClient, HttpParams } from '@angular/common/http';
 import { Injectable, inject } from '@angular/core';
 import { Observable } from 'rxjs';
-import { Biodata, BiodataFields, MatrimonyConsentNotice, MyBiodata, Proposal, SearchFilters } from './matrimony.models';
+import { Biodata, BiodataFields, MatrimonyConsentNotice, MyBiodata, Proposal, SearchFilters,
+  MatrimonyEligibility,
+} from './matrimony.models';
 
 /**
  * Every call this app makes to matrimony-service.
@@ -25,6 +27,11 @@ export class MatrimonyApi {
    * resolves a 204 to a `null` body itself, so this needs no special handling
    * beyond the nullable return type.
    */
+  /** Whether the caller may keep a biodata at all. The service refuses opting in and editing otherwise. */
+  eligibility(): Observable<{ status: MatrimonyEligibility }> {
+    return this.http.get<{ status: MatrimonyEligibility }>('/v1/matrimony/eligibility/me');
+  }
+
   myBiodata(): Observable<MyBiodata | null> {
     return this.http.get<MyBiodata | null>('/v1/matrimony/biodata/me');
   }

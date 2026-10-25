@@ -339,7 +339,7 @@ import { isNotFound } from '../../core/http-status';
                     </div>
 
                     @if (confirmingPublish() === election.id) {
-                      <div class="notice" role="status">
+                      <div class="notice warn" role="status">
                         <p>
                           This picks the top {{ seatsLabel(election.seats) }} from the votes cast and
                           installs them as {{ election.positionTitle }}. Anyone who holds it now and did
@@ -578,15 +578,15 @@ import { isNotFound } from '../../core/http-status';
                 </div>
 
                 @if (closesBeforeOpening(nominationStartAt, nominationEndAt)) {
-                  <p class="notice span-all" role="alert">Nominations cannot close before they open.</p>
+                  <p class="notice warn span-all" role="alert">Nominations cannot close before they open.</p>
                 }
 
                 @if (closesBeforeOpening(votingStartAt, votingEndAt)) {
-                  <p class="notice span-all" role="alert">Voting cannot close before it opens.</p>
+                  <p class="notice warn span-all" role="alert">Voting cannot close before it opens.</p>
                 }
 
                 @if (windowsOverlap()) {
-                  <p class="notice span-all" role="alert">
+                  <p class="notice warn span-all" role="alert">
                     Voting must start after nominations close, so that early voters and late voters
                     see the same ballot.
                   </p>
@@ -654,15 +654,15 @@ import { isNotFound } from '../../core/http-status';
                 </div>
 
                 @if (closesBeforeOpening(editNominationStartAt, editNominationEndAt)) {
-                  <p class="notice span-all" role="alert">Nominations cannot close before they open.</p>
+                  <p class="notice warn span-all" role="alert">Nominations cannot close before they open.</p>
                 }
 
                 @if (closesBeforeOpening(editVotingStartAt, editVotingEndAt)) {
-                  <p class="notice span-all" role="alert">Voting cannot close before it opens.</p>
+                  <p class="notice warn span-all" role="alert">Voting cannot close before it opens.</p>
                 }
 
                 @if (editWindowsOverlap()) {
-                  <p class="notice span-all" role="alert">
+                  <p class="notice warn span-all" role="alert">
                     Voting must start after nominations close.
                   </p>
                 }

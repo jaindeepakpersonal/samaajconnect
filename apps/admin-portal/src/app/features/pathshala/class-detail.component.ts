@@ -167,7 +167,7 @@ type Mark = AttendanceStatus | '';
           }
 
           @if (dateProblem(subject); as problem) {
-            <p class="notice" role="alert">{{ problem }}</p>
+            <p class="notice warn" role="alert">{{ problem }}</p>
           }
 
           @if (registerLoading()) {

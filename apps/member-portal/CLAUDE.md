@@ -25,9 +25,9 @@ before translating another screen.
 | Your data and privacy | `/privacy` | `#profile`'s privacy card, plus none for the DPDP rights | built - carries `#profile`'s per-field directory privacy card, moved here 2026-09-11, ahead of the three DPDP rights (no wireframe covers those, and endpoints reachable only with curl are not rights a member has). Reachable from the top bar's user menu, not the sidebar |
 | Jain Pathshala | `/pathshala` | `#pathshala` | built |
 | Pathshala enrolment | `/pathshala/:id` | `#myclass` + `#attendance` + `#exams` + `#progress` | built as one screen, four tabs since 2026-10-24 - Class, Attendance, Exams, Progress |
-| Auctions / Boli | `/boli` | `#boli` | built |
-| Boli detail | `/boli/:id` | `#bolidetail` | built |
-| Boli occasion | `/boli/occasions/:id` | — | built; the wireframe's "View Occasion" had no screen behind it |
+| Auctions / Boli | `/boli` | `#boli` | built. Three tabs - Bidding now, Occasions, Results - opening on whichever is live, a City/Locality filter over all three, where each Boli is held, and who won by name |
+| Boli detail | `/boli/:id` | `#bolidetail` | built. The current highest and Place a bid (a popup) above three tabs - Details (everything entered when it was opened), Bid history, Result (the winner by name, once announced) |
+| Boli occasion | `/boli/occasions/:id` | — | built; the wireframe's "View Occasion" had no screen behind it. Where it is held |
 | Notifications | `/notifications` | `#notifications` | built |
 | Businesses directory | `/businesses` | — | built; no wireframe covers a member marketplace. Listings with the business's photo, category, where it is and who runs it; category, city and locality filters |
 | Business detail | `/businesses/:id` | — | built. A shop front - photo, where it is, the owner, call and email - then products as image tiles with Add and a stepper, beside "Your order" - hidden for the business's own owner |
@@ -40,6 +40,10 @@ before translating another screen.
 | Panch election | `/panch/:id` | — | built. Nominate somebody by name, cast one final ballot of up to ten, read the result |
 | Trusts | `/trust` | — | built; no wireframe covers this new module. Our Samaaj's locality Trusts, read-only, with a "What you owe" card above them when a Boli the member won has fallen due to a Trust |
 | Trust detail | `/trust/:id` | — | built. Roster with each trustee's role, and its elections - nominate a fellow trustee, cast a ballot of up to the role's seats, see every winner |
+| Matrimony - my biodata | `/matrimony` | — | built; no wireframe covers matrimony. Opens on the saved biodata with Edit; only for a member My Profile says is Unmarried or Divorced - see below |
+| Matrimony search | `/matrimony/search` | — | built |
+| Matrimony proposals | `/matrimony/proposals` | — | built. Sent and received |
+| Matrimony candidate | `/matrimony/candidates/:id` | — | built. One biodata, and Send a proposal |
 | Pathshala events | — | `#pathevents` | not built — no endpoint exists |
 | Set your password | `/activate` | — | built; no wireframe covers redeeming an activation code, and three admin screens told people to do it here |
 | Forgot password | `/forgot`, `/reset` | `#forgot`, `#otp` | built — redeems into a new password, not a session |
@@ -594,6 +598,20 @@ The window is quoted in minutes only when it is a whole number of them, because
 rounding 90 seconds up to two minutes prints a longer window than the server is
 actually keeping, on the one line a bidder is being asked to rely on.
 
+**A Boli is tabs and a popup, and names its winner (2026-10-24).** The list
+is Bidding now / Occasions / Results, opening on Bidding now unless nothing is,
+and a City/Locality filter narrows all three - the service filters the first
+two (`?cityId=`, `?localityId=`), and Results is narrowed here from the place
+each result carries. The detail page keeps the current highest and a Place a
+bid button above the tabs, so bidding is never a tab away; the form itself is a
+popup, and an accepted bid closes it and says so on the page. Details is
+everything the manager entered - type, occasion, where, window, floor,
+increment, the late-bid rule, who may bid - and an announced Boli opens on
+Result. **Who won is named to every member** once the Samaaj announces it:
+through `MemberLookup`, one call per winner on screen, linked to their profile,
+"A member" if it fails. Who is *leading* is still never named, and the bid
+history still names nobody but "Yours" - the service does not send it.
+
 **"You are leading" is only ever said while bidding is open.** It shipped
 appearing beside "Result announced", which is the wrong tense on a race that
 finished hours ago — and on a Boli closed *without* a published result it would
@@ -602,6 +620,26 @@ announced it. That is precisely what the service's record-then-publish split
 exists to prevent, and a screen is as able to break it as a handler. Once a
 result is published the list says "Won by you", from the result rather than from
 the leading bid.
+
+**My Profile has a marital status, and it decides who sees Matrimony
+(2026-10-24).** Unmarried, Married, Divorced or "Prefer not to say", on the
+Basic tab, saved with the rest. Nobody else is shown it. The Matrimony page asks
+matrimony-service first (`/v1/matrimony/eligibility/me`) and, for anybody who
+is not Unmarried or Divorced, says so in an amber notice with a link to My
+Profile instead of a form the service would refuse - "Prefer not to say" counts
+as not saying, so a member who has never set it is asked to. A member who
+already has a biodata sees it read-only either way, and an Edit button only
+while eligible. The page opens on what is saved; the form appears on Edit, or
+for an eligible member with nothing saved yet.
+
+**Messages are one palette in both apps (2026-10-24).** Green (`.notice.ok`)
+says something worked, amber (`.notice.warn`) asks for care before going on - a
+confirmation, a refusal the member can act on, being outbid - and red
+(`.notice.error`, with `role="alert"`) says something failed. Anything else is
+plain information (`.notice`, `.notice.info`): neutral, not coloured. The block
+in each app's `styles.css` is the same text, colours spelled out, because the
+two apps share no stylesheet; change one and change the other. Every variant
+sets its text colour as well as its background, so a state is never hue alone.
 
 **Withdrawing a consent has no confirmation step, and erasing has two.** DPDP
 section 6(4) requires withdrawing to be as easy as giving, and giving was a tick

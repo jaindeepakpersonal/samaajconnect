@@ -103,7 +103,7 @@ import { isNotFound } from '../../core/http-status';
           </button>
 
           @if (confirmingPublish()) {
-            <div class="notice" role="status">
+            <div class="notice warn" role="status">
               <p>
                 This seats the winners and unseats the current Panch. It cannot be undone or
                 recomputed.

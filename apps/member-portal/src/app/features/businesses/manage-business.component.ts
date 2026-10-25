@@ -70,7 +70,7 @@ import { Business, BusinessFields, Product, ProductFields } from './businesses.m
         }
 
         @if (done(); as message) {
-          <p class="notice info" role="status">{{ message }}</p>
+          <p class="notice ok" role="status">{{ message }}</p>
         }
 
         <div class="tabs" role="tablist" aria-label="This business">
@@ -191,7 +191,7 @@ import { Business, BusinessFields, Product, ProductFields } from './businesses.m
                 </div>
 
                 @if (confirmingStatus() && found.isActive) {
-                  <div class="notice">
+                  <div class="notice warn">
                     <p role="status">
                       Deactivating takes {{ found.name }} out of the directory. Every product and past order is
                       kept, and this can be undone at any time.

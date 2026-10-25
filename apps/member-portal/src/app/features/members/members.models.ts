@@ -9,6 +9,13 @@
 /** `Gender` in the domain. */
 export type Gender = 'Unspecified' | 'Female' | 'Male' | 'Other';
 
+/**
+ * As the member gives it on My Profile - theirs alone to see. Matrimony biodata
+ * is for members who are Unmarried or Divorced, and matrimony-service decides
+ * that from this.
+ */
+export type MaritalStatus = 'Unmarried' | 'Married' | 'Divorced';
+
 /** `PrivacyLevel` in the domain. */
 export type PrivacyLevel = 'Private' | 'SamaajOnly' | 'Public';
 
@@ -91,6 +98,9 @@ export interface MyProfile {
   readonly permanentAddress: Address;
   readonly temporaryAddress: Address | null;
   readonly privacy: FieldPrivacy;
+
+  /** Null until the member says. */
+  readonly maritalStatus?: MaritalStatus | null;
 
   /**
    * Whether this member appears in the Samaaj directory search.

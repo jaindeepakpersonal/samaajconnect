@@ -59,7 +59,7 @@ const PHONE = /^\+?[0-9 ()-]{7,20}$/;
       </div>
 
       @if (removing(); as teacher) {
-        <div class="notice" role="status">
+        <div class="notice warn" role="status">
           <p>
             <b>{{ teacher.fullName }}</b> will stop teaching every class here, and their record
             will be removed. Registers they marked and results they recorded are kept.

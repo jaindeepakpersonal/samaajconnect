@@ -180,7 +180,7 @@ import { EventScheduleItem, SamaajEvent } from './events.models';
             }
 
             @if (promotedFromWaitlist()) {
-              <p class="notice info" role="status">
+              <p class="notice warn" role="status">
                 Your place went to somebody who was waiting.
               </p>
             }

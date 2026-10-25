@@ -148,6 +148,30 @@ namespace Sangam.Matrimony.Infrastructure.Persistence.Migrations
                     b.ToTable("biodata_profiles", (string)null);
                 });
 
+            modelBuilder.Entity("Sangam.Matrimony.Domain.Biodata.MatrimonyEligibility", b =>
+                {
+                    b.Property<Guid>("TenantId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("tenant_id");
+
+                    b.Property<Guid>("MemberId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("member_id");
+
+                    b.Property<DateTimeOffset>("ChangedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("changed_at");
+
+                    b.Property<bool>("IsEligible")
+                        .HasColumnType("boolean")
+                        .HasColumnName("is_eligible");
+
+                    b.HasKey("TenantId", "MemberId")
+                        .HasName("pk_matrimony_eligibility");
+
+                    b.ToTable("matrimony_eligibility", (string)null);
+                });
+
             modelBuilder.Entity("Sangam.Matrimony.Domain.Proposals.Proposal", b =>
                 {
                     b.Property<Guid>("Id")

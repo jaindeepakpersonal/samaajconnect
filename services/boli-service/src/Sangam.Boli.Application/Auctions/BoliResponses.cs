@@ -11,7 +11,10 @@ public sealed record OccasionResponse(
     int BoliCount,
 
     /// <summary>Null for a Samaaj-wide occasion. A loose reference into master-data-service's Locality.</summary>
-    Guid? LocalityId);
+    Guid? LocalityId,
+
+    string? Venue = null,
+    Guid? CityId = null);
 
 public sealed record OccasionDetailResponse(
     Guid Id,
@@ -21,7 +24,9 @@ public sealed record OccasionDetailResponse(
     string Status,
     Guid? LocalityId,
     IReadOnlyList<BoliTypeResponse> Types,
-    IReadOnlyList<BoliResponse> Boli);
+    IReadOnlyList<BoliResponse> Boli,
+    string? Venue = null,
+    Guid? CityId = null);
 
 public sealed record BoliTypeResponse(Guid Id, string Name, string? Description);
 
@@ -61,7 +66,20 @@ public sealed record BoliResponse(
     long? HighestAmount,
     long MinimumNextBid,
     bool HighestBidderIsMe,
-    int BidCount);
+    int BidCount,
+
+    /// <summary>The occasion it is offered at, and where that is - a Boli's location is its occasion's.</summary>
+    string? OccasionTitle = null,
+    Guid? LocalityId = null,
+    Guid? CityId = null,
+    string? Venue = null);
+
+/// <summary>
+/// One bid as an administrator sees it: who, how much and when (2026-10-24).
+/// Members' bid history never names a bidder; this shape exists only behind
+/// <c>Boli.Manage</c>, so the Samaaj's managers can see who bid and when.
+/// </summary>
+public sealed record BidLedgerEntry(Guid Id, Guid MemberId, long Amount, DateTimeOffset PlacedAt);
 
 /// <summary>
 /// One row of the wireframe's bid history: an amount and a time.
@@ -110,4 +128,9 @@ public sealed record BoliResultResponse(
     bool WinnerIsMe,
     bool IsPublished,
     DateTimeOffset RecordedAt,
-    DateTimeOffset? PublishedAt);
+    DateTimeOffset? PublishedAt,
+
+    /// <summary>The occasion, and where it is - so a list of results can be filtered by place.</summary>
+    Guid? OccasionId = null,
+    Guid? LocalityId = null,
+    Guid? CityId = null);

@@ -144,7 +144,7 @@ interface NavGroup {
             Making it impossible to forget which Samaaj you are acting on is
             the least the panel can do about that.
           -->
-          <p class="notice" role="status">
+          <p class="notice warn" role="status">
             Acting on <b>{{ acting.name }}</b> ({{ acting.slug }}). Every request you make is
             recorded against your account in that Samaaj's audit log.
             <button class="btn link" type="button" (click)="scope.clear()">

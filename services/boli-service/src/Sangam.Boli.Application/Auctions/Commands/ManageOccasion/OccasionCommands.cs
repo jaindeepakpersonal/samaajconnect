@@ -15,7 +15,8 @@ namespace Sangam.Boli.Application.Auctions.Commands.ManageOccasion;
 /// </summary>
 [RequiresPermission(PermissionKeys.BoliManage)]
 public sealed record UpdateOccasionCommand(
-    Guid OccasionId, string Title, string? Description, DateOnly OccasionDate, Guid? LocalityId)
+    Guid OccasionId, string Title, string? Description, DateOnly OccasionDate, Guid? LocalityId,
+    string? Venue = null, Guid? CityId = null)
     : ICommand<OccasionResponse>;
 
 public sealed class UpdateOccasionCommandValidator : AbstractValidator<UpdateOccasionCommand>
@@ -25,6 +26,7 @@ public sealed class UpdateOccasionCommandValidator : AbstractValidator<UpdateOcc
         RuleFor(x => x.OccasionId).NotEmpty();
         RuleFor(x => x.Title).NotEmpty().MaximumLength(200);
         RuleFor(x => x.Description).MaximumLength(2000);
+        RuleFor(x => x.Venue).MaximumLength(300);
         RuleFor(x => x.OccasionDate).NotEqual(default(DateOnly));
     }
 }
@@ -55,7 +57,8 @@ public sealed class UpdateOccasionCommandHandler(
         }
 
         if (!occasion.Update(
-                command.Title, command.Description, command.OccasionDate, command.LocalityId, actorId, clock.UtcNow))
+                command.Title, command.Description, command.OccasionDate, command.LocalityId, actorId, clock.UtcNow,
+                command.Venue, command.CityId))
         {
             return Result.Failure<OccasionResponse>(Error.Conflict(
                 "Occasion.Closed", "This occasion is closed and its results announced, so it can no longer be edited."));
@@ -83,7 +86,8 @@ public sealed class UpdateOccasionCommandHandler(
 /// </remarks>
 [RequiresPermission(PermissionKeys.BoliManage)]
 public sealed record CreateOccasionCommand(
-    string Title, string? Description, DateOnly OccasionDate, Guid? LocalityId = null)
+    string Title, string? Description, DateOnly OccasionDate, Guid? LocalityId = null,
+    string? Venue = null, Guid? CityId = null)
     : ICommand<OccasionResponse>;
 
 public sealed class CreateOccasionCommandValidator : AbstractValidator<CreateOccasionCommand>
@@ -92,6 +96,7 @@ public sealed class CreateOccasionCommandValidator : AbstractValidator<CreateOcc
     {
         RuleFor(x => x.Title).NotEmpty().MaximumLength(200);
         RuleFor(x => x.Description).MaximumLength(2000);
+        RuleFor(x => x.Venue).MaximumLength(300);
         RuleFor(x => x.OccasionDate).NotEqual(default(DateOnly));
     }
 }
@@ -114,7 +119,7 @@ public sealed class CreateOccasionCommandHandler(
 
         var occasion = BoliOccasion.Create(
             tenantId, command.Title, command.Description, command.OccasionDate, clock.UtcNow,
-            command.LocalityId);
+            command.LocalityId, command.Venue, command.CityId);
 
         occasions.Add(occasion);
 

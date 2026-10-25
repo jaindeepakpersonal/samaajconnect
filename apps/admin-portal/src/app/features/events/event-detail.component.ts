@@ -102,7 +102,7 @@ import { LocalityOptions } from '../../core/locality-options';
       </div>
 
       @if (subject.status === 'Cancelled') {
-        <p class="notice">
+        <p class="notice warn">
           This event is off.
           @if (subject.cancellationReason) {
             {{ subject.cancellationReason }}
@@ -398,7 +398,7 @@ import { LocalityOptions } from '../../core/locality-options';
                   </div>
 
                   @if (endsBeforeItStarts()) {
-                    <p class="notice span-all" role="alert">An event cannot end before it starts.</p>
+                    <p class="notice warn span-all" role="alert">An event cannot end before it starts.</p>
                   }
 
                   <div class="field">
@@ -495,7 +495,7 @@ import { LocalityOptions } from '../../core/locality-options';
                 </div>
 
                 @if (dateOutsideEvent(subject)) {
-                  <p class="notice span-all" role="alert">
+                  <p class="notice warn span-all" role="alert">
                     A programme has to fall on one of the event's own days: {{ dayRange(subject) }}.
                     @if (!subject.endAt) {
                       Give the event an end date to schedule more days.
@@ -504,7 +504,7 @@ import { LocalityOptions } from '../../core/locality-options';
                 }
 
                 @if (endsBeforeStart()) {
-                  <p class="notice span-all" role="alert">A programme cannot end before it starts.</p>
+                  <p class="notice warn span-all" role="alert">A programme cannot end before it starts.</p>
                 }
               </div>
 

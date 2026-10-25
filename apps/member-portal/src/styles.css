@@ -216,23 +216,45 @@ label {
   margin-left: 2px;
 }
 
+/* Messages, one palette in both apps (2026-10-24): green says something
+   worked, amber asks for care before going on, red says something failed, and
+   anything else is plain information. The two apps share no stylesheet, so this
+   block is the same text in each, colours spelled out rather than tokens, and
+   it must stay that way. Every variant sets its text colour as well as its
+   background, so a state is never carried by hue alone; each pair clears 4.5:1. */
 .notice {
   padding: var(--space-3);
   border-radius: 9px;
   margin: var(--space-3) 0;
   font-size: 14px;
+  background: var(--panel);
+  border: 1px solid var(--line);
+  color: var(--ink);
+}
+
+.notice.info,
+.notice.plain {
+  background: var(--panel);
+  border-color: var(--line);
+  color: var(--ink);
+}
+
+.notice.ok {
+  background: #dff5e3;
+  border-color: #b7e2c3;
+  color: #1c6b36;
+}
+
+.notice.warn {
+  background: #fff7dd;
+  border-color: #f0d889;
+  color: #7a5800;
 }
 
 .notice.error {
-  background: var(--danger-soft);
-  border: 1px solid #f0b5b5;
-  color: var(--danger);
-}
-
-.notice.info {
-  background: var(--warn-soft);
-  border: 1px solid var(--warn-line);
-  color: var(--warn-ink);
+  background: #ffe1e1;
+  border-color: #f0b5b5;
+  color: #a12b2b;
 }
 
 .pill {

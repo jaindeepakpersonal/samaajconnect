@@ -94,6 +94,7 @@ public sealed class UpdateBiodataCommandValidator : AbstractValidator<UpdateBiod
 
 public sealed class UpdateBiodataCommandHandler(
     IBiodataRepository biodata,
+    IEligibilityRepository eligibility,
     IUnitOfWork unitOfWork,
     ICurrentUser currentUser,
     ITenantContext tenantContext,
@@ -114,6 +115,11 @@ public sealed class UpdateBiodataCommandHandler(
         {
             return Result.Failure<MyBiodataResponse>(
                 Error.NotFound("Biodata.NotFound", "You have not opted into matrimony yet."));
+        }
+
+        if (!await MatrimonyEligibilityRules.IsEligibleAsync(eligibility, memberId, cancellationToken))
+        {
+            return Result.Failure<MyBiodataResponse>(MatrimonyEligibilityRules.NotEligible);
         }
 
         if (tenantContext.TenantId is { } tenantId && profile.TenantId != tenantId)

@@ -68,4 +68,7 @@ public sealed record MyProfileResponse(
     FieldPrivacyResponse Privacy,
     bool IsListedInDirectory,
     DateTimeOffset CreatedAt,
-    DateTimeOffset? UpdatedAt);
+    DateTimeOffset? UpdatedAt,
+
+    /// <summary>Unmarried, Married or Divorced; null until the member says. Their own view only.</summary>
+    string? MaritalStatus = null);

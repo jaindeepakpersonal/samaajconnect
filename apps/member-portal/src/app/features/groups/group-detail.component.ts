@@ -729,7 +729,7 @@ import {
                   <h3 class="section-heading">{{ election.status === 'Published' ? 'Result' : 'Ballot' }}</h3>
 
                   @if (voteNote(election, found.group, approvedCandidates(detail).length); as note) {
-                    <p class="notice info" role="status">{{ note }}</p>
+                    <p class="notice ok" role="status">{{ note }}</p>
                   }
 
                   @if (approvedCandidates(detail).length === 0) {

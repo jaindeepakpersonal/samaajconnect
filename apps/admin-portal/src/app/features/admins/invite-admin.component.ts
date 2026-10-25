@@ -85,7 +85,7 @@ const AREA_ADMIN = 'AreaAdmin';
           <h2>Their one-time code</h2>
           <p class="code">{{ result.activationCode }}</p>
 
-          <p class="notice">
+          <p class="notice warn">
             <b>This is the only time the code is shown.</b> Only its hash is stored, so it cannot be
             looked up again — give it to {{ result.fullName }} in person or by a channel you trust.
             It expires {{ result.codeExpiresAt | date: 'd MMM y, HH:mm' }}, and five wrong attempts

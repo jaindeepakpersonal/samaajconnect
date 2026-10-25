@@ -1,6 +1,8 @@
 import { Component, OnInit, inject, signal } from '@angular/core';
 import { ActivatedRoute, RouterLink } from '@angular/router';
 import { closesIn, describeError, formatRupees } from '@samaajconnect/shared';
+import { MasterDataApi } from '../members/master-data.api';
+import { City, Locality } from '../members/members.models';
 import { BoliApi } from './boli.api';
 import { Boli, OccasionDetail, OccasionStatusLabels } from './boli.models';
 
@@ -33,6 +35,10 @@ import { Boli, OccasionDetail, OccasionStatusLabels } from './boli.models';
           <span class="pill" [class]="pillClass(found.status)">{{ stage(found.status) }}</span>
           {{ date(found.occasionDate) }}
         </p>
+
+        @if (whereOf(found); as where) {
+          <p class="small place">{{ where }}</p>
+        }
 
         @if (found.description; as description) {
           <p>{{ description }}</p>
@@ -96,12 +102,28 @@ import { Boli, OccasionDetail, OccasionStatusLabels } from './boli.models';
 export class OccasionComponent implements OnInit {
   private readonly api = inject(BoliApi);
   private readonly route = inject(ActivatedRoute);
+  private readonly masterData = inject(MasterDataApi);
+
+  readonly cities = signal<readonly City[]>([]);
+  readonly localities = signal<readonly Locality[]>([]);
+
+  /** "Shri Mahavir Mandir · Hiran Magri, Udaipur" - where the occasion is held (2026-10-24). */
+  whereOf(found: OccasionDetail): string | null {
+    const locality = this.localities().find((l) => l.id === found.localityId);
+    const city = this.cities().find((c) => c.id === (found.cityId ?? locality?.cityId));
+    const area = [locality?.name, city?.name].filter((part): part is string => !!part).join(', ');
+    const parts = [found.venue, area].filter((part): part is string => !!part && part.trim().length > 0);
+
+    return parts.length > 0 ? parts.join(' · ') : null;
+  }
 
   readonly occasion = signal<OccasionDetail | null>(null);
   readonly loading = signal(true);
   readonly error = signal<string | null>(null);
 
   ngOnInit(): void {
+    this.masterData.listCities().subscribe({ next: (found) => this.cities.set(found), error: () => {} });
+    this.masterData.listLocalities().subscribe({ next: (found) => this.localities.set(found), error: () => {} });
     this.load();
   }
 

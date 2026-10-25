@@ -102,7 +102,7 @@ import { Biodata, Diet, DietLabels } from './matrimony.models';
           <p class="notice error" role="alert">{{ message }}</p>
         }
         @if (proposalSent()) {
-          <p class="notice info" role="status">Your proposal has been sent.</p>
+          <p class="notice ok" role="status">Your proposal has been sent.</p>
         } @else {
           <div class="card">
             <h2>Send a proposal</h2>

@@ -2,7 +2,7 @@ import { AfterViewInit, Component, ElementRef, OnInit, ViewChild, inject, input,
 import { FormsModule } from '@angular/forms';
 import { describeError } from '@samaajconnect/shared';
 import { AdminApi } from '../../core/admin-api';
-import { Occasion } from '../../core/admin.models';
+import { City, Occasion } from '../../core/admin.models';
 import { LocalityOptions } from '../../core/locality-options';
 import { blankToNull, modalKeydown } from '../../core/modal-keys';
 
@@ -49,6 +49,18 @@ import { blankToNull, modalKeydown } from '../../core/modal-keys';
           <input id="occasion-date" class="input inline" type="date" name="occasionDate"
             [(ngModel)]="occasionDate" />
 
+          <label for="occasion-venue">Venue</label>
+          <input id="occasion-venue" class="input" name="venue" [(ngModel)]="venue"
+            maxlength="300" placeholder="Shri Mahavir Mandir" />
+
+          <label for="occasion-city">City or village</label>
+          <select id="occasion-city" class="input" name="city" [(ngModel)]="cityId">
+            <option value="">Not specified</option>
+            @for (city of cities(); track city.id) {
+              <option [value]="city.id">{{ city.name }}</option>
+            }
+          </select>
+
           <label for="occasion-locality">Locality</label>
           <select id="occasion-locality" class="input" name="locality" [(ngModel)]="localityId">
             <option value="">Whole Samaaj</option>
@@ -94,10 +106,16 @@ export class OccasionDialogComponent implements OnInit, AfterViewInit {
   description = '';
   occasionDate = '';
   localityId = '';
+  venue = '';
+  cityId = '';
+
+  /** Every active city or village, for where it is held. */
+  readonly cities = signal<readonly City[]>([]);
 
   @ViewChild('firstField') private readonly firstFieldRef?: ElementRef<HTMLInputElement>;
 
   ngOnInit(): void {
+    this.api.listCities().subscribe({ next: (found) => this.cities.set(found), error: () => {} });
     this.localities.load();
 
     const existing = this.occasion();
@@ -107,6 +125,8 @@ export class OccasionDialogComponent implements OnInit, AfterViewInit {
       this.description = existing.description ?? '';
       this.occasionDate = existing.occasionDate;
       this.localityId = existing.localityId ?? '';
+      this.venue = existing.venue ?? '';
+      this.cityId = existing.cityId ?? '';
     }
   }
 
@@ -133,8 +153,10 @@ export class OccasionDialogComponent implements OnInit, AfterViewInit {
     const localityId = this.localityId || null;
 
     const work = existing
-      ? this.api.updateOccasion(existing.id, title, description, this.occasionDate, localityId)
-      : this.api.createOccasion(title, description, this.occasionDate, localityId);
+      ? this.api.updateOccasion(
+          existing.id, title, description, this.occasionDate, localityId, blankToNull(this.venue), this.cityId || null)
+      : this.api.createOccasion(
+          title, description, this.occasionDate, localityId, blankToNull(this.venue), this.cityId || null);
 
     this.busy.set(true);
     this.error.set(null);

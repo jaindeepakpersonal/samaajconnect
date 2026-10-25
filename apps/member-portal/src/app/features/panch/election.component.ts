@@ -135,7 +135,7 @@ import { Candidate, Election, ElectionDetail, ElectionResult, stageLabel } from 
             }
 
             @if (nominateMessage(); as message) {
-              <p class="notice info" role="status">{{ message }}</p>
+              <p class="notice ok" role="status">{{ message }}</p>
             }
 
             <div class="actions">
@@ -166,7 +166,7 @@ import { Candidate, Election, ElectionDetail, ElectionResult, stageLabel } from 
           }
 
           @if (canVote(found.election)) {
-            <p class="notice info" role="status">
+            <p class="notice warn" role="status">
               Choose up to {{ found.election.seats }} candidates. Your ballot is final once cast.
               <strong>{{ picked().length }} of {{ found.election.seats }} chosen.</strong>
             </p>

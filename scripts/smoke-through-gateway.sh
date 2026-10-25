@@ -3720,6 +3720,39 @@ echo "Matrimony: an opt-in, a search, a proposal, a response"
 # Wrapped in a function for the same reason boli_checks is: a missing id can
 # return rather than exit, so one broken extraction here does not blame the
 # sections that run after it.
+# Sets the caller's own marital status and waits for matrimony-service to call
+# them eligible. PATCH /v1/members/{id} replaces the profile whole, so the body
+# is the member's own /me with only maritalStatus changed - nothing else about
+# them moves because the matrimony section ran.
+set_marital_status() {
+  local token=$1 marital=$2 me id body eligibility
+
+  me=$(curl -s -H "Authorization: Bearer $token" "$GATEWAY/v1/members/me")
+  id=$(printf '%s' "$me" | json_field id)
+  body=$(printf '%s' "$me" | sed -E "s/\"maritalStatus\":(null|\"[A-Za-z]*\")/\"maritalStatus\":\"$marital\"/")
+
+  check "a member sets their marital status to $marital" 200 \
+    "$(status -X PATCH "$GATEWAY/v1/members/$id" -H 'Content-Type: application/json' \
+       -H "Authorization: Bearer $token" -d "$body")"
+
+  # Up to a minute: the first change creates its topic, and the consumer
+  # notices a new topic on its 30-second metadata refresh.
+  for _ in $(seq 1 60); do
+    eligibility=$(curl -s -H "Authorization: Bearer $token" "$GATEWAY/v1/matrimony/eligibility/me" | json_field status)
+    [ "$eligibility" = "Eligible" ] && break
+    sleep 1
+  done
+
+  if [ "$eligibility" = "Eligible" ]; then
+    echo "  ok    and matrimony-service hears of it, without a call between them"
+    pass=$((pass + 1))
+  else
+    echo "  FAIL  eligibility never reached matrimony-service (last '$eligibility')"
+    fail=$((fail + 1))
+    return 1
+  fi
+}
+
 matrimony_checks() {
 
   check "switching the matrimony module on" 200 \
@@ -3745,6 +3778,19 @@ matrimony_checks() {
 
   check "nobody has opted in yet, so it reads as 204" 204 \
     "$(status -H "Authorization: Bearer $MEMBER_TOKEN" "$GATEWAY/v1/matrimony/biodata/me")"
+
+  # A biodata is only for a member My Profile says is Unmarried or Divorced,
+  # and one who has never said is not one. matrimony-service hears it from
+  # member-family-service's event, so a status set here is eligible a moment
+  # later, not on the response.
+  check "a member with no marital status may not opt in" 409 \
+    "$(status -X POST "$GATEWAY/v1/matrimony/biodata/me/opt-in" \
+       -H 'Content-Type: application/json' -H "Authorization: Bearer $MEMBER_TOKEN" \
+       -d "{\"fullName\":\"Smoke Member\",\"gender\":\"Male\",\"dateOfBirth\":\"1995-04-02\",
+            \"consentGiven\":true,\"noticeVersion\":\"$NOTICE_VERSION\"}")"
+
+  set_marital_status "$MEMBER_TOKEN" Unmarried || return 1
+  set_marital_status "$CHILD_TOKEN" Divorced || return 1
 
   check "opting in without consent is refused" 400 \
     "$(status -X POST "$GATEWAY/v1/matrimony/biodata/me/opt-in" \

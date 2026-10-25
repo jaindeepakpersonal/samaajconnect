@@ -181,6 +181,7 @@ checking no endpoint file mentions the type.
 | `CreateAccountForConvertedChildCommand` | identity-tenant | An approved adult-child conversion |
 | `EraseBusinessesDataCommand` | businesses | `identity.user.erased.v1` |
 | `EraseMatrimonyDataCommand` | matrimony | `identity.user.erased.v1` |
+| `RecordMaritalStatusCommand` | matrimony | `members.marital-status.changed.v1` - eligibility only, never the status |
 
 ## Permission key naming convention
 

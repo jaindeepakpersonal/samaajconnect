@@ -36,6 +36,12 @@ public sealed class UpdateProfileCommandValidator : AbstractValidator<UpdateProf
             RuleFor(x => x.TemporaryAddress!.Line).MaximumLength(500);
         });
 
+        RuleFor(x => x.MaritalStatus)
+            .Must(value => Enum.TryParse<MaritalStatus>(value, ignoreCase: true, out var parsed)
+                && Enum.IsDefined(parsed))
+            .WithMessage($"Marital status must be one of: {string.Join(", ", Enum.GetNames<MaritalStatus>())}.")
+            .When(x => !string.IsNullOrWhiteSpace(x.MaritalStatus));
+
         RuleFor(x => x.Gender)
             .Must(value => Enum.TryParse<Gender>(value, ignoreCase: true, out _))
             .WithMessage($"Gender must be one of: {string.Join(", ", Enum.GetNames<Gender>())}.")

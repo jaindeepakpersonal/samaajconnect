@@ -81,7 +81,34 @@ public sealed class MatrimonyApiFactory : WebApplicationFactory<Program>, IAsync
         var dbContext = scope.ServiceProvider.GetRequiredService<MatrimonyDbContext>();
 
         await dbContext.Database.ExecuteSqlRawAsync(
-            "TRUNCATE TABLE proposals, biodata_profiles, outbox_messages RESTART IDENTITY CASCADE;");
+            "TRUNCATE TABLE proposals, biodata_profiles, matrimony_eligibility, outbox_messages RESTART IDENTITY CASCADE;");
+    }
+
+    /// <summary>
+    /// Records a member's marital-status change the way the Kafka consumer
+    /// does - through `RecordMaritalStatusCommand` - so a test can make
+    /// somebody eligible, or not, without a broker.
+    /// </summary>
+    public async Task SetEligibleAsync(Guid memberId, Guid tenantId, bool eligible, DateTimeOffset? at = null)
+    {
+        var payload = System.Text.Json.JsonSerializer.Serialize(new
+        {
+            memberId,
+            tenantId,
+            eligibleForMatrimony = eligible,
+            changedBy = memberId,
+            occurredAt = at ?? DateTimeOffset.UtcNow,
+        });
+
+        var result = await SendAsync(new Sangam.Matrimony.Application.IntegrationEvents.Commands.RecordMaritalStatus
+            .RecordMaritalStatusCommand(new Sangam.Matrimony.Application.IntegrationEvents.IntegrationEventEnvelope(
+                Guid.NewGuid(), tenantId, "members.marital-status.changed.v1", "MemberMaritalStatusChangedDomainEvent",
+                payload, DateTimeOffset.UtcNow)));
+
+        if (!result.IsSuccess)
+        {
+            throw new InvalidOperationException($"Recording eligibility failed: {result.Error.Code}");
+        }
     }
 
     public async Task<T> WithDbContextAsync<T>(Func<MatrimonyDbContext, Task<T>> action)

@@ -13,7 +13,7 @@ worked example of a cross-service flow with no synchronous call.
 
 | Entity | Status | Notes |
 |---|---|---|
-| `MemberProfile` | built | Tenant-scoped. Its `Id` **is** the user id from identity-tenant-service. Carries `GautraId`/`ProfessionId`/`QualificationId` (master-data-service ids) and a `PermanentAddress`/`TemporaryAddress` pair (`ProfileAddress`: line, city id, locality id) — see the address/Gautra/Qualification decision note and the Profession note below. |
+| `MemberProfile` | built | Tenant-scoped. Its `Id` **is** the user id from identity-tenant-service. Carries `GautraId`/`ProfessionId`/`QualificationId` (master-data-service ids) and a `PermanentAddress`/`TemporaryAddress` pair (`ProfileAddress`: line, city id, locality id) — see the address/Gautra/Qualification decision note and the Profession note below. `MaritalStatus` (Unmarried, Married, Divorced; nullable) since 2026-10-24. |
 | `Family` | built | Household, joined by quoting a family code. |
 | `FamilyMember` | built | Membership or a pending request; carries the relationship. |
 | `ChildProfile` | built | No login of its own; the family manages the record. |
@@ -69,6 +69,7 @@ worked example of a cross-service flow with no synchronous call.
 | Event | Topic | Raised by |
 |---|---|---|
 | `MemberProfileUpdatedDomainEvent` | `members.profile.updated.v1` | `MemberProfile.Update` |
+| `MemberMaritalStatusChangedDomainEvent` | `members.marital-status.changed.v1` | `MemberProfile.SetMaritalStatus`, only on a change. Carries whether the member may hold a matrimony biodata - never the status |
 | `FamilyCreatedDomainEvent` | `members.family.created.v1` | `Family.Create` |
 | `FamilyHeadChangedDomainEvent` | `members.family.head-changed.v1` | `Family.SetHead` |
 | `ChildConversionApprovedDomainEvent` | `members.child-conversion.approved.v1` | `ChildConversionRequest.Approve` |
@@ -120,6 +121,17 @@ here, which looks exactly like a broker problem and is not one.
 | GET | `/health` | anonymous |
 
 ## Decisions worth knowing before you change this service
+
+**Marital status is the member's own, and only its consequence leaves the
+service (2026-10-24).** `UpdateProfileCommand` takes an optional
+`MaritalStatus` - Unmarried, Married or Divorced, or null for "prefer not to
+say" - and `GetMyProfileQuery` returns it. Nobody else reads it: the directory
+response does not carry it and an administrator's correction cannot set it.
+What matrimony-service needs is whether a biodata is allowed, so that is all
+`members.marital-status.changed.v1` says (`EligibleForMatrimony`, true for
+Unmarried and Divorced - `MaritalStatusRules`), raised only when the status
+actually changes. A status nobody has set raises nothing, and matrimony reads
+the absence as not eligible.
 
 **An Area Admin sees and corrects only their own locality's members, added
 2026-09-26.** identity-tenant-service puts the restriction on the token as

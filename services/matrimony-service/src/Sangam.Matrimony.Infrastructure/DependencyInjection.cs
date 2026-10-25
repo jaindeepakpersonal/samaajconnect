@@ -32,6 +32,7 @@ public static class DependencyInjection
 
         services.AddScoped<IUnitOfWork, UnitOfWork>();
         services.AddScoped<IBiodataRepository, BiodataRepository>();
+        services.AddScoped<IEligibilityRepository, EligibilityRepository>();
         services.AddScoped<IProposalRepository, ProposalRepository>();
         services.AddSingleton<IDateTimeProvider, SystemDateTimeProvider>();
 

@@ -148,7 +148,7 @@ const PHONE = /^\+?[0-9 ()-]{7,20}$/;
                 }
 
                 @if (enrolMessage()[pathshala.id]; as message) {
-                  <p class="notice info" role="status">{{ message }}</p>
+                  <p class="notice ok" role="status">{{ message }}</p>
                 }
 
                 <div class="actions">

@@ -40,7 +40,11 @@ public sealed record UpdateProfileCommand(
     // than partial. Defaulting it to true would quietly put a member who had
     // taken themselves out of the directory back into it, which is the exact
     // failure the privacy rule below it exists to prevent.
-    bool? IsListedInDirectory) : ICommand<MyProfileResponse>;
+    bool? IsListedInDirectory,
+    // Unmarried, Married or Divorced; null for "not saying". It replaces with
+    // the rest of the profile, so omitting it clears it - the member portal
+    // always sends it.
+    string? MaritalStatus = null) : ICommand<MyProfileResponse>;
 
 public sealed record PrivacySettings(
     string Mobile,

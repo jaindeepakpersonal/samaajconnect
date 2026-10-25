@@ -25,7 +25,20 @@ public sealed class MatrimonyEndpointsTests(MatrimonyApiFactory factory)
     private static readonly Guid Meera = Guid.NewGuid();
     private static readonly Guid Neha = Guid.NewGuid();
 
-    public Task InitializeAsync() => factory.ResetDatabaseAsync();
+    /// <summary>
+    /// Every member here starts unmarried as far as matrimony knows, because
+    /// opting in is refused otherwise; the eligibility tests change that.
+    /// </summary>
+    public async Task InitializeAsync()
+    {
+        await factory.ResetDatabaseAsync();
+
+        foreach (var member in new[] { Ravi, Meera, Neha })
+        {
+            await factory.SetEligibleAsync(member, TenantA, eligible: true, at: DateTimeOffset.UtcNow.AddDays(-1));
+            await factory.SetEligibleAsync(member, TenantB, eligible: true, at: DateTimeOffset.UtcNow.AddDays(-1));
+        }
+    }
 
     public Task DisposeAsync() => Task.CompletedTask;
 
@@ -383,5 +396,86 @@ public sealed class MatrimonyEndpointsTests(MatrimonyApiFactory factory)
         // Meera's own received-proposal history survives the other party's erasure.
         var received = await Member(Meera).GetFromJsonAsync<JsonElement>("/v1/matrimony/proposals/received");
         received.EnumerateArray().Should().ContainSingle();
+    }
+
+    // ---- Eligibility: unmarried or divorced only (2026-10-24) -------------
+
+    private static readonly Guid Kiran = Guid.NewGuid();
+
+    [Fact]
+    public async Task A_member_who_has_not_set_their_marital_status_cannot_opt_in_and_is_told_why()
+    {
+        var eligibility = await Member(Kiran).GetFromJsonAsync<JsonElement>("/v1/matrimony/eligibility/me");
+        eligibility.GetProperty("status").GetString().Should().Be("Unknown");
+
+        var response = await Member(Kiran).PostAsJsonAsync("/v1/matrimony/biodata/me/opt-in", OptInBody());
+
+        response.StatusCode.Should().Be(HttpStatusCode.Conflict);
+        (await response.Content.ReadAsStringAsync()).Should().Contain("unmarried or divorced");
+    }
+
+    [Fact]
+    public async Task A_married_member_cannot_opt_in()
+    {
+        await factory.SetEligibleAsync(Kiran, TenantA, eligible: false);
+
+        (await Member(Kiran).GetFromJsonAsync<JsonElement>("/v1/matrimony/eligibility/me"))
+            .GetProperty("status").GetString().Should().Be("NotEligible");
+        (await Member(Kiran).PostAsJsonAsync("/v1/matrimony/biodata/me/opt-in", OptInBody()))
+            .StatusCode.Should().Be(HttpStatusCode.Conflict);
+    }
+
+    [Fact]
+    public async Task Marrying_takes_a_biodata_out_of_search_and_off_offer_but_leaves_it_to_its_owner()
+    {
+        await OptInAsync(Ravi, fullName: "Ravi Shah", gender: "Male");
+        await OptInAsync(Meera, fullName: "Meera Shah", gender: "Female");
+
+        await factory.SetEligibleAsync(Meera, TenantA, eligible: false);
+
+        var results = await Member(Ravi).GetFromJsonAsync<JsonElement>("/v1/matrimony/biodata/search");
+        results.EnumerateArray().Select(r => r.GetProperty("fullName").GetString()).Should().NotContain("Meera Shah");
+
+        (await Member(Ravi).GetAsync($"/v1/matrimony/biodata/{Meera}"))
+            .StatusCode.Should().Be(HttpStatusCode.NotFound, "the same answer as a withdrawn biodata");
+
+        // Hers to see, and not to edit while she is not eligible.
+        (await Member(Meera).GetAsync("/v1/matrimony/biodata/me")).StatusCode.Should().Be(HttpStatusCode.OK);
+        (await Member(Meera).PatchAsJsonAsync("/v1/matrimony/biodata/me", OptInBody("Meera Shah", "Female")))
+            .StatusCode.Should().Be(HttpStatusCode.Conflict);
+
+        // Divorced is eligible again, and she is back.
+        await factory.SetEligibleAsync(Meera, TenantA, eligible: true);
+
+        results = await Member(Ravi).GetFromJsonAsync<JsonElement>("/v1/matrimony/biodata/search");
+        results.EnumerateArray().Select(r => r.GetProperty("fullName").GetString()).Should().Contain("Meera Shah");
+    }
+
+    [Fact]
+    public async Task An_older_marital_status_change_never_overwrites_a_newer_one()
+    {
+        var now = DateTimeOffset.UtcNow;
+
+        await factory.SetEligibleAsync(Kiran, TenantA, eligible: false, at: now);
+        await factory.SetEligibleAsync(Kiran, TenantA, eligible: true, at: now.AddMinutes(-5));
+
+        (await Member(Kiran).GetFromJsonAsync<JsonElement>("/v1/matrimony/eligibility/me"))
+            .GetProperty("status").GetString().Should().Be("NotEligible", "the later change stands");
+    }
+
+    [Fact]
+    public async Task Erasure_takes_the_eligibility_record_with_the_biodata()
+    {
+        await OptInAsync(Ravi);
+
+        var envelope = new IntegrationEventEnvelope(
+            Guid.NewGuid(), TenantA, "identity.user.erased.v1", "UserErasedDomainEvent",
+            $$"""{"userId":"{{Ravi}}","tenantId":"{{TenantA}}"}""", DateTimeOffset.UtcNow);
+
+        (await factory.SendAsync(new EraseMatrimonyDataCommand(envelope))).IsSuccess.Should().BeTrue();
+
+        var left = await factory.WithDbContextAsync(db =>
+            db.Eligibility.IgnoreQueryFilters().CountAsync(e => e.MemberId == Ravi && e.TenantId == TenantA));
+        left.Should().Be(0);
     }
 }

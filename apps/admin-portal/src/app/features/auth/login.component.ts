@@ -51,7 +51,7 @@ const ADMIN_ROLES = [
         <p class="sub">Administrator access to the platform.</p>
 
         @if (sessionExpired()) {
-          <p class="notice" role="status">Your session ended. Please sign in again.</p>
+          <p class="notice warn" role="status">Your session ended. Please sign in again.</p>
         }
 
         @if (flow.step() === 'password') {

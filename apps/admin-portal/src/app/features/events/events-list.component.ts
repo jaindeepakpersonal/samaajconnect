@@ -181,7 +181,7 @@ import { ALL_LOCALITIES, LocalityFilterComponent, matchesLocality } from '../../
                       </div>
 
                       @if (cancelling() === event.id) {
-                        <div class="notice" role="status">
+                        <div class="notice warn" role="status">
                           <label [attr.for]="'reason-' + event.id">
                             Why is <b>{{ event.title }}</b> off?
                           </label>

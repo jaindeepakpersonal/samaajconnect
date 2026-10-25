@@ -294,8 +294,11 @@ public sealed class MemberEndpointsTests(MemberFamilyApiFactory factory)
     {
         // Asking for another locality is allowed - it is the member directory -
         // but the private fields stay private.
+        // Narrowed to this test's own member by name: the class shares one
+        // database, every test seeds a Pune member, and a page holds twenty.
         var directory = await AreaAdminClient(TenantA, UdaipurLocalityId)
-            .GetFromJsonAsync<JsonElement>("/v1/members?localityId=" + PuneLocalityId);
+            .GetFromJsonAsync<JsonElement>(
+                "/v1/members?localityId=" + PuneLocalityId + "&term=" + Uri.EscapeDataString(Named("Pune Member")));
 
         var pune = directory.GetProperty("items").EnumerateArray()
             .Single(m => m.GetProperty("id").GetGuid() == _puneMember);
@@ -388,6 +391,53 @@ public sealed class MemberEndpointsTests(MemberFamilyApiFactory factory)
 
         body.GetProperty("fullName").GetString().Should().Be(Named("Ravi K Shah"));
         body.GetProperty("privacy").GetProperty("mobile").GetString().Should().Be("Private");
+    }
+
+    [Fact]
+    public async Task A_member_sets_their_marital_status_and_only_its_matrimony_eligibility_is_announced()
+    {
+        object Body(string? maritalStatus) => new
+        {
+            fullName = Named("Ravi Shah"),
+            permanentAddress = BlankAddress(),
+            privacy = PrivacyAll("Private"),
+            isListedInDirectory = true,
+            maritalStatus,
+        };
+
+        var response = await MemberClient(_ravi, TenantA).PatchAsJsonAsync("/v1/members/" + _ravi, Body("Divorced"));
+
+        response.StatusCode.Should().Be(HttpStatusCode.OK);
+        (await response.Content.ReadFromJsonAsync<JsonElement>()).GetProperty("maritalStatus").GetString()
+            .Should().Be("Divorced");
+
+        // Saving the same status again says nothing new.
+        (await MemberClient(_ravi, TenantA).PatchAsJsonAsync("/v1/members/" + _ravi, Body("Divorced")))
+            .StatusCode.Should().Be(HttpStatusCode.OK);
+
+        await using (var scope = factory.Services.CreateAsyncScope())
+        {
+            var db = scope.ServiceProvider.GetRequiredService<MemberFamilyDbContext>();
+            // The payload column is jsonb, so the match on its text happens here.
+            var announced = (await db.OutboxMessages
+                    .Where(m => m.Topic == "members.marital-status.changed.v1")
+                    .Select(m => m.Payload)
+                    .ToListAsync())
+                .Where(payload => payload.Contains(_ravi.ToString()))
+                .ToList();
+
+            announced.Should().ContainSingle();
+            JsonDocument.Parse(announced[0]).RootElement.GetProperty("eligibleForMatrimony").GetBoolean().Should().BeTrue();
+            announced[0].Should().NotContain("Divorced",
+                "the payload is kept forever; whether they may keep a biodata is all it needs to say");
+        }
+
+        // Theirs alone: another member's view of them does not carry it.
+        var seen = await MemberClient(_meera, TenantA).GetFromJsonAsync<JsonElement>("/v1/members/" + _ravi);
+        seen.TryGetProperty("maritalStatus", out _).Should().BeFalse();
+
+        (await MemberClient(_ravi, TenantA).PatchAsJsonAsync("/v1/members/" + _ravi, Body("Widowed")))
+            .StatusCode.Should().Be(HttpStatusCode.BadRequest);
     }
 
     [Fact]

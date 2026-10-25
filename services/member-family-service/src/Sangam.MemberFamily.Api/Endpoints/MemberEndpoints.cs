@@ -129,7 +129,8 @@ public static class MemberEndpoints
                     request.PermanentAddress,
                     request.TemporaryAddress,
                     request.Privacy,
-                    request.IsListedInDirectory);
+                    request.IsListedInDirectory,
+                    request.MaritalStatus);
 
                 var result = await sender.Send(command, cancellationToken);
 
@@ -195,7 +196,8 @@ public static class MemberEndpoints
         ProfileAddressInput PermanentAddress,
         ProfileAddressInput? TemporaryAddress,
         PrivacySettings Privacy,
-        bool? IsListedInDirectory);
+        bool? IsListedInDirectory,
+        string? MaritalStatus = null);
 
     /// <summary>
     /// The same factual fields, and deliberately no privacy ones.

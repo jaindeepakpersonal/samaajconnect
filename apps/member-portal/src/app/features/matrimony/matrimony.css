@@ -107,3 +107,16 @@
 .tabs button:hover:not(.on) {
   color: var(--ink);
 }
+
+/* A card's title with its Edit beside it. */
+.section-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: var(--space-3);
+  flex-wrap: wrap;
+}
+
+.section-head h2 {
+  margin: 0;
+}

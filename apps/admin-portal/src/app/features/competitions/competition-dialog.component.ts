@@ -81,7 +81,7 @@ import { blankToNull, modalKeydown } from '../../core/modal-keys';
           </div>
 
           @if (windowInvalid()) {
-            <p class="notice" role="alert">Registration cannot close before it opens.</p>
+            <p class="notice warn" role="alert">Registration cannot close before it opens.</p>
           }
 
           @if (!competition()) {

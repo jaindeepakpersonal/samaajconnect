@@ -49,6 +49,13 @@ public sealed class MemberProfile : AggregateRoot, ITenantScopedEntity
     public Guid? QualificationId { get; private set; }
 
     /// <summary>
+    /// As the member gives it on My Profile; null until they do. Shown to them
+    /// alone - no directory response carries it - and what matrimony-service
+    /// decides biodata eligibility from (<see cref="SetMaritalStatus"/>).
+    /// </summary>
+    public MaritalStatus? MaritalStatus { get; private set; }
+
+    /// <summary>
     /// Always present - <see cref="ProfileAddress.Empty"/> until the member
     /// sets one, never null. See <see cref="ProfileAddress"/>.
     /// </summary>
@@ -230,6 +237,28 @@ public sealed class MemberProfile : AggregateRoot, ITenantScopedEntity
             Id, TenantId, FullName, [nameof(PhotoImageId)], updatedBy, updatedAt));
 
         return previous;
+    }
+
+    /// <summary>
+    /// Records the member's marital status. False, and nothing raised, when it is
+    /// what they already said. A change raises
+    /// <see cref="MemberMaritalStatusChangedDomainEvent"/>, which carries whether
+    /// they may keep a matrimony biodata and not the status itself.
+    /// </summary>
+    public bool SetMaritalStatus(MaritalStatus? status, Guid changedBy, DateTimeOffset now)
+    {
+        if (MaritalStatus == status)
+        {
+            return false;
+        }
+
+        MaritalStatus = status;
+        UpdatedAt = now;
+
+        Raise(new MemberMaritalStatusChangedDomainEvent(
+            Id, TenantId, MaritalStatusRules.IsEligibleForMatrimony(status), changedBy, now));
+
+        return true;
     }
 
     public void Update(

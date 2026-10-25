@@ -18,7 +18,10 @@ public sealed class BiodataRepository(MatrimonyDbContext dbContext) : IBiodataRe
     {
         var query = dbContext.BiodataProfiles
             .AsNoTracking()
-            .Where(p => p.IsActive && p.Id != filters.ExcludeMemberId);
+            .Where(p => p.IsActive && p.Id != filters.ExcludeMemberId)
+            // Only members who may keep a biodata: unmarried or divorced, as
+            // their own profile says (MatrimonyEligibility).
+            .Where(p => dbContext.Eligibility.Any(e => e.MemberId == p.Id && e.IsEligible));
 
         if (filters.Gender is { } gender)
         {

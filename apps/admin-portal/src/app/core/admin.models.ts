@@ -554,6 +554,10 @@ export interface Occasion {
 
   /** Null for a Samaaj-wide occasion. */
   readonly localityId: string | null;
+
+  /** Where it is held, in the manager's words, and the city or village (2026-10-24). */
+  readonly venue?: string | null;
+  readonly cityId?: string | null;
 }
 
 /** Mirrors `BoliTypeResponse`. Nobody bids on a type; it is a label reused. */
@@ -593,8 +597,36 @@ export interface OccasionDetail {
   readonly description: string | null;
   readonly occasionDate: string;
   readonly status: OccasionStatus;
+  readonly localityId?: string | null;
+  readonly venue?: string | null;
+  readonly cityId?: string | null;
   readonly types: readonly BoliType[];
   readonly boli: readonly Boli[];
+}
+
+/**
+ * Mirrors `BidLedgerEntry` - one bid with who placed it, for `Boli.Manage`
+ * only (2026-10-24). Members' bid history never names a bidder.
+ */
+export interface BidLedgerEntry {
+  readonly id: string;
+  readonly memberId: string;
+  readonly amount: number;
+  readonly placedAt: string;
+}
+
+/**
+ * Mirrors `BoliResultResponse`. `winningMemberId` is null until the result is
+ * published, for everybody - the manager who recorded it included.
+ */
+export interface BoliResultView {
+  readonly boliId: string;
+  readonly boliTitle: string;
+  readonly amount: number;
+  readonly winningMemberId: string | null;
+  readonly isPublished: boolean;
+  readonly recordedAt: string;
+  readonly publishedAt: string | null;
 }
 
 /**

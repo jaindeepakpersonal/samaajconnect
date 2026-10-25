@@ -65,6 +65,28 @@ import { ALL_LOCALITIES, LocalityFilterComponent, matchesLocality } from '../../
     } @else if (loading()) {
       <p class="empty" role="status">Loading…</p>
     } @else {
+      <div class="tabs" role="tablist" aria-label="Auctions">
+        @for (item of tabs; track item.value) {
+          <button
+            type="button"
+            role="tab"
+            [id]="'boli-tab-' + item.value"
+            [class.on]="tab() === item.value"
+            [attr.aria-selected]="tab() === item.value"
+            aria-controls="boli-tab-panel"
+            (click)="tab.set(item.value)"
+          >
+            {{ item.label }}
+            @if (item.value === 'pending' && pending().length > 0) {
+              ({{ pending().length }})
+            }
+          </button>
+        }
+      </div>
+
+      <div id="boli-tab-panel" role="tabpanel" [attr.aria-labelledby]="'boli-tab-' + tab()">
+      @switch (tab()) {
+      @case ('pending') {
       <!-- Awaiting publication ------------------------------------------- -->
       <div class="card">
         <h2>Results awaiting publication</h2>
@@ -118,7 +140,7 @@ import { ALL_LOCALITIES, LocalityFilterComponent, matchesLocality } from '../../
                       </button>
 
                       @if (confirming() === result.boliId) {
-                        <div class="notice" role="status">
+                        <div class="notice warn" role="status">
                           <p>
                             Publishing {{ rupees(result.amount) }} for
                             <b>{{ result.boliTitle }}</b> announces the highest bidder as the
@@ -143,9 +165,10 @@ import { ALL_LOCALITIES, LocalityFilterComponent, matchesLocality } from '../../
           </div>
         }
       </div>
-
+      }
+      @default {
       <!-- Occasions ------------------------------------------------------ -->
-      <div class="card spaced">
+      <div class="card">
         <h2>Occasions</h2>
 
         <app-locality-filter [(value)]="localityFilter" inputId="occasions-locality" />
@@ -164,7 +187,7 @@ import { ALL_LOCALITIES, LocalityFilterComponent, matchesLocality } from '../../
             <table>
               <caption class="sr-only">Boli occasions</caption>
               <thead>
-                <tr><th>Occasion</th><th>Locality</th><th>Date</th><th>Status</th><th>Types</th><th>Boli</th><th></th></tr>
+                <tr><th>Occasion</th><th>Where</th><th>Date</th><th>Status</th><th>Types</th><th>Boli</th><th></th></tr>
               </thead>
               <tbody>
                 @for (occasion of shownOccasions(); track occasion.id) {
@@ -172,7 +195,12 @@ import { ALL_LOCALITIES, LocalityFilterComponent, matchesLocality } from '../../
                     <td>
                       <a [routerLink]="['/boli', occasion.id]"><b>{{ occasion.title }}</b></a>
                     </td>
-                    <td>{{ localities.label(occasion.localityId) }}</td>
+                    <td>
+                      {{ localities.label(occasion.localityId) }}
+                      @if (occasion.venue) {
+                        <div class="muted">{{ occasion.venue }}</div>
+                      }
+                    </td>
                     <td>{{ occasion.occasionDate }}</td>
                     <td>{{ occasion.status }}</td>
                     <td>{{ occasion.typeCount }}</td>
@@ -191,6 +219,9 @@ import { ALL_LOCALITIES, LocalityFilterComponent, matchesLocality } from '../../
           </div>
         }
 
+      </div>
+      }
+      }
       </div>
     }
 
@@ -225,6 +256,14 @@ import { ALL_LOCALITIES, LocalityFilterComponent, matchesLocality } from '../../
 })
 export class BoliListComponent implements OnInit {
   private readonly api = inject(AdminApi);
+
+  readonly tabs: readonly { value: BoliListTab; label: string }[] = [
+    { value: 'occasions', label: 'Occasions' },
+    { value: 'pending', label: 'Awaiting publication' },
+  ];
+
+  /** Occasions first - running one is what this screen is opened for most. */
+  readonly tab = signal<BoliListTab>('occasions');
 
   readonly scope = inject(AdminScope);
 
@@ -382,3 +421,4 @@ export class BoliListComponent implements OnInit {
   }
 }
 
+type BoliListTab = 'occasions' | 'pending';

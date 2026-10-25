@@ -38,6 +38,16 @@ public sealed class BoliOccasion : AggregateRoot, ITenantScopedEntity
     /// </summary>
     public Guid? LocalityId { get; private set; }
 
+    /// <summary>
+    /// Where it is held, in the manager's own words - "Shri Mahavir Mandir".
+    /// The city or village and the locality are the master-data picks beside it
+    /// (2026-10-24). A tag for members to find it by, like the locality.
+    /// </summary>
+    public string? Venue { get; private set; }
+
+    /// <summary>The city or village, a master-data-service id. Null when not given.</summary>
+    public Guid? CityId { get; private set; }
+
     public string Title { get; private set; } = null!;
     public string? Description { get; private set; }
 
@@ -57,7 +67,9 @@ public sealed class BoliOccasion : AggregateRoot, ITenantScopedEntity
         string? description,
         DateOnly occasionDate,
         DateTimeOffset now,
-        Guid? localityId = null)
+        Guid? localityId = null,
+        string? venue = null,
+        Guid? cityId = null)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(title);
 
@@ -66,6 +78,8 @@ public sealed class BoliOccasion : AggregateRoot, ITenantScopedEntity
             Id = Guid.NewGuid(),
             TenantId = tenantId,
             LocalityId = localityId,
+            Venue = string.IsNullOrWhiteSpace(venue) ? null : venue.Trim(),
+            CityId = cityId,
             Title = title.Trim(),
             Description = string.IsNullOrWhiteSpace(description) ? null : description.Trim(),
             OccasionDate = occasionDate,
@@ -95,7 +109,9 @@ public sealed class BoliOccasion : AggregateRoot, ITenantScopedEntity
         DateOnly occasionDate,
         Guid? localityId,
         Guid updatedBy,
-        DateTimeOffset now)
+        DateTimeOffset now,
+        string? venue = null,
+        Guid? cityId = null)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(title);
 
@@ -108,6 +124,8 @@ public sealed class BoliOccasion : AggregateRoot, ITenantScopedEntity
         Description = string.IsNullOrWhiteSpace(description) ? null : description.Trim();
         OccasionDate = occasionDate;
         LocalityId = localityId;
+        Venue = string.IsNullOrWhiteSpace(venue) ? null : venue.Trim();
+        CityId = cityId;
 
         Raise(new OccasionUpdatedDomainEvent(Id, TenantId, updatedBy, now));
 

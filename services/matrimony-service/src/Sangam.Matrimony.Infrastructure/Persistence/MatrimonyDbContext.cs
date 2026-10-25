@@ -21,6 +21,8 @@ public sealed class MatrimonyDbContext(
 
     public DbSet<OutboxMessage> OutboxMessages => Set<OutboxMessage>();
 
+    public DbSet<MatrimonyEligibility> Eligibility => Set<MatrimonyEligibility>();
+
     /// <summary>
     /// Backing value for the global tenant query filter. Public because the
     /// filter expression reads it off this context instance, and EF

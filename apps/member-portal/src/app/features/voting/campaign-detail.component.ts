@@ -166,7 +166,7 @@ import { Campaign, CampaignDetail, CampaignResult, Candidate, stageLabel } from 
             }
 
             @if (nominateMessage(); as message) {
-              <p class="notice info" role="status">{{ message }}</p>
+              <p class="notice ok" role="status">{{ message }}</p>
             }
 
             <div class="actions">

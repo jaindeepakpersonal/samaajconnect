@@ -36,26 +36,26 @@ import { AuthService, LoginResult, SignInFlow, describeError } from '@samaajconn
         <p class="subtitle">Common login automatically routes you to your registered Samaaj.</p>
 
         @if (sessionExpired()) {
-          <p class="notice info" role="status">Your session ended. Please sign in again.</p>
+          <p class="notice warn" role="status">Your session ended. Please sign in again.</p>
         }
 
         @if (otherSamaaj()) {
-          <p class="notice info" role="status">
+          <p class="notice warn" role="status">
             That link belongs to a different Samaaj from the one you were signed in
             to. Please sign in again.
           </p>
         }
 
         @if (justActivated()) {
-          <p class="notice info" role="status">Your password is set. Sign in to continue.</p>
+          <p class="notice ok" role="status">Your password is set. Sign in to continue.</p>
         }
 
         @if (justReset()) {
-          <p class="notice info" role="status">Your password has been reset. Sign in to continue.</p>
+          <p class="notice ok" role="status">Your password has been reset. Sign in to continue.</p>
         }
 
         @if (justRegistered()) {
-          <p class="notice info" role="status">
+          <p class="notice ok" role="status">
             Your account is ready. Sign in to continue - the first time, we send a code to your
             mobile or email to confirm it is you.
           </p>

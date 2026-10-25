@@ -35,7 +35,7 @@ import { Business, BusinessFields } from './businesses.models';
       }
 
       @if (done(); as message) {
-        <p class="notice info" role="status">{{ message }}</p>
+        <p class="notice ok" role="status">{{ message }}</p>
       }
 
       @if (loading()) {

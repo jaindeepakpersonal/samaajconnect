@@ -17,7 +17,7 @@ highest". Read "The guarantee" before changing anything under `Bid`.
 
 | Entity | Notes |
 |---|---|
-| `BoliOccasion` | Aggregate root. Title, date, status, `LocalityId` (nullable). Owns its `BoliType`s and **not** its Boli |
+| `BoliOccasion` | Aggregate root. Title, date, status, and where it is held: `LocalityId`, `CityId` (both nullable) and `Venue` (free text, up to 300). Owns its `BoliType`s and **not** its Boli |
 | `BoliType` | A label a Samaaj reuses — "Mangal Deep", "Swapna". Nobody bids on a type |
 | `Boli` | Aggregate root. One item being bid for: window, floor, increment, status. Owns **no** bids |
 | `Bid` | One offer. Written directly, outside the aggregate. Never amended or deleted |
@@ -27,8 +27,8 @@ highest". Read "The guarantee" before changing anything under `Bid`.
 
 | Command | Permission | Notes |
 |---|---|---|
-| `CreateOccasionCommand` | `Boli.Manage` | Starts `Upcoming`. Takes an optional `LocalityId` |
-| `UpdateOccasionCommand` | `Boli.Manage` | Corrects title, description, date and locality until the occasion closes; 409 after, when results have been announced against it |
+| `CreateOccasionCommand` | `Boli.Manage` | Starts `Upcoming`. Takes an optional `LocalityId`, `CityId` and `Venue` |
+| `UpdateOccasionCommand` | `Boli.Manage` | Corrects title, description, date, locality, city and venue until the occasion closes; 409 after, when results have been announced against it |
 | `DefineBoliTypeCommand` | `Boli.Manage` | One name per occasion, case-insensitively |
 | `MoveOccasionCommand` | `Boli.Manage` | Upcoming → Active → Closed. Never backwards |
 | `OpenBoliCommand` | `Boli.Manage` | Creates it `Scheduled` and starts it. Takes the anti-sniping window |
@@ -41,13 +41,14 @@ highest". Read "The guarantee" before changing anything under `Bid`.
 
 | Query | Permission | Notes |
 |---|---|---|
-| `ListOccasionsQuery` | `Members.Read` | Newest first. Optional `?localityId=` narrows to one locality |
+| `ListOccasionsQuery` | `Members.Read` | Newest first. Optional `?localityId=` and `?cityId=` narrow to one place |
 | `GetOccasionQuery` | `Members.Read` | Types and the Boli under it, each with its live highest |
-| `GetActiveBoliQuery` | `Members.Read` | Only those actually taking bids — status *and* clock. Optional `?localityId=` narrows to one locality's occasions |
+| `GetActiveBoliQuery` | `Members.Read` | Only those actually taking bids — status *and* clock. Optional `?localityId=` and `?cityId=` narrow to one place's occasions. Each Boli carries its occasion's title and place |
 | `GetBoliQuery` | `Members.Read` | One Boli, its highest, and the minimum next bid |
 | `GetBidHistoryQuery` | `Members.Read` | Amounts and times. Never who bid |
+| `GetBidLedgerQuery` | `Boli.Manage` | Every bid with who placed it and when, highest first - the organiser's record. See below |
 | `GetBoliResultQuery` | `Members.Read` | 404 until recorded; no winner named until published |
-| `GetPublishedResultsQuery` | `Members.Read` | Everything announced, newest first |
+| `GetPublishedResultsQuery` | `Members.Read` | Everything announced, newest first, each with its occasion and place, and the winner by member id |
 | `ListPendingResultsQuery` | `Boli.PublishResults` | Recorded and not yet announced, oldest first |
 
 ## Events published
@@ -129,6 +130,26 @@ nullable and additive: every occasion that existed before this field, and
 every one a Samaaj chooses to create without picking a locality, keeps
 running exactly as before — a Samaaj too small to split by locality has no
 reason to ever set it.
+
+**Who bid is the organiser's to see, and nobody else's (2026-10-24).**
+`GetBidLedgerQuery` (`GET /v1/boli/boli/{id}/bids/ledger`) is the bid history
+with the member id on every row, behind `Boli.Manage` - a Samaaj has to be able
+to answer "who bid, and when" when a result is questioned, and the admin panel
+shows it in each Boli's popup with names resolved there. `GetBidHistoryQuery`
+is unchanged: a member still sees amounts, times and which bids are theirs,
+because naming rivals while bidding is open is exactly what the record-then-
+publish split exists to prevent. The winner, once announced, is named to every
+member - `BoliResultResponse.WinningMemberId` was already that - and both
+portals now show the name.
+
+**Where an occasion is held is three loose fields (2026-10-24).** `Venue` is the
+manager's own words ("Shri Mahavir Mandir"); `CityId` and `LocalityId` are
+master-data ids, with no referential integrity, the same as `LocalityId` above.
+A Boli takes its occasion's place - it has none of its own - so `BoliResponse`
+and `BoliResultResponse` copy it from the occasion when they are built, and
+`?cityId=` on the occasion list and the active list filters on the occasion.
+All three are nullable and additive, so every occasion before them reads as held
+"in the whole Samaaj", which is what it was.
 
 **A Boli should not be won by arriving last.** Without an auto-extend
 window, whoever bids a second before the close takes it — not because
@@ -264,6 +285,9 @@ path that must stay fast exactly when it is busiest. The highest is a
   non-breaking (an occasion created without one behaves exactly as before)
   and that both `ListOccasionsQuery` and `GetActiveBoliQuery` filter
   correctly when a locality is given and return everything when it is not.
+  `BidLedgerAndPlaceTests` holds that the ledger names bidders only for
+  `Boli.Manage`, that the member history still names nobody, and that the
+  venue and city round-trip and filter.
 - `scripts/smoke-through-gateway.sh` runs the same walk through YARP.
   **This service had no gateway coverage at all until the admin screens
   were built**, which root `CLAUDE.md` §9 asks for on every service — the

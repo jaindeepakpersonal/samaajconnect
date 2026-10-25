@@ -19,6 +19,7 @@ tenant query filter like any other service.
 |---|---|---|
 | `BiodataProfile` | built | Tenant-scoped. `Id` **is** the member's own id — "has this member opted in?" is a primary-key check, the same convention `MemberProfile` itself uses. |
 | `Proposal` | built | Tenant-scoped. A peer-to-peer fact between two `BiodataProfile`s, not owned by either one. |
+| `MatrimonyEligibility` | built | Tenant-scoped, keyed `(TenantId, MemberId)`. Whether My Profile's marital status allows a biodata, fed by member-family-service's event - see "Who may hold a biodata" below. |
 
 `BiodataProfile`'s starting values (name, DOB, Gautra, profession,
 qualification, city, locality) are supplied by the caller at opt-in time,
@@ -104,6 +105,7 @@ command's own precedent of role-only gating for a purely self-scoped write.
 | `RespondToProposalCommand` | role list above, recipient only | built |
 | `WithdrawProposalCommand` | role list above, sender only | built |
 | `EraseMatrimonyDataCommand` | `[InternalRequest]` | built |
+| `RecordMaritalStatusCommand` | `[InternalRequest]` | built. Upserts `MatrimonyEligibility` from `members.marital-status.changed.v1`, applying only a change newer than the one held |
 
 `SendProposalCommand` refuses a new proposal while a `Pending` or `Accepted`
 one already exists between the same two members, in either direction — the
@@ -128,6 +130,7 @@ mirroring volunteer-groups-service's own list/get queries' use of it.
 | `SearchBiodataQuery` | `Members.Read` | built |
 | `ListSentProposalsQuery` | `Members.Read` | built |
 | `ListReceivedProposalsQuery` | `Members.Read` | built |
+| `GetMyMatrimonyEligibilityQuery` | `Members.Read` | built. `Eligible`, `NotEligible` or `Unknown` - so the screen can say why before offering a form |
 
 `GetMyBiodataQuery` returns the caller's own biodata whether active or not,
 so a withdrawn member can still see and reactivate it — reads as 204, not
@@ -166,6 +169,31 @@ the same as "which row this is about".
 already-announced erasure (`identity.user.erased.v1`), not a new fact worth
 its own audit row.
 
+## Who may hold a biodata
+
+**Only a member whose My Profile says Unmarried or Divorced (2026-10-24).**
+Marital status lives in member-family-service; this service keeps
+`MatrimonyEligibility`, a yes/no per member fed by
+`members.marital-status.changed.v1`, which carries the eligibility and never
+the status itself - matrimony has no use for "Married" beyond "no", and a copy
+of the status here would be a second place to erase it from. Opting in and
+updating answer 409 `Matrimony.NotEligible` without it; `GetBiodataQuery`
+answers 404 for a member who is not eligible, and `SearchBiodataQuery` leaves
+them out, so a member who marries drops out of search the moment My Profile
+says so. Their own biodata stays readable to them, unedited and unshown.
+
+**No row is not eligible.** A member who has never set a marital status is
+`Unknown`, and Unknown is refused like NotEligible - so every biodata created
+before this rule is hidden until its owner sets their status. That is
+deliberate: the alternative is showing a married member's biodata because the
+platform had not asked.
+
+**It is a projection, not a call** - the "no synchronous call to
+member-family-service" rule below holds. Kafka can deliver late or twice;
+`MatrimonyEligibility.Apply` ignores a change older than the one held, so a
+redelivered Married cannot undo a later Divorced. Erasure removes the row with
+the biodata.
+
 ## Events consumed
 
 **`identity.user.erased.v1`** — a member's full account erasure takes their
@@ -181,9 +209,14 @@ delivery: nothing found returns success rather than an error, matching
 `CreateProfileForNewUserCommandHandler`'s own "unusable payload → log a
 warning and succeed, never retry to exhaustion" precedent.
 
+**`members.marital-status.changed.v1`** — `RecordMaritalStatusCommand`
+records whether the member may hold a biodata; see "Who may hold a biodata"
+above. The consumer is subscribed to exactly these two topics and sends
+each to its own command.
+
 No `[InternalRequest]`-gated synchronous endpoint exists anywhere in this
 service — the only cross-service data flow is member-portal's client-
-supplied opt-in payload, plus this one Kafka consumer.
+supplied opt-in payload, plus these two Kafka topics.
 
 ## API endpoints
 
@@ -191,6 +224,7 @@ supplied opt-in payload, plus this one Kafka consumer.
 |---|---|---|
 | GET | `/v1/matrimony/consent-notice` | `Members.Read` |
 | GET | `/v1/matrimony/biodata/me` | `Members.Read` |
+| GET | `/v1/matrimony/eligibility/me` | `Members.Read` |
 | POST | `/v1/matrimony/biodata/me/opt-in` | role list above |
 | PATCH | `/v1/matrimony/biodata/me` | role list above |
 | DELETE | `/v1/matrimony/biodata/me/consent` | role list above |
@@ -233,7 +267,7 @@ other services; see their own `CLAUDE.md`s.
 
 - **Postgres** `samaajconnect_matrimony` — `ConnectionStrings__Default`
 - **Kafka** — `Kafka__BootstrapServers`, producer and consumer
-  (`identity.user.erased.v1`)
+  (`identity.user.erased.v1`, `members.marital-status.changed.v1`)
 - **Jwt** — `Jwt__SigningKey`, validation only. This service never mints
   tokens.
 - No Redis dependency.

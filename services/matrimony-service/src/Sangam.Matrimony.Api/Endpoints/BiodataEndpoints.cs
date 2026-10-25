@@ -7,6 +7,7 @@ using Sangam.Matrimony.Application.Biodata.Commands.WithdrawMatrimonyConsent;
 using Sangam.Matrimony.Application.Biodata.Queries.GetBiodata;
 using Sangam.Matrimony.Application.Biodata.Queries.GetMatrimonyConsentNotice;
 using Sangam.Matrimony.Application.Biodata.Queries.GetMyBiodata;
+using Sangam.Matrimony.Application.Biodata.Queries.GetMyEligibility;
 using Sangam.Matrimony.Application.Biodata.Queries.SearchBiodata;
 
 namespace Sangam.Matrimony.Api.Endpoints;
@@ -31,6 +32,14 @@ public static class BiodataEndpoints
             .WithName("GetMatrimonyConsentNotice")
             .WithSummary("What a member is shown before opting into matrimony search.")
             .Produces<MatrimonyConsentNoticeResponse>()
+            .ProducesProblem(StatusCodes.Status401Unauthorized);
+
+        group.MapGet("/eligibility/me", async (ISender sender, CancellationToken cancellationToken) =>
+                (await sender.Send(new GetMyMatrimonyEligibilityQuery(), cancellationToken)).ToApiResult())
+            .RequireAuthorization()
+            .WithName("GetMyMatrimonyEligibility")
+            .WithSummary("Whether the caller may keep a biodata: Eligible, NotEligible, or Unknown until their marital status is set.")
+            .Produces<MatrimonyEligibilityResponse>()
             .ProducesProblem(StatusCodes.Status401Unauthorized);
 
         group.MapGet("/biodata/me", async (ISender sender, CancellationToken cancellationToken) =>

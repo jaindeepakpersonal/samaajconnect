@@ -24,8 +24,8 @@ screen. The spec is `docs/product/wireframes/admin-panel-wireframes.html`.
 | Pathshala detail | `/pathshala/:id` | — | built; no wireframe covers running one. Nine tabs: sessions, classes, teachers, students (with the placement queue), exams, progress report, attendance, donations, announcements |
 | Class detail | `/pathshala/:id/classes/:classId` | — | built. Five tabs - Register (first), Roll, Exams and results, Timetable, Teachers (picked from the Pathshala's teacher records) - with assigning a teacher, adding a slot and setting an exam in popups. The Pathshala page's own session, class, donation and announcement forms are popups too |
 | Notifications | `/notifications` | `#notifications` | built — compose and recent, without the Audience and Channel dropdowns |
-| Auctions / Boli | `/boli` | `#boli` + `#publishboli` | built. Occasions - announced and corrected (until closed) in a popup, with a locality - and the publication queue with its confirmation |
-| Occasion detail | `/boli/:id` | — | built; no wireframe covers running an auction. Types, opening a Boli, closing, recording |
+| Auctions / Boli | `/boli` | `#boli` + `#publishboli` | built. Two tabs - Occasions (announced and corrected until closed in a popup, with a locality, city and venue) and Awaiting publication (the queue with its confirmation) |
+| Occasion detail | `/boli/:id` | — | built; no wireframe covers running an auction. Two tabs, Boli and Types; defining a type and opening a Boli are popups, and each Boli opens a popup with everything entered, every bid by name and time, and the result - the winner with their photo, mobile and email once announced |
 | Events | `/events` | `#events` | built. Drafts and published together, create, publish, cancel |
 | Event detail | `/events/:id` | — | built; no wireframe covers one. A page: a photo cover (or a calendar leaf), tabs - About, Schedule, Going (who is going, who is waiting, and in what order) - and Edit, one popup for the details and the photo |
 | Celebrities / Voting | `/voting` | `#celebrity` | built. Campaigns, setting one up, and editing one (a modal, until voting opens) |
@@ -482,6 +482,15 @@ already carries everything that screen showed and there is no endpoint that
 reads a single pending result — so a separate route would have had to fetch the
 whole queue to draw one row of it.
 
+**Who bid, and when, is on each Boli's popup (2026-10-24).** `Details` on a
+row opens what was entered when it was opened, the bids from
+`GET /v1/boli/boli/{id}/bids/ledger` (`Boli.Manage`) with each bidder's name
+resolved once per member, and the result. Before it is announced the popup says
+who it will go to - the highest bidder, which is all recording ever reads -
+and once announced it names the winner with the contact details an organiser
+needs to collect. Members never see the ledger; their bid history is amounts
+and times.
+
 **A 403 from the queue is not an empty queue.** `Boli.PublishResults` is a
 separate permission from `Boli.Manage`, so a manager who may run an auction but
 not announce its result gets told the queue belongs to somebody else. Telling
@@ -494,6 +503,15 @@ portal's Boli feature until this screen needed to type an amount; a type or a
 function moves to the shared library when a second app needs it, not in
 anticipation. Amounts are integer paise on the wire, and `parseRupees` rounds
 rather than truncating — a detail that is worth exactly one implementation.
+
+**Messages are one palette in both apps (2026-10-24).** Green (`.notice.ok`)
+says something worked, amber (`.notice.warn`) asks for care before going on - a
+confirmation, a refusal the member can act on, being outbid - and red
+(`.notice.error`, with `role="alert"`) says something failed. Anything else is
+plain information (`.notice`, `.notice.info`): neutral, not coloured. The block
+in each app's `styles.css` is the same text, colours spelled out, because the
+two apps share no stylesheet; change one and change the other. Every variant
+sets its text colour as well as its background, so a state is never hue alone.
 
 **`isNotFound` had three copies before it had one home.** It now lives in
 `core/http-status.ts` alongside `isForbidden`. A duplicated predicate is

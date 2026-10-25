@@ -15,6 +15,7 @@ public sealed class ConsumerOptions
     public string[] Topics { get; set; } =
     [
         "identity.user.erased.v1",
+        "members.marital-status.changed.v1",
     ];
 
     /// <summary>

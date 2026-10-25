@@ -291,6 +291,14 @@ public static class KnownEvents
             ActorIdProperty: "updatedBy",
             BeforeProperties: ["changedFields"]),
 
+        // Carries whether the member may keep a matrimony biodata, never the
+        // status itself - a payload kept verbatim forever has no need of it.
+        ["members.marital-status.changed.v1"] = new(
+            Action: "MemberMaritalStatusChanged",
+            EntityName: "MemberProfile",
+            EntityIdProperty: "memberId",
+            ActorIdProperty: "changedBy"),
+
         ["identity.tenant.modules-changed.v1"] = new(
             Action: "TenantModulesChanged",
             EntityName: "Tenant",

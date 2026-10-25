@@ -110,7 +110,7 @@ import { isNotFound } from '../../core/http-status';
           </button>
 
           @if (confirmingPublish()) {
-            <div class="notice" role="status">
+            <div class="notice warn" role="status">
               <p>
                 This freezes the Top {{ subject.topN }} as it stands and announces it. It cannot
                 be undone or recomputed.

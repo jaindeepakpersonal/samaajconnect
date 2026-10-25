@@ -47,6 +47,7 @@ public sealed class MemberProfileConfiguration : IEntityTypeConfiguration<Member
             .ValueGeneratedNever();
 
         builder.Property(p => p.Gender).HasConversion<string>().HasMaxLength(20).IsRequired();
+        builder.Property(p => p.MaritalStatus).HasConversion<string>().HasMaxLength(20);
 
         // Owned rather than a table of its own: six levels that only ever
         // travel with their profile.

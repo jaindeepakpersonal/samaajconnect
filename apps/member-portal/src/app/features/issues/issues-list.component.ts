@@ -186,7 +186,7 @@ type IssuesTab = 'community' | 'raise' | 'mine' | 'panch';
             }
 
             @if (justSubmitted()) {
-              <p class="notice info span-all" role="status">
+              <p class="notice ok span-all" role="status">
                 {{
                   submittedAsDraft()
                     ? 'Saved as a draft. Only you can see it until you submit it.'

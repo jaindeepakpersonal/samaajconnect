@@ -126,6 +126,7 @@ public sealed class OptIntoMatrimonyCommandValidator : AbstractValidator<OptInto
 
 public sealed class OptIntoMatrimonyCommandHandler(
     IBiodataRepository biodata,
+    IEligibilityRepository eligibility,
     IUnitOfWork unitOfWork,
     ICurrentUser currentUser,
     ITenantContext tenantContext,
@@ -145,6 +146,11 @@ public sealed class OptIntoMatrimonyCommandHandler(
         {
             return Result.Failure<MyBiodataResponse>(Error.Forbidden(
                 "Biodata.NoSamaaj", "Select a Samaaj before opting into matrimony."));
+        }
+
+        if (!await MatrimonyEligibilityRules.IsEligibleAsync(eligibility, memberId, cancellationToken))
+        {
+            return Result.Failure<MyBiodataResponse>(MatrimonyEligibilityRules.NotEligible);
         }
 
         var fields = ToFields(command);

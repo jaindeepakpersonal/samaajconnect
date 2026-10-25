@@ -8,6 +8,7 @@ using Microsoft.Extensions.Options;
 using Sangam.Matrimony.Application.Common;
 using Sangam.Matrimony.Application.IntegrationEvents;
 using Sangam.Matrimony.Application.IntegrationEvents.Commands.EraseMatrimonyData;
+using Sangam.Matrimony.Application.IntegrationEvents.Commands.RecordMaritalStatus;
 
 namespace Sangam.Matrimony.Infrastructure.Messaging;
 
@@ -108,7 +109,10 @@ public sealed class IntegrationEventConsumer(
                 await using var scope = scopeFactory.CreateAsyncScope();
                 var sender = scope.ServiceProvider.GetRequiredService<ISender>();
 
-                Result outcome = await sender.Send(new EraseMatrimonyDataCommand(envelope), stoppingToken);
+                // Each topic has its own command; ConsumerOptions subscribes to no other.
+                Result outcome = envelope.Topic == "members.marital-status.changed.v1"
+                    ? await sender.Send(new RecordMaritalStatusCommand(envelope), stoppingToken)
+                    : await sender.Send(new EraseMatrimonyDataCommand(envelope), stoppingToken);
 
                 if (outcome.IsSuccess)
                 {

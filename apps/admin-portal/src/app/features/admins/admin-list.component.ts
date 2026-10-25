@@ -101,7 +101,7 @@ import { ActivationCode, AdminUser, Role } from '../../core/admin.models';
 
                   @if (issued(); as code) {
                     @if (code.userId === admin.userId) {
-                      <div class="notice" role="status">
+                      <div class="notice warn" role="status">
                         <p class="code">{{ code.code }}</p>
                         <p class="small">
                           <b>Shown once.</b> Only its hash is stored, so it cannot be looked

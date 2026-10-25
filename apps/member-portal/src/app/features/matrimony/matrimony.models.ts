@@ -79,6 +79,12 @@ export interface MyBiodata {
 }
 
 /** Shown before the opt-in form, per DPDP consent conventions (`ChildDataNotice`'s own shape). */
+/**
+ * Whether the caller may keep a biodata - matrimony is for members who are
+ * unmarried or divorced, as their own My Profile says. Unknown until they set it.
+ */
+export type MatrimonyEligibility = 'Eligible' | 'NotEligible' | 'Unknown';
+
 export interface MatrimonyConsentNotice {
   readonly version: string;
   readonly summary: string;

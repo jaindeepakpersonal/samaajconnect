@@ -29,7 +29,9 @@ public static class BoliMappings
             occasion.Status.ToString(),
             occasion.Types.Count,
             boliCount,
-            occasion.LocalityId);
+            occasion.LocalityId,
+            occasion.Venue,
+            occasion.CityId);
 
     public static BoliTypeResponse ToResponse(BoliType type) =>
         new(type.Id, type.Name, type.Description);
@@ -40,7 +42,8 @@ public static class BoliMappings
         DateTimeOffset now,
         long? highest,
         bool highestBidderIsMe,
-        int bidCount) =>
+        int bidCount,
+        BoliOccasion? occasion = null) =>
         new(
             lot.Id,
             lot.OccasionId,
@@ -58,13 +61,19 @@ public static class BoliMappings
             highest,
             lot.MinimumNextBid(highest),
             highestBidderIsMe,
-            bidCount);
+            bidCount,
+            occasion?.Title,
+            occasion?.LocalityId,
+            occasion?.CityId,
+            occasion?.Venue);
 
     public static BidResponse ToResponse(Bid bid, Guid? currentMemberId) =>
         new(bid.Id, bid.Amount, bid.PlacedAt, bid.MemberId == currentMemberId);
 
+    public static BidLedgerEntry ToLedgerEntry(Bid bid) => new(bid.Id, bid.MemberId, bid.Amount, bid.PlacedAt);
+
     public static BoliResultResponse ToResponse(
-        BoliResult result, Domain.Auctions.Boli lot, Guid? currentMemberId) =>
+        BoliResult result, Domain.Auctions.Boli lot, Guid? currentMemberId, BoliOccasion? occasion = null) =>
         new(
             lot.Id,
             lot.Title,
@@ -76,7 +85,10 @@ public static class BoliMappings
             result.WinningMemberId == currentMemberId && result.IsPublished,
             result.IsPublished,
             result.RecordedAt,
-            result.PublishedAt);
+            result.PublishedAt,
+            lot.OccasionId,
+            occasion?.LocalityId,
+            occasion?.CityId);
 
     /// <summary>
     /// Describes a Boli with its live bidding state, which needs two more reads.
@@ -101,6 +113,7 @@ public static class BoliMappings
             now,
             top?.Amount,
             top is not null && top.MemberId == currentMemberId,
-            bids.Count));
+            bids.Count,
+            occasion));
     }
 }

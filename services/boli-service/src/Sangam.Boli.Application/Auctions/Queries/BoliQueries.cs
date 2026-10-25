@@ -14,7 +14,8 @@ namespace Sangam.Boli.Application.Auctions.Queries;
 /// occasion, including Samaaj-wide ones with no locality of their own.
 /// </summary>
 [RequiresPermission(PermissionKeys.MembersRead)]
-public sealed record ListOccasionsQuery(Guid? LocalityId = null) : IQuery<IReadOnlyList<OccasionResponse>>;
+public sealed record ListOccasionsQuery(Guid? LocalityId = null, Guid? CityId = null)
+    : IQuery<IReadOnlyList<OccasionResponse>>;
 
 public sealed class ListOccasionsQueryHandler(
     IOccasionRepository occasions, IBoliRepository boli)
@@ -26,7 +27,9 @@ public sealed class ListOccasionsQueryHandler(
         var all = await occasions.ListAsync(query.LocalityId, cancellationToken);
         var responses = new List<OccasionResponse>(all.Count);
 
-        foreach (var occasion in all)
+        // A city or village narrows here: a Samaaj's occasions are few, and the
+        // repository's locality filter is the one with an index behind it.
+        foreach (var occasion in all.Where(o => query.CityId is not { } cityId || o.CityId == cityId))
         {
             var lots = await boli.ListForOccasionAsync(occasion.Id, cancellationToken);
 
@@ -76,7 +79,8 @@ public sealed class GetOccasionQueryHandler(
                 now,
                 top?.Amount,
                 top is not null && top.MemberId == me,
-                bids.Count));
+                bids.Count,
+                occasion));
         }
 
         return Result.Success(new OccasionDetailResponse(
@@ -87,7 +91,9 @@ public sealed class GetOccasionQueryHandler(
             occasion.Status.ToString(),
             occasion.LocalityId,
             [.. occasion.Types.Select(BoliMappings.ToResponse)],
-            described));
+            described,
+            occasion.Venue,
+            occasion.CityId));
     }
 }
 
@@ -99,7 +105,8 @@ public sealed class GetOccasionQueryHandler(
 /// locality; null returns every locality's, including Samaaj-wide occasions.
 /// </summary>
 [RequiresPermission(PermissionKeys.MembersRead)]
-public sealed record GetActiveBoliQuery(Guid? LocalityId = null) : IQuery<IReadOnlyList<BoliResponse>>;
+public sealed record GetActiveBoliQuery(Guid? LocalityId = null, Guid? CityId = null)
+    : IQuery<IReadOnlyList<BoliResponse>>;
 
 public sealed class GetActiveBoliQueryHandler(
     IOccasionRepository occasions,
@@ -134,6 +141,11 @@ public sealed class GetActiveBoliQueryHandler(
                 continue;
             }
 
+            if (query.CityId is { } cityId && occasion?.CityId != cityId)
+            {
+                continue;
+            }
+
             var bids = await boli.ListBidsAsync(lot.Id, cancellationToken);
             var top = bids.Count > 0 ? bids[0] : null;
 
@@ -143,7 +155,8 @@ public sealed class GetActiveBoliQueryHandler(
                 now,
                 top?.Amount,
                 top is not null && top.MemberId == me,
-                bids.Count));
+                bids.Count,
+                occasion));
         }
 
         return Result.Success<IReadOnlyList<BoliResponse>>(described);
@@ -209,6 +222,40 @@ public sealed class GetBidHistoryQueryHandler(
     }
 }
 
+/// <summary>
+/// Every bid on a Boli with who placed it and when - the Samaaj's managers'
+/// view (2026-10-24, the user's request). Highest first, like the members'
+/// history, which still never names anyone.
+/// </summary>
+/// <remarks>
+/// Behind <c>Boli.Manage</c> alone. Who is prepared to pay what is a statement
+/// about people's means, which is why members never see it; the managers who
+/// run the auction, record the result and collect the money already deal with
+/// the winner by name, and asked to see who bid.
+/// </remarks>
+[RequiresPermission(PermissionKeys.BoliManage)]
+public sealed record GetBidLedgerQuery(Guid BoliId) : IQuery<IReadOnlyList<BidLedgerEntry>>;
+
+public sealed class GetBidLedgerQueryHandler(IBoliRepository boli)
+    : IRequestHandler<GetBidLedgerQuery, Result<IReadOnlyList<BidLedgerEntry>>>
+{
+    public async Task<Result<IReadOnlyList<BidLedgerEntry>>> Handle(
+        GetBidLedgerQuery query, CancellationToken cancellationToken)
+    {
+        var lot = await boli.GetByIdAsync(query.BoliId, cancellationToken);
+
+        if (lot is null)
+        {
+            return Result.Failure<IReadOnlyList<BidLedgerEntry>>(
+                Error.NotFound("Boli.NotFound", "No such Boli in this Samaaj."));
+        }
+
+        var bids = await boli.ListBidsAsync(query.BoliId, cancellationToken);
+
+        return Result.Success<IReadOnlyList<BidLedgerEntry>>([.. bids.Select(BoliMappings.ToLedgerEntry)]);
+    }
+}
+
 // ---- Results -----------------------------------------------------------------
 
 /// <summary>
@@ -254,7 +301,7 @@ public sealed class GetBoliResultQueryHandler(
 public sealed record GetPublishedResultsQuery : IQuery<IReadOnlyList<BoliResultResponse>>;
 
 public sealed class GetPublishedResultsQueryHandler(
-    IBoliRepository boli, ICurrentUser currentUser)
+    IBoliRepository boli, IOccasionRepository occasions, ICurrentUser currentUser)
     : IRequestHandler<GetPublishedResultsQuery, Result<IReadOnlyList<BoliResultResponse>>>
 {
     public async Task<Result<IReadOnlyList<BoliResultResponse>>> Handle(
@@ -270,7 +317,8 @@ public sealed class GetPublishedResultsQueryHandler(
 
             if (lot is not null)
             {
-                responses.Add(BoliMappings.ToResponse(result, lot, me));
+                var occasion = await occasions.GetByIdAsync(lot.OccasionId, cancellationToken);
+                responses.Add(BoliMappings.ToResponse(result, lot, me, occasion));
             }
         }
 

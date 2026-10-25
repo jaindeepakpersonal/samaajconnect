@@ -2,19 +2,37 @@ import { DatePipe } from '@angular/common';
 import { Component, OnInit, computed, inject, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { ActivatedRoute, RouterLink } from '@angular/router';
-import { closesIn, describeError, formatRupees, parseRupees } from '@samaajconnect/shared';
+import { AuthedImageDirective, closesIn, describeError, formatRupees, parseRupees } from '@samaajconnect/shared';
 import { AdminApi } from '../../core/admin-api';
 import { AdminScope } from '../../core/admin-scope';
-import { Boli, OccasionDetail, OccasionStatus } from '../../core/admin.models';
+import {
+  AdminMember,
+  BidLedgerEntry,
+  Boli,
+  BoliResultView,
+  City,
+  OccasionDetail,
+  OccasionStatus,
+} from '../../core/admin.models';
 import { isNotFound } from '../../core/http-status';
+import { LocalityOptions } from '../../core/locality-options';
 
 /**
- * One occasion: its Boli types, the Boli under it, and running each one.
+ * One occasion: its Boli types, the Boli under it, and running each one -
+ * in two tabs, Boli and Types, with every form in a popup (2026-10-24).
  *
  * **The auction floor, which was curl-only.** Defining a type, opening a Boli,
  * closing it and recording who won are four of the seven Boli endpoints no
  * screen reached. Members could bid the whole time — which is to say they could
  * bid on nothing, because nothing could be opened for them to bid on.
+ *
+ * **Each Boli opens in its own popup with everything entered when it was
+ * opened** - type, window, floor, increment, the anti-sniping window, the
+ * eligibility rule - **who bid and when** (\`bidLedger\`, \`Boli.Manage\` only;
+ * members' history never names a bidder), and **the result with the winner's
+ * details** once it is announced. Until then the result names nobody, for the
+ * manager too: the highest bidder is shown as the one who will win, read from
+ * the ledger, not from the result.
  *
  * **Amounts are typed in rupees and sent as paise.** `parseRupees` from
  * `libs/shared` is the only conversion, and it rounds rather than truncating:
@@ -35,12 +53,14 @@ import { isNotFound } from '../../core/http-status';
  */
 @Component({
   selector: 'app-occasion-detail',
-  imports: [FormsModule, DatePipe, RouterLink],
+  imports: [FormsModule, DatePipe, RouterLink, AuthedImageDirective],
   template: `
     <p><a class="btn link" routerLink="/boli">← All occasions</a></p>
 
     @if (error(); as message) {
-      <p class="notice error" role="alert">{{ message }}</p>
+      @if (!popup()) {
+        <p class="notice error" role="alert">{{ message }}</p>
+      }
     }
 
     @if (done(); as message) {
@@ -52,251 +72,419 @@ import { isNotFound } from '../../core/http-status';
     } @else if (notFound()) {
       <p class="notice">No such occasion in {{ scope.label() }}.</p>
     } @else if (occasion(); as event) {
-      <h1 class="title">{{ event.title }}</h1>
-      <p class="sub">{{ event.occasionDate }} · {{ event.status }}</p>
-
-      @if (event.description) {
-        <p>{{ event.description }}</p>
-      }
-
-      <!-- Status --------------------------------------------------------- -->
       <div class="card">
-        <h2>Status</h2>
+        <div class="section-head">
+          <div>
+            <h1 class="title">{{ event.title }}</h1>
+            <p class="sub">{{ event.occasionDate }} · {{ event.status }}</p>
+            @if (whereHeld(event); as where) {
+              <p class="small">{{ where }}</p>
+            }
+          </div>
 
-        @if (nextStatus(); as next) {
-          <p class="small">
-            Upcoming → Active → Closed, and never backwards. The service refuses a step back, so
-            this is the one move available.
-          </p>
+          @if (nextStatus(); as next) {
+            <button class="btn" type="button" [disabled]="busy()" (click)="move(next)">
+              Move to {{ next }}
+            </button>
+          } @else {
+            <span class="pill off">Closed</span>
+          }
+        </div>
 
-          <button class="btn" type="button" [disabled]="busy()" (click)="move(next)">
-            Move to {{ next }}
-          </button>
+        @if (event.description) {
+          <p>{{ event.description }}</p>
+        }
+
+        @if (nextStatus()) {
+          <p class="small">Upcoming → Active → Closed, and never backwards.</p>
         } @else {
           <p class="empty">This occasion is closed. Nothing moves it further.</p>
         }
       </div>
 
-      <!-- Boli types ----------------------------------------------------- -->
-      <div class="card spaced">
-        <h2>Boli types</h2>
-
-        @if (event.types.length === 0) {
-          <p class="empty">
-            None yet. A type is a label the Samaaj reuses — "Mangal Deep", "Swapna". Nobody bids
-            on a type; a Boli is opened against one.
-          </p>
-        } @else {
-          <ul class="plain">
-            @for (type of event.types; track type.id) {
-              <li>
-                <b>{{ type.name }}</b>
-                @if (type.description) { — {{ type.description }} }
-              </li>
-            }
-          </ul>
-        }
-
-        <form (ngSubmit)="defineType()">
-          <h3 class="section-heading">Define a type</h3>
-
-          <label for="type-name">Name</label>
-          <input id="type-name" class="input" name="typeName" [(ngModel)]="typeName"
-            maxlength="120" placeholder="Mangal Deep" />
-
-          <label for="type-description">Description</label>
-          <input id="type-description" class="input" name="typeDescription"
-            [(ngModel)]="typeDescription" maxlength="500" />
-
-          <p class="small">One name per occasion, whatever the capitalisation.</p>
-
-          <button class="btn" type="submit" [disabled]="busy() || !typeName.trim()">
-            Define type
+      <div class="tabs" role="tablist" aria-label="This occasion">
+        @for (item of tabs; track item.value) {
+          <button
+            type="button"
+            role="tab"
+            [id]="'occasion-tab-' + item.value"
+            [class.on]="tab() === item.value"
+            [attr.aria-selected]="tab() === item.value"
+            aria-controls="occasion-tab-panel"
+            (click)="tab.set(item.value)"
+          >
+            {{ item.label }} ({{ item.value === 'types' ? event.types.length : event.boli.length }})
           </button>
-        </form>
+        }
       </div>
 
-      <!-- The Boli ------------------------------------------------------- -->
-      <div class="card spaced">
-        <h2>Boli</h2>
+      <div id="occasion-tab-panel" role="tabpanel" [attr.aria-labelledby]="'occasion-tab-' + tab()">
+        @switch (tab()) {
+          <!-- Types ------------------------------------------------------ -->
+          @case ('types') {
+            <div class="card">
+              <div class="section-head">
+                <h2>Boli types</h2>
+                <button class="btn small" type="button" (click)="openPopup('type')">Define a type</button>
+              </div>
 
-        @if (event.boli.length === 0) {
-          <p class="empty">None opened yet.</p>
-        } @else {
-          <div class="table-wrap">
-            <table>
-              <caption class="sr-only">Boli in this occasion</caption>
-              <thead>
-                <tr>
-                  <th>Boli</th><th>Window</th><th>Highest</th><th>Bids</th>
-                  <th>Status</th><th></th>
-                </tr>
-              </thead>
-              <tbody>
-                @for (lot of event.boli; track lot.id) {
-                  <tr>
-                    <td>
-                      <b>{{ lot.title }}</b>
-                      <div class="muted">{{ lot.boliTypeName }}</div>
-                    </td>
-                    <td>
-                      {{ lot.startAt | date: 'd MMM, h:mm a' }} —
-                      {{ lot.endAt | date: 'h:mm a' }}
-                      @if (lot.acceptsBids) {
-                        <div class="muted">{{ closes(lot.endAt) }}</div>
-                      }
-                      @if (lot.autoExtendSeconds > 0) {
-                        <!--
-                          Worth showing: a closing time that moves on its own is
-                          surprising unless the screen says it can.
-                        -->
-                        <div class="muted">
-                          A bid in the last {{ lot.autoExtendSeconds }}s pushes this out
-                        </div>
-                      }
-                    </td>
-                    <td>
-                      @if (lot.highestAmount !== null) {
-                        {{ rupees(lot.highestAmount) }}
-                      } @else {
-                        <span class="muted">No bids · floor {{ rupees(lot.startingAmount) }}</span>
-                      }
-                    </td>
-                    <td>{{ lot.bidCount }}</td>
-                    <td>
-                      {{ lot.status }}
-                      @if (lot.status === 'Open' && !lot.acceptsBids) {
-                        <div class="muted">Window has passed</div>
-                      }
-                    </td>
-                    <td>
-                      <div class="row-actions">
-                        @if (lot.status === 'Open' || lot.status === 'Scheduled') {
-                          <button class="btn small" type="button" [disabled]="busy()"
-                            (click)="close(lot)">
-                            Close
-                          </button>
-                        }
-
-                        @if (lot.status === 'Closed') {
-                          @if (lot.bidCount === 0) {
-                            <span class="muted">Nobody bid</span>
-                          } @else {
-                            <button class="btn small" type="button" [disabled]="busy()"
-                              (click)="record(lot)">
-                              Record result
-                            </button>
-                          }
-                        }
-
-                        @if (lot.status === 'ResultPublished') {
-                          <span class="muted">Announced</span>
-                        }
-                      </div>
-                    </td>
-                  </tr>
-                }
-              </tbody>
-            </table>
-          </div>
-
-          <p class="small">
-            A recorded result waits on the Auctions screen until somebody announces it. Recording
-            names nobody — the winner is read from the highest bid and appears when it is
-            published.
-          </p>
-        }
-
-        @if (event.types.length === 0) {
-          <p class="notice">
-            Define a Boli type first. A Boli is opened against one, so there is nothing to open
-            it as yet.
-          </p>
-        } @else {
-          <form (ngSubmit)="open()">
-            <h3 class="section-heading">Open a Boli</h3>
-
-            <div class="form-grid">
-              <div class="field">
-                <label for="boli-type">Type</label>
-                <select id="boli-type" class="input" name="boliType" [(ngModel)]="boliTypeId">
-                  <option value="">Choose a type…</option>
+              @if (event.types.length === 0) {
+                <p class="empty">
+                  None yet. A type is a label the Samaaj reuses — "Mangal Deep", "Swapna". Nobody
+                  bids on a type; a Boli is opened against one.
+                </p>
+              } @else {
+                <ul class="plain">
                   @for (type of event.types; track type.id) {
-                    <option [value]="type.id">{{ type.name }}</option>
+                    <li>
+                      <b>{{ type.name }}</b>
+                      @if (type.description) { — {{ type.description }} }
+                    </li>
                   }
-                </select>
+                </ul>
+              }
+            </div>
+          }
+
+          <!-- Boli ------------------------------------------------------- -->
+          @default {
+            <div class="card">
+              <div class="section-head">
+                <h2>Boli</h2>
+                @if (event.types.length > 0) {
+                  <button class="btn small" type="button" (click)="openPopup('open')">Open a Boli</button>
+                }
               </div>
 
-              <div class="field">
-                <label for="boli-title">Title</label>
-                <input id="boli-title" class="input" name="boliTitle" [(ngModel)]="boliTitle"
-                  maxlength="200" placeholder="Mangal Deep — first day" />
-              </div>
-
-              <div class="field">
-                <label for="boli-start">Opens</label>
-                <input id="boli-start" class="input" type="datetime-local" name="startAt"
-                  [(ngModel)]="startAt" />
-              </div>
-
-              <div class="field">
-                <label for="boli-end">Closes</label>
-                <input id="boli-end" class="input" type="datetime-local" name="endAt"
-                  [(ngModel)]="endAt" />
-              </div>
-
-              <div class="field">
-                <label for="boli-floor">Starting amount (₹)</label>
-                <input id="boli-floor" class="input" name="startingAmount"
-                  [(ngModel)]="startingAmount" inputmode="decimal" placeholder="1000"
-                  [attr.aria-invalid]="startingAmount && floorPaise() === null ? 'true' : null" />
-              </div>
-
-              <div class="field">
-                <label for="boli-increment">Minimum increment (₹)</label>
-                <input id="boli-increment" class="input" name="minIncrement"
-                  [(ngModel)]="minIncrement" inputmode="decimal" placeholder="500"
-                  [attr.aria-invalid]="minIncrement && incrementPaise() === null ? 'true' : null" />
-              </div>
-
-              <div class="field span-all">
-                <label for="boli-extend">If somebody bids in the last… (seconds)</label>
-                <input id="boli-extend" class="input inline" type="number" min="0" max="3600"
-                  name="autoExtendSeconds" [(ngModel)]="autoExtendSeconds" />
-                <p class="small">
-                  …then the close moves that far past the bid, and keeps moving while people keep
-                  bidding. Leave it at 0 and the Boli shuts on the clock — which means it can be won
-                  by whoever bids last rather than by whoever will pay most. Two minutes is a common
-                  choice; the auctioneer's "going, going" is the same idea.
+              @if (event.types.length === 0) {
+                <p class="notice">
+                  Define a Boli type first, on the Types tab. A Boli is opened against one, so there
+                  is nothing to open it as yet.
                 </p>
-              </div>
+              }
 
-              <div class="field span-all">
-                <label for="boli-eligibility">Eligibility rule</label>
-                <input id="boli-eligibility" class="input" name="eligibilityRule"
-                  [(ngModel)]="eligibilityRule" maxlength="500" placeholder="One per family." />
+              @if (event.boli.length === 0) {
+                <p class="empty">None opened yet.</p>
+              } @else {
+                <div class="table-wrap">
+                  <table>
+                    <caption class="sr-only">Boli in this occasion</caption>
+                    <thead>
+                      <tr>
+                        <th>Boli</th><th>Window</th><th>Highest</th><th>Bids</th>
+                        <th>Status</th><th></th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      @for (lot of event.boli; track lot.id) {
+                        <tr>
+                          <td>
+                            <b>{{ lot.title }}</b>
+                            <div class="muted">{{ lot.boliTypeName }}</div>
+                          </td>
+                          <td>
+                            {{ lot.startAt | date: 'd MMM, h:mm a' }} —
+                            {{ lot.endAt | date: 'h:mm a' }}
+                            @if (lot.acceptsBids) {
+                              <div class="muted">{{ closes(lot.endAt) }}</div>
+                            }
+                            @if (lot.autoExtendSeconds > 0) {
+                              <!--
+                                Worth showing: a closing time that moves on its own is
+                                surprising unless the screen says it can.
+                              -->
+                              <div class="muted">
+                                A bid in the last {{ lot.autoExtendSeconds }}s pushes this out
+                              </div>
+                            }
+                          </td>
+                          <td>
+                            @if (lot.highestAmount !== null) {
+                              {{ rupees(lot.highestAmount) }}
+                            } @else {
+                              <span class="muted">No bids · floor {{ rupees(lot.startingAmount) }}</span>
+                            }
+                          </td>
+                          <td>{{ lot.bidCount }}</td>
+                          <td>
+                            {{ lot.status }}
+                            @if (lot.status === 'Open' && !lot.acceptsBids) {
+                              <div class="muted">Window has passed</div>
+                            }
+                          </td>
+                          <td>
+                            <div class="row-actions">
+                              <button class="btn small alt" type="button" (click)="showBoli(lot)">
+                                Details<span class="sr-only"> of {{ lot.title }}</span>
+                              </button>
+
+                              @if (lot.status === 'Open' || lot.status === 'Scheduled') {
+                                <button class="btn small" type="button" [disabled]="busy()" (click)="close(lot)">
+                                  Close
+                                </button>
+                              }
+
+                              @if (lot.status === 'Closed') {
+                                @if (lot.bidCount === 0) {
+                                  <span class="muted">Nobody bid</span>
+                                } @else {
+                                  <button class="btn small" type="button" [disabled]="busy()" (click)="record(lot)">
+                                    Record result
+                                  </button>
+                                }
+                              }
+
+                              @if (lot.status === 'ResultPublished') {
+                                <span class="muted">Announced</span>
+                              }
+                            </div>
+                          </td>
+                        </tr>
+                      }
+                    </tbody>
+                  </table>
+                </div>
+
                 <p class="small">
-                  The eligibility rule is shown to bidders and enforced by the Samaaj, not by the
-                  platform. Real rules are facts this service does not hold.
+                  A recorded result waits on the Auctions screen until somebody announces it.
+                  Recording names nobody — the winner is read from the highest bid and appears when it
+                  is published.
                 </p>
+              }
+            </div>
+          }
+        }
+      </div>
+
+      <!-- Define a type --------------------------------------------------- -->
+      @if (popup() === 'type') {
+        <div class="modal-backdrop" (click)="closePopup()">
+          <div class="card modal-card modal-dialog" role="dialog" aria-modal="true" aria-labelledby="type-popup-title"
+            (click)="$event.stopPropagation()" (keydown.escape)="closePopup()">
+            <h2 id="type-popup-title">Define a Boli type</h2>
+
+            @if (error(); as message) {
+              <p class="notice error" role="alert">{{ message }}</p>
+            }
+
+            <form (ngSubmit)="defineType()">
+              <label for="type-name">Name</label>
+              <input id="type-name" class="input" name="typeName" [(ngModel)]="typeName"
+                maxlength="120" placeholder="Mangal Deep" />
+
+              <label for="type-description">Description</label>
+              <input id="type-description" class="input" name="typeDescription"
+                [(ngModel)]="typeDescription" maxlength="500" />
+
+              <p class="small">One name per occasion, whatever the capitalisation.</p>
+
+              <div class="actions">
+                <button class="btn" type="submit" [disabled]="busy() || !typeName.trim()">Define type</button>
+                <button class="btn alt" type="button" (click)="closePopup()">Cancel</button>
+              </div>
+            </form>
+          </div>
+        </div>
+      }
+
+      <!-- Open a Boli ----------------------------------------------------- -->
+      @if (popup() === 'open') {
+        <div class="modal-backdrop" (click)="closePopup()">
+          <div class="card modal-card modal-dialog" role="dialog" aria-modal="true" aria-labelledby="open-popup-title"
+            (click)="$event.stopPropagation()" (keydown.escape)="closePopup()">
+            <h2 id="open-popup-title">Open a Boli</h2>
+
+            @if (error(); as message) {
+              <p class="notice error" role="alert">{{ message }}</p>
+            }
+
+            <form (ngSubmit)="open()">
+              <div class="form-grid">
+                <div class="field">
+                  <label for="boli-type">Type</label>
+                  <select id="boli-type" class="input" name="boliType" [(ngModel)]="boliTypeId">
+                    <option value="">Choose a type…</option>
+                    @for (type of event.types; track type.id) {
+                      <option [value]="type.id">{{ type.name }}</option>
+                    }
+                  </select>
+                </div>
+
+                <div class="field">
+                  <label for="boli-title">Title</label>
+                  <input id="boli-title" class="input" name="boliTitle" [(ngModel)]="boliTitle"
+                    maxlength="200" placeholder="Mangal Deep — first day" />
+                </div>
+
+                <div class="field">
+                  <label for="boli-start">Opens</label>
+                  <input id="boli-start" class="input" type="datetime-local" name="startAt" [(ngModel)]="startAt" />
+                </div>
+
+                <div class="field">
+                  <label for="boli-end">Closes</label>
+                  <input id="boli-end" class="input" type="datetime-local" name="endAt" [(ngModel)]="endAt" />
+                </div>
+
+                <div class="field">
+                  <label for="boli-floor">Starting amount (₹)</label>
+                  <input id="boli-floor" class="input" name="startingAmount"
+                    [(ngModel)]="startingAmount" inputmode="decimal" placeholder="1000"
+                    [attr.aria-invalid]="startingAmount && floorPaise() === null ? 'true' : null" />
+                </div>
+
+                <div class="field">
+                  <label for="boli-increment">Minimum increment (₹)</label>
+                  <input id="boli-increment" class="input" name="minIncrement"
+                    [(ngModel)]="minIncrement" inputmode="decimal" placeholder="500"
+                    [attr.aria-invalid]="minIncrement && incrementPaise() === null ? 'true' : null" />
+                </div>
+
+                <div class="field span-all">
+                  <label for="boli-extend">If somebody bids in the last… (seconds)</label>
+                  <input id="boli-extend" class="input inline" type="number" min="0" max="3600"
+                    name="autoExtendSeconds" [(ngModel)]="autoExtendSeconds" />
+                  <p class="small">
+                    …then the close moves that far past the bid, and keeps moving while people keep
+                    bidding. Leave it at 0 and the Boli shuts on the clock — which means it can be
+                    won by whoever bids last rather than by whoever will pay most. Two minutes is a
+                    common choice; the auctioneer's "going, going" is the same idea.
+                  </p>
+                </div>
+
+                <div class="field span-all">
+                  <label for="boli-eligibility">Eligibility rule</label>
+                  <input id="boli-eligibility" class="input" name="eligibilityRule"
+                    [(ngModel)]="eligibilityRule" maxlength="500" placeholder="One per family." />
+                  <p class="small">
+                    Shown to bidders and enforced by the Samaaj, not by the platform. Real rules are
+                    facts this service does not hold.
+                  </p>
+                </div>
               </div>
 
-              <div class="span-all">
+              <div class="actions">
                 <button class="btn" type="submit" [disabled]="busy() || !canOpen()">Open Boli</button>
+                <button class="btn alt" type="button" (click)="closePopup()">Cancel</button>
+              </div>
+            </form>
+          </div>
+        </div>
+      }
+
+      <!-- One Boli: what was entered, who bid, and who won ------------------ -->
+      @if (popup() === 'boli') {
+        @if (selected(); as lot) {
+          <div class="modal-backdrop" (click)="closePopup()">
+            <div class="card modal-card modal-dialog wide" role="dialog" aria-modal="true" aria-labelledby="boli-popup-title"
+              (click)="$event.stopPropagation()" (keydown.escape)="closePopup()">
+              <h2 id="boli-popup-title">{{ lot.title }}</h2>
+
+              <h3 class="section-heading first">Details</h3>
+              <dl class="details">
+                <dt>Type</dt><dd>{{ lot.boliTypeName }}</dd>
+                <dt>Status</dt><dd>{{ lot.status }}{{ lot.acceptsBids ? ' - taking bids' : '' }}</dd>
+                <dt>Opens</dt><dd>{{ lot.startAt | date: 'd MMM y, h:mm a' }}</dd>
+                <dt>Closes</dt><dd>{{ lot.endAt | date: 'd MMM y, h:mm a' }}</dd>
+                <dt>Starting amount</dt><dd>{{ rupees(lot.startingAmount) }}</dd>
+                <dt>Minimum increment</dt><dd>{{ rupees(lot.minIncrement) }}</dd>
+                <dt>Late-bid window</dt>
+                <dd>{{ lot.autoExtendSeconds > 0 ? lot.autoExtendSeconds + ' seconds' : 'Off - shuts on the clock' }}</dd>
+                <dt>Eligibility rule</dt><dd>{{ lot.eligibilityRule ?? 'None' }}</dd>
+                <dt>Highest bid</dt><dd>{{ lot.highestAmount !== null ? rupees(lot.highestAmount) : 'No bids yet' }}</dd>
+              </dl>
+
+              <h3 class="section-heading">Result</h3>
+              @if (result(); as outcome) {
+                @if (outcome.isPublished && outcome.winningMemberId) {
+                  <div class="winner">
+                    @if (members()[outcome.winningMemberId]?.photoUrl; as path) {
+                      <img class="winner-photo" [scAuthedSrc]="path" alt="" />
+                    }
+                    <div>
+                      <p>
+                        Won by
+                        <a [routerLink]="['/members', outcome.winningMemberId]">
+                          <b>{{ nameOf(outcome.winningMemberId) }}</b>
+                        </a>
+                        for <b>{{ rupees(outcome.amount) }}</b>
+                      </p>
+                      @if (members()[outcome.winningMemberId]; as winner) {
+                        <p class="small">
+                          {{ winner.mobile ?? 'No mobile on record' }} · {{ winner.email ?? 'No email on record' }}
+                        </p>
+                      }
+                      <p class="small">Announced {{ outcome.publishedAt | date: 'd MMM y, h:mm a' }}</p>
+                    </div>
+                  </div>
+                } @else {
+                  <p>
+                    Recorded at <b>{{ rupees(outcome.amount) }}</b> on {{ outcome.recordedAt | date: 'd MMM y, h:mm a' }},
+                    and not announced yet.
+                    @if (ledger()[0]; as top) {
+                      It goes to {{ nameOf(top.memberId) }}, the highest bidder, when it is announced.
+                    }
+                  </p>
+                }
+              } @else {
+                <p class="small">
+                  No result yet. Close the Boli, then record its result - from the highest bid.
+                </p>
+              }
+
+              <h3 class="section-heading">Bids</h3>
+              @if (ledgerError(); as message) {
+                <p class="notice error" role="alert">{{ message }}</p>
+              } @else if (ledger().length === 0) {
+                <p class="small">Nobody has bid.</p>
+              } @else {
+                <div class="table-wrap">
+                  <table>
+                    <caption class="sr-only">Who bid on {{ lot.title }}, and when</caption>
+                    <thead><tr><th>Bidder</th><th>Amount</th><th>When</th></tr></thead>
+                    <tbody>
+                      @for (bid of ledger(); track bid.id) {
+                        <tr>
+                          <td><a [routerLink]="['/members', bid.memberId]">{{ nameOf(bid.memberId) }}</a></td>
+                          <td>{{ rupees(bid.amount) }}</td>
+                          <td>{{ bid.placedAt | date: 'd MMM, h:mm:ss a' }}</td>
+                        </tr>
+                      }
+                    </tbody>
+                  </table>
+                </div>
+                <p class="small">Only the Samaaj's Boli managers see who bid. Members see amounts and times.</p>
+              }
+
+              <div class="actions">
+                <button class="btn alt" type="button" (click)="closePopup()">Close</button>
               </div>
             </div>
-          </form>
+          </div>
         }
-      </div>
+      }
     }
   `,
   styles: `
-    .spaced {
-      margin-top: var(--space-4);
+    .section-head {
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-start;
+      gap: var(--space-3);
+      flex-wrap: wrap;
+    }
+
+    .section-head h1,
+    .section-head h2 {
+      margin: 0;
     }
 
     .section-heading {
       margin-top: var(--space-5);
+    }
+
+    .section-heading.first {
+      margin-top: var(--space-3);
     }
 
     .row-actions {
@@ -314,6 +502,44 @@ import { isNotFound } from '../../core/http-status';
       flex-direction: column;
       gap: var(--space-2);
     }
+
+    .modal-dialog.wide {
+      max-width: 760px;
+    }
+
+    .details {
+      display: grid;
+      grid-template-columns: max-content 1fr;
+      gap: var(--space-1) var(--space-3);
+      margin: 0;
+    }
+
+    .details dt {
+      font-weight: 600;
+      color: var(--muted);
+    }
+
+    .details dd {
+      margin: 0;
+    }
+
+    .winner {
+      display: flex;
+      gap: var(--space-3);
+      align-items: center;
+    }
+
+    .winner p {
+      margin: 0 0 var(--space-1);
+    }
+
+    .winner-photo {
+      width: 56px;
+      height: 56px;
+      border-radius: 50%;
+      object-fit: cover;
+      flex-shrink: 0;
+    }
   `,
 })
 export class OccasionDetailComponent implements OnInit {
@@ -321,6 +547,7 @@ export class OccasionDetailComponent implements OnInit {
   private readonly route = inject(ActivatedRoute);
 
   readonly scope = inject(AdminScope);
+  readonly localities = inject(LocalityOptions);
 
   readonly occasion = signal<OccasionDetail | null>(null);
   readonly loading = signal(true);
@@ -328,6 +555,27 @@ export class OccasionDetailComponent implements OnInit {
   readonly notFound = signal(false);
   readonly error = signal<string | null>(null);
   readonly done = signal<string | null>(null);
+
+  readonly tabs: readonly { value: OccasionTab; label: string }[] = [
+    { value: 'boli', label: 'Boli' },
+    { value: 'types', label: 'Types' },
+  ];
+
+  readonly tab = signal<OccasionTab>('boli');
+
+  /** Which popup is open over the page, if any. */
+  readonly popup = signal<'type' | 'open' | 'boli' | null>(null);
+
+  /** The Boli whose details popup is open. */
+  readonly selected = signal<Boli | null>(null);
+  readonly ledger = signal<readonly BidLedgerEntry[]>([]);
+  readonly ledgerError = signal<string | null>(null);
+  readonly result = signal<BoliResultView | null>(null);
+
+  /** Bidders and winners, looked up once each - an administrator sees every field. */
+  readonly members = signal<Readonly<Record<string, AdminMember | null>>>({});
+
+  readonly cities = signal<readonly City[]>([]);
 
   typeName = '';
   typeDescription = '';
@@ -368,6 +616,8 @@ export class OccasionDetailComponent implements OnInit {
   }
 
   ngOnInit(): void {
+    this.localities.load();
+    this.api.listCities().subscribe({ next: (found) => this.cities.set(found), error: () => {} });
     this.load();
   }
 
@@ -380,6 +630,77 @@ export class OccasionDetailComponent implements OnInit {
       parseRupees(this.startingAmount) !== null &&
       parseRupees(this.minIncrement) !== null
     );
+  }
+
+  /** "Shri Mahavir Mandir · Hiran Magri, Udaipur" - the venue, then the locality or the city alone. */
+  whereHeld(event: OccasionDetail): string | null {
+    const area = event.localityId
+      ? this.localities.place(event.localityId, event.cityId)
+      : (this.cities().find((c) => c.id === event.cityId)?.name ?? null);
+
+    const parts = [event.venue, area].filter((part): part is string => !!part);
+
+    return parts.length > 0 ? parts.join(' · ') : null;
+  }
+
+  /** A bidder's name once looked up; "A member" while asking or if they cannot be found - never an id. */
+  nameOf(memberId: string): string {
+    return this.members()[memberId]?.fullName ?? 'A member';
+  }
+
+  openPopup(which: 'type' | 'open'): void {
+    this.error.set(null);
+    this.done.set(null);
+    this.popup.set(which);
+  }
+
+  closePopup(): void {
+    this.popup.set(null);
+    this.selected.set(null);
+    this.error.set(null);
+  }
+
+  /** Opens a Boli's details: what was entered, its bids by name, and its result. */
+  showBoli(lot: Boli): void {
+    this.selected.set(lot);
+    this.ledger.set([]);
+    this.ledgerError.set(null);
+    this.result.set(null);
+    this.popup.set('boli');
+
+    this.api.bidLedger(lot.id).subscribe({
+      next: (bids) => {
+        this.ledger.set(bids);
+        this.lookUp(bids.map((b) => b.memberId));
+      },
+      error: (failure: unknown) => this.ledgerError.set(describeError(failure)),
+    });
+
+    // A 404 is "no result recorded yet", the ordinary state of an open Boli.
+    this.api.boliResult(lot.id).subscribe({
+      next: (found) => {
+        this.result.set(found);
+
+        if (found.winningMemberId) {
+          this.lookUp([found.winningMemberId]);
+        }
+      },
+      error: () => this.result.set(null),
+    });
+  }
+
+  private lookUp(ids: readonly string[]): void {
+    for (const memberId of new Set(ids)) {
+      if (memberId in this.members()) {
+        continue;
+      }
+
+      this.members.update((known) => ({ ...known, [memberId]: null }));
+      this.api.member(memberId).subscribe({
+        next: (found) => this.members.update((known) => ({ ...known, [memberId]: found })),
+        error: () => {},
+      });
+    }
   }
 
   private load(): void {
@@ -474,7 +795,8 @@ export class OccasionDetailComponent implements OnInit {
    * Every action re-reads the occasion. Closing a Boli changes which buttons
    * belong on its row, defining a type changes whether the open form can be
    * offered at all, and a bid placed a second ago changes the highest amount —
-   * the server is the only thing that knows all of it at once.
+   * the server is the only thing that knows all of it at once. A popup the
+   * action came from closes on success.
    */
   private act(work: { subscribe: (o: object) => void }, message: string, reset?: () => void): void {
     this.busy.set(true);
@@ -486,6 +808,7 @@ export class OccasionDetailComponent implements OnInit {
         this.done.set(message);
         this.busy.set(false);
         reset?.();
+        this.popup.set(null);
         this.load();
       },
       error: (failure: unknown) => {
@@ -495,6 +818,8 @@ export class OccasionDetailComponent implements OnInit {
     });
   }
 }
+
+type OccasionTab = 'boli' | 'types';
 
 function blankToNull(value: string): string | null {
   const trimmed = value.trim();

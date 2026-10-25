@@ -6,7 +6,7 @@ import { MasterDataApi } from './master-data.api';
 import { MemberCommunityComponent } from './member-community.component';
 import { MembersApi } from './members.api';
 import { ProfileHeaderComponent } from './profile-header.component';
-import { Address, City, Gautra, Gender, LookupItem, Locality, MyProfile, PrivacyLevel } from './members.models';
+import { Address, City, Gautra, Gender, LookupItem, Locality, MaritalStatus, MyProfile, PrivacyLevel } from './members.models';
 
 /**
  * My Profile, from the member-portal wireframe's `#profile` screen.
@@ -103,7 +103,7 @@ type ProfileTab = 'basic' | 'professional' | 'educational' | 'address' | 'photo'
       }
 
       @if (saved()) {
-        <p class="notice info" role="status">Your profile has been saved.</p>
+        <p class="notice ok" role="status">Your profile has been saved.</p>
       }
 
       @if (loading()) {
@@ -136,6 +136,8 @@ type ProfileTab = 'basic' | 'professional' | 'educational' | 'address' | 'photo'
                 <dd>{{ me.dateOfBirth ? day(me.dateOfBirth) : notSet }}</dd>
                 <dt>Gender</dt>
                 <dd>{{ genderLabel(me.gender) }}</dd>
+                <dt>Marital status</dt>
+                <dd>{{ me.maritalStatus ?? notSet }}</dd>
                 <dt>Gautra</dt>
                 <dd>{{ nameOf(gautras(), me.gautraId) ?? notSet }}</dd>
                 <dt>Profession</dt>
@@ -241,6 +243,17 @@ type ProfileTab = 'basic' | 'professional' | 'educational' | 'address' | 'photo'
                     <option [value]="option.value">{{ option.label }}</option>
                   }
                 </select>
+              </div>
+
+              <div class="field">
+                <label for="marital-status">Marital status</label>
+                <select class="input" id="marital-status" name="maritalStatus" [(ngModel)]="form.maritalStatus">
+                  <option value="">Prefer not to say</option>
+                  @for (option of maritalStatuses; track option) {
+                    <option [value]="option">{{ option }}</option>
+                  }
+                </select>
+                <p class="small">Only you see this. Matrimony biodata is for members who are unmarried or divorced.</p>
               </div>
 
               <div class="field">
@@ -443,7 +456,7 @@ type ProfileTab = 'basic' | 'professional' | 'educational' | 'address' | 'photo'
             }
 
             @if (photoNotice(); as message) {
-              <p class="notice info" role="status">{{ message }}</p>
+              <p class="notice ok" role="status">{{ message }}</p>
             }
 
             @if (photoPath()) {
@@ -547,6 +560,8 @@ export class ProfileComponent implements OnInit {
     { value: 'Other', label: 'Other' },
   ];
 
+  readonly maritalStatuses: readonly MaritalStatus[] = ['Unmarried', 'Married', 'Divorced'];
+
   /**
    * The editable copy. Bound with `ngModel` rather than to the signal, so a
    * half-typed form is never mistaken for what the server holds — and `''` is
@@ -559,6 +574,7 @@ export class ProfileComponent implements OnInit {
     email: '',
     dateOfBirth: '',
     gender: 'Unspecified' as Gender,
+    maritalStatus: '' as MaritalStatus | '',
     gautraId: '',
     professionId: '',
     qualificationId: '',
@@ -621,6 +637,7 @@ export class ProfileComponent implements OnInit {
       // an empty date input rather than as an error.
       dateOfBirth: me.dateOfBirth ? me.dateOfBirth.slice(0, 10) : '',
       gender: me.gender,
+      maritalStatus: me.maritalStatus ?? '',
       gautraId: me.gautraId ?? '',
       professionId: me.professionId ?? '',
       qualificationId: me.qualificationId ?? '',
@@ -789,6 +806,7 @@ export class ProfileComponent implements OnInit {
         email: blankToNull(this.form.email),
         dateOfBirth: blankToNull(this.form.dateOfBirth),
         gender: this.form.gender,
+        maritalStatus: this.form.maritalStatus || null,
         gautraId: blankToNull(this.form.gautraId),
         professionId: blankToNull(this.form.professionId),
         qualificationId: blankToNull(this.form.qualificationId),

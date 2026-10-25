@@ -1,7 +1,7 @@
-import { HttpClient } from '@angular/common/http';
+import { HttpClient, HttpParams } from '@angular/common/http';
 import { Injectable, inject } from '@angular/core';
 import { Observable } from 'rxjs';
-import { Bid, Boli, BoliResult, Occasion, OccasionDetail, PlaceBidResult } from './boli.models';
+import { Bid, Boli, BoliPlaceFilter, BoliResult, Occasion, OccasionDetail, PlaceBidResult } from './boli.models';
 
 /**
  * Every call this app makes to boli-service.
@@ -22,18 +22,18 @@ import { Bid, Boli, BoliResult, Occasion, OccasionDetail, PlaceBidResult } from 
 export class BoliApi {
   private readonly http = inject(HttpClient);
 
-  /** This Samaaj's occasions, newest first. */
-  occasions(): Observable<Occasion[]> {
-    return this.http.get<Occasion[]>('/v1/boli/occasions');
+  /** This Samaaj's occasions, newest first - in one place, when `filter` names one. */
+  occasions(filter?: BoliPlaceFilter): Observable<Occasion[]> {
+    return this.http.get<Occasion[]>('/v1/boli/occasions', { params: placeParams(filter) });
   }
 
   occasion(id: string): Observable<OccasionDetail> {
     return this.http.get<OccasionDetail>(`/v1/boli/occasions/${id}`);
   }
 
-  /** Every Boli taking bids right now. The wireframe's "Active Boli". */
-  active(): Observable<Boli[]> {
-    return this.http.get<Boli[]>('/v1/boli/boli/active');
+  /** Every Boli taking bids right now - the wireframe's "Active Boli" - in one place, when `filter` names one. */
+  active(filter?: BoliPlaceFilter): Observable<Boli[]> {
+    return this.http.get<Boli[]>('/v1/boli/boli/active', { params: placeParams(filter) });
   }
 
   get(id: string): Observable<Boli> {
@@ -64,4 +64,19 @@ export class BoliApi {
   publishedResults(): Observable<BoliResult[]> {
     return this.http.get<BoliResult[]>('/v1/boli/results');
   }
+}
+
+/** Only the place filters actually set. */
+function placeParams(filter?: BoliPlaceFilter): HttpParams {
+  let params = new HttpParams();
+
+  if (filter?.localityId) {
+    params = params.set('localityId', filter.localityId);
+  }
+
+  if (filter?.cityId) {
+    params = params.set('cityId', filter.cityId);
+  }
+
+  return params;
 }

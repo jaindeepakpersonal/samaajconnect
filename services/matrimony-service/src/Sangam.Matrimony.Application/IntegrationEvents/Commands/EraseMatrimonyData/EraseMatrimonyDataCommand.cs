@@ -23,6 +23,7 @@ public sealed record EraseMatrimonyDataResult(bool Erased, int ProposalsDeIdenti
 public sealed class EraseMatrimonyDataCommandHandler(
     IBiodataRepository biodata,
     IProposalRepository proposals,
+    IEligibilityRepository eligibility,
     IUnitOfWork unitOfWork,
     IDateTimeProvider clock,
     ILogger<EraseMatrimonyDataCommandHandler> logger)
@@ -51,6 +52,13 @@ public sealed class EraseMatrimonyDataCommandHandler(
         if (profile is not null)
         {
             profile.Erase(now);
+            erasedAnything = true;
+        }
+
+        // Whether they could keep a biodata is a fact about them, and goes too.
+        if (await eligibility.GetForConsumerAsync(payload.TenantId, payload.UserId, cancellationToken) is { } eligible)
+        {
+            eligibility.Remove(eligible);
             erasedAnything = true;
         }
 

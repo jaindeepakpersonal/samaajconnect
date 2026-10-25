@@ -86,7 +86,7 @@ import { Comment, Post, ReactionType, Reactions } from './timeline.models';
       </section>
 
       @if (!isContactVerified()) {
-        <p class="notice info" role="status">
+        <p class="notice warn" role="status">
           Your mobile number is not verified yet. Verification messages are not switched on yet;
           nothing is blocked in the meantime.
         </p>
@@ -134,7 +134,7 @@ import { Comment, Post, ReactionType, Reactions } from './timeline.models';
           }
 
           @if (justPosted()) {
-            <p class="notice info" role="status">
+            <p class="notice ok" role="status">
               {{
                 asAnnouncement
                   ? 'Your announcement is live.'

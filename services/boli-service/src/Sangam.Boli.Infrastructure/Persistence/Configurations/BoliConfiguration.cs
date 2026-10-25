@@ -15,6 +15,7 @@ public sealed class OccasionConfiguration : IEntityTypeConfiguration<BoliOccasio
 
         builder.Property(o => o.Title).IsRequired().HasMaxLength(200);
         builder.Property(o => o.Description).HasMaxLength(2000);
+        builder.Property(o => o.Venue).HasMaxLength(300);
         builder.Property(o => o.Status).HasConversion<string>().HasMaxLength(20);
 
         builder.HasIndex(o => new { o.TenantId, o.Status });

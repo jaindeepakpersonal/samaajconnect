@@ -53,7 +53,7 @@ import {
            away. A message inside it would be removed by the same reload that
            made it true. -->
       @if (withdrawError(); as message) {
-        <p class="notice info" role="status">{{ message }}</p>
+        <p class="notice ok" role="status">{{ message }}</p>
       }
 
       @if (loading()) {
@@ -242,7 +242,7 @@ import {
             }
 
             @if (confirmingLeave()) {
-              <div class="notice info" role="status">
+              <div class="notice warn" role="status">
                 <p>
                   You will no longer be in this household, and you will be free to join
                   another or start your own. Nothing else about you changes.
@@ -401,7 +401,7 @@ import {
                   }
 
                   @if (withdrawing() === child.id) {
-                    <div class="notice info" role="status">
+                    <div class="notice warn" role="status">
                       <p>
                         This removes {{ child.fullName }}'s record. Their name, date of birth
                         and photograph go; nothing on this platform can bring them back, and
@@ -574,7 +574,7 @@ import {
               }
 
               @if (joinSent()) {
-                <p class="notice info" role="status">
+                <p class="notice ok" role="status">
                   Sent. The family admin decides; check back here.
                 </p>
               }

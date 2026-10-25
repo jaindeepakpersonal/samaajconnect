@@ -182,7 +182,7 @@ import { isNotFound } from '../../core/http-status';
                 </div>
 
                 @if (closesBeforeOpening(nominationStartAt, nominationEndAt)) {
-                  <p class="notice span-all" role="alert">Nominations cannot close before they open.</p>
+                  <p class="notice warn span-all" role="alert">Nominations cannot close before they open.</p>
                 }
               </div>
 
@@ -202,11 +202,11 @@ import { isNotFound } from '../../core/http-status';
                 </div>
 
                 @if (closesBeforeOpening(votingStartAt, votingEndAt)) {
-                  <p class="notice span-all" role="alert">Voting cannot close before it opens.</p>
+                  <p class="notice warn span-all" role="alert">Voting cannot close before it opens.</p>
                 }
 
                 @if (windowsOverlap()) {
-                  <p class="notice span-all" role="alert">
+                  <p class="notice warn span-all" role="alert">
                     Voting cannot start before nominations close. Members who vote early have to see
                     the same ballot as members who vote late.
                   </p>

@@ -87,7 +87,7 @@ enforced by `TenantAuthorizationBehavior`, not just UI hiding.
 | GET | `/members/registration-summary` | `SamaajAdmin`/`SuperAdmin` + `Members.Read` | Registrations in the current 30-day window against the 30 days before it, for the admin Reports & Analytics screen |
 | GET | `/members/{id}` | `Members.Read` | One member, through the same per-field privacy mapper the directory uses, with `fatherName`/`motherName` by the directory's rules |
 | GET | `/members/{id}/household` | `Members.Read` | `{ household }` - the household they actively belong to: `namedAfter` (head, or admin) and `members` (`memberId`, `fullName`, `photoUrl`, `relationshipToAdmin`, `isHead`, `isAdmin`) - only people the caller could find in the directory, never a child's record or the family code. `household` is null when they are in none |
-| PATCH | `/members/{id}` | Member, **self only** | Update your own profile. Replaces it whole: `privacy` and `isListedInDirectory` are both **required**, because defaulting either would silently reopen something a member had closed. Also carries `gautraId`, `professionId`, `qualificationId` (all master-data-service ids), `permanentAddress` (`{line, cityId, localityId}`, required) and `temporaryAddress` (same shape, nullable). Takes **no** photo field — see below |
+| PATCH | `/members/{id}` | Member, **self only** | Update your own profile. Replaces it whole: `privacy` and `isListedInDirectory` are both **required**, because defaulting either would silently reopen something a member had closed. Also carries `gautraId`, `professionId`, `qualificationId` (all master-data-service ids), `permanentAddress` (`{line, cityId, localityId}`, required), `temporaryAddress` (same shape, nullable) and `maritalStatus` (`Unmarried`, `Married`, `Divorced` or null - optional, and returned only on `/members/me`). Takes **no** photo field — see below |
 | PATCH | `/members/{id}/details` | `SamaajAdmin` or `AreaAdmin` (own locality only) + `Members.Write`, never self | Correct somebody else's factual details. The same fields **minus** `privacy` and `isListedInDirectory`, which are the member's own. **409** on your own id: use the profile screen, which can set them |
 | POST | `/members/{id}/photo` | Member (self), `Members.Write` | `multipart/form-data`, one file part. JPEG, PNG or WebP, 2 MB |
 | GET | `/members/{id}/photo` | `Members.Read` | The bytes. `ETag` + `Cache-Control: private` |
@@ -337,22 +337,23 @@ the resource under it, the same shape as `/v1/pathshala/pathshalas`.
 
 | Method | Path | Permission | Purpose |
 |---|---|---|---|
-| GET | `/occasions` | `Members.Read` | Occasions, newest first. `?localityId=` narrows to one locality |
-| POST | `/occasions` | `Boli.Manage` | Create occasion. Optional `localityId` - null runs it Samaaj-wide |
-| PATCH | `/occasions/{id}` | `Boli.Manage` | Correct title, description, date and locality. 409 once the occasion is closed |
+| GET | `/occasions` | `Members.Read` | Occasions, newest first. `?localityId=` and `?cityId=` narrow to one place |
+| POST | `/occasions` | `Boli.Manage` | Create occasion. Optional `localityId` - null runs it Samaaj-wide - and optional `cityId` and `venue` (up to 300) |
+| PATCH | `/occasions/{id}` | `Boli.Manage` | Correct title, description, date, locality, city and venue. 409 once the occasion is closed |
 | GET | `/occasions/{id}` | `Members.Read` | Types and the Boli under it |
 | POST | `/occasions/{id}/boli-types` | `Boli.Manage` | Define Boli type. One name per occasion |
 | POST | `/occasions/{id}/status` | `Boli.Manage` | Activate or close. Never backwards |
 | POST | `/occasions/{id}/boli` | `Boli.Manage` | Open a Boli for bidding |
-| GET | `/boli/active` | `Members.Read` | Every Boli taking bids right now. `?localityId=` narrows to one locality's occasions |
+| GET | `/boli/active` | `Members.Read` | Every Boli taking bids right now, each with its occasion's title and place. `?localityId=` and `?cityId=` narrow to one place's occasions |
 | GET | `/boli/{id}` | `Members.Read` | One Boli, its highest and the minimum next bid |
 | POST | `/boli/{id}/bids` | `Members.Read` | Place bid. Being outbid answers **200** with `accepted: false` |
 | GET | `/boli/{id}/bids` | `Members.Read` | Bid history: amounts and times, never who bid |
+| GET | `/boli/{id}/bids/ledger` | `Boli.Manage` | Every bid with the `memberId` who placed it and when, highest first. The organiser's record; members never see it |
 | POST | `/boli/{id}/close` | `Boli.Manage` | Close bidding. Idempotent |
 | POST | `/boli/{id}/result` | `Boli.Manage` | Record result from the highest bid. Winner is not a parameter |
 | GET | `/boli/{id}/result` | `Members.Read` | 404 until recorded; names no winner until published |
 | POST | `/boli/{id}/result/publish` | `Boli.PublishResults` | Publish. Idempotent, and irreversible here |
-| GET | `/results` | `Members.Read` | Everything announced, newest first |
+| GET | `/results` | `Members.Read` | Everything announced, newest first, each with `winningMemberId`, its `occasionId` and the occasion's `localityId`/`cityId` |
 | GET | `/results/pending` | `Boli.PublishResults` | Recorded and not yet announced, oldest first. Carries the amount and `recordedBy`, never a winner |
 
 Amounts are integers in paise. A Boli is money, and a floating-point
@@ -456,11 +457,12 @@ its own.
 |---|---|---|---|
 | GET | `/consent-notice` | `Members.Read` | What a member is shown before opting in |
 | GET | `/biodata/me` | `Members.Read` | The caller's own biodata, active or not. **204**, not 200 with a null body, if never opted in |
-| POST | `/biodata/me/opt-in` | role list above | Opt in, or rejoin after a withdrawal. 400 without `consentGiven` |
-| PATCH | `/biodata/me` | role list above | Edit an already-opted-in profile |
+| GET | `/eligibility/me` | `Members.Read` | `{ status }`: `Eligible` (My Profile says Unmarried or Divorced), `NotEligible`, or `Unknown` (no marital status set) |
+| POST | `/biodata/me/opt-in` | role list above | Opt in, or rejoin after a withdrawal. 400 without `consentGiven`; **409** `Matrimony.NotEligible` unless eligible |
+| PATCH | `/biodata/me` | role list above | Edit an already-opted-in profile. **409** `Matrimony.NotEligible` unless eligible |
 | DELETE | `/biodata/me/consent` | role list above | Withdraw — deactivates, does not erase. Proposal history is kept |
 | GET | `/biodata/search` | `Members.Read` | Active candidates in the caller's own Samaaj, filtered; excludes the caller; capped at 50 |
-| GET | `/biodata/{memberId}` | `Members.Read` | One candidate's full biodata. 404 if inactive or in a different Samaaj |
+| GET | `/biodata/{memberId}` | `Members.Read` | One candidate's full biodata. 404 if inactive, not eligible, or in a different Samaaj. Search leaves out the not-eligible too |
 | POST | `/proposals` | role list above | Send a proposal. 409 if a Pending/Accepted one already exists between the same two members |
 | GET | `/proposals/sent` | `Members.Read` | The caller's own sent proposals, with the other party resolved |
 | GET | `/proposals/received` | `Members.Read` | The caller's own received proposals, with the other party resolved |

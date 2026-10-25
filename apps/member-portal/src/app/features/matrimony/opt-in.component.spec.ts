@@ -122,9 +122,15 @@ describe('MatrimonyOptInComponent', () => {
     http.expectOne((r) => r.url === '/v1/master-data/cities').flush([]);
   }
 
+  /** matrimony-service's answer to whether My Profile's marital status allows a biodata. */
+  function settleEligibility(status: 'Eligible' | 'NotEligible' | 'Unknown' = 'Eligible'): void {
+    http.expectOne('/v1/matrimony/eligibility/me').flush({ status });
+  }
+
   it('shows the consent notice and prefills from the base profile when never opted in', () => {
     fixture.detectChanges();
     settleMasterData();
+    settleEligibility();
 
     http.expectOne('/v1/matrimony/biodata/me').flush(null, { status: 204, statusText: 'No Content' });
     http.expectOne('/v1/matrimony/consent-notice').flush(notice());
@@ -151,6 +157,7 @@ describe('MatrimonyOptInComponent', () => {
   it('disables Opt in until a date of birth is filled in', async () => {
     fixture.detectChanges();
     settleMasterData();
+    settleEligibility();
 
     http.expectOne('/v1/matrimony/biodata/me').flush(null, { status: 204, statusText: 'No Content' });
     http.expectOne('/v1/matrimony/consent-notice').flush(notice());
@@ -170,6 +177,7 @@ describe('MatrimonyOptInComponent', () => {
   it('refuses to submit without ticking the consent box', () => {
     fixture.detectChanges();
     settleMasterData();
+    settleEligibility();
 
     http.expectOne('/v1/matrimony/biodata/me').flush(null, { status: 204, statusText: 'No Content' });
     http.expectOne('/v1/matrimony/consent-notice').flush(notice());
@@ -194,21 +202,70 @@ describe('MatrimonyOptInComponent', () => {
     expect(component.saveError()).not.toBeNull();
   });
 
-  it('shows the edit form, not the notice, once already opted in', () => {
+  it('opens on the biodata already saved, and offers the form only on Edit', () => {
     fixture.detectChanges();
     settleMasterData();
+    settleEligibility();
 
     http.expectOne('/v1/matrimony/biodata/me').flush(myBiodata());
     fixture.detectChanges();
 
-    expect(text()).toContain('Edit your biodata');
+    expect(text()).toContain('Ravi Shah');
     expect(text()).toContain('Visible in search');
+    expect(text()).not.toContain('Edit your biodata');
     expect(text()).not.toContain('We show your biodata');
+    expect(fixture.nativeElement.querySelector('form')).toBeNull();
+
+    component.startEditing();
+    fixture.detectChanges();
+
+    expect(text()).toContain('Edit your biodata');
+    expect(component.form.fullName).toBe('Ravi Shah');
+
+    component.cancelEditing();
+    fixture.detectChanges();
+
+    expect(fixture.nativeElement.querySelector('form')).toBeNull();
+  });
+
+  it('sends a member with no marital status to My Profile instead of offering the form', () => {
+    fixture.detectChanges();
+    settleMasterData();
+    settleEligibility('Unknown');
+
+    http.expectOne('/v1/matrimony/biodata/me').flush(null, { status: 204, statusText: 'No Content' });
+    http.expectOne('/v1/matrimony/consent-notice').flush(notice());
+    http.expectOne('/v1/members/me').flush(profile());
+    http.expectOne((r) => r.url === '/v1/master-data/localities').flush([]);
+    fixture.detectChanges();
+
+    const warning = fixture.nativeElement.querySelector('.notice.warn') as HTMLElement;
+
+    expect(warning.textContent).toContain('My Profile');
+    expect(warning.querySelector('a')?.getAttribute('href')).toBe('/profile');
+    expect(fixture.nativeElement.querySelector('form')).toBeNull();
+  });
+
+  it('shows a married member their old biodata without an Edit button', () => {
+    fixture.detectChanges();
+    settleMasterData();
+    settleEligibility('NotEligible');
+
+    http.expectOne('/v1/matrimony/biodata/me').flush(myBiodata());
+    fixture.detectChanges();
+
+    expect(fixture.nativeElement.querySelector('.notice.warn')).not.toBeNull();
+    expect(text()).toContain('Ravi Shah');
+
+    const buttons = Array.from(fixture.nativeElement.querySelectorAll('button') as NodeListOf<HTMLButtonElement>);
+
+    expect(buttons.some((b) => b.textContent?.trim() === 'Edit')).toBe(false);
   });
 
   it('withdraws and re-reads the profile as no longer active', () => {
     fixture.detectChanges();
     settleMasterData();
+    settleEligibility();
 
     http.expectOne('/v1/matrimony/biodata/me').flush(myBiodata());
     fixture.detectChanges();
@@ -217,6 +274,7 @@ describe('MatrimonyOptInComponent', () => {
     component.withdraw();
 
     http.expectOne('/v1/matrimony/biodata/me/consent').flush({ withdrawn: true });
+    settleEligibility();
     http.expectOne('/v1/matrimony/biodata/me').flush(myBiodata({ isActive: false }));
     fixture.detectChanges();
 

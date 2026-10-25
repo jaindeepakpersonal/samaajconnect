@@ -46,6 +46,8 @@ import {
   ProgressRow,
   ClassAttendance,
   ExamOverview,
+  BidLedgerEntry,
+  BoliResultView,
   DonationLedger,
   PathshalaDonation,
   DonationInput,
@@ -1249,12 +1251,16 @@ export class AdminApi {
     description: string | null,
     occasionDate: string,
     localityId: string | null,
+    venue: string | null = null,
+    cityId: string | null = null,
   ): Observable<Occasion> {
     return this.http.patch<Occasion>(`/v1/boli/occasions/${id}`, {
       title,
       description,
       occasionDate,
       localityId,
+      venue,
+      cityId,
     });
   }
 
@@ -1263,13 +1269,27 @@ export class AdminApi {
     description: string | null,
     occasionDate: string,
     localityId: string | null = null,
+    venue: string | null = null,
+    cityId: string | null = null,
   ): Observable<Occasion> {
     return this.http.post<Occasion>('/v1/boli/occasions', {
       localityId,
       title,
       description,
       occasionDate,
+      venue,
+      cityId,
     });
+  }
+
+  /** Every bid on a Boli with who placed it and when, highest first. `Boli.Manage` only. */
+  bidLedger(boliId: string): Observable<BidLedgerEntry[]> {
+    return this.http.get<BidLedgerEntry[]>(`/v1/boli/boli/${boliId}/bids/ledger`);
+  }
+
+  /** A Boli's result: 404 until one is recorded; the winner is named only once it is published. */
+  boliResult(boliId: string): Observable<BoliResultView> {
+    return this.http.get<BoliResultView>(`/v1/boli/boli/${boliId}/result`);
   }
 
   /** Forward only: Upcoming → Active → Closed. The service refuses backwards. */

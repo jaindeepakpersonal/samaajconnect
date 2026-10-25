@@ -149,7 +149,7 @@ import { Business, PlaceOrderItem, Product } from './businesses.models';
               <h2 id="cart-heading">Your order</h2>
 
               @if (orderPlaced()) {
-                <p class="notice info" role="status">Your order has been sent to the business owner.</p>
+                <p class="notice ok" role="status">Your order has been sent to the business owner.</p>
                 <a class="btn small secondary" routerLink="/businesses/orders">See your orders</a>
               } @else {
                 @if (lines().length === 0) {

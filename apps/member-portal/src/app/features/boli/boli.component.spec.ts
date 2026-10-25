@@ -9,6 +9,19 @@ import { Bid, Boli, BoliResult, Occasion, OccasionDetail } from './boli.models';
 import { OccasionComponent } from './occasion.component';
 
 const ACTIVE = '/v1/boli/boli/active';
+const CITY = { id: 'c1', name: 'Udaipur' };
+const LOCALITY = { id: 'l1', name: 'Hiran Magri', cityId: 'c1' };
+
+/** Every Boli screen loads the City and Locality lists once, to say where a Boli is held. */
+function settlePlaces(http: HttpTestingController): void {
+  for (const request of http.match((r) => r.url === '/v1/master-data/cities')) {
+    request.flush([CITY]);
+  }
+
+  for (const request of http.match((r) => r.url === '/v1/master-data/localities')) {
+    request.flush([LOCALITY]);
+  }
+}
 const OCCASIONS = '/v1/boli/occasions';
 const RESULTS = '/v1/boli/results';
 
@@ -101,9 +114,10 @@ describe('BoliListComponent', () => {
     results?: BoliResult[];
   } = {}): void {
     fixture.detectChanges();
+    settlePlaces(http);
 
-    http.expectOne(ACTIVE).flush(options.active ?? [boli()]);
-    http.expectOne(OCCASIONS).flush(options.occasions ?? [occasion()]);
+    http.expectOne((r) => r.url === ACTIVE).flush(options.active ?? [boli()]);
+    http.expectOne((r) => r.url === OCCASIONS).flush(options.occasions ?? [occasion()]);
     http.expectOne(RESULTS).flush(options.results ?? []);
 
     fixture.detectChanges();
@@ -137,33 +151,96 @@ describe('BoliListComponent', () => {
   });
 
   it('says so when nothing is taking bids', () => {
-    load({ active: [] });
+    load({ active: [], occasions: [] });
 
     expect(text()).toContain('Nothing is taking bids');
   });
 
+  it('opens on the occasions when nothing is taking bids', () => {
+    load({ active: [] });
+
+    expect(component.tab()).toBe('occasions');
+    expect(text()).toContain('Paryushan 2026');
+  });
+
   it('shows announced results with the amount', () => {
-    load({ results: [result()] });
+    load({ results: [result({ winnerIsMe: true })] });
+    component.tab.set('results');
+    fixture.detectChanges();
 
     expect(text()).toContain('16,100');
   });
 
   it('tells a member which announced Boli they won', () => {
     load({ results: [result({ winnerIsMe: true })] });
+    component.tab.set('results');
+    fixture.detectChanges();
 
-    expect(text()).toContain('Won by you');
+    expect(fixture.nativeElement.querySelector('td .pill.ok')?.textContent.trim()).toBe('You');
+  });
+
+  it('names who won, because a result is announced to the whole Samaaj', () => {
+    load({ results: [result()] });
+
+    // One lookup per winner on screen, never one per member of the Samaaj.
+    http.expectOne('/v1/members/m1').flush({ id: 'm1', fullName: 'Ravi Jain', photoUrl: null });
+    component.tab.set('results');
+    fixture.detectChanges();
+
+    expect(text()).toContain('Ravi Jain');
+  });
+
+  it('says where each Boli is held', () => {
+    load({ active: [boli({ venue: 'Shri Mahavir Mandir', localityId: 'l1', cityId: 'c1' })] });
+
+    expect(text()).toContain('Shri Mahavir Mandir · Hiran Magri, Udaipur');
+  });
+
+  it('asks the service for the chosen place', () => {
+    load();
+
+    component.chooseCity('c1');
+    component.load();
+
+    const active = http.expectOne((r) => r.url === ACTIVE);
+    expect(active.request.params.get('cityId')).toBe('c1');
+    active.flush([]);
+
+    const occasions = http.expectOne((r) => r.url === OCCASIONS);
+    expect(occasions.request.params.get('cityId')).toBe('c1');
+    occasions.flush([]);
+    http.expectOne(RESULTS).flush([]);
+  });
+
+  it('narrows announced results to the chosen place', () => {
+    const both = [
+      result({ cityId: 'c1', winnerIsMe: true }),
+      result({ boliId: 'b2', boliTitle: 'Aarti', cityId: 'c2', winnerIsMe: true }),
+    ];
+
+    load({ results: both });
+
+    component.chooseCity('c1');
+    component.load();
+    http.expectOne((r) => r.url === ACTIVE).flush([boli()]);
+    http.expectOne((r) => r.url === OCCASIONS).flush([occasion()]);
+    http.expectOne(RESULTS).flush(both);
+
+    expect(component.shownResults().map((r) => r.boliId)).toEqual(['b1']);
   });
 
   it('still shows the rest when the Samaaj has announced nothing', () => {
     fixture.detectChanges();
+    settlePlaces(http);
 
-    http.expectOne(ACTIVE).flush([boli()]);
-    http.expectOne(OCCASIONS).flush([occasion()]);
+    http.expectOne((r) => r.url === ACTIVE).flush([boli()]);
+    http.expectOne((r) => r.url === OCCASIONS).flush([occasion()]);
     http.expectOne(RESULTS).flush(null, { status: 404, statusText: 'Not Found' });
+    component.tab.set('results');
     fixture.detectChanges();
 
     expect(component.error()).toBeNull();
-    expect(text()).toContain('Nothing has been announced yet');
+    expect(text()).toContain('Nothing has been announced here yet');
   });
 });
 
@@ -196,6 +273,7 @@ describe('BoliDetailComponent', () => {
 
   function load(options: { lot?: Boli; bids?: Bid[]; result?: BoliResult | null } = {}): void {
     fixture.detectChanges();
+    settlePlaces(http);
 
     const lot = options.lot ?? boli();
 
@@ -221,6 +299,8 @@ describe('BoliDetailComponent', () => {
 
   it('shows the minimum the server computed, not one of its own', () => {
     load();
+    component.openBid(boli());
+    fixture.detectChanges();
 
     // 15,100 + 500. The screen must print the server's `minimumNextBid`,
     // because the increment rule belongs to the Boli and a second copy here
@@ -291,6 +371,33 @@ describe('BoliDetailComponent', () => {
   it('shows the Samaaj eligibility rule as its own words', () => {
     load();
 
+    expect(text()).toContain('One per family.');
+  });
+
+  it('opens the bid form over the page, starting on the minimum', () => {
+    load();
+
+    expect(fixture.nativeElement.querySelector('#amount')).toBeNull();
+
+    (fixture.nativeElement.querySelector('.actions .btn') as HTMLButtonElement).click();
+    fixture.detectChanges();
+
+    expect(fixture.nativeElement.querySelector('[role="dialog"] #amount')).not.toBeNull();
+    expect(component.amount).toBe('15600');
+
+    component.closeBid();
+    fixture.detectChanges();
+
+    expect(fixture.nativeElement.querySelector('[role="dialog"]')).toBeNull();
+  });
+
+  it('shows everything entered when the Boli was opened', () => {
+    load({ lot: boli({ venue: 'Shri Mahavir Mandir', localityId: 'l1', occasionTitle: 'Paryushan 2026' }) });
+
+    expect(component.tab()).toBe('details');
+    expect(text()).toContain('Shri Mahavir Mandir · Hiran Magri, Udaipur');
+    expect(text()).toContain('Paryushan 2026');
+    expect(text()).toContain('15,000');
     expect(text()).toContain('One per family.');
   });
 
@@ -375,8 +482,11 @@ describe('BoliDetailComponent', () => {
     // The endpoint answers 404 by design until one is recorded. http.verify()
     // in afterEach is what proves the call was not made.
     load({ lot: boli({ status: 'Open', acceptsBids: true }) });
+    component.tab.set('result');
+    fixture.detectChanges();
 
-    expect(text()).not.toContain('Result');
+    expect(component.result()).toBeNull();
+    expect(text()).toContain('No result yet');
   });
 
   it('says a result is recorded without naming anybody', () => {
@@ -384,6 +494,11 @@ describe('BoliDetailComponent', () => {
       lot: boli({ status: 'Closed', acceptsBids: false }),
       result: result({ isPublished: false, winningMemberId: null, publishedAt: null }),
     });
+
+    // Not announced, so it does not open on the result.
+    expect(component.tab()).toBe('details');
+    component.tab.set('result');
+    fixture.detectChanges();
 
     expect(text()).toContain('will be announced shortly');
     expect(text()).not.toContain('Won by you');
@@ -395,8 +510,21 @@ describe('BoliDetailComponent', () => {
       result: result({ winnerIsMe: true }),
     });
 
+    expect(component.tab()).toBe('result');
     expect(text()).toContain('Won by you');
     expect(text()).toContain('16,100');
+  });
+
+  it('names the winner to everybody once it is announced', () => {
+    load({
+      lot: boli({ status: 'ResultPublished', acceptsBids: false }),
+      result: result(),
+    });
+
+    http.expectOne('/v1/members/m1').flush({ id: 'm1', fullName: 'Ravi Jain', photoUrl: null });
+    fixture.detectChanges();
+
+    expect(text()).toContain('Won by Ravi Jain');
   });
 
   it('offers no bid form once the window has passed', () => {
@@ -424,6 +552,8 @@ describe('BoliDetailComponent', () => {
     load({
       bids: [bid({ id: 'x', isMine: true }), bid({ id: 'y', amount: 1_500_000 })],
     });
+    component.tab.set('bids');
+    fixture.detectChanges();
 
     expect(text()).toContain('Yours');
     expect(fixture.nativeElement.querySelectorAll('tr.mine')).toHaveLength(1);
@@ -470,6 +600,7 @@ describe('OccasionComponent', () => {
       boli: boliUnder,
     };
 
+    settlePlaces(http);
     http.expectOne('/v1/boli/occasions/o1').flush(detail);
     fixture.detectChanges();
   }

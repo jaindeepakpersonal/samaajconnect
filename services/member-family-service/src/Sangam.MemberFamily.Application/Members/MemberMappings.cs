@@ -87,5 +87,6 @@ public static class MemberMappings
             profile.Privacy.Qualification.ToString()),
         profile.IsListedInDirectory,
         profile.CreatedAt,
-        profile.UpdatedAt);
+        profile.UpdatedAt,
+        profile.MaritalStatus?.ToString());
 }

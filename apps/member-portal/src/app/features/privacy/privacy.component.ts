@@ -71,7 +71,7 @@ import {
              nothing else is shown. -->
         <h2 class="section-heading">Your account has been erased</h2>
 
-        <p class="notice info" role="status">
+        <p class="notice ok" role="status">
           Erased {{ dateTime(done.erasedAt) }}.
         </p>
 
@@ -154,7 +154,7 @@ import {
           }
 
           @if (privacySaved()) {
-            <p class="notice info" role="status">Your privacy settings have been saved.</p>
+            <p class="notice ok" role="status">Your privacy settings have been saved.</p>
           }
 
           <div class="actions">
@@ -265,7 +265,7 @@ import {
         }
 
         @if (exportReady()) {
-          <p class="notice info" role="status">
+          <p class="notice ok" role="status">
             Your copy has been downloaded.
           </p>
         }
