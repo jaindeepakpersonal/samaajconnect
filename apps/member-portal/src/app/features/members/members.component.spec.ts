@@ -97,6 +97,12 @@ function providers() {
   ];
 }
 
+// jsdom implements neither, and the directive that renders a hosted photo uses
+// both. Set for the whole file, not per describe: a photo drawn by a test that
+// did not stub them is an unhandled error after it, which fails the run in CI.
+URL.createObjectURL = () => 'blob:test';
+URL.revokeObjectURL = () => undefined;
+
 describe('MembersListComponent', () => {
   let fixture: ComponentFixture<MembersListComponent>;
   let component: MembersListComponent;

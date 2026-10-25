@@ -59,9 +59,13 @@ public sealed class RedisTenantCache(IConnectionMultiplexer redis, ILogger<Redis
                 return null;
             }
 
+            // (string), explicitly: RedisValue converts implicitly to both string
+            // and ReadOnlySpan<byte>, and newer SDKs refuse to pick between the two
+            // Deserialize overloads - CI's 9.0.x broke the build on this line
+            // while an older local SDK still compiled it.
             return value == NegativeCacheMarker
                 ? new CachedTenantLookup(false, null)
-                : new CachedTenantLookup(true, JsonSerializer.Deserialize<ResolvedTenant>(value!, JsonOptions));
+                : new CachedTenantLookup(true, JsonSerializer.Deserialize<ResolvedTenant>((string)value!, JsonOptions));
         }
         catch (Exception exception)
         {

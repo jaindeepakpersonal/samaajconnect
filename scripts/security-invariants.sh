@@ -65,7 +65,10 @@ END {
   for (i = 1; i <= n; i++) {
     if (line[i] !~ /(public|internal) +(sealed +)?record +[A-Za-z0-9_]+/) { continue }
     decl = line[i]
-    for (j = i + 1; j <= n && j <= i + 12; j++) {
+    # A one-line record ends on its own line. Without this check the scan ran on
+    # into the next declaration and read PlaceOrderCommand's ": ICommand<>" as
+    # belonging to PlaceOrderItem, the line-item record declared above it.
+    for (j = i + 1; line[i] !~ /(\{|;) *$/ && j <= n && j <= i + 12; j++) {
       decl = decl " " line[j]
       if (line[j] ~ /(\{|;) *$/) { break }
     }

@@ -98,6 +98,12 @@ describe('GroupElectionsComponent', () => {
   let http: HttpTestingController;
 
   beforeEach(() => {
+    // jsdom implements neither, and the directive that renders a hosted photo
+    // uses both - left unstubbed, every photo it fetches is an unhandled error
+    // after the test, which fails the whole run in CI.
+    URL.createObjectURL = () => 'blob:test';
+    URL.revokeObjectURL = () => undefined;
+
     TestBed.configureTestingModule({
       imports: [GroupElectionsComponent],
       providers: [
