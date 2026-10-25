@@ -364,7 +364,37 @@ describe('ElectionComponent', () => {
       .flush(detail({ acceptsVotes: false, acceptsNominations: true }, []));
     fixture.detectChanges();
 
-    expect(text()).toContain('Put forward. An administrator decides');
+    expect(text()).toContain('Aarav Jain put forward. An administrator decides');
+  });
+
+  it('clears the last outcome as soon as the next name is typed', () => {
+    load(detail({ acceptsVotes: false, acceptsNominations: true, status: 'NominationsOpen' }, []));
+
+    component.selectNominee({ id: 'm2', fullName: 'Aarav Jain' } as never);
+    component.nominate(component.detail()!.election);
+    http
+      .expectOne('/v1/panch/elections/e1/candidates')
+      .flush({ electionId: 'e1', candidateId: 'c9', memberId: 'm2', nominated: true });
+    http
+      .expectOne('/v1/panch/elections/e1')
+      .flush(detail({ acceptsVotes: false, acceptsNominations: true }, []));
+
+    component.onNomineeQueryChange('A');
+    fixture.detectChanges();
+
+    expect(component.nominateMessage()).toBeNull();
+    expect(text()).not.toContain('put forward. An administrator decides');
+  });
+
+  it('says a missing election is gone, without offering a retry that cannot help', () => {
+    fixture.detectChanges();
+    http.expectOne('/v1/identity/me').flush(currentUser);
+    http.expectOne('/v1/panch/elections/e1').flush({}, { status: 404, statusText: 'Not Found' });
+    fixture.detectChanges();
+
+    expect(text()).toContain('There is no such election in our Samaaj');
+    expect(text()).not.toContain('Try again');
+    expect(fixture.nativeElement.querySelector('[role="alert"]')).toBeNull();
   });
 
   it('says a repeat nomination is not a failure', () => {
@@ -380,7 +410,7 @@ describe('ElectionComponent', () => {
       .flush(detail({ acceptsVotes: false, acceptsNominations: true }, []));
     fixture.detectChanges();
 
-    expect(text()).toContain('They had already been put forward');
+    expect(text()).toContain('Aarav Jain had already been put forward');
     expect(fixture.nativeElement.querySelector('[role="alert"]')).toBeNull();
   });
 

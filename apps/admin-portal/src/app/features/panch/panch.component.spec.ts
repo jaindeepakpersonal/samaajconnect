@@ -428,6 +428,18 @@ describe('ElectionDetailComponent', () => {
     expect(text()).not.toContain('Take off the ballot');
   });
 
+  it('says voting has closed, not opened, once it has', () => {
+    load(
+      detail({
+        election: election({ status: 'Closed' }),
+        candidates: [candidate({ status: 'Approved', votes: 3 })],
+      }),
+    );
+
+    expect(text()).toContain('Voting has closed');
+    expect(text()).not.toContain('Voting has opened');
+  });
+
   it('shows an administrator the tally even when members cannot see it', () => {
     load(
       detail({
@@ -436,7 +448,9 @@ describe('ElectionDetailComponent', () => {
       }),
     );
 
-    expect(text()).toContain('4 votes cast');
+    // Votes, not voters: one ballot backs up to ten candidates.
+    expect(text()).toContain('4 votes for these candidates');
+    expect(text()).toContain('counts choices, not voters');
     expect(text()).toContain('Members cannot see these counts until voting closes');
   });
 

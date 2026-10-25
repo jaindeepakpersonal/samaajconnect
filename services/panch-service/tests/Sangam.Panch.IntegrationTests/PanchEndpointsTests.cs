@@ -229,6 +229,46 @@ public sealed class PanchEndpointsTests(PanchApiFactory factory)
     }
 
     [Fact]
+    public async Task Moving_an_election_and_deciding_nominations_name_the_administrator_in_the_outbox()
+    {
+        var adminId = Guid.NewGuid();
+        var admin = factory.CreateClientAs(adminId, TenantId, ["SamaajAdmin"], ["Panch.Manage", "Members.Read"]);
+
+        var created = await admin.PostAsJsonAsync("/v1/panch/elections", Body(Start));
+        var electionId = (await created.Content.ReadFromJsonAsync<JsonElement>()).GetProperty("id").GetGuid();
+        await admin.PostAsJsonAsync($"/v1/panch/elections/{electionId}/status", new { status = "NominationsOpen" });
+
+        var candidateIds = new List<Guid>();
+
+        foreach (var _ in Enumerable.Range(0, 2))
+        {
+            var nominated = await Member(Guid.NewGuid()).PostAsJsonAsync(
+                $"/v1/panch/elections/{electionId}/candidates", new { memberId = Guid.NewGuid().ToString() });
+            candidateIds.Add((await nominated.Content.ReadFromJsonAsync<JsonElement>()).GetProperty("candidateId").GetGuid());
+        }
+
+        (await admin.PostAsJsonAsync(
+                $"/v1/panch/elections/{electionId}/candidates/{candidateIds[0]}/decide", new { approve = true }))
+            .StatusCode.Should().Be(HttpStatusCode.OK);
+        (await admin.PostAsJsonAsync(
+                $"/v1/panch/elections/{electionId}/candidates/{candidateIds[1]}/decide", new { approve = false }))
+            .StatusCode.Should().Be(HttpStatusCode.OK);
+
+        var moved = await factory.WithDbContextAsync(db =>
+            db.OutboxMessages.Where(m => m.Topic == "panch.election.status-changed.v1").Select(m => m.Payload).SingleAsync());
+        moved.Should().Contain(adminId.ToString(), "who opened nominations is the audit row's actor");
+
+        var decided = await factory.WithDbContextAsync(db =>
+            db.OutboxMessages.Where(m => m.Topic == "panch.candidate.decided.v1").Select(m => m.Payload).ToListAsync());
+        decided.Should().HaveCount(2);
+        decided.Should().OnlyContain(p => p.Contains(adminId.ToString()));
+        decided.Should().ContainSingle(p => p.Contains("Approved") && p.Contains(candidateIds[0].ToString()));
+        decided.Should().ContainSingle(
+            p => p.Contains("TurnedDown") && p.Contains(candidateIds[1].ToString()),
+            "the turned-down nomination's row is gone, so this is its only record");
+    }
+
+    [Fact]
     public async Task An_admin_removes_one_member_and_the_seat_stays_empty()
     {
         var (electionId, candidates) = await VotingOpenAsync(3);

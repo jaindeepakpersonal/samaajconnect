@@ -76,7 +76,7 @@ public sealed class PublishElectionResultsCommandHandler(
 
         var now = clock.UtcNow;
 
-        if (!election.MoveTo(ElectionStatus.Published, now))
+        if (!election.MoveTo(ElectionStatus.Published, actorId, now))
         {
             return Result.Failure<ElectionResultResponse>(Error.Conflict(
                 "Election.NotClosed",

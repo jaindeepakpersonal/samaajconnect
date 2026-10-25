@@ -160,7 +160,8 @@ import { isNotFound } from '../../core/http-status';
         } @else {
           @if (tallyVisible()) {
             <p class="small">
-              {{ totalVotes() }} vote{{ totalVotes() === 1 ? '' : 's' }} cast.
+              {{ totalVotes() }} vote{{ totalVotes() === 1 ? '' : 's' }} for these candidates -
+              each member's ballot backs up to ten of them, so this counts choices, not voters.
               @if (subject.resultsVisibility === 'HiddenUntilClose') {
                 Members cannot see these counts until voting closes; you can.
               }
@@ -191,7 +192,7 @@ import { isNotFound } from '../../core/http-status';
                           Take off the ballot
                         </button>
                       } @else {
-                        <span class="muted">Voting has opened</span>
+                        <span class="muted">{{ ballotLocked() }}</span>
                       }
                     </td>
                   </tr>
@@ -292,6 +293,22 @@ export class ElectionDetailComponent implements OnInit {
   readonly totalVotes = computed(() =>
     this.approved().reduce((sum, c) => sum + (c.votes ?? 0), 0),
   );
+
+  /**
+   * Why a candidate can no longer be taken off the ballot. It used to say
+   * "Voting has opened" at every stage from then on, which read as wrong once
+   * voting had closed or the result was published.
+   */
+  readonly ballotLocked = computed(() => {
+    switch (this.election()?.status) {
+      case 'Closed':
+        return 'Voting has closed';
+      case 'Published':
+        return 'Result published';
+      default:
+        return 'Voting has opened';
+    }
+  });
 
   /** The one stage this election can move to, or null when the next step is publishing. */
   readonly nextStatus = computed<ElectionStatus | null>(() => {

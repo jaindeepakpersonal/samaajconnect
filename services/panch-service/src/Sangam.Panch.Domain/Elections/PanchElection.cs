@@ -206,7 +206,7 @@ public sealed class PanchElection : AggregateRoot, ITenantScopedEntity
     /// NominationsOpen, VotingOpen, Closed, Published - because an election that
     /// can go backwards is not an election.
     /// </summary>
-    public bool MoveTo(ElectionStatus target, DateTimeOffset now)
+    public bool MoveTo(ElectionStatus target, Guid changedBy, DateTimeOffset now)
     {
         var allowed = Status switch
         {
@@ -236,7 +236,7 @@ public sealed class PanchElection : AggregateRoot, ITenantScopedEntity
         }
 
         Raise(new ElectionStatusChangedDomainEvent(
-            Id, TenantId, previous.ToString(), target.ToString(), now));
+            Id, TenantId, previous.ToString(), target.ToString(), changedBy, now));
 
         return true;
     }
@@ -277,11 +277,17 @@ public sealed class PanchElection : AggregateRoot, ITenantScopedEntity
 
         candidate.Approve(approvedBy, now);
 
+        Raise(new CandidateDecidedDomainEvent(
+            Id, TenantId, candidate.Id, candidate.MemberId, "Approved", approvedBy, now));
+
         return true;
     }
 
-    /// <summary>Removes a nomination before the ballot is set.</summary>
-    public bool RejectCandidate(Guid candidateId, DateTimeOffset now)
+    /// <summary>
+    /// Removes a nomination before the ballot is set. The row goes, so the event
+    /// is the only trace that it was turned down, and by whom.
+    /// </summary>
+    public bool RejectCandidate(Guid candidateId, Guid rejectedBy, DateTimeOffset now)
     {
         if (Status is ElectionStatus.VotingOpen or ElectionStatus.Closed or ElectionStatus.Published)
         {
@@ -298,6 +304,9 @@ public sealed class PanchElection : AggregateRoot, ITenantScopedEntity
         }
 
         _candidates.Remove(candidate);
+
+        Raise(new CandidateDecidedDomainEvent(
+            Id, TenantId, candidate.Id, candidate.MemberId, "TurnedDown", rejectedBy, now));
 
         return true;
     }

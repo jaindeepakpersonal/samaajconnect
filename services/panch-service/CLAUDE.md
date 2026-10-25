@@ -51,6 +51,7 @@ when it is ready to elect a Panch.
 - `ElectionUpdatedDomainEvent` — `panch.election.updated.v1`
 - `ElectionVotingExtendedDomainEvent` — `panch.election.voting-extended.v1`
 - `ElectionDeletedDomainEvent` — `panch.election.deleted.v1`
+- `CandidateDecidedDomainEvent` — `panch.candidate.decided.v1`
 - `PanelChangedDomainEvent` — `panch.panel.changed.v1`
 
 ## Events consumed
@@ -124,6 +125,19 @@ leaving a dead election on the list and starting another.
 
 Each names the administrator who acted, and the extension also carries the
 close members were first told, so the audit row shows both.
+
+**Every administrator's act on an election names them (2026-10-25).** Until
+then the status change - opening nominations, opening voting, closing it,
+publishing - carried no actor, and approving or turning down a nomination
+raised no event at all. A browser walk through the whole flow found the
+audit trail could not say who closed voting or who kept a nominee off the
+ballot. `ElectionStatusChangedDomainEvent` now carries `ChangedBy`, and
+`CandidateDecidedDomainEvent` records each decision with `DecidedBy` and
+`Approved` or `TurnedDown`. A turned-down nomination is deleted, so its event
+is the only trace it existed. A decision that changes nothing - approving
+somebody already on the ballot, or trying to remove one after voting opens -
+raises nothing. Creating an election is still unaudited: it is a draft
+nobody can see until nominations open, and opening them names who did.
 
 ## Testing
 
