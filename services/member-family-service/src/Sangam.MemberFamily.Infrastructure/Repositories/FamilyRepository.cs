@@ -43,6 +43,13 @@ public sealed class FamilyRepository(MemberFamilyDbContext dbContext) : IFamilyR
                     && m.Status != FamilyMemberStatus.Rejected),
                 cancellationToken);
 
+    public Task<Family?> GetByIdForConsumerAsync(
+        Guid familyId, CancellationToken cancellationToken = default) =>
+        dbContext.Families
+            .IgnoreQueryFilters()
+            .Include(f => f.Members)
+            .FirstOrDefaultAsync(f => f.Id == familyId, cancellationToken);
+
     public async Task<IReadOnlyList<Family>> ListForMembersAsync(
         IReadOnlyCollection<Guid> memberProfileIds, CancellationToken cancellationToken = default)
     {

@@ -796,6 +796,28 @@ for attempt in $(seq 1 30); do
   sleep 2
 done
 check "the child record is marked Converted" 1 "$converted"
+
+# **And they are a member, with a profile, from the same event.** Until
+# 2026-10-25 nothing created one: a converted child signed in with the Member
+# role and /v1/members/me answered 404, which surfaced eleven sections later as
+# the Matrimony section failing to set a marital status. The profile is written
+# in the same transaction as the Converted status above, so no wait is needed.
+CHILD_TOKEN=$(sign_in_as "$CHILD_EMAIL" "$CHILD_PASSWORD")
+
+check "the converted child has a member profile of their own" 200 \
+  "$(status -H "Authorization: Bearer $CHILD_TOKEN" "$GATEWAY/v1/members/me")"
+
+CHILD_PROFILE_ID=$(curl -s -H "Authorization: Bearer $CHILD_TOKEN" "$GATEWAY/v1/members/me" | json_field id)
+
+if [ -n "$CHILD_PROFILE_ID" ] \
+   && curl -s -H "Authorization: Bearer $CHILD_TOKEN" "$GATEWAY/v1/families/mine" \
+      | grep -q "\"memberProfileId\":\"$CHILD_PROFILE_ID\""; then
+  echo "  ok    and is a member of the household they were a child of"
+  pass=$((pass + 1))
+else
+  echo "  FAIL  the converted child joins their household"
+  fail=$((fail + 1))
+fi
 echo
 echo "DPDP: the three data exports, and the grievance contact"
 check "identity export" 200 "$(status -H "Authorization: Bearer $MEMBER_TOKEN" \
@@ -1275,7 +1297,14 @@ SECOND_CHILD=$(curl -s -X POST "$GATEWAY/v1/children" -H 'Content-Type: applicat
   | json_field id)
 require_id second_child "$SECOND_CHILD"
 
-# The head of the smoke Samaaj's main household is its only member, and now has
+# The converted child joined this household when their conversion completed,
+# so it has two members. They leave it first - which is also the check that a
+# converted child is an ordinary member who can - so the head is its last.
+check "the converted child can leave the household like any member" 200 \
+  "$(status -X DELETE "$GATEWAY/v1/families/mine/membership" \
+     -H "Authorization: Bearer $CHILD_TOKEN")"
+
+# The head of the smoke Samaaj's main household is now its only member, and has
 # a minor in it. Leaving would leave that record with nobody able to manage it,
 # so it is refused rather than allowed to orphan them.
 check "but the last member of a household with a minor in it cannot" 409 \
@@ -3819,7 +3848,10 @@ matrimony_checks() {
          \"aboutMe\":\"Loves to travel.\",
          \"consentGiven\":true,\"noticeVersion\":\"$NOTICE_VERSION\"}")
 
-  CANDIDATE_ID=$(printf '%s' "$CANDIDATE" | json_field id)
+  # memberId, not id: the opt-in answers with the biodata nested under its
+  # member, and that id is what a proposal is addressed to. This read `id` and
+  # went unnoticed while the section never got this far.
+  CANDIDATE_ID=$(printf '%s' "$CANDIDATE" | json_field memberId)
 
   if [ -n "$CANDIDATE_ID" ]; then
     echo "  ok    and a second member opts in too"

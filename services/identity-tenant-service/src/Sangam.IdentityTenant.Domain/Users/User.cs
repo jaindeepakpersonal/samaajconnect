@@ -273,7 +273,9 @@ public sealed class User : AggregateRoot, ITenantScopedEntity
     /// signal to the rest of the platform. A converted child already has a
     /// <see cref="ChildProfile"/> waiting in member-family-service, so
     /// <see cref="UserActivatedFromChildDomainEvent"/> links the new account
-    /// to it. An invited admin has no such record - member-family-service has
+    /// to it - and, since 2026-10-25, is also what creates their
+    /// <c>MemberProfile</c> there, which until then nothing did. An invited
+    /// admin has no such record - member-family-service has
     /// never heard of them - so this raises <see cref="UserRegisteredDomainEvent"/>
     /// instead, the same event an ordinary registration raises, which is what
     /// creates their <c>MemberProfile</c>. Raising the child-conversion event

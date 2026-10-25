@@ -335,6 +335,30 @@ public sealed class Family : AggregateRoot, ITenantScopedEntity
         return true;
     }
 
+    /// <summary>
+    /// Makes a child of this household, who has just converted to an account of
+    /// their own, an Active member of it with no join request in between.
+    /// Returns false, changing nothing, when they already have a row here.
+    /// </summary>
+    /// <remarks>
+    /// No request because there is nothing to decide: they were already in the
+    /// household as a child record, and the family admin is who started the
+    /// conversion. Joining is not a commitment either - they can leave like any
+    /// other member, or erase their account.
+    /// </remarks>
+    public bool AdmitConvertedChild(Guid memberProfileId, DateTimeOffset admittedAt)
+    {
+        if (FindMember(memberProfileId) is not null)
+        {
+            return false;
+        }
+
+        _members.Add(new FamilyMember(
+            Id, memberProfileId, Relationship.Child, FamilyMemberStatus.Active, admittedAt));
+
+        return true;
+    }
+
     public bool DecideJoinRequest(Guid requestId, bool accepted, Guid decidedBy, DateTimeOffset decidedAt)
     {
         var request = _members.FirstOrDefault(

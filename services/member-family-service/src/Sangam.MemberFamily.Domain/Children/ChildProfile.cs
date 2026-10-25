@@ -39,7 +39,10 @@ public sealed class ChildProfile : AggregateRoot, ITenantScopedEntity
     /// </summary>
     public ParentalConsent? ParentalConsent { get; private set; }
 
-    /// <summary>The member profile created when conversion was approved.</summary>
+    /// <summary>
+    /// The account - and the member profile, which shares its id - created
+    /// when conversion completed.
+    /// </summary>
     public Guid? ConvertedMemberId { get; private set; }
 
     public DateTimeOffset CreatedAt { get; private set; }

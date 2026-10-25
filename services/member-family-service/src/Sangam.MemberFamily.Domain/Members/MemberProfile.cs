@@ -131,21 +131,88 @@ public sealed class MemberProfile : AggregateRoot, ITenantScopedEntity
             CreatedAt = createdAt,
         };
 
-        // The identifier someone registered with is their first known contact
-        // detail; seeding it saves them retyping it, and they can change it.
-        if (!string.IsNullOrWhiteSpace(mobileOrEmail))
-        {
-            if (mobileOrEmail.Contains('@'))
-            {
-                profile.Email = mobileOrEmail.Trim().ToLowerInvariant();
-            }
-            else
-            {
-                profile.Mobile = mobileOrEmail.Trim();
-            }
-        }
+        profile.SeedContact(mobileOrEmail);
 
         return profile;
+    }
+
+    /// <summary>
+    /// Creates the profile of a child who has just become a member in their own
+    /// right, seeded from the record their household kept for them.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// Called from the conversion-completion consumer, never from an endpoint.
+    /// A converted child signs in with the Member role, so without this they
+    /// held a login and no profile: <c>/v1/members/me</c> answered 404 and
+    /// every screen built on it was unusable. Same gap identity-tenant-service
+    /// closed for invited admins, one consumer further along.
+    /// </para>
+    /// <para>
+    /// The defaults are a registration's - <see cref="FieldPrivacy.Default"/>
+    /// and listed - because from today they are an ordinary adult member and
+    /// these are now their own choices to make. The permanent address is the
+    /// household's (the caller passes the family admin's): it is where they
+    /// were living when the household added them, it starts
+    /// <see cref="PrivacyLevel.Private"/>, and its locality is what puts them
+    /// in their Area Admin's scope rather than outside everyone's.
+    /// </para>
+    /// <para>
+    /// The child's photograph is deliberately not carried over. It was held on
+    /// a parent's consent (DPDP s.9); whether the adult wants it on their
+    /// directory card is theirs to decide by uploading one.
+    /// </para>
+    /// </remarks>
+    public static MemberProfile FromConvertedChild(
+        Guid userId,
+        Guid tenantId,
+        string fullName,
+        DateOnly dateOfBirth,
+        Gender gender,
+        string? mobileOrEmail,
+        ProfileAddress permanentAddress,
+        DateTimeOffset createdAt)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(fullName);
+        ArgumentNullException.ThrowIfNull(permanentAddress);
+
+        var profile = new MemberProfile
+        {
+            Id = userId,
+            TenantId = tenantId,
+            FullName = fullName.Trim(),
+            DateOfBirth = dateOfBirth,
+            Gender = gender,
+            PermanentAddress = NormalizeAddress(permanentAddress),
+            Privacy = FieldPrivacy.Default,
+            IsListedInDirectory = true,
+            CreatedAt = createdAt,
+        };
+
+        profile.SeedContact(mobileOrEmail);
+
+        return profile;
+    }
+
+    /// <summary>
+    /// The identifier someone signs in with is their first known contact
+    /// detail; seeding it saves them retyping it, and they can change it.
+    /// </summary>
+    private void SeedContact(string? mobileOrEmail)
+    {
+        if (string.IsNullOrWhiteSpace(mobileOrEmail))
+        {
+            return;
+        }
+
+        if (mobileOrEmail.Contains('@'))
+        {
+            Email = mobileOrEmail.Trim().ToLowerInvariant();
+        }
+        else
+        {
+            Mobile = mobileOrEmail.Trim();
+        }
     }
 
     /// <summary>
