@@ -15,7 +15,8 @@
 #   - master data: the migration's seeded countries, states and cities as they
 #     are, plus Parsad, Sarada and Chawand (Rajasthan) and five Udaipur
 #     localities. Udaipur, Mumbai and Pune are already in the seeded list.
-#   - one Samaaj, Shri Digambar Jain Dasha Nagda Samaaj, with every module on
+#   - one Samaaj, Shri Digambar Jain Dasha Nagda Samaaj, with every module on,
+#     its logo and its banner (scripts/seed-assets)
 #   - its five Gautras: Mundfoda, Pujavat, Pancholi, Mundaliya, Devda
 #   - a Samaaj Admin, and an Area Admin for each locality
 #   - 50 members, each with a random Gautra, in five households of ten (family
@@ -212,6 +213,15 @@ need "tenant id" "$TENANT_ID" "is the database fresh?"
 expect "activating the Samaaj" 200 "$(status -X PATCH "$GATEWAY/v1/identity/tenants/$TENANT_ID/status" \
   -H 'Content-Type: application/json' -H "Authorization: Bearer $SUPER" -d '{"status":"Active"}')"
 note "$SAMAAJ_NAME ($SLUG), every module on"
+
+# Every Samaaj has a logo and a banner: the logo beside its name everywhere,
+# the banner across the top of its members' Home.
+ASSETS="$(dirname "$0")/seed-assets"
+expect "uploading the logo" 200 "$(status -X POST "$GATEWAY/v1/identity/tenants/$TENANT_ID/logo" \
+  -H "Authorization: Bearer $SUPER" -F "file=@$ASSETS/dasha-nagda-logo.png")"
+expect "uploading the banner" 200 "$(status -X POST "$GATEWAY/v1/identity/tenants/$TENANT_ID/banner" \
+  -H "Authorization: Bearer $SUPER" -F "file=@$ASSETS/dasha-nagda-banner.jpg")"
+note "logo and banner uploaded"
 
 OVERRIDE="X-Tenant-Override-Id: $TENANT_ID"
 

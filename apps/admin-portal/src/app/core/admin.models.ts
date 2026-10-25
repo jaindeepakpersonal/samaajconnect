@@ -12,6 +12,9 @@ export interface Tenant {
   readonly slug: string;
   readonly domain: string | null;
   readonly logoUrl: string | null;
+
+  /** Members only, unlike the logo - fetch it with `scAuthedSrc`, never a plain `src`. */
+  readonly bannerUrl: string | null;
   readonly contactPerson: string | null;
   readonly contactEmail: string | null;
   readonly status: TenantStatus;

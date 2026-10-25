@@ -56,7 +56,7 @@ public sealed class UploadTenantLogoCommandValidator : AbstractValidator<UploadT
 
 public sealed class UploadTenantLogoCommandHandler(
     ITenantRepository tenants,
-    ILogoStore logos,
+    ITenantImageStore logos,
     IUnitOfWork unitOfWork,
     ITenantContext tenantContext,
     ICurrentUser currentUser,
@@ -84,7 +84,7 @@ public sealed class UploadTenantLogoCommandHandler(
                 Error.NotFound("Tenant.NotFound", "No Samaaj with that id exists."));
         }
 
-        var logo = TenantLogo.Capture(
+        var logo = TenantImage.Capture(
             tenant.Id, command.Bytes, currentUser.UserId ?? Guid.Empty, clock.UtcNow);
 
         logos.Add(logo);
@@ -120,7 +120,7 @@ public sealed class RemoveTenantLogoCommandValidator : AbstractValidator<RemoveT
 
 public sealed class RemoveTenantLogoCommandHandler(
     ITenantRepository tenants,
-    ILogoStore logos,
+    ITenantImageStore logos,
     IUnitOfWork unitOfWork,
     ITenantContext tenantContext,
     ICurrentUser currentUser)

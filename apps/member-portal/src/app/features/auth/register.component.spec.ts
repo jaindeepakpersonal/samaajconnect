@@ -16,6 +16,7 @@ describe('RegisterComponent', () => {
       name: 'Mahavir Samaaj',
       slug: 'mahavir-samaj',
       logoUrl: null,
+      bannerUrl: null,
       status: 'Active',
       enabledModules: [],
     },

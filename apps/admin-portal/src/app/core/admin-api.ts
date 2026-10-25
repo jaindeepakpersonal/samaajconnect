@@ -167,6 +167,19 @@ export class AdminApi {
     return this.http.delete<void>(`/v1/identity/tenants/${tenantId}/logo`);
   }
 
+  /** Uploads the photo across the top of a Samaaj's members' Home. Multipart, like a logo. */
+  uploadTenantBanner(tenantId: string, file: File): Observable<void> {
+    const body = new FormData();
+    body.append('file', file);
+
+    return this.http.post<void>(`/v1/identity/tenants/${tenantId}/banner`, body);
+  }
+
+  /** Takes a banner down. Doing it twice is success. */
+  removeTenantBanner(tenantId: string): Observable<void> {
+    return this.http.delete<void>(`/v1/identity/tenants/${tenantId}/banner`);
+  }
+
   /** A volunteer group's banner photo. Multipart, like a logo; the service reads the type from the bytes. */
   uploadGroupPhoto(groupId: string, file: File): Observable<void> {
     const body = new FormData();

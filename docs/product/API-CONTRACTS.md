@@ -21,6 +21,12 @@ enforced by `TenantAuthorizationBehavior`, not just UI hiding.
 | GET | `/tenants/by-id/{id}` | Anonymous | Resolve id → tenant (used by the gateway on every request) |
 | GET | `/tenants/directory` | Anonymous | Active Samaaj a visitor can register into |
 | PUT | `/tenants/{id}/grievance-contact` | SuperAdmin, SamaajAdmin | Name who members complain to (DPDP s.13) |
+| POST | `/tenants/{id}/logo` | SuperAdmin, SamaajAdmin (own Samaaj) | Upload the logo, multipart. JPEG/PNG/WebP read from the bytes, 2 MB |
+| GET | `/tenants/{id}/logo` | Anonymous | The logo - public, so the registration form can show it. `Cache-Control: public` |
+| DELETE | `/tenants/{id}/logo` | SuperAdmin, SamaajAdmin (own Samaaj) | Take the logo down; twice is success |
+| POST | `/tenants/{id}/banner` | SuperAdmin, SamaajAdmin (own Samaaj) | Upload the banner across members' Home, multipart, same rules as the logo |
+| GET | `/tenants/{id}/banner` | That Samaaj's Member/SamaajAdmin/AreaAdmin, SuperAdmin | The banner - members only, `Cache-Control: private`. Another Samaaj's member gets 404 |
+| DELETE | `/tenants/{id}/banner` | SuperAdmin, SamaajAdmin (own Samaaj) | Take the banner down; twice is success |
 | GET | `/tenants/{id}/security-policy` | SuperAdmin, SamaajAdmin (own Samaaj) | A Samaaj's own overrides to the platform's password/OTP/lockout/session constants, raw and nullable |
 | PUT | `/tenants/{id}/security-policy` | SuperAdmin, SamaajAdmin (own Samaaj) | Replace those overrides, whole. A null field clears that override back to the platform default |
 | POST | `/register` | Anonymous | Member registration into one Samaaj |

@@ -11,7 +11,7 @@ screen. The spec is `docs/product/wireframes/admin-panel-wireframes.html`.
 |---|---|---|---|
 | Sign in | `/login` | — (the wireframe has none) | built. A CAPTCHA and the password, then a 6-digit code on an untrusted browser (trust it for 30 days) - `SignInFlow` in libs/shared, shared with the member portal |
 | Dashboard | `/dashboard` | `#dashboard` | built — see below |
-| Samaaj / Tenants | `/tenants` | `#tenants` | built. Status, modules, logo, and the DPDP s.13 grievance contact |
+| Samaaj / Tenants | `/tenants` | `#tenants` | built. Status, modules, logo and banner (flagged "Missing" until a Samaaj has both), and the DPDP s.13 grievance contact |
 | Create Samaaj | `/tenants/new` | `#createtenant` | built |
 | Admin Users & Roles | `/admins` | `#admins` | built. Roles, re-issuing a one-time activation code, and suspending or reinstating an account |
 | Invite Admin | `/admins/invite` | `#inviteadmin` | built |
@@ -669,6 +669,13 @@ while the dashboard counted it every day. The button is on the status cell of a
 pending row, and the panel says the earlier code has been cancelled, because an
 administrator who hands out a second code without knowing that leaves somebody
 holding a dead one.
+
+**The banner sits beside the logo in one "Logo & banner" panel (2026-10-25)**,
+and the panel says what differs: the logo is public, the banner is shown only
+to the Samaaj's own members. So the logo is drawn with a plain `<img src>` and
+the banner preview through `scAuthedSrc`, which sends the token - a plain `src`
+would be refused. The row's button carries a "Missing" pill until a Samaaj has
+both, the same nudge "Grievance contact" gives with "Not named".
 
 **The grievance form duplicates the service's rule and must stay in step.** A
 name with no email and no phone is refused, because that is not a means of

@@ -7,7 +7,7 @@ using Sangam.IdentityTenant.Domain.Media;
 namespace Sangam.IdentityTenant.Api.Endpoints;
 
 /// <summary>
-/// A Samaaj's logo: upload, serve, remove.
+/// A Samaaj's own images - its logo and its banner: upload, serve, remove.
 /// </summary>
 /// <remarks>
 /// Its own file rather than joining <c>TenantEndpoints</c>, per CLAUDE.md §4.6 —
@@ -21,7 +21,7 @@ namespace Sangam.IdentityTenant.Api.Endpoints;
 /// services share no code by design; it is small, and both copies are held
 /// identical by <c>scripts/security-invariants.sh</c>.
 /// </remarks>
-public static class TenantLogoEndpoints
+public static class TenantImageEndpoints
 {
     /// <summary>
     /// A little over the domain's cap, so a file just above the limit is read
@@ -30,7 +30,7 @@ public static class TenantLogoEndpoints
     /// </summary>
     private const long MaxUploadBytes = ImageContent.MaxBytes + (64 * 1024);
 
-    public static IEndpointRouteBuilder MapTenantLogoEndpoints(this IEndpointRouteBuilder app)
+    public static IEndpointRouteBuilder MapTenantImageEndpoints(this IEndpointRouteBuilder app)
     {
         var group = app.MapGroup("/v1/identity/tenants").WithTags("Tenants");
 
@@ -40,7 +40,7 @@ public static class TenantLogoEndpoints
                 ISender sender,
                 CancellationToken cancellationToken) =>
             {
-                var (bytes, error) = await ReadAsync(request, cancellationToken);
+                var (bytes, error) = await ReadAsync(request, "logo", cancellationToken);
 
                 if (error is not null)
                 {
@@ -75,7 +75,7 @@ public static class TenantLogoEndpoints
             {
                 var result = await sender.Send(new GetTenantLogoQuery(id), cancellationToken);
 
-                return Serve(result, context);
+                return Serve(result, context, isPublic: true);
             })
             .AllowAnonymous()
             .WithName("GetTenantLogo")
@@ -100,6 +100,69 @@ public static class TenantLogoEndpoints
             .ProducesProblem(StatusCodes.Status403Forbidden)
             .ProducesProblem(StatusCodes.Status404NotFound);
 
+        group.MapPost("/{id:guid}/banner", async (
+                Guid id,
+                HttpRequest request,
+                ISender sender,
+                CancellationToken cancellationToken) =>
+            {
+                var (bytes, error) = await ReadAsync(request, "banner", cancellationToken);
+
+                if (error is not null)
+                {
+                    return error;
+                }
+
+                var result = await sender.Send(
+                    new UploadTenantBannerCommand(id, bytes!), cancellationToken);
+
+                return result.ToApiResult();
+            })
+            .RequireAuthorization()
+            .WithName("UploadTenantBanner")
+            .WithSummary("Upload the photo across the top of a Samaaj's members' Home. JPEG, PNG or WebP, 2 MB or smaller.")
+            .Accepts<IFormFile>("multipart/form-data")
+            .Produces<TenantBannerResponse>()
+            .ProducesValidationProblem()
+            .ProducesProblem(StatusCodes.Status403Forbidden)
+            .ProducesProblem(StatusCodes.Status404NotFound)
+            .DisableAntiforgery();
+
+        // Members only, unlike the logo above - GetTenantBannerQuery says why.
+        group.MapGet("/{id:guid}/banner", async (
+                Guid id,
+                HttpContext context,
+                ISender sender,
+                CancellationToken cancellationToken) =>
+            {
+                var result = await sender.Send(new GetTenantBannerQuery(id), cancellationToken);
+
+                return Serve(result, context, isPublic: false);
+            })
+            .RequireAuthorization()
+            .WithName("GetTenantBanner")
+            .WithSummary("A Samaaj's banner, to its own members.")
+            .Produces(StatusCodes.Status200OK, contentType: "image/jpeg")
+            .ProducesProblem(StatusCodes.Status401Unauthorized)
+            .ProducesProblem(StatusCodes.Status404NotFound);
+
+        group.MapDelete("/{id:guid}/banner", async (
+                Guid id,
+                ISender sender,
+                CancellationToken cancellationToken) =>
+            {
+                var result = await sender.Send(
+                    new RemoveTenantBannerCommand(id), cancellationToken);
+
+                return result.ToApiResult();
+            })
+            .RequireAuthorization()
+            .WithName("RemoveTenantBanner")
+            .WithSummary("Take a Samaaj's banner down. Doing it twice is success.")
+            .Produces(StatusCodes.Status200OK)
+            .ProducesProblem(StatusCodes.Status403Forbidden)
+            .ProducesProblem(StatusCodes.Status404NotFound);
+
         return app;
     }
 
@@ -114,12 +177,12 @@ public static class TenantLogoEndpoints
     /// so the common honest case fails fast.
     /// </remarks>
     private static async Task<(byte[]? Bytes, IResult? Error)> ReadAsync(
-        HttpRequest request, CancellationToken cancellationToken)
+        HttpRequest request, string what, CancellationToken cancellationToken)
     {
         if (!request.HasFormContentType)
         {
             return (null, Results.Problem(
-                title: "Upload a logo as a form file.",
+                title: $"Upload a {what} as a form file.",
                 detail: "This endpoint takes multipart/form-data with a single file part.",
                 statusCode: StatusCodes.Status400BadRequest));
         }
@@ -130,14 +193,14 @@ public static class TenantLogoEndpoints
         if (file is null || file.Length == 0)
         {
             return (null, Results.Problem(
-                title: "No logo was uploaded.",
+                title: $"No {what} was uploaded.",
                 detail: "Attach one image file.",
                 statusCode: StatusCodes.Status400BadRequest));
         }
 
         if (file.Length > MaxUploadBytes)
         {
-            return (null, TooLarge());
+            return (null, TooLarge(what));
         }
 
         using var buffer = new MemoryStream();
@@ -150,7 +213,7 @@ public static class TenantLogoEndpoints
         {
             if (buffer.Length + read > MaxUploadBytes)
             {
-                return (null, TooLarge());
+                return (null, TooLarge(what));
             }
 
             buffer.Write(chunk, 0, read);
@@ -159,22 +222,23 @@ public static class TenantLogoEndpoints
         return (buffer.ToArray(), null);
     }
 
-    private static IResult TooLarge() => Results.Problem(
-        title: $"A logo has to be {ImageContent.MaxBytes / (1024 * 1024)} MB or smaller.",
+    private static IResult TooLarge(string what) => Results.Problem(
+        title: $"A {what} has to be {ImageContent.MaxBytes / (1024 * 1024)} MB or smaller.",
         detail: "Resize the image and try again.",
         statusCode: StatusCodes.Status413PayloadTooLarge);
 
     /// <summary>
-    /// Writes logo bytes, or maps the failure the way every other endpoint does.
+    /// Writes image bytes, or maps the failure the way every other endpoint does.
     /// </summary>
     /// <remarks>
-    /// <c>Cache-Control: public</c>, which is the opposite of what a member's
-    /// photo gets and for the same reason the endpoint is anonymous: this is an
+    /// The logo is <c>Cache-Control: public</c>, the opposite of what a member's
+    /// photo gets and for the same reason its endpoint is anonymous: an
     /// organisation's mark rather than a person, so a shared cache holding it
-    /// hands it to callers who were always entitled to it. That makes serving
-    /// logos cheaper than serving photos rather than more expensive.
+    /// hands it to callers who were always entitled to it. The banner is
+    /// <c>private</c>, a member's photo's rule: a shared cache would hand a
+    /// photograph of the Samaaj to whoever asked next.
     /// </remarks>
-    private static IResult Serve(Result<LogoContent> result, HttpContext context)
+    private static IResult Serve(Result<TenantImageContent> result, HttpContext context, bool isPublic)
     {
         if (!result.IsSuccess)
         {
@@ -184,7 +248,7 @@ public static class TenantLogoEndpoints
         var logo = result.Value!;
         var etag = $"\"{logo.ETag}\"";
 
-        context.Response.Headers.CacheControl = "public, max-age=3600";
+        context.Response.Headers.CacheControl = isPublic ? "public, max-age=3600" : "private, max-age=3600";
         context.Response.Headers.ETag = etag;
         context.Response.Headers["X-Content-Type-Options"] = "nosniff";
 

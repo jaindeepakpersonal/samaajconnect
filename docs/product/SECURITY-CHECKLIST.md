@@ -520,6 +520,13 @@ is the outer gate and grants nothing on its own.
       does **not** cover that endpoint, and `GetTenantLogoQuery` is on the
       anonymous list above with the same reasoning.
 
+      **A Samaaj's banner is not that exception, and the difference is
+      deliberate (2026-10-25).** It is stored beside the logo, but it is a
+      photograph - usually of the Samaaj's own members - so it is served per
+      request to that Samaaj's members and administrators and to Super Admins
+      only, `Cache-Control: private`, and this box does cover it. Another
+      Samaaj's member is told there is none.
+
 ## Data privacy
 
 - [x] Member directory respects `PrivacyLevel` per profile field, not

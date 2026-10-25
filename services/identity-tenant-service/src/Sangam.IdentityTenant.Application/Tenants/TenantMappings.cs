@@ -19,12 +19,24 @@ internal static class TenantMappings
     private static string? LogoPath(Tenant tenant) =>
         tenant.LogoImageId is null ? null : "/v1/identity/tenants/" + tenant.Id + "/logo";
 
+    /// <summary>
+    /// Where a member fetches this Samaaj's banner, or null when there is none.
+    /// Members only, unlike the logo - see <c>GetTenantBannerQuery</c>. The id
+    /// is in the path so a replaced banner is a new URL and no cache serves the
+    /// old one.
+    /// </summary>
+    private static string? BannerPath(Tenant tenant) =>
+        tenant.BannerImageId is not { } bannerId
+            ? null
+            : "/v1/identity/tenants/" + tenant.Id + "/banner?v=" + bannerId.ToString("N")[..8];
+
     public static TenantResponse ToResponse(this Tenant tenant) => new(
         tenant.Id,
         tenant.Name,
         tenant.Slug,
         tenant.Domain,
         LogoPath(tenant),
+        BannerPath(tenant),
         tenant.ContactPerson,
         tenant.ContactEmail,
         tenant.Status.ToString(),
@@ -44,6 +56,7 @@ internal static class TenantMappings
         tenant.Name,
         tenant.Slug,
         LogoPath(tenant),
+        BannerPath(tenant),
         tenant.Status.ToString(),
         tenant.EnabledModules,
         tenant.GrievanceContactName is null

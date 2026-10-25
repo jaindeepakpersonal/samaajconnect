@@ -21,7 +21,7 @@ public sealed class IdentityTenantDbContext(
     public DbSet<Tenant> Tenants => Set<Tenant>();
 
     /// <summary>Samaaj logos the platform hosts, bytes included.</summary>
-    public DbSet<TenantLogo> TenantLogos => Set<TenantLogo>();
+    public DbSet<TenantImage> TenantImages => Set<TenantImage>();
 
     /// <summary>Sparse - most tenants have no row. See TenantSecurityPolicy.</summary>
     public DbSet<TenantSecurityPolicy> TenantSecurityPolicies => Set<TenantSecurityPolicy>();

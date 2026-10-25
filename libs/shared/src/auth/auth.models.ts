@@ -136,6 +136,13 @@ export interface TenantSummary {
   readonly name: string;
   readonly slug: string;
   readonly logoUrl: string | null;
+
+  /**
+   * Members only, unlike the logo: fetch it with `scAuthedSrc`, never a plain
+   * `src`. A path even here, where the lookup is anonymous - knowing a banner
+   * exists says nothing the picture would.
+   */
+  readonly bannerUrl: string | null;
   readonly status: string;
   readonly enabledModules: readonly string[];
 }

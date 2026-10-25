@@ -270,6 +270,15 @@ pattern: one `MembersApi.get()` per distinct `authorMemberId` on screen,
 called from `load()` for the feed and from `toggleComments()` for whichever
 thread is open, never for the whole Samaaj.
 
+**Home is headed by the Samaaj's own banner and logo (2026-10-25)** - the
+banner photo across the top, the logo in a white-ringed circle on it, and the
+Samaaj's name beside that. They come from the same anonymous Samaaj lookup the
+shell makes for its name (`logoUrl`, `bannerUrl`). The logo is public and drawn
+from its path; the banner is a members-only photograph, so it goes through
+`scAuthedSrc` - a plain `src` would be refused. A Samaaj with no banner gets a
+band in the brand colour, one with no logo its initials, and a lookup that
+fails draws no header and costs the feed nothing.
+
 **Home opens on the reader's own face, and every post shows its author's
 (2026-09-27).** A card at the top of Timeline carries the member's photo, name
 and Gautra - `/v1/members/me`, plus the Gautra list only when they have picked

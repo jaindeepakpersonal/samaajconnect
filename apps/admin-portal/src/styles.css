@@ -649,3 +649,15 @@ main:focus {
   border: 1px solid var(--line);
   border-radius: var(--radius-md);
 }
+
+/* The banner as members' Home draws it: wide and short, cropped to fill. */
+.tenant-banner {
+  display: block;
+  width: 100%;
+  max-width: 480px;
+  aspect-ratio: 4 / 1;
+  object-fit: cover;
+  border-radius: var(--radius-sm);
+  background: var(--line-soft);
+  margin: var(--space-2) 0;
+}

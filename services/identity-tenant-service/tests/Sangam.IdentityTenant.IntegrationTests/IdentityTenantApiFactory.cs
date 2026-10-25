@@ -111,7 +111,7 @@ public class IdentityTenantApiFactory : WebApplicationFactory<Program>, IAsyncLi
     /// nothing about what was left behind.
     /// </remarks>
     public Task<int> CountLogosAsync(Guid tenantId) =>
-        WithDbContextAsync(db => db.TenantLogos.CountAsync(l => l.TenantId == tenantId));
+        WithDbContextAsync(db => db.TenantImages.CountAsync(l => l.TenantId == tenantId));
 
     public async Task ResetDatabaseAsync()
     {

@@ -813,7 +813,7 @@ namespace Sangam.IdentityTenant.Infrastructure.Persistence.Migrations
                     b.ToTable("consent_records", (string)null);
                 });
 
-            modelBuilder.Entity("Sangam.IdentityTenant.Domain.Media.TenantLogo", b =>
+            modelBuilder.Entity("Sangam.IdentityTenant.Domain.Media.TenantImage", b =>
                 {
                     b.Property<Guid>("Id")
                         .HasColumnType("uuid")
@@ -853,12 +853,12 @@ namespace Sangam.IdentityTenant.Infrastructure.Persistence.Migrations
                         .HasColumnName("uploaded_by");
 
                     b.HasKey("Id")
-                        .HasName("pk_tenant_logos");
+                        .HasName("pk_tenant_images");
 
                     b.HasIndex("TenantId")
-                        .HasDatabaseName("ix_tenant_logos_tenant");
+                        .HasDatabaseName("ix_tenant_images_tenant");
 
-                    b.ToTable("tenant_logos", (string)null);
+                    b.ToTable("tenant_images", (string)null);
                 });
 
             modelBuilder.Entity("Sangam.IdentityTenant.Domain.Tenants.Tenant", b =>
@@ -867,6 +867,10 @@ namespace Sangam.IdentityTenant.Infrastructure.Persistence.Migrations
                         .ValueGeneratedOnAdd()
                         .HasColumnType("uuid")
                         .HasColumnName("id");
+
+                    b.Property<Guid?>("BannerImageId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("banner_image_id");
 
                     b.Property<string>("ContactEmail")
                         .HasMaxLength(320)

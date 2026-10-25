@@ -20,7 +20,7 @@ a `Tenant`'s own `Id` **is** the tenant id every other service references.
 | `UserRole` | built | A null `TenantScope` is the platform-wide grant, i.e. Super Admin. `LocalityId` is set only on an `AreaAdmin` grant - see "Area Admin" below. |
 | `ConsentRecord` | built | Append-only. One row per decision, per purpose. |
 | `RefreshToken` | built | A session step. Hashed, single-use, rotating. Deliberately not tenant-scoped. |
-| `TenantLogo` | built | A Samaaj mark the platform hosts. Not tenant-scoped, for the reason `Tenant` is not. |
+| `TenantImage` | built | A Samaaj's own hosted image - its logo or its banner (`TenantLogo` until 2026-10-25). Not tenant-scoped, for the reason `Tenant` is not. |
 | `TenantSecurityPolicy` | built | A Samaaj's own overrides to the platform's password/OTP/lockout/session constants. Sparse — no row means no overrides, not zero. |
 | `LoginChallenge` | built | Owned by `User`: a sign-in held open between a correct password and its code. Hashed, and as short-lived as the code. |
 | `TrustedDevice` | built | A browser excused the sign-in code for 30 days. Hashed token, revoked with the account's sessions. Not tenant-scoped, like `RefreshToken`. |
@@ -55,6 +55,8 @@ since those happen *before* a tenant is established.
 | `SetTenantModulesCommand` | `SuperAdmin` + `Tenant.Manage` | built |
 | `UploadTenantLogoCommand` | `SuperAdmin`, `SamaajAdmin` + `Tenant.Manage` | built |
 | `RemoveTenantLogoCommand` | `SuperAdmin`, `SamaajAdmin` + `Tenant.Manage` | built |
+| `UploadTenantBannerCommand` | `SuperAdmin`, `SamaajAdmin` + `Tenant.Manage` | built |
+| `RemoveTenantBannerCommand` | `SuperAdmin`, `SamaajAdmin` + `Tenant.Manage` | built |
 | `SetRolePermissionCommand` | `Roles.Manage` | built |
 | `ChangePasswordCommand` | any authenticated role, self only | built |
 | `RequestPasswordResetCommand` | anonymous | built |
@@ -79,6 +81,7 @@ traffic are two separately audited decisions, so activation is its own command.
 | `ListAdminUsersQuery` | `SuperAdmin`, `SamaajAdmin` + `AdminUsers.Manage` | built |
 | `ListRolesQuery` | any authenticated role | built |
 | `GetTenantLogoQuery` | **anonymous** — see below | built |
+| `GetTenantBannerQuery` | `Member`, `SamaajAdmin`, `AreaAdmin`, `SuperAdmin` - and only the Samaaj's own | built |
 | `GetSecurityPolicyQuery` | `SuperAdmin`, `SamaajAdmin` + `Tenant.ManageSecurityPolicy` | built |
 
 `GetTenantBySlugQuery` returns `TenantSummaryResponse`, not `TenantResponse`.
@@ -162,6 +165,9 @@ offsets for messages it did nothing with.
 | POST | `/v1/identity/tenants/{id}/logo` | `SuperAdmin`, `SamaajAdmin` + `Tenant.Manage` |
 | GET | `/v1/identity/tenants/{id}/logo` | anonymous |
 | DELETE | `/v1/identity/tenants/{id}/logo` | `SuperAdmin`, `SamaajAdmin` + `Tenant.Manage` |
+| POST | `/v1/identity/tenants/{id}/banner` | `SuperAdmin`, `SamaajAdmin` + `Tenant.Manage` |
+| GET | `/v1/identity/tenants/{id}/banner` | that Samaaj's members and administrators, and Super Admins |
+| DELETE | `/v1/identity/tenants/{id}/banner` | `SuperAdmin`, `SamaajAdmin` + `Tenant.Manage` |
 | GET | `/v1/identity/tenants/{id}/security-policy` | `SuperAdmin`, `SamaajAdmin` + `Tenant.ManageSecurityPolicy` |
 | PUT | `/v1/identity/tenants/{id}/security-policy` | `SuperAdmin`, `SamaajAdmin` + `Tenant.ManageSecurityPolicy` |
 | GET | `/health` | anonymous |
@@ -195,6 +201,20 @@ already publish.
 tick imply it covers this, and `GetTenantLogoQuery` is on that page's anonymous
 list. `Cache-Control` is `public` for the same reason it is `private` on a
 photo, which makes logos cheaper to serve rather than more expensive.
+
+**A Samaaj has a banner as well as a logo (2026-10-25), and it is the logo's
+opposite on who may see it.** The photo across the top of its members' Home:
+set by the same people (a Super Admin, or the Samaaj's own administrator),
+stored the same way - which is why `TenantLogo` became `TenantImage`, one table
+holding both, the rename written as a real rename so no logo was lost - and
+served only to that Samaaj's own members and administrators, and Super Admins.
+`Cache-Control: private`, never public. The reason is what a banner usually is:
+a photograph of a gathering, a temple or a procession, with the Samaaj's members
+in it - a member's photo's rule, not a letterhead's. The anonymous Samaaj lookup
+still names its *path*, `bannerUrl`, because knowing one exists says nothing
+the picture would; the path carries a version so a replaced banner is a new URL.
+Another Samaaj's member asking for it is told there is none. `TenantBannerTests`
+holds all of it.
 
 **Reading a logo is anonymous; setting one is not, and they share a path.**
 `Tenant.Manage`, and a Samaaj Admin may set their own — the same reasoning as
